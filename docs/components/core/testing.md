@@ -21,6 +21,64 @@ The fakes of the four seams, public so apps can test their UI code with them: `R
 
 `crates/lune-ui-core/src/testing/recording.rs:57` (`RecordingRenderer`), `crates/lune-ui-core/src/testing/text.rs:16` (`FakeText`), `:64` (`text_system_contract`), `crates/lune-ui-core/src/testing/input.rs:16` (`ScriptedInput`), `crates/lune-ui-core/src/testing/backdrop.rs:9` (`NullMaterial`), `:34` (`backdrop_contract`). The real adapters run the same suites: `crates/lune-ui-wgpu/tests/text.rs` (`TextCache`), `crates/lune-ui-winit/tests/input.rs` (`Translator` against `ScriptedInput`).
 
+## Spec
+
+### Evidence
+
+Pinned: this repo fa2958b. Read: `crates/lune-ui-core/src/testing/mod.rs:1-21` (module and re-exports); the test files `crates/lune-ui-core/src/testing/backdrop.rs`, `recording.rs`, `text.rs` (test names).
+Conflicts: none.
+
+### Anatomy
+
+- Backdrop: `NullMaterial`, `backdrop_contract` [R crates/lune-ui-core/src/testing/mod.rs:18].
+- Input: `ScriptedInput` [R crates/lune-ui-core/src/testing/mod.rs:19].
+- Recording: `DrawCall`, `RecordedFrame`, `RecordingRenderer` [R crates/lune-ui-core/src/testing/mod.rs:20].
+- Text: `FakeText`, `text_system_contract` [R crates/lune-ui-core/src/testing/mod.rs:21].
+
+### States
+
+n/a — test fixtures; no state of their own.
+
+### Transitions
+
+n/a — no motion.
+
+### Input and focus
+
+n/a — `ScriptedInput` feeds input into the app under test; it has no focus of its own.
+
+### Retained state
+
+n/a — fixtures reset per test.
+
+### Accessibility
+
+n/a — no UI node.
+
+### Strings
+
+n/a — no text.
+
+### Gallery scenes
+
+n/a — the fixtures are headless; the gallery draws the same scenes on the real GPU (`apps/gallery/src/scenes.rs:82-180`).
+
+### Painter primitives
+
+- Existing: none.
+- Note: The recording renderer records the painter's calls)..
+- New: none.
+
+### Acceptance
+
+- Existing tests (by path): `crates/lune-ui-core/src/testing/backdrop.rs` `null_material_meets_the_contract`, `contract_catches_broken_backdrops`; `crates/lune-ui-core/src/testing/recording.rs` `records_the_documented_draw_order`; `crates/lune-ui-core/src/testing/text.rs` `fake_text_meets_the_contract`, `fake_text_sizes_follow_its_formula`.
+- Done standard still needs: a `ScriptedInput` contract test (the winit side is in `crates/lune-ui-winit/tests/input.rs`, `translator_and_scripted_input_agree`).
+
+### Build
+
+- Milestone: M11 (done standard; code exists).
+- Depends on: core.painter, core.scene, text.shaping.
+
 ## Open questions
 
 - None. A cargo feature was rejected (DECISIONS D36); the module is always compiled.
