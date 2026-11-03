@@ -2,34 +2,120 @@
 id: widget.banner-empty-state
 title: Banners, empty states and loading gates
 area: widget
-status: stub
+status: planned
 consumers: lunegit
 source: Lunegit: src/Lunegit.Desktop/Controls/IndexingBanner.axaml
 owner: —
-summary: Indexing banner, empty-repository view, loading view and gate views (rough stub)
+summary: Indexing banner (warning tone, spinning sync icon) and the empty-repository view: centred icon, title, subtitle, action buttons
 ---
 
 ## What it is
 
-Rough stub — not analysed. An indexing banner plus empty, loading and gate full-page views; `empty-state-action` is a button style.
+Two Lunegit surfaces: the indexing banner (a warning-tone strip with a spinning sync icon and one line of text) and the empty-repository view (a centred icon, a title, a subtitle and action buttons) [L src/Lunegit.Desktop/Controls/IndexingBanner.axaml:8-26], [L src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:10-35].
 
 ## Needs
 
-- Simple composed views from existing widgets (R-widget-1, R-layout-1).
+- Drawn through the painter (R-widget-2) and the image primitive for the empty-state icon (R-core-9).
+- The spinner in the banner (`widget.spinner`); buttons in the empty state (`widget.button`).
 
 ## Existing code
 
-Lunegit (`/Users/ijat/Projects/AvaloniaApps/Project Lunegit`, HEAD 33a1dd4), paths relative to the repo root:
-- `src/Lunegit.Desktop/Controls/IndexingBanner.axaml`
-- `src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml`
-- `src/Lunegit.Desktop/Views/StartupRepositoryLoadingView.axaml`
-- `src/Lunegit.Desktop/Views/EulaGateView.axaml`
-- `src/Lunegit.Desktop/Views/GitRequiredGateView.axaml`
+`src/Lunegit.Desktop/Controls/IndexingBanner.axaml`, `src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml`. The startup loading view and the EULA and Git gate views are named in the survey; they were not read and are not specified here (Open questions).
+
+## Spec
+
+### Evidence
+
+Pinned: Lunegit 33a1dd41, Wane 69931d6, this repo fa2958b. Read: `src/Lunegit.Desktop/Controls/IndexingBanner.axaml:6-26`; `src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:8-40`; `src/Lunegit.Desktop/App.axaml:162,209,213`; `src/Lunegit.Desktop/Themes/AnimationsReduced.axaml:42-46`.
+Wane has no banner or empty-state component; Wane's callout is the nearest look and is compared under `widget.callout` (conflict noted there). No Wane conflict for this entry.
+
+### Anatomy
+
+Banner:
+- Fill `StatusWarningDark`, 1 px border `StatusWarningLight`, radius 6, padding 10 horizontal and 8 vertical [L src/Lunegit.Desktop/Controls/IndexingBanner.axaml:9-13], [L src/Lunegit.Desktop/App.axaml:209].
+- Sync icon 14 x 14 in `StatusWarningLight`, spinning through `SpinBehavior` [L src/Lunegit.Desktop/Controls/IndexingBanner.axaml:15-20].
+- Text 13 px, wrapped, `StatusWarningLight`, centred vertically; spacing 8 between icon and text [L src/Lunegit.Desktop/Controls/IndexingBanner.axaml:14,21-25].
+
+Empty-repository view:
+- Centred column, spacing 24, max width 520 [L src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:13-14].
+- Icon: app icon, 100 x 100, uniform stretch [L src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:17-21], [L src/Lunegit.Desktop/App.axaml:213].
+- Title: 18 px `FontSizeL` [L src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:24-27], [L src/Lunegit.Desktop/App.axaml:162], `ForegroundPrimary`.
+- Subtitle: 13 px, centred, wrapped, `ForegroundSecondary` [L src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:30-35].
+- Actions: row of `Button.empty-state-action`, spacing 12 [L src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:38-39].
+
+### States
+
+| state | look | cite |
+|---|---|---|
+| banner, shown | warning fill and border, spinning icon | [L src/Lunegit.Desktop/Controls/IndexingBanner.axaml:9-19] |
+| banner, hidden | not drawn | [L src/Lunegit.Desktop/Controls/IndexingBanner.axaml:9] (owner's visibility; the banner has no state of its own) |
+| empty view | centred content as Anatomy | [L src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:13-35] |
+| action button hover, pressed | per `widget.button` classed-button rows | [L src/Lunegit.Desktop/App.axaml:455-458], [L src/Lunegit.Desktop/Themes/Animations.axaml:88-109] |
+| disabled | opacity 0.4, inert | [widget.button], [L src/Lunegit.Desktop/App.axaml:481-483] |
+
+### Transitions
+
+| change | property | kind | duration | easing | reduced | cite |
+|---|---|---|---|---|---|---|
+| action hover | background | hover | instant | linear | keep | [L src/Lunegit.Desktop/Themes/Animations.axaml:88-96], [L src/Lunegit.Desktop/Themes/AnimationsReduced.axaml:42-46] |
+| action press | scale 0.98 | press | fast | quad-out | snap | [L src/Lunegit.Desktop/Themes/Animations.axaml:97-109], [L .claude/docs/animation-rules.md:103] |
+
+The banner has no transition of its own; the spinner's rotation is in `widget.spinner`.
+
+### Input and focus
+
+- Banner: no input.
+- Empty view: the action buttons take Tab and Enter [core.focus]; clicks run the owner's commands.
+- Layer: `Base`; no overlay, no focus scope.
+
+### Retained state
+
+- Transient: action hover and press [core.ui].
+- Persistent: none.
+- App-owned: banner visibility, the banner text, the empty-view commands (passed every frame).
+- Exit retention: no.
+
+### Accessibility
+
+- Banner: role `status` with a polite live region when shown; name = the text [infra.accessibility].
+- Empty view: role `static-text` for the title and subtitle; the action buttons are `button`s named by the owner; the icon is role `image` with a name from the owner or hidden.
+
+### Strings
+
+- `luneui.banner-empty-state.indexing-banner`: English default not read in this tree; Lunegit key `indexing.banner` (`src/Lunegit.Desktop/Controls/IndexingBanner.axaml:21`).
+- `luneui.banner-empty-state.empty-title`: Lunegit key `emptyRepo.title` (`src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:24`); English default not read.
+- `luneui.banner-empty-state.empty-subtitle`: Lunegit key `emptyRepo.subtitle` (`src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:30`); English default not read.
+
+### Gallery scenes
+
+- `banner-shown`: banner with the spinner, settled.
+- `banner-empty-state`: empty-repository view with two actions, settled.
+- `banner-empty-state-action-mid`: action pressed, t = 90 ms (half of `fast`).
+- `banner-empty-state-hover-mid`: action rest → hover, t = 60 ms (half of `instant`).
+
+### Painter primitives
+
+- Existing: fill, ring, icon, text
+- New: rotate, image
+
+`rotate` is the banner's spinning icon (through `widget.spinner`); `image` is the empty-state icon (`src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:17`).
+
+### Acceptance
+
+- Pixel probes at scale 2: banner radius 12 px, 2 px border; empty icon 200 x 200 px; subtitle centred.
+- Conformance: action press scale over 60 Hz samples settles within 180 ms + 1 frame; Reduced snaps the scale.
+- Semantic node: banner role status, polite live region; empty-view title role static-text.
+
+### Build
+
+- Milestone: M6
+- Depends on: widget.spinner, widget.button, core.image, text.shaping
 
 ## Open questions
 
-- Likely app code, not toolkit; confirm.
+- `scope`: the startup loading view and the EULA and Git gate views are app code per the survey; their look is not read here. Confirm the split with the owner before M6.
+- `design-gap`: the banner's solid warning fill against Wane's callout tint; see `widget.callout`.
 
 ## Notes for the planner
 
-A planner must read the Lunegit code before anyone builds this; the lines above come from a file-name survey, not a read.
+Lunegit-only (consumers lunegit). `EmptyStateLogoSize` 100 and `FontSizeL` 18 are the drawn values.

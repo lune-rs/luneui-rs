@@ -6,28 +6,91 @@ status: planned
 consumers: wane
 source: —
 owner: —
-summary: Check result row: tone mark, name, text (quant runnability checks)
+summary: Verdict row: mark OK, WARN or NO in its tone, then name and text; three-column or stacked; static
 ---
 
 ## What it is
 
-Check result row: tone mark, name, text (quant runnability checks). Named by Wane's UI mocks (2026-11-04); the look is Lunegit's dark glass. Behaviour: Static.
+`verdict-row`: check row with a mark (OK, WARN or NO) in the tone, a name and a text. Three columns by default, or stacked for a narrow column. Static; the tone is on the mark only [W docs/ui/components.md:517-521].
 
 ## Needs
 
-- Wane — Variants: three-column (default); stacked (`--stacked`: mark and name on line 1, text below in 11 px secondary, hairlines between rows, for a ~214 px column) (R-widget-4)
-- Wane — States: mark OK (ok), WARN (warn), NO (err); the tone is on the mark only. (R-widget-4)
-- Wane — Sizes: Rows min 24; grid 40 / 92 / 1fr; mark RznMono 11 Medium; name 13 tertiary; text 13/20 primary. Stacked: grid 40 / 1fr, padding 4 0. (R-widget-4)
-- Wane — Behaviour: Static. (R-widget-4)
+- Wane controls the toolkit lacks (R-widget-4).
 
 ## Existing code
 
-None in luneui-rs or Luneterm's `lune-ui` (Wane: missing). Design source (not code to move): Wane `docs/ui/mocks/css/components.css` (widget.verdict-row); no lune-ui source.
+None in luneui-rs or Luneterm's `lune-ui` [W docs/ui/components.md:524]. Wane is the only source for this entry.
+
+## Spec
+
+### Evidence
+
+Pinned: Lunegit 33a1dd41, Wane 69931d6, this repo fa2958b. Read: `docs/ui/components.md:515-527,686`; `docs/ui/mocks/css/tokens.css:13,14,49,52,55,125`.
+No conflict: one source.
+
+### Anatomy
+
+- Rows min 24 high; grid 40 / 92 / 1fr [W docs/ui/components.md:520].
+- Mark: RznMono 11 Medium [W docs/ui/components.md:520]; name 13 tertiary [W docs/ui/components.md:520], [W docs/ui/mocks/css/tokens.css:14]; text 13/20 primary [W docs/ui/components.md:520], [W docs/ui/mocks/css/tokens.css:12,125].
+- Stacked (`--stacked`): grid 40 / 1fr, padding 4 0; mark and name on line 1; text 11 secondary below, wrapping; hairlines between rows; for a column about 214 px wide [W docs/ui/components.md:518,686].
+
+### States
+
+| state | look | cite |
+|---|---|---|
+| OK | mark in `ok` | [W docs/ui/components.md:519], [W docs/ui/mocks/css/tokens.css:49] |
+| WARN | mark in `warn` | [W docs/ui/components.md:519], [W docs/ui/mocks/css/tokens.css:52] |
+| NO | mark in `err` | [W docs/ui/components.md:519], [W docs/ui/mocks/css/tokens.css:55] |
+
+Static: no hover, focus or disabled look [W docs/ui/components.md:521].
+
+### Transitions
+
+n/a — static [W docs/ui/components.md:521].
+
+### Input and focus
+
+n/a — static [W docs/ui/components.md:521].
+
+### Retained state
+
+- Transient: none.
+- Persistent: none.
+- App-owned: the verdict, the name, the text (passed every frame).
+- Exit retention: no.
+
+### Accessibility
+
+- Role `row` with `cell`s; name = the name; value = the mark word; the mark's tone is not the only channel, the word carries it [infra.accessibility].
+
+### Strings
+
+None: the mark words OK, WARN and NO are fixed mock words; no Lunegit `en.json` line was read for them.
+
+### Gallery scenes
+
+- `verdict-row-states`: OK, WARN and NO in three columns, then the same three stacked; settled.
+
+### Painter primitives
+
+- Existing: text
+- New: none
+
+### Acceptance
+
+- Pixel probes at scale 2: row min 48 px; grid columns 80 px and 184 px; stacked column 428 px.
+- Conformance: n/a — no transition.
+- Semantic node: role row; name equals the name passed.
+
+### Build
+
+- Milestone: M6
+- Depends on: core.painter, text.shaping
 
 ## Open questions
 
-- Whether this is a toolkit component or app code composed from the painter: the planner decides (Wane needs it either way).
+- None.
 
 ## Notes for the planner
 
-Wane priority P1 (P0 = needed by Overview, Requests or Settings). Full spec: Wane `docs/ui/components.md`, section `widget.verdict-row`; mock: Wane `docs/ui/mocks/components.html`. Screens using it: components, local-models.
+Wane P1. Used by the local-models quant cards in the mocks.
