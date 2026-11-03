@@ -4,8 +4,8 @@ App-agnostic native Rust glass UI toolkit: immediate-mode painter on wgpu, widge
 materials, window helpers and theme tokens. No CSS or web engine; styles are Rust tokens. The look
 follows Lunegit. Extracted from Luneterm's `lune-ui` so several Rust apps can share it.
 
-Status: scaffolding. The workspace builds with an empty placeholder `lune-ui` crate; no toolkit code
-has moved in yet. `docs/requirements.md` says what the toolkit must provide and `docs/components/INDEX.md`
+Status: in development. `crates/lune-ui` holds the code moved as is from Luneterm's `lune-ui`, and
+`apps/gallery` renders the reference scenes; see `docs/STATE.md`. `docs/requirements.md` says what the toolkit must provide and `docs/components/INDEX.md`
 lists every component (existing in Luneterm, planned, or a rough Lunegit stub).
 
 ```bash
