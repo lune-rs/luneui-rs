@@ -1,7 +1,7 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-04 (M2 review round 1: boundary script fails closed on multi-line cfg and TOML variants)
+Last updated: 2026-11-04 (M2 review round 2: dependency rules read cargo metadata; rule 12 pins compiled sources)
 
 ## Now
 
@@ -11,8 +11,8 @@ types and the `testing` fakes), adapters `lune-ui-wgpu`, `lune-ui-winit`, `lune-
 facade `lune-ui` that keeps every old module path. The four seams (display list, text, input and
 output, OS glass) each have a core model, a fake and a contract test. One `Gpu` and one `TextCache`
 serve any number of windows and headless targets; the gallery's `--dump` runs headless, with the 15
-scenes at zero pixel delta against M1. `scripts/check-boundaries.sh` enforces rules 1 to 11 (core
-purity, adapter dependency lists, `unsafe` and OS-cfg placement, facade only; multi-line `cfg` and odd TOML forms included). DECISIONS D24 to D38
+scenes at zero pixel delta against M1. `scripts/check-boundaries.sh` enforces rules 1 to 12 (core
+purity, adapter dependency lists, `unsafe` and OS-cfg placement, facade only; dependency edges and build targets read from `cargo metadata`, multi-line `cfg` included). DECISIONS D24 to D39
 record the M2 choices; `docs/architecture.md` holds the module map, seam table and multi-window model;
 the catalogue has five new entries (`core.scene`, `core.input`, `core.testing`, `render.surface`,
 `platform.input`).

@@ -21,7 +21,7 @@ Luneterm 296cfdc's `crates/lune-ui` in M1 (D10) and was cut along its seams in M
 | `docs/components/` | Catalogue, one file per component; `docs/components/INDEX.md` is generated |
 | `licenses/`, `THIRD_PARTY_NOTICES.md` | Licence texts and the per-asset notice rows |
 
-Scripts: `scripts/check-boundaries.sh` (rules 1 to 11, see below; fixed-string exceptions in
+Scripts: `scripts/check-boundaries.sh` (rules 1 to 12, see below; fixed-string exceptions in
 `scripts/boundaries.allow`), `scripts/gen-component-index.sh` (catalogue index; `--check` is in the
 gate), `scripts/pixel-gate.sh`, `scripts/pixel-gate-luneterm.sh`, `scripts/check-targets.sh`.
 
@@ -170,11 +170,12 @@ offender, 2 when a scanned path or a tool is missing):
 | 4 | No `crates/*/src` file reads the clock or the environment | hard rule 2 |
 | 5 | Every manifest inherits the workspace licence | hard rule 7 |
 | 6 | `unsafe` only under `lune-ui-platform/src/platform/` or `src/material/`; every other crate's `lib.rs` has `#![forbid(unsafe_code)]` | hard rule 3 |
-| 7 | `lune-ui-core/Cargo.toml` declares no dependency of any kind | crate rule |
+| 7 | `lune-ui-core` declares no dependency of any kind (as `cargo metadata --no-deps` reports them) | crate rule |
 | 8 | No third-party crate path or `extern crate` in a file under `lune-ui-core` | crate rule |
-| 9 | Every crate dir is registered with its allowed dependency names; an unregistered dir or a `package =` rename fails; adapters name no `lune-ui-*` crate but the core | crate rule (adapters depend on the core only) |
-| 10 | No OS predicate in `cfg` outside `platform/` or `material/` dirs, except `#[cfg]` on `mod x;` or `use` | hard rule 3 |
+| 9 | Every crate dir is registered with its allowed dependency names and is the workspace member of that name; every dependency cargo reports is within its lists; an unregistered dir, a rename, a path dependency outside `crates/<name>`, or a root `package =`, `[patch]` or `[replace]` fails; adapters name no `lune-ui-*` crate but the core | crate rule (adapters depend on the core only) |
+| 10 | No OS predicate in `cfg` outside `platform/` or `material/` dirs, except `#[cfg]` on `mod x;` or `use`; a wrapped statement is joined (strings and comments skipped), one open after 40 lines fails | hard rule 3 |
 | 11 | `crates/lune-ui/src` holds only `lib.rs`, with no item definitions | crate rule (facade only) |
+| 12 | Compiled code comes only from the scanned files: build targets are `src/lib.rs` and `tests/` files; no `path = "..."` attribute or `include!` in `crates/*/src` | rules 6, 10, 11 (what they scan is what is built) |
 
 The script does not cover hard rules 4 (a new dependency needs a DECISIONS row; rule 9 forces a
 script edit but does not check the row), 5, 6 (licence rows), 8, 9 or 10 (`gen-component-index.sh
