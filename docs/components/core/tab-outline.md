@@ -4,7 +4,7 @@ title: Tab outline geometry
 area: core
 status: in-progress
 consumers: luneterm
-source: crates/lune-ui/src/chrome.rs
+source: crates/lune-ui-core/src/chrome.rs
 owner: orch/toolkit-v1
 summary: Tab-chrome outline loop geometry
 ---
@@ -19,7 +19,7 @@ summary: Tab-chrome outline loop geometry
 
 ## Existing code
 
-`crates/lune-ui/src/chrome.rs:6-9` (constants), `:14` (`TabSpan`), `:20` (`outline`); 226 lines; tests at `:172`.
+`crates/lune-ui-core/src/chrome.rs:6-9` (constants), `:14` (`TabSpan`), `:20` (`outline`); 226 lines; tests at `:172`.
 
 ## Open questions
 

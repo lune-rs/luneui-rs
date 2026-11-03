@@ -4,7 +4,7 @@ title: OS glass materials
 area: platform
 status: in-progress
 consumers: luneterm
-source: crates/lune-ui/src/material.rs
+source: crates/lune-ui-platform/src/material.rs
 owner: orch/toolkit-v1
 summary: Material enum and apply: macOS NSVisualEffect and Liquid Glass, Windows acrylic and mica, opaque elsewhere
 ---
@@ -20,7 +20,7 @@ summary: Material enum and apply: macOS NSVisualEffect and Liquid Glass, Windows
 
 ## Existing code
 
-`crates/lune-ui/src/material.rs:23` (`Material`), `:47` (`apply`); `material/macos.rs:63`, `:65`, `:75` (`unsafe`); 49 + 77 + 23 + 11 lines. No tests.
+`crates/lune-ui-platform/src/material.rs:23` (`Material`), `:47` (`apply`); `material/macos.rs:63`, `:65`, `:75` (`unsafe`); 49 + 77 + 23 + 11 lines. No tests.
 
 ## Open questions
 

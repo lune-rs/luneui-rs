@@ -1,0 +1,13 @@
+[package]
+name = "lune-ui-core"
+description = "Pure core of the glass UI toolkit: painter, display list, widgets, theme and the seam types; no GPU, window or text-shaping dependency"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true

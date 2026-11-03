@@ -29,8 +29,8 @@ use lune_ui::lunegit_dark;
 use lune_ui::material::{self, Material};
 use lune_ui::paint::{Painter, Rect};
 use lune_ui::surface::{Acquired, WindowSurface};
-use lune_ui::text_cache::TextCache;
-use lune_ui::winit_window::glass_attributes;
+use lune_ui::text::TextCache;
+use lune_ui::window::glass_attributes;
 use scenes::{BLUR_SATURATION, BLUR_SIGMA, H, SCENES, Scene, W};
 
 const USAGE: &str = "usage: gallery [--dump <dir> | --list]";

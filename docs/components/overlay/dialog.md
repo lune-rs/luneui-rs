@@ -4,7 +4,7 @@ title: Modal dialog
 area: overlay
 status: in-progress
 consumers: luneterm, wane
-source: crates/lune-ui/src/widgets/dialog.rs
+source: crates/lune-ui-core/src/widgets/dialog.rs
 owner: orch/toolkit-v1
 summary: Modal dialog card: dim backdrop, 448 px acrylic card, darker footer, app-supplied body
 ---
@@ -23,7 +23,7 @@ summary: Modal dialog card: dim backdrop, 448 px acrylic card, darker footer, ap
 
 ## Existing code
 
-`crates/lune-ui/src/widgets/dialog.rs:42` (`dialog`), `:10` (`DialogSpec`), `:22` (`DialogGlass`), `:32` (`DialogHits`); 94 lines. No tests.
+`crates/lune-ui-core/src/widgets/dialog.rs:42` (`dialog`), `:10` (`DialogSpec`), `:22` (`DialogGlass`), `:32` (`DialogHits`); 94 lines. No tests.
 
 ## Open questions
 

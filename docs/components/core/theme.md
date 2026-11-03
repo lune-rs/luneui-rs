@@ -4,7 +4,7 @@ title: Theme tokens and Lunegit dark preset
 area: core
 status: in-progress
 consumers: luneterm
-source: crates/lune-ui/src/theme.rs
+source: crates/lune-ui-core/src/theme.rs
 owner: orch/toolkit-v1
 summary: Theme token struct and the lunegit_dark preset with the WINDOW, PANEL and CARD glass layers
 ---
@@ -20,7 +20,7 @@ summary: Theme token struct and the lunegit_dark preset with the WINDOW, PANEL a
 
 ## Existing code
 
-`crates/lune-ui/src/theme.rs:11` (`Theme`), `:46` (`lunegit_dark`), `:51` (`THEME`), `:84` (`TINT`), `:87`/`:94`/`:101` (layers); 114 lines. No tests.
+`crates/lune-ui-core/src/theme.rs:11` (`Theme`), `:46` (`lunegit_dark`), `:51` (`THEME`), `:84` (`TINT`), `:87`/`:94`/`:101` (layers); 114 lines. No tests.
 
 ## Open questions
 

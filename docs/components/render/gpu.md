@@ -4,7 +4,7 @@ title: wgpu instance, surface and pipelines
 area: render
 status: in-progress
 consumers: luneterm
-source: crates/lune-ui/src/gpu.rs
+source: crates/lune-ui-wgpu/src/gpu.rs
 owner: orch/toolkit-v1
 summary: wgpu instance, surface, pipelines and the noise texture
 ---
@@ -20,7 +20,7 @@ summary: wgpu instance, surface, pipelines and the noise texture
 
 ## Existing code
 
-`crates/lune-ui/src/gpu.rs:40` (`Gpu`), `:436` (noise texture); 481 lines; shaders `src/shader.wgsl` (161 lines). No tests.
+`crates/lune-ui-wgpu/src/gpu.rs:40` (`Gpu`), `:436` (noise texture); 481 lines; shaders `src/shader.wgsl` (161 lines). No tests.
 
 ## Open questions
 

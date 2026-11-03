@@ -1,7 +1,7 @@
 //! The text seam's contract on the glyphon `TextCache`, with the gallery's fonts and with none.
 
-use lune_ui::testing::text_system_contract;
-use lune_ui::text_cache::TextCache;
+use lune_ui_core::testing::text_system_contract;
+use lune_ui_wgpu::text_cache::TextCache;
 
 #[test]
 fn text_cache_with_fonts_meets_the_contract() {

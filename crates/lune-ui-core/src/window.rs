@@ -1,6 +1,6 @@
 //! Helpers for a borderless glass window: edge resizing, title-bar double click and Windows 11
 //! style caption buttons. The caller owns the event loop and calls these from it. The winit side
-//! (window attributes, edge → resize direction) is in `winit_window`.
+//! (window attributes, edge → resize direction) is in the `lune-ui-winit` crate.
 
 use std::time::{Duration, Instant};
 

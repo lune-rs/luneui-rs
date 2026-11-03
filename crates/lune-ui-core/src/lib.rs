@@ -1,0 +1,47 @@
+//! App-agnostic glass UI toolkit, core: an immediate-mode painter, the display list it builds, widgets,
+//! the theme, and the seam types (text, input, backdrop material) that adapter crates implement.
+//! Styled after the house look (Fluent/Avalonia; see `docs/glass-styling.md`).
+//!
+//! This crate has no dependencies: no wgpu, winit or glyphon types appear in its signatures. The
+//! renderer (`lune-ui-wgpu`), the window and input adapter (`lune-ui-winit`) and the OS material
+//! (`lune-ui-platform`) depend on it, and the `lune-ui` facade re-exports all of them.
+//!
+//! lune-ui knows nothing about the app that uses it. The app owns the winit event loop and passes
+//! in everything else: fonts, the [`theme::Theme`], hit values (the painter and widgets are
+//! generic over the app's hit type), sizes, scale and time. The crate reads neither the clock nor
+//! the environment, so frames are deterministic.
+//!
+//! Modules:
+//! - `color`, `theme` (the `Theme` tokens and the dark preset with its glass layers), `acrylic`
+//!   (Avalonia acrylic colour math);
+//! - `paint` (the `Painter`), `scene` (the display list it builds: plain data and the draw-order
+//!   contract), `text` (specs and the `TextSystem` seam), `icon`, `widgets` (controls, menus,
+//!   dropdowns, dialogs), `chrome` (tab outline geometry);
+//! - `input` (the input seam: `RawInput` in, `FrameOutput` out, plain data);
+//! - `backdrop` (the material seam: `GlassLayer`, `BackdropKind`, `Material` and the `Backdrop`
+//!   capability);
+//! - `window` (edge resize, double click, caption buttons);
+//! - `testing` (fakes of the seams for tests: the display-list recorder, a fake text system
+//!   and its contract suite, a scripted input source, a null material and its contract suite).
+//!
+//! Values in the dark preset are copied from the house look's `DarkTheme.axaml` and `App.axaml`, so
+//! apps styled after it match.
+
+#![forbid(unsafe_code)]
+
+pub mod acrylic;
+pub mod backdrop;
+pub mod chrome;
+pub mod color;
+pub mod icon;
+pub mod input;
+pub mod paint;
+pub mod scene;
+pub mod testing;
+pub mod text;
+pub mod theme;
+pub mod widgets;
+pub mod window;
+
+pub use backdrop::{Backdrop, BackdropKind, GlassLayer};
+pub use theme::lunegit_dark;

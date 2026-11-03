@@ -4,7 +4,7 @@ title: Frame pass sequence
 area: render
 status: in-progress
 consumers: luneterm
-source: crates/lune-ui/src/frame.rs
+source: crates/lune-ui-wgpu/src/frame.rs
 owner: orch/toolkit-v1
 summary: FrameRenderer: scene, blur, target pass sequence
 ---
@@ -19,7 +19,7 @@ summary: FrameRenderer: scene, blur, target pass sequence
 
 ## Existing code
 
-`crates/lune-ui/src/frame.rs:22` (`FrameParams`), `:33` (`FrameRenderer`); 273 lines. No tests.
+`crates/lune-ui-wgpu/src/frame.rs:22` (`FrameParams`), `:33` (`FrameRenderer`); 273 lines. No tests.
 
 ## Open questions
 

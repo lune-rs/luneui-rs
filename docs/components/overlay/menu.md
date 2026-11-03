@@ -4,7 +4,7 @@ title: Glass context menu
 area: overlay
 status: in-progress
 consumers: luneterm, wane
-source: crates/lune-ui/src/widgets/menu.rs
+source: crates/lune-ui-core/src/widgets/menu.rs
 owner: orch/toolkit-v1
 summary: Glass context menu with open and close motion
 ---
@@ -24,7 +24,7 @@ summary: Glass context menu with open and close motion
 
 ## Existing code
 
-`crates/lune-ui/src/widgets/menu.rs:64` (`menu`), `:9` (`MenuEntry`), `:46` (`menu_open_anim`), `:52` (`menu_close_anim`); 192 lines; tests at `:163`.
+`crates/lune-ui-core/src/widgets/menu.rs:64` (`menu`), `:9` (`MenuEntry`), `:46` (`menu_open_anim`), `:52` (`menu_close_anim`); 192 lines; tests at `:163`.
 
 ## Open questions
 

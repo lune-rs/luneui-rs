@@ -4,7 +4,7 @@ title: App-owned drawing hook
 area: render
 status: in-progress
 consumers: luneterm
-source: crates/lune-ui/src/custom.rs
+source: crates/lune-ui-wgpu/src/custom.rs
 owner: orch/toolkit-v1
 summary: CustomDraw trait: app-owned GPU drawing inside a layer
 ---
@@ -19,7 +19,7 @@ summary: CustomDraw trait: app-owned GPU drawing inside a layer
 
 ## Existing code
 
-`crates/lune-ui/src/custom.rs:11` (`CustomFrame`), `:22` (`CustomDraw`), `:35` (`CustomItem`); 40 lines. Used by lune-termview (`src/render.rs:12`) and the glass-ui spike (`src/main.rs:29`).
+`crates/lune-ui-wgpu/src/custom.rs:11` (`CustomFrame`), `:22` (`CustomDraw`), `:35` (`CustomItem`); 40 lines. Used by lune-termview (`src/render.rs:12`) and the glass-ui spike (`src/main.rs:29`).
 
 ## Open questions
 

@@ -6,8 +6,9 @@ use glyphon::{Cache, SwashCache, TextAtlas};
 use wgpu::util::DeviceExt;
 
 use crate::blur;
-use crate::scene::{Scene, Shape, StrokeVertex};
+use crate::platform;
 use crate::text_cache::TextCache;
+use lune_ui_core::scene::{Scene, Shape, StrokeVertex};
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
@@ -128,16 +129,11 @@ pub struct Uploaded {
 /// display handle, say); `None` for a headless instance. On Windows this is DX12 presented
 /// through a DirectComposition visual, the wgpu path that supports a transparent window.
 pub fn instance(display: Option<Box<dyn wgpu::wgt::WgpuHasDisplayHandle>>) -> wgpu::Instance {
-    #[allow(unused_mut)]
     let mut desc = match display {
         Some(display) => wgpu::InstanceDescriptor::new_with_display_handle(display),
         None => wgpu::InstanceDescriptor::new_without_display_handle(),
     };
-    #[cfg(target_os = "windows")]
-    {
-        desc.backends = wgpu::Backends::DX12;
-        desc.backend_options.dx12.presentation_system = wgpu::Dx12SwapchainKind::DxgiFromVisual;
-    }
+    platform::configure(&mut desc);
     wgpu::Instance::new(desc)
 }
 

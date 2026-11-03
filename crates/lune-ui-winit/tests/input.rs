@@ -3,11 +3,11 @@
 
 use std::time::Duration;
 
-use lune_ui::input::{CursorIcon as C, ImeEvent, Key, Modifiers, NamedKey, PointerButton};
-use lune_ui::testing::ScriptedInput;
-use lune_ui::window::ResizeEdge;
-use lune_ui::winit_input::{Translator, cursor_icon};
-use lune_ui::winit_window::resize_direction;
+use lune_ui_core::input::{CursorIcon as C, ImeEvent, Key, Modifiers, NamedKey, PointerButton};
+use lune_ui_core::testing::ScriptedInput;
+use lune_ui_core::window::ResizeEdge;
+use lune_ui_winit::input::{Translator, cursor_icon};
+use lune_ui_winit::window::resize_direction;
 use winit::dpi::{PhysicalPosition, PhysicalSize};
 use winit::event::{
     DeviceId, ElementState::Pressed, ElementState::Released, Ime, MouseButton, MouseScrollDelta,
@@ -51,7 +51,7 @@ fn scripted() -> ScriptedInput {
     s
 }
 
-fn translated() -> lune_ui::input::RawInput {
+fn translated() -> lune_ui_core::input::RawInput {
     let id = DeviceId::dummy();
     let mut t = Translator::new(PhysicalSize::new(1, 1), 2.0);
     t.window_event(&WindowEvent::Resized(PhysicalSize::new(800, 600)));
@@ -111,7 +111,7 @@ fn translator_and_scripted_input_agree() {
         .events
         .iter()
         .filter_map(|e| match e {
-            lune_ui::input::Event::Text(t) => Some(t.as_str()),
+            lune_ui_core::input::Event::Text(t) => Some(t.as_str()),
             _ => None,
         })
         .collect();
@@ -131,7 +131,7 @@ fn state_persists_and_events_drain() {
     assert_eq!(second.time, FRAME * 2);
     assert_eq!(
         second.events,
-        [lune_ui::input::Event::PointerButton {
+        [lune_ui_core::input::Event::PointerButton {
             pos: (10.0, 10.0),
             button: PointerButton::Secondary,
             pressed: true,
@@ -156,7 +156,7 @@ fn unmapped_keys_are_unidentified() {
         .events
         .into_iter()
         .filter_map(|e| match e {
-            lune_ui::input::Event::Key { key, .. } => Some(key),
+            lune_ui_core::input::Event::Key { key, .. } => Some(key),
             _ => None,
         })
         .collect();
@@ -173,7 +173,7 @@ fn other_mouse_button_keeps_its_number() {
     let e = t.take(Duration::ZERO).events;
     assert!(matches!(
         e[..],
-        [lune_ui::input::Event::PointerButton {
+        [lune_ui_core::input::Event::PointerButton {
             button: PointerButton::Other(7),
             ..
         }]

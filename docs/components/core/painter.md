@@ -4,7 +4,7 @@ title: Immediate-mode painter
 area: core
 status: in-progress
 consumers: luneterm
-source: crates/lune-ui/src/paint.rs
+source: crates/lune-ui-core/src/paint.rs
 owner: orch/toolkit-v1
 summary: Painter: ordered layers, fills, rings, strokes, acrylic, text, clip, transform and hit regions
 ---
@@ -20,7 +20,7 @@ summary: Painter: ordered layers, fills, rings, strokes, acrylic, text, clip, tr
 
 ## Existing code
 
-`crates/lune-ui/src/paint.rs:136` (`Painter`), `:11` (`Rect`), `:90` (`StrokeStyle`), `:444` (`polyline_length`); 519 lines; tests at `:453`.
+`crates/lune-ui-core/src/paint.rs:136` (`Painter`), `:11` (`Rect`), `:90` (`StrokeStyle`), `:444` (`polyline_length`); 519 lines; tests at `:453`.
 
 ## Open questions
 

@@ -4,7 +4,7 @@ title: Drop-down list
 area: overlay
 status: in-progress
 consumers: luneterm, wane
-source: crates/lune-ui/src/widgets/dropdown.rs
+source: crates/lune-ui-core/src/widgets/dropdown.rs
 owner: orch/toolkit-v1
 summary: Combo drop-down option list that flips above its anchor near the window bottom
 ---
@@ -22,7 +22,7 @@ summary: Combo drop-down option list that flips above its anchor near the window
 
 ## Existing code
 
-`crates/lune-ui/src/widgets/dropdown.rs:9` (`dropdown`); 54 lines.
+`crates/lune-ui-core/src/widgets/dropdown.rs:9` (`dropdown`); 54 lines.
 
 ## Open questions
 

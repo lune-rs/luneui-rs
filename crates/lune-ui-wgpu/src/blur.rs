@@ -3,7 +3,7 @@
 
 use bytemuck::{Pod, Zeroable};
 
-use crate::scene::BackdropRequest;
+use lune_ui_core::scene::BackdropRequest;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]

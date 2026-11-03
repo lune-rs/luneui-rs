@@ -1,0 +1,22 @@
+[package]
+name = "lune-ui-platform"
+description = "OS backdrop material for the glass UI toolkit: the platform glass effect behind a transparent window"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+lune-ui-core = { path = "../lune-ui-core" }
+winit = "0.30"
+
+[target.'cfg(any(target_os = "macos", target_os = "windows"))'.dependencies]
+window-vibrancy = "0.8.1"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSResponder", "NSView"] }
+raw-window-handle = "0.6"
+
+[lints]
+workspace = true

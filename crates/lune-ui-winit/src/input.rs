@@ -8,12 +8,13 @@ use winit::event::{ElementState, Ime, MouseButton, MouseScrollDelta, WindowEvent
 use winit::keyboard::{Key as WKey, ModifiersState, NamedKey as WNamed};
 use winit::window::{CursorIcon as WCursor, Window};
 
-use crate::input::{
+use lune_ui_core::input::{
     CursorIcon, Event, FrameOutput, ImeEvent, Key, Modifiers, NamedKey, PointerButton, RawInput,
     ScrollDelta, WindowCommand, printable,
 };
-use crate::paint::Rect;
-use crate::winit_window::resize_direction;
+use lune_ui_core::paint::Rect;
+
+use crate::window::resize_direction;
 
 /// Collects one window's winit events into [`RawInput`] frames.
 ///
@@ -269,6 +270,9 @@ pub fn cursor_icon(icon: CursorIcon) -> WCursor {
         CursorIcon::ZoomOut => WCursor::ZoomOut,
         CursorIcon::DndAsk => WCursor::DndAsk,
         CursorIcon::AllResize => WCursor::AllResize,
+        // `CursorIcon` is `#[non_exhaustive]`: an icon added in core shows the default cursor
+        // until this adapter maps it.
+        _ => WCursor::Default,
     }
 }
 

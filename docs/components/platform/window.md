@@ -4,7 +4,7 @@ title: Glass window helpers
 area: platform
 status: in-progress
 consumers: luneterm, wane
-source: crates/lune-ui/src/window.rs
+source: crates/lune-ui-core/src/window.rs
 owner: orch/toolkit-v1
 summary: Glass window attributes, edge resize, double-click detection and caption buttons
 ---
@@ -23,7 +23,7 @@ summary: Glass window attributes, edge resize, double-click detection and captio
 
 ## Existing code
 
-`crates/lune-ui/src/window.rs:52` (`glass_attributes`), `:71` (`edge_at`), `:93` (`DoubleClick`), `:115` (`caption_buttons`); 144 lines. Integration test `crates/lune-ui/tests/window.rs` (edges, 6 px border, double-click gap under 400 ms).
+`crates/lune-ui-core/src/window.rs:52` (`glass_attributes`), `:71` (`edge_at`), `:93` (`DoubleClick`), `:115` (`caption_buttons`); 144 lines. Integration test `crates/lune-ui-core/tests/window.rs` (edges, 6 px border, double-click gap under 400 ms).
 
 ## Open questions
 

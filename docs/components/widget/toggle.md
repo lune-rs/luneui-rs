@@ -4,7 +4,7 @@ title: Toggle switch
 area: widget
 status: in-progress
 consumers: luneterm, wane
-source: crates/lune-ui/src/widgets/mod.rs
+source: crates/lune-ui-core/src/widgets/mod.rs
 owner: orch/toolkit-v1
 summary: Fluent ToggleSwitch: 40x20 track, accent fill when on
 ---
@@ -23,7 +23,7 @@ summary: Fluent ToggleSwitch: 40x20 track, accent fill when on
 
 ## Existing code
 
-`crates/lune-ui/src/widgets/mod.rs:20`; the glass-ui spike calls it from `src/widgets.rs`. `widgets/mod.rs` has 203 lines and mostly no tests.
+`crates/lune-ui-core/src/widgets/mod.rs:20`; the glass-ui spike calls it from `src/widgets.rs`. `widgets/mod.rs` has 203 lines and mostly no tests.
 
 ## Open questions
 

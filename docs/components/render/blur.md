@@ -4,7 +4,7 @@ title: Backdrop blur pass
 area: render
 status: in-progress
 consumers: luneterm
-source: crates/lune-ui/src/blur.rs
+source: crates/lune-ui-wgpu/src/blur.rs
 owner: orch/toolkit-v1
 summary: Backdrop blur pass with its WGSL shader
 ---
@@ -19,7 +19,7 @@ summary: Backdrop blur pass with its WGSL shader
 
 ## Existing code
 
-`crates/lune-ui/src/blur.rs:50` (`Blur`), `:29` (`Backdrop` struct); 377 lines; `blur.wgsl` 95 lines. No tests.
+`crates/lune-ui-wgpu/src/blur.rs:50` (`Blur`), `:29` (`Backdrop` struct); 377 lines; `blur.wgsl` 95 lines. No tests.
 
 ## Open questions
 

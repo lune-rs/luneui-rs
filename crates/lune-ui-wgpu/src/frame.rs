@@ -1,8 +1,8 @@
 //! The frame renderer of one target: its uniforms, viewport, text renderers and blur textures,
 //! and the scene → blur → target pass sequence.
 //!
-//! The app paints into a [`Painter`](crate::paint::Painter) and hands the finished [`Scene`] to
-//! [`FrameRenderer::draw`], which renders it in the [`scene`](crate::scene) module's draw order
+//! The app paints into a [`Painter`](lune_ui_core::paint::Painter) and hands the finished [`Scene`] to
+//! [`FrameRenderer::draw`], which renders it in the [`scene`](lune_ui_core::scene) module's draw order
 //! into any target view at an explicit size and scale: a window surface (see
 //! [`WindowSurface`](crate::surface::WindowSurface)) or an offscreen texture (frame dumps). Any
 //! number of renderers share one [`Gpu`]; everything a draw writes belongs to its renderer, except
@@ -13,10 +13,10 @@ use glyphon::{Color, Resolution, TextArea, TextBounds, TextRenderer, Viewport};
 use crate::blur::Blur;
 use crate::custom::{CustomDraw, CustomFrame, CustomItem};
 use crate::gpu::{Globals, Gpu};
-use crate::scene::{LAYER_COUNT, SCENE_LAYERS, Scene};
 use crate::text_cache::TextCache;
+use lune_ui_core::scene::{LAYER_COUNT, SCENE_LAYERS, Scene};
 
-pub use crate::scene::FrameParams;
+pub use lune_ui_core::scene::FrameParams;
 
 /// Draws scenes into targets of one colour format. Use it only with the [`Gpu`] that made it.
 pub struct FrameRenderer {

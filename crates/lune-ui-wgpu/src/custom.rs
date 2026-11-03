@@ -1,12 +1,12 @@
 //! Custom draw items: app-owned GPU drawing that sits inside a painted layer.
 //!
-//! The painter records a [`CustomItem`] with [`Painter::custom`](crate::paint::Painter::custom).
+//! The painter records a [`CustomItem`] with [`Painter::custom`](lune_ui_core::paint::Painter::custom).
 //! [`FrameRenderer::draw_with`](crate::frame::FrameRenderer::draw_with) draws it after that
 //! layer's acrylic and under shapes and before its text, with the scissor set to the item's
 //! clip. Because the item lives in a layer, a popup's backdrop blur sees it when the layer is
 //! below the popup.
 
-pub use crate::scene::CustomItem;
+pub use lune_ui_core::scene::CustomItem;
 
 /// What the current frame is drawn at; handed to [`CustomDraw`] on both calls.
 #[derive(Debug, Clone, Copy, PartialEq)]

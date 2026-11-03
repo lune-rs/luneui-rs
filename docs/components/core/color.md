@@ -4,7 +4,7 @@ title: Colour helpers
 area: core
 status: in-progress
 consumers: luneterm
-source: crates/lune-ui/src/color.rs
+source: crates/lune-ui-core/src/color.rs
 owner: orch/toolkit-v1
 summary: Straight-alpha RGBA values with premultiply, blend-over and alpha helpers
 ---
@@ -19,7 +19,7 @@ summary: Straight-alpha RGBA values with premultiply, blend-over and alpha helpe
 
 ## Existing code
 
-`crates/lune-ui/src/color.rs:6` (`premul`), `:16` (`over`), `:26` (`with_alpha`); 28 lines.
+`crates/lune-ui-core/src/color.rs:6` (`premul`), `:16` (`over`), `:26` (`with_alpha`); 28 lines.
 
 ## Open questions
 

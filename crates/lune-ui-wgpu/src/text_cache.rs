@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use glyphon::{Attrs, Buffer, Color, Family, FontSystem, Metrics, Shaping, Weight, Wrap};
 
-use crate::text::{Font, Spec, Style, TextKey, TextSystem};
+use lune_ui_core::text::{Font, Spec, Style, TextKey, TextSystem};
 
 #[derive(Debug)]
 struct Entry {

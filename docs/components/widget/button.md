@@ -4,7 +4,7 @@ title: Button
 area: widget
 status: in-progress
 consumers: luneterm, wane
-source: crates/lune-ui/src/widgets/mod.rs
+source: crates/lune-ui-core/src/widgets/mod.rs
 owner: orch/toolkit-v1
 summary: Button and its measured width
 ---
@@ -23,7 +23,7 @@ summary: Button and its measured width
 
 ## Existing code
 
-`crates/lune-ui/src/widgets/mod.rs:146`. `widgets/mod.rs` has 203 lines and mostly no tests.
+`crates/lune-ui-core/src/widgets/mod.rs:146`. `widgets/mod.rs` has 203 lines and mostly no tests.
 
 ## Open questions
 

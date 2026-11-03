@@ -21,7 +21,7 @@ Luneterm M10 lists tabs: new, close, rename, switch and close-confirm via foregr
 
 ## Existing code
 
-Geometry: `crates/lune-ui/src/chrome.rs` (see `core.tab-outline`). The glass-ui spike imports `chrome` in `spikes/glass-ui/src/terminal_view.rs:5` (rest of the file not read for this entry). Lunegit's equivalent: `src/Lunegit.Desktop/Controls/Terminal/TerminalTabChrome.cs`, `TerminalTabDragController.cs`, `TerminalChromeAnimation.cs`.
+Geometry: `crates/lune-ui-core/src/chrome.rs` (see `core.tab-outline`). The glass-ui spike imports `chrome` in `spikes/glass-ui/src/terminal_view.rs:5` (rest of the file not read for this entry). Lunegit's equivalent: `src/Lunegit.Desktop/Controls/Terminal/TerminalTabChrome.cs`, `TerminalTabDragController.cs`, `TerminalChromeAnimation.cs`.
 
 ## Open questions
 

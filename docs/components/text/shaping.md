@@ -4,7 +4,7 @@ title: Shaped-text cache
 area: text
 status: in-progress
 consumers: luneterm
-source: crates/lune-ui/src/text.rs
+source: crates/lune-ui-core/src/text.rs
 owner: orch/toolkit-v1
 summary: Shaped-text cache over glyphon keyed by content; the app registers its fonts
 ---
@@ -20,7 +20,7 @@ summary: Shaped-text cache over glyphon keyed by content; the app registers its 
 
 ## Existing code
 
-`crates/lune-ui/src/text.rs:110` (`TextCache`), `:72` (`Spec`), `:123` (`TextCache::new`); 224 lines. No tests.
+`crates/lune-ui-core/src/text.rs:110` (`TextCache`), `:72` (`Spec`), `:123` (`TextCache::new`); 224 lines. No tests.
 
 ## Open questions
 

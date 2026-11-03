@@ -5,15 +5,15 @@
 //! GPU test: with no adapter it prints `skipped: no GPU adapter` and passes, unless
 //! `LUNEUI_REQUIRE_GPU=1`, which makes a missing adapter a failure.
 
-use lune_ui::color::premul;
-use lune_ui::dump;
-use lune_ui::frame::{FrameParams, FrameRenderer};
-use lune_ui::gpu::{self, Gpu};
-use lune_ui::paint::{LayerId, Painter, Rect, StrokeStyle, Xform};
-use lune_ui::scene::Scene;
-use lune_ui::text::{Spec, Style};
-use lune_ui::text_cache::TextCache;
-use lune_ui::theme::DARK;
+use lune_ui_core::color::premul;
+use lune_ui_core::paint::{LayerId, Painter, Rect, StrokeStyle, Xform};
+use lune_ui_core::scene::Scene;
+use lune_ui_core::text::{Spec, Style};
+use lune_ui_core::theme::DARK;
+use lune_ui_wgpu::dump;
+use lune_ui_wgpu::frame::{FrameParams, FrameRenderer};
+use lune_ui_wgpu::gpu::{self, Gpu};
+use lune_ui_wgpu::text_cache::TextCache;
 
 const UI_FONT: &str = "RznSans";
 const MONO_FONT: &str = "RobotoMono Nerd Font Mono";
