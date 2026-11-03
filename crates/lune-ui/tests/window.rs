@@ -1,9 +1,8 @@
-//! Edge mapping and double-click timing of `lune_ui::window`.
+//! Edge mapping and double-click timing of `lune_ui::window`, and its winit direction mapping.
 
 use std::time::{Duration, Instant};
 
-use lune_ui::window::{DoubleClick, edge_at};
-use winit::window::ResizeDirection as D;
+use lune_ui::window::{DoubleClick, ResizeEdge as D, edge_at};
 
 const W: f32 = 400.0;
 const H: f32 = 300.0;

@@ -16,11 +16,13 @@
 //! - [`gpu`] (the GPU every target shares), [`frame`] (one target's renderer: the scene → blur →
 //!   target pass sequence), [`blur`] (backdrop blur), [`surface`] (a window's swapchain), [`dump`]
 //!   (offscreen targets and PNG readback);
+//! - [`input`] (the input seam: `RawInput` in, `FrameOutput` out, plain data), [`winit_input`]
+//!   (its winit translation and output application);
 //! - [`material`] (OS backdrop per platform, [`GlassLayer`] and [`Backdrop`] describe the layers
-//!   and capability levels), [`window`] (glass window attributes, edge resize, double click,
-//!   caption buttons);
+//!   and capability levels), [`window`] (edge resize, double click, caption buttons),
+//!   [`winit_window`] (glass window attributes, edge → winit direction);
 //! - [`testing`] (fakes of the seams for tests: the display-list recorder, a fake text system
-//!   and its contract suite).
+//!   and its contract suite, a scripted input source).
 //!
 //! Values in the dark preset are copied from the house look's `DarkTheme.axaml` and `App.axaml`, so
 //! apps styled after it match.
@@ -34,6 +36,7 @@ pub mod dump;
 pub mod frame;
 pub mod gpu;
 pub mod icon;
+pub mod input;
 pub mod material;
 pub mod paint;
 pub mod scene;
@@ -44,6 +47,8 @@ pub mod text_cache;
 pub mod theme;
 pub mod widgets;
 pub mod window;
+pub mod winit_input;
+pub mod winit_window;
 
 pub use theme::lunegit_dark;
 

@@ -30,7 +30,7 @@ use lune_ui::material::{self, Material};
 use lune_ui::paint::{Painter, Rect};
 use lune_ui::surface::{Acquired, WindowSurface};
 use lune_ui::text_cache::TextCache;
-use lune_ui::window;
+use lune_ui::winit_window::glass_attributes;
 use scenes::{BLUR_SATURATION, BLUR_SIGMA, H, SCENES, Scene, W};
 
 const USAGE: &str = "usage: gallery [--dump <dir> | --list]";
@@ -152,7 +152,7 @@ fn run_dump(dir: &Path) -> Result<(), String> {
 
 impl App {
     fn setup(&self, event_loop: &ActiveEventLoop) -> Result<Shown, String> {
-        let attrs = window::glass_attributes(
+        let attrs = glass_attributes(
             "luneui gallery",
             (f64::from(W), f64::from(H)),
             (560.0, 360.0),

@@ -1,75 +1,30 @@
-//! Helpers for a borderless glass window: its attributes, edge resizing, title-bar double click
-//! and Windows 11 style caption buttons. The caller owns the winit loop and calls these from it.
+//! Helpers for a borderless glass window: edge resizing, title-bar double click and Windows 11
+//! style caption buttons. The caller owns the event loop and calls these from it. The winit side
+//! (window attributes, edge → resize direction) is in `winit_window`.
 
 use std::time::{Duration, Instant};
 
-use winit::dpi::LogicalSize;
-use winit::window::{ResizeDirection, Window, WindowAttributes};
-
 use crate::paint::{Painter, Rect};
-
-#[cfg(target_os = "macos")]
-mod platform {
-    use winit::platform::macos::WindowAttributesExtMacOS;
-    use winit::window::WindowAttributes;
-
-    pub(super) fn glass(attrs: WindowAttributes) -> WindowAttributes {
-        attrs
-            .with_titlebar_transparent(true)
-            .with_fullsize_content_view(true)
-            .with_title_hidden(true)
-    }
-}
-
-#[cfg(target_os = "windows")]
-mod platform {
-    use winit::platform::windows::{CornerPreference, WindowAttributesExtWindows};
-    use winit::window::WindowAttributes;
-
-    pub(super) fn glass(attrs: WindowAttributes) -> WindowAttributes {
-        // Borderless so the glass reaches the top edge; the app draws the caption buttons. No
-        // redirection bitmap: wgpu presents through DirectComposition, which keeps alpha.
-        attrs
-            .with_decorations(false)
-            .with_no_redirection_bitmap(true)
-            .with_undecorated_shadow(true)
-            .with_corner_preference(CornerPreference::Round)
-            .with_theme(Some(winit::window::Theme::Dark))
-    }
-}
-
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
-mod platform {
-    use winit::window::WindowAttributes;
-
-    pub(super) fn glass(attrs: WindowAttributes) -> WindowAttributes {
-        attrs
-    }
-}
-
-/// Window attributes for a transparent glass window. Sizes are logical pixels. macOS gets a
-/// transparent, full-size title bar; Windows gets a borderless window (see [`caption_buttons`]).
-pub fn glass_attributes(
-    title: &str,
-    size: (f64, f64),
-    min_size: (f64, f64),
-    visible: bool,
-) -> WindowAttributes {
-    let attrs = Window::default_attributes()
-        .with_title(title)
-        .with_inner_size(LogicalSize::new(size.0, size.1))
-        .with_min_inner_size(LogicalSize::new(min_size.0, min_size.1))
-        .with_transparent(true)
-        .with_visible(visible);
-    platform::glass(attrs)
-}
 
 /// Width of the resize border of a borderless window, in logical pixels.
 pub const EDGE_BORDER: f32 = 6.0;
 
+/// An edge or corner of a window, for resizing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResizeEdge {
+    North,
+    South,
+    East,
+    West,
+    NorthEast,
+    NorthWest,
+    SouthEast,
+    SouthWest,
+}
+
 /// Which edge of a borderless window of size `w` × `h` the point `p` is on, for resizing.
-pub fn edge_at(p: (f32, f32), w: f32, h: f32) -> Option<ResizeDirection> {
-    use ResizeDirection as D;
+pub fn edge_at(p: (f32, f32), w: f32, h: f32) -> Option<ResizeEdge> {
+    use ResizeEdge as D;
     const B: f32 = EDGE_BORDER;
     let (l, r, t, b) = (p.0 < B, p.0 >= w - B, p.1 < B, p.1 >= h - B);
     Some(match (l, r, t, b) {
