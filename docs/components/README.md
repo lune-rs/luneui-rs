@@ -53,7 +53,7 @@ Between two `---` lines, one `key: value` per line, no nesting, every key presen
 | `title` | short human title |
 | `area` | one of the areas above, equal to the directory |
 | `status` | see below |
-| `consumers` | comma list: `luneterm`, `lunegit`, `any` |
+| `consumers` | comma list: `luneterm`, `lunegit`, `wane`, `any` |
 | `source` | existing code: a Luneterm-relative path for `in-luneterm`, `Lunegit: <path>` for a Lunegit stub, or `—` |
 | `owner` | agent or task working on it, or `—` |
 | `summary` | one line |

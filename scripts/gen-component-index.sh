@@ -13,7 +13,7 @@ COMP="${COMPONENTS_DIR:-$ROOT/docs/components}"
 INDEX="$COMP/INDEX.md"
 AREAS="core render platform widget overlay layout data text motion infra lunegit luneterm"
 STATUSES="in-luneterm planned stub in-progress done external"
-CONSUMERS="luneterm lunegit any"
+CONSUMERS="luneterm lunegit wane any"
 KEYS="id title area status consumers source owner summary"
 
 mode=write

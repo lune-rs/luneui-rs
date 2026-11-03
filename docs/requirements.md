@@ -15,6 +15,9 @@ planner".
   Today only the `glass-ui` spike exercises the painter, frame and window APIs.
 - **A possible Rust rebuild of Lunegit** (the Avalonia git client): about 75 views, custom controls
   and AvaloniaEdit-based editors. Not a commitment; its needs are rough stubs in the catalogue.
+- **Wane** (this author's LLM gateway desktop app, `/Users/ijat/Projects/wane`): its window and tray UI. Its
+  HTML mocks and component spec (`docs/ui/components.md`, 35 components, P0-P2 build order) name what it
+  needs; 20 of them are new here (2026-11-04).
 - **Others**: any app that wants the same glass look. The toolkit stays app-agnostic.
 
 ## Functional
@@ -68,6 +71,8 @@ planner".
   caption button geometry for a custom caption (`window.rs`).
 - R-platform-5 [open] OS clipboard, cursor icons, file dialogs and drag-and-drop between windows.
   None is in the inventory; whether the toolkit owns them or the app does is undecided.
+- R-platform-6 [new] System tray / menu-bar status item with a status dot, its click flyout and menu,
+  close-to-tray, single instance, autostart at sign-in and OS notifications (Wane).
 
 ### Widgets
 
@@ -77,6 +82,9 @@ planner".
   tab control, slider and others found by the planner (Lunegit styles several kinds; which exist as
   controls was not verified).
 - R-widget-3 [open] Keyboard focus order and key handling inside widgets. Not in the inventory.
+- R-widget-4 [new] The controls Wane uses that the toolkit lacks: radio group, status dot, navigation
+  item, badge, form field (label, control, hint), setting and item rows, callout, wizard steps,
+  verdict row.
 
 ### Overlays
 
@@ -95,6 +103,8 @@ planner".
 - R-data-1 [new] Domain views Lunegit draws itself: commit graph rows, diff views (unified and
   split) with hunk actions and conflict strips, pie chart, kanban board with drag-and-drop. Whether
   these are toolkit components or app code is for the planner.
+- R-data-2 [new] Dashboard data views Wane uses: data table, stat cell strip, key-value list, progress
+  bar and stacked bar chart. Whether the chart is a toolkit component or app drawing is for the planner.
 
 ### Motion
 

@@ -10,12 +10,12 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | status | count |
 | --- | --- |
 | in-luneterm | 26 |
-| planned | 3 |
+| planned | 23 |
 | stub | 29 |
 | in-progress | 0 |
 | done | 0 |
 | external | 1 |
-| **total** | **59** |
+| **total** | **79** |
 
 ## core
 
@@ -23,7 +23,7 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | --- | --- | --- | --- | --- |
 | [core.acrylic](core/acrylic.md) | Acrylic colour math and noise opacity | in-luneterm | luneterm | Avalonia acrylic colour math with tests, and the noise opacity |
 | [core.color](core/color.md) | Colour helpers | in-luneterm | luneterm | Straight-alpha RGBA values with premultiply, blend-over and alpha helpers |
-| [core.icon](core/icon.md) | Codicon glyph constants | in-luneterm | luneterm | Codicon glyph constants and a glyph helper; the app supplies the icon font |
+| [core.icon](core/icon.md) | Codicon glyph constants | in-luneterm | luneterm, wane | Codicon glyph constants and a glyph helper; the app supplies the icon font |
 | [core.painter](core/painter.md) | Immediate-mode painter | in-luneterm | luneterm | Painter: ordered layers, fills, rings, strokes, acrylic, text, clip, transform and hit regions |
 | [core.tab-outline](core/tab-outline.md) | Tab outline geometry | in-luneterm | luneterm | Tab-chrome outline loop geometry |
 | [core.theme](core/theme.md) | Theme tokens and Lunegit dark preset | in-luneterm | luneterm | Theme token struct and the lunegit_dark preset with the WINDOW, PANEL and CARD glass layers |
@@ -43,33 +43,44 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
 | [platform.material](platform/material.md) | OS glass materials | in-luneterm | luneterm | Material enum and apply: macOS NSVisualEffect and Liquid Glass, Windows acrylic and mica, opaque elsewhere |
-| [platform.window](platform/window.md) | Glass window helpers | in-luneterm | luneterm | Glass window attributes, edge resize, double-click detection and caption buttons |
+| [platform.tray-icon](platform/tray-icon.md) | Tray icon with status dot | planned | wane | 16 px monochrome glyph with a status dot: green serving, amber degraded, grey paused |
+| [platform.window](platform/window.md) | Glass window helpers | in-luneterm | luneterm, wane | Glass window attributes, edge resize, double-click detection and caption buttons |
 
 ## widget
 
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
+| [widget.badge](widget/badge.md) | Badge | planned | wane | 18 px pill with a tone: neutral, ok, warn, err, data |
 | [widget.banner-empty-state](widget/banner-empty-state.md) | Banners, empty states and loading gates | stub | lunegit | Indexing banner, empty-repository view, loading view and gate views (rough stub) |
-| [widget.button](widget/button.md) | Button | in-luneterm | luneterm | Button and its measured width |
-| [widget.checkbox](widget/checkbox.md) | Checkbox | in-luneterm | luneterm | Checkbox |
-| [widget.combo](widget/combo.md) | Combo box | in-luneterm | luneterm | ComboBox: value plus chevron |
+| [widget.button](widget/button.md) | Button | in-luneterm | luneterm, wane | Button and its measured width |
+| [widget.callout](widget/callout.md) | Callout | planned | wane | Inline note with an icon, text and an optional action; neutral, data, warn, err |
+| [widget.checkbox](widget/checkbox.md) | Checkbox | in-luneterm | luneterm, wane | Checkbox |
+| [widget.combo](widget/combo.md) | Combo box | in-luneterm | luneterm, wane | ComboBox: value plus chevron |
 | [widget.filter-bar](widget/filter-bar.md) | Filter bar | stub | lunegit | Filter bar control (rough stub) |
-| [widget.label](widget/label.md) | Label | in-luneterm | luneterm | UI-font text at the theme base size |
-| [widget.list-row-badge](widget/list-row-badge.md) | List rows with status badges | stub | lunegit | List item rows and status badge borders styled in App.axaml (rough stub) |
-| [widget.scrollbar](widget/scrollbar.md) | Scrollbars | stub | lunegit | ScrollViewer, ScrollBar and Thumb overrides in App.axaml (rough stub) |
+| [widget.form-field](widget/form-field.md) | Form field (label, control, hint) | planned | wane | Label over a control with a hint line and an error state |
+| [widget.label](widget/label.md) | Label | in-luneterm | luneterm, wane | UI-font text at the theme base size |
+| [widget.list-row-badge](widget/list-row-badge.md) | List rows with status badges | stub | lunegit, wane | List item rows and status badge borders styled in App.axaml (rough stub) |
+| [widget.nav-item](widget/nav-item.md) | Navigation item | planned | wane | Sidebar row: 16 px icon and a 13 px label |
+| [widget.radio-group](widget/radio-group.md) | Radio group | planned | wane | Vertical group of mutually exclusive options |
+| [widget.row](widget/row.md) | Row (setting row, list item row) | planned | wane | Title with description and a right-hand control, or a compact item row with lead, name, meta and value |
+| [widget.scrollbar](widget/scrollbar.md) | Scrollbars | stub | lunegit, wane | ScrollViewer, ScrollBar and Thumb overrides in App.axaml (rough stub) |
 | [widget.search-picker](widget/search-picker.md) | Search picker | stub | lunegit | Search picker controls built on a shared base (rough stub) |
 | [widget.star-rating](widget/star-rating.md) | Star rating | stub | lunegit | Star rating control (rough stub) |
-| [widget.stepper](widget/stepper.md) | Numeric stepper | in-luneterm | luneterm | NumericUpDown: value with minus and plus buttons |
-| [widget.text-field](widget/text-field.md) | Text field | in-luneterm | luneterm | TextBox with placeholder and a caret when focused |
-| [widget.toggle](widget/toggle.md) | Toggle switch | in-luneterm | luneterm | Fluent ToggleSwitch: 40x20 track, accent fill when on |
+| [widget.status-dot](widget/status-dot.md) | Status dot | planned | wane | 8 px tone dot: ok, warn, err, data, paused |
+| [widget.stepper](widget/stepper.md) | Numeric stepper | in-luneterm | luneterm, wane | NumericUpDown: value with minus and plus buttons |
+| [widget.steps](widget/steps.md) | Wizard steps | planned | wane | Numbered step list with done, current and upcoming states (first run) |
+| [widget.text-field](widget/text-field.md) | Text field | in-luneterm | luneterm, wane | TextBox with placeholder and a caret when focused |
+| [widget.toggle](widget/toggle.md) | Toggle switch | in-luneterm | luneterm, wane | Fluent ToggleSwitch: 40x20 track, accent fill when on |
+| [widget.verdict-row](widget/verdict-row.md) | Verdict check row | planned | wane | Check result row: tone mark, name, text (quant runnability checks) |
 
 ## overlay
 
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
-| [overlay.dialog](overlay/dialog.md) | Modal dialog | in-luneterm | luneterm | Modal dialog card: dim backdrop, 448 px acrylic card, darker footer, app-supplied body |
-| [overlay.dropdown](overlay/dropdown.md) | Drop-down list | in-luneterm | luneterm | Combo drop-down option list that flips above its anchor near the window bottom |
-| [overlay.menu](overlay/menu.md) | Glass context menu | in-luneterm | luneterm | Glass context menu with open and close motion |
+| [overlay.dialog](overlay/dialog.md) | Modal dialog | in-luneterm | luneterm, wane | Modal dialog card: dim backdrop, 448 px acrylic card, darker footer, app-supplied body |
+| [overlay.dropdown](overlay/dropdown.md) | Drop-down list | in-luneterm | luneterm, wane | Combo drop-down option list that flips above its anchor near the window bottom |
+| [overlay.flyout](overlay/flyout.md) | Tray flyout | planned | wane | Windows tray left-click surface: header, stats, route list, action rows |
+| [overlay.menu](overlay/menu.md) | Glass context menu | in-luneterm | luneterm, wane | Glass context menu with open and close motion |
 | [overlay.popup-panel](overlay/popup-panel.md) | Popup panel surface | in-luneterm | luneterm | Menu and dropdown surface (popup_panel) |
 | [overlay.toast-notifications](overlay/toast-notifications.md) | Toasts and notification history | stub | lunegit | Toast overlay and the notification history panel (rough stub) |
 | [overlay.tooltip](overlay/tooltip.md) | Tooltips | stub | lunegit | Hover-triggered tooltip or flyout (rough stub) |
@@ -78,21 +89,30 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
+| [layout.page](layout/page.md) | Page card (header, scroll body, footer) | planned | wane | The card that holds a screen: header with title and actions, scrolling body, optional pinned footer |
+| [layout.panel](layout/panel.md) | Panel (group box) | planned | wane | Outline-only group box with title, meta, body and action footer |
+| [layout.sidebar](layout/sidebar.md) | Sidebar | planned | wane | 208 px column on the window glass: nav list (or wizard steps) and a status footer |
 | [layout.split-panes](layout/split-panes.md) | Resizable split panes | stub | lunegit | Resizable split layout between panels and content (rough stub) |
-| [layout.tree-view](layout/tree-view.md) | Tree view and tree guides | stub | lunegit | Tree rows with guide lines for branches, tags, stash and files (rough stub) |
+| [layout.tree-view](layout/tree-view.md) | Tree view and tree guides | stub | lunegit, wane | Tree rows with guide lines for branches, tags, stash and files (rough stub) |
 | [layout.virtualized-list](layout/virtualized-list.md) | Virtualized list | stub | lunegit | Virtualizing list used by several Lunegit views (rough stub) |
 
 ## data
 
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
+| [data.bar-chart](data/bar-chart.md) | Stacked bar chart | planned | wane | Hourly stacked columns, two series, three grid lines |
 | [data.kanban-board](data/kanban-board.md) | Kanban board with drag and drop | stub | lunegit | Scratchpad kanban board with card drag and drop (rough stub) |
+| [data.kv-list](data/kv-list.md) | Key-value list | planned | wane | Aligned key and value pairs: facts, paths, ids, figures |
 | [data.pie-chart](data/pie-chart.md) | Pie chart | stub | lunegit | Storage pie chart drawn by a custom control (rough stub) |
+| [data.progress](data/progress.md) | Progress bar | planned | wane | 4 px track with an accent fill; warn and err only for meaning |
+| [data.stat](data/stat.md) | Stat cell | planned | wane | A labelled figure in a strip: label, mono value, sub-line, optional meter |
+| [data.table](data/table.md) | Data table | planned | wane | 28 px rows with hairlines, numeric columns in mono, sortable header look, selectable rows |
 
 ## text
 
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
+| [text.code-block](text/code-block.md) | Code block | planned | wane | Read-only mono block with a copy button |
 | [text.code-editor-view](text/code-editor-view.md) | Code viewer and editor with syntax highlighting | stub | lunegit | Code text view and editor with TextMate syntax highlighting (AvaloniaEdit equivalent) (rough stub) |
 | [text.markdown-preview](text/markdown-preview.md) | Markdown preview | stub | lunegit | Markdown preview rendered from Markdig output (rough stub) |
 | [text.shaping](text/shaping.md) | Shaped-text cache | in-luneterm | luneterm | Shaped-text cache over glyphon keyed by content; the app registers its fonts |
