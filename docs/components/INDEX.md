@@ -9,10 +9,10 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 
 | status | count |
 | --- | --- |
-| in-luneterm | 26 |
+| in-luneterm | 0 |
 | planned | 23 |
 | stub | 29 |
-| in-progress | 0 |
+| in-progress | 26 |
 | done | 0 |
 | external | 1 |
 | **total** | **79** |
@@ -21,30 +21,30 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
-| [core.acrylic](core/acrylic.md) | Acrylic colour math and noise opacity | in-luneterm | luneterm | Avalonia acrylic colour math with tests, and the noise opacity |
-| [core.color](core/color.md) | Colour helpers | in-luneterm | luneterm | Straight-alpha RGBA values with premultiply, blend-over and alpha helpers |
-| [core.icon](core/icon.md) | Codicon glyph constants | in-luneterm | luneterm, wane | Codicon glyph constants and a glyph helper; the app supplies the icon font |
-| [core.painter](core/painter.md) | Immediate-mode painter | in-luneterm | luneterm | Painter: ordered layers, fills, rings, strokes, acrylic, text, clip, transform and hit regions |
-| [core.tab-outline](core/tab-outline.md) | Tab outline geometry | in-luneterm | luneterm | Tab-chrome outline loop geometry |
-| [core.theme](core/theme.md) | Theme tokens and Lunegit dark preset | in-luneterm | luneterm | Theme token struct and the lunegit_dark preset with the WINDOW, PANEL and CARD glass layers |
+| [core.acrylic](core/acrylic.md) | Acrylic colour math and noise opacity | in-progress | luneterm | Avalonia acrylic colour math with tests, and the noise opacity |
+| [core.color](core/color.md) | Colour helpers | in-progress | luneterm | Straight-alpha RGBA values with premultiply, blend-over and alpha helpers |
+| [core.icon](core/icon.md) | Codicon glyph constants | in-progress | luneterm, wane | Codicon glyph constants and a glyph helper; the app supplies the icon font |
+| [core.painter](core/painter.md) | Immediate-mode painter | in-progress | luneterm | Painter: ordered layers, fills, rings, strokes, acrylic, text, clip, transform and hit regions |
+| [core.tab-outline](core/tab-outline.md) | Tab outline geometry | in-progress | luneterm | Tab-chrome outline loop geometry |
+| [core.theme](core/theme.md) | Theme tokens and Lunegit dark preset | in-progress | luneterm | Theme token struct and the lunegit_dark preset with the WINDOW, PANEL and CARD glass layers |
 
 ## render
 
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
-| [render.blur](render/blur.md) | Backdrop blur pass | in-luneterm | luneterm | Backdrop blur pass with its WGSL shader |
-| [render.custom-draw](render/custom-draw.md) | App-owned drawing hook | in-luneterm | luneterm | CustomDraw trait: app-owned GPU drawing inside a layer |
-| [render.dump](render/dump.md) | Offscreen frame dump | in-luneterm | luneterm | Offscreen target, GPU readback and PNG writer for frame goldens |
-| [render.frame](render/frame.md) | Frame pass sequence | in-luneterm | luneterm | FrameRenderer: scene, blur, target pass sequence |
-| [render.gpu](render/gpu.md) | wgpu instance, surface and pipelines | in-luneterm | luneterm | wgpu instance, surface, pipelines and the noise texture |
+| [render.blur](render/blur.md) | Backdrop blur pass | in-progress | luneterm | Backdrop blur pass with its WGSL shader |
+| [render.custom-draw](render/custom-draw.md) | App-owned drawing hook | in-progress | luneterm | CustomDraw trait: app-owned GPU drawing inside a layer |
+| [render.dump](render/dump.md) | Offscreen frame dump | in-progress | luneterm | Offscreen target, GPU readback and PNG writer for frame goldens |
+| [render.frame](render/frame.md) | Frame pass sequence | in-progress | luneterm | FrameRenderer: scene, blur, target pass sequence |
+| [render.gpu](render/gpu.md) | wgpu instance, surface and pipelines | in-progress | luneterm | wgpu instance, surface, pipelines and the noise texture |
 
 ## platform
 
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
-| [platform.material](platform/material.md) | OS glass materials | in-luneterm | luneterm | Material enum and apply: macOS NSVisualEffect and Liquid Glass, Windows acrylic and mica, opaque elsewhere |
+| [platform.material](platform/material.md) | OS glass materials | in-progress | luneterm | Material enum and apply: macOS NSVisualEffect and Liquid Glass, Windows acrylic and mica, opaque elsewhere |
 | [platform.tray-icon](platform/tray-icon.md) | Tray icon with status dot | planned | wane | 16 px monochrome glyph with a status dot: green serving, amber degraded, grey paused |
-| [platform.window](platform/window.md) | Glass window helpers | in-luneterm | luneterm, wane | Glass window attributes, edge resize, double-click detection and caption buttons |
+| [platform.window](platform/window.md) | Glass window helpers | in-progress | luneterm, wane | Glass window attributes, edge resize, double-click detection and caption buttons |
 
 ## widget
 
@@ -52,13 +52,13 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | --- | --- | --- | --- | --- |
 | [widget.badge](widget/badge.md) | Badge | planned | wane | 18 px pill with a tone: neutral, ok, warn, err, data |
 | [widget.banner-empty-state](widget/banner-empty-state.md) | Banners, empty states and loading gates | stub | lunegit | Indexing banner, empty-repository view, loading view and gate views (rough stub) |
-| [widget.button](widget/button.md) | Button | in-luneterm | luneterm, wane | Button and its measured width |
+| [widget.button](widget/button.md) | Button | in-progress | luneterm, wane | Button and its measured width |
 | [widget.callout](widget/callout.md) | Callout | planned | wane | Inline note with an icon, text and an optional action; neutral, data, warn, err |
-| [widget.checkbox](widget/checkbox.md) | Checkbox | in-luneterm | luneterm, wane | Checkbox |
-| [widget.combo](widget/combo.md) | Combo box | in-luneterm | luneterm, wane | ComboBox: value plus chevron |
+| [widget.checkbox](widget/checkbox.md) | Checkbox | in-progress | luneterm, wane | Checkbox |
+| [widget.combo](widget/combo.md) | Combo box | in-progress | luneterm, wane | ComboBox: value plus chevron |
 | [widget.filter-bar](widget/filter-bar.md) | Filter bar | stub | lunegit | Filter bar control (rough stub) |
 | [widget.form-field](widget/form-field.md) | Form field (label, control, hint) | planned | wane | Label over a control with a hint line and an error state |
-| [widget.label](widget/label.md) | Label | in-luneterm | luneterm, wane | UI-font text at the theme base size |
+| [widget.label](widget/label.md) | Label | in-progress | luneterm, wane | UI-font text at the theme base size |
 | [widget.list-row-badge](widget/list-row-badge.md) | List rows with status badges | stub | lunegit, wane | List item rows and status badge borders styled in App.axaml (rough stub) |
 | [widget.nav-item](widget/nav-item.md) | Navigation item | planned | wane | Sidebar row: 16 px icon and a 13 px label |
 | [widget.radio-group](widget/radio-group.md) | Radio group | planned | wane | Vertical group of mutually exclusive options |
@@ -67,21 +67,21 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | [widget.search-picker](widget/search-picker.md) | Search picker | stub | lunegit | Search picker controls built on a shared base (rough stub) |
 | [widget.star-rating](widget/star-rating.md) | Star rating | stub | lunegit | Star rating control (rough stub) |
 | [widget.status-dot](widget/status-dot.md) | Status dot | planned | wane | 8 px tone dot: ok, warn, err, data, paused |
-| [widget.stepper](widget/stepper.md) | Numeric stepper | in-luneterm | luneterm, wane | NumericUpDown: value with minus and plus buttons |
+| [widget.stepper](widget/stepper.md) | Numeric stepper | in-progress | luneterm, wane | NumericUpDown: value with minus and plus buttons |
 | [widget.steps](widget/steps.md) | Wizard steps | planned | wane | Numbered step list with done, current and upcoming states (first run) |
-| [widget.text-field](widget/text-field.md) | Text field | in-luneterm | luneterm, wane | TextBox with placeholder and a caret when focused |
-| [widget.toggle](widget/toggle.md) | Toggle switch | in-luneterm | luneterm, wane | Fluent ToggleSwitch: 40x20 track, accent fill when on |
+| [widget.text-field](widget/text-field.md) | Text field | in-progress | luneterm, wane | TextBox with placeholder and a caret when focused |
+| [widget.toggle](widget/toggle.md) | Toggle switch | in-progress | luneterm, wane | Fluent ToggleSwitch: 40x20 track, accent fill when on |
 | [widget.verdict-row](widget/verdict-row.md) | Verdict check row | planned | wane | Check result row: tone mark, name, text (quant runnability checks) |
 
 ## overlay
 
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
-| [overlay.dialog](overlay/dialog.md) | Modal dialog | in-luneterm | luneterm, wane | Modal dialog card: dim backdrop, 448 px acrylic card, darker footer, app-supplied body |
-| [overlay.dropdown](overlay/dropdown.md) | Drop-down list | in-luneterm | luneterm, wane | Combo drop-down option list that flips above its anchor near the window bottom |
+| [overlay.dialog](overlay/dialog.md) | Modal dialog | in-progress | luneterm, wane | Modal dialog card: dim backdrop, 448 px acrylic card, darker footer, app-supplied body |
+| [overlay.dropdown](overlay/dropdown.md) | Drop-down list | in-progress | luneterm, wane | Combo drop-down option list that flips above its anchor near the window bottom |
 | [overlay.flyout](overlay/flyout.md) | Tray flyout | planned | wane | Windows tray left-click surface: header, stats, route list, action rows |
-| [overlay.menu](overlay/menu.md) | Glass context menu | in-luneterm | luneterm, wane | Glass context menu with open and close motion |
-| [overlay.popup-panel](overlay/popup-panel.md) | Popup panel surface | in-luneterm | luneterm | Menu and dropdown surface (popup_panel) |
+| [overlay.menu](overlay/menu.md) | Glass context menu | in-progress | luneterm, wane | Glass context menu with open and close motion |
+| [overlay.popup-panel](overlay/popup-panel.md) | Popup panel surface | in-progress | luneterm | Menu and dropdown surface (popup_panel) |
 | [overlay.toast-notifications](overlay/toast-notifications.md) | Toasts and notification history | stub | lunegit | Toast overlay and the notification history panel (rough stub) |
 | [overlay.tooltip](overlay/tooltip.md) | Tooltips | stub | lunegit | Hover-triggered tooltip or flyout (rough stub) |
 
@@ -115,14 +115,14 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | [text.code-block](text/code-block.md) | Code block | planned | wane | Read-only mono block with a copy button |
 | [text.code-editor-view](text/code-editor-view.md) | Code viewer and editor with syntax highlighting | stub | lunegit | Code text view and editor with TextMate syntax highlighting (AvaloniaEdit equivalent) (rough stub) |
 | [text.markdown-preview](text/markdown-preview.md) | Markdown preview | stub | lunegit | Markdown preview rendered from Markdig output (rough stub) |
-| [text.shaping](text/shaping.md) | Shaped-text cache | in-luneterm | luneterm | Shaped-text cache over glyphon keyed by content; the app registers its fonts |
+| [text.shaping](text/shaping.md) | Shaped-text cache | in-progress | luneterm | Shaped-text cache over glyphon keyed by content; the app registers its fonts |
 
 ## motion
 
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
 | [motion.animation-tiers](motion/animation-tiers.md) | Animation tiers and reduced motion | stub | lunegit | Normal and reduced animation tiers applied at run time (rough stub) |
-| [motion.curves](motion/curves.md) | Easing curves and menu motion | in-luneterm | luneterm | cubic_bezier easing and the menu open and close animation values |
+| [motion.curves](motion/curves.md) | Easing curves and menu motion | in-progress | luneterm | cubic_bezier easing and the menu open and close animation values |
 
 ## infra
 

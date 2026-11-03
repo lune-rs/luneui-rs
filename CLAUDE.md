@@ -23,10 +23,15 @@ for the extraction; Luneterm's `docs/architecture.md` sections "lune-ui modules"
 - Boundaries: `scripts/check-boundaries.sh`
 - Catalogue index (regenerate after adding or editing a component file): `scripts/gen-component-index.sh`
 - Gate (before every commit; must be green): `cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && scripts/check-boundaries.sh && scripts/gen-component-index.sh --check`
-- Pixel gate (any drawing change): dump offscreen frames of the reference scenes to a dir before and
-  after the change, then compare with the compare tool; zero delta unless the look change is intended
-  and re-baselined in the same commit with the reason. Exact commands: set by the extraction plan
-  (not yet runnable (no drawing code)).
+- Pixel gate (any drawing change): `scripts/pixel-gate.sh [--base <rev>] [--allow <id>…]` dumps the
+  gallery's 15 reference scenes for `<rev>` (default `HEAD`) and for the working tree and compares them
+  (`dump-compare`); zero delta unless the look change is intended: name its scenes with `--allow <id>`
+  and give the reason in a DECISIONS.md row in the same commit. Exit 0 pass, 1 delta, 2 setup error.
+  Needs a logged-in macOS GUI session.
+- Dump the scenes by hand: `cargo run -p gallery -- --dump <dir>` (`-- --list` prints the scene names)
+- M1 proof against Luneterm's 18-scene spike gate: `scripts/pixel-gate-luneterm.sh` (`--parity-only`
+  checks only that `Cargo.lock` holds no version Luneterm's lock lacks)
+- Cross-target (Windows clippy, Linux in Docker; skips Linux when Docker is not running): `scripts/check-targets.sh`
 
 Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, resolver 3: in
 `rust-toolchain.toml` and the root manifest.
@@ -37,7 +42,7 @@ Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, r
   Target, decided by the extraction plan and not true today: each sits behind a trait owned by a pure
   core with no wgpu, winit or glyphon types in its signatures, adapters depending on the core only.
 - The first extraction is behaviour-preserving: code moves from `lune-ui` as is, pixel gate at zero
-  delta. The seams follow as separate, gated steps. Crate names and split: set by the first plan.
+  delta. The seams follow as separate, gated steps (M2). Crate names and split: D9.
 - The toolkit has no composition root: each consuming app wires adapters. The toolkit never starts an
   event loop and never reads the clock or environment; the app passes time, sizes, fonts, theme and hit
   values in, so frames are deterministic.
@@ -45,13 +50,13 @@ Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, r
   a catalogue file; new look = a `Theme` value. App-specific drawing goes through the `CustomDraw`
   hook, not into the toolkit (D8).
 - As each seam lands it gets a contract test and a fake (headless target, null material).
-  `docs/architecture.md` (to be created by the first plan) holds the module map.
+  `docs/architecture.md` holds the module map, the known deviations and the pixel gates.
 
 ## Hard rules
 
 1. App-agnostic: no app, terminal or domain words in library source. Enforced by
    `scripts/check-boundaries.sh` and its allow list (`scripts/boundaries.allow`; `lunegit` is
-   allowed only in the theme preset module).
+   allowed only in the theme preset module, its re-export and the in-crate tests that import the preset; D14).
 2. No clock, environment or event-loop access in library `src` (same script; tests and examples may).
 3. `unsafe` only in platform modules, each block with a `// SAFETY:` comment; `unsafe_op_in_unsafe_fn`
    denied. Platform code lives in `#[cfg(target_os = ...)]` modules inside the crate that owns the trait;
@@ -62,7 +67,7 @@ Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, r
    the commit message.
 6. Every bundled third-party asset or code (the Avalonia acrylic noise texture and colour formulas,
    fonts, shaders from elsewhere) has its licence text in `licenses/` and a row in
-   `THIRD_PARTY_NOTICES.md` (both to be created by the first plan).
+   `THIRD_PARTY_NOTICES.md`.
 7. Every manifest inherits `license = "MIT OR Apache-2.0"` from the workspace; `publish = false` until
    the user decides otherwise.
 8. A drawing change passes the pixel gate (see Commands). Look values follow Lunegit; a deliberate
@@ -86,4 +91,4 @@ Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, r
 - `docs/requirements.md` - what the toolkit must provide (requirement ids `R-<area>-<n>`)
 - `docs/components/INDEX.md` - generated catalogue index; open a component's file under
   `docs/components/<area>/<slug>.md` for its detail; `docs/components/README.md` explains how to add one
-- `docs/architecture.md` - crates, seams, module map (to be created by the first plan)
+- `docs/architecture.md` - crates, seams, module map, extension points, pixel gates

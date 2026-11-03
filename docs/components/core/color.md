@@ -2,10 +2,10 @@
 id: core.color
 title: Colour helpers
 area: core
-status: in-luneterm
+status: in-progress
 consumers: luneterm
 source: crates/lune-ui/src/color.rs
-owner: —
+owner: orch/toolkit-v1
 summary: Straight-alpha RGBA values with premultiply, blend-over and alpha helpers
 ---
 

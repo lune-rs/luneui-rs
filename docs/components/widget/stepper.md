@@ -2,10 +2,10 @@
 id: widget.stepper
 title: Numeric stepper
 area: widget
-status: in-luneterm
+status: in-progress
 consumers: luneterm, wane
 source: crates/lune-ui/src/widgets/mod.rs
-owner: —
+owner: orch/toolkit-v1
 summary: NumericUpDown: value with minus and plus buttons
 ---
 

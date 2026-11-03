@@ -2,10 +2,10 @@
 id: overlay.menu
 title: Glass context menu
 area: overlay
-status: in-luneterm
+status: in-progress
 consumers: luneterm, wane
 source: crates/lune-ui/src/widgets/menu.rs
-owner: —
+owner: orch/toolkit-v1
 summary: Glass context menu with open and close motion
 ---
 

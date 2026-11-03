@@ -1,7 +1,11 @@
 # Fixed strings that may appear on a line the boundary rules 2 and 3 would otherwise reject.
 # One per line; blank lines and # comments are ignored.
 #
-# Reserved: the extraction needs entries here (for example the theme preset that reproduces
-# Lunegit's look, and doc-comment mentions in moved files). Matching is per line, so one entry
-# covers only the lines containing that fixed string. Add each entry with a reason; the extraction
-# plan decides between allow entries and rewording the comments. No live entry yet.
+# The theme preset module is the one place that names the look it reproduces; its file may carry
+# the word on any line (per-line prefix match on grep's `path:line:text`).
+crates/lune-ui/src/theme.rs:
+# The public re-export of the preset; the pub API pins the identifier.
+pub use theme::lunegit_dark;
+# In-crate test imports of the preset: they name the pinned identifier and cannot be reworded.
+use crate::theme::lunegit_dark::THEME;
+use crate::lunegit_dark::{CARD, PANEL, WINDOW};

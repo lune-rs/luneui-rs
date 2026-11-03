@@ -2,10 +2,10 @@
 id: motion.curves
 title: Easing curves and menu motion
 area: motion
-status: in-luneterm
+status: in-progress
 consumers: luneterm
 source: crates/lune-ui/src/widgets/menu.rs
-owner: —
+owner: orch/toolkit-v1
 summary: cubic_bezier easing and the menu open and close animation values
 ---
 

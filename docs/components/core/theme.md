@@ -2,10 +2,10 @@
 id: core.theme
 title: Theme tokens and Lunegit dark preset
 area: core
-status: in-luneterm
+status: in-progress
 consumers: luneterm
 source: crates/lune-ui/src/theme.rs
-owner: —
+owner: orch/toolkit-v1
 summary: Theme token struct and the lunegit_dark preset with the WINDOW, PANEL and CARD glass layers
 ---
 
