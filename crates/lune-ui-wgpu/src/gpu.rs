@@ -77,6 +77,8 @@ impl From<&StrokeVertex> for GpuStrokeVertex {
 pub(crate) struct FormatState {
     pub(crate) format: wgpu::TextureFormat,
     acrylic_pipeline: wgpu::RenderPipeline,
+    /// The acrylic shader blended in at a constant opacity (`src·c + dst·(1 − c)`).
+    acrylic_fade_pipeline: wgpu::RenderPipeline,
     shape_pipeline: wgpu::RenderPipeline,
     stroke_pipeline: wgpu::RenderPipeline,
     pub(crate) blur: blur::Pipelines,
@@ -117,12 +119,16 @@ impl std::fmt::Debug for Gpu {
 
 type Range = std::ops::Range<u32>;
 
+/// A run of acrylic shapes drawn with one pipeline: opacity 1.0 is the replace pipeline for the
+/// whole run, anything lower is a single shape through the constant-blend pipeline.
+type AcrylicRun = (Range, f32);
+
 #[derive(Debug)]
 pub(crate) struct Uploaded {
     shapes: wgpu::Buffer,
     strokes: Option<wgpu::Buffer>,
-    /// Per layer: acrylic, under, over shape ranges and the stroke vertex range.
-    ranges: Vec<(Range, Range, Range, Range)>,
+    /// Per layer: the acrylic runs, the under and over shape ranges and the stroke vertex range.
+    ranges: Vec<(Vec<AcrylicRun>, Range, Range, Range)>,
 }
 
 /// The wgpu instance. `display` is the windowing system's display handle (an event loop's owned
@@ -306,6 +312,23 @@ impl Gpu {
             strip,
             Some(wgpu::BlendState::REPLACE),
         );
+        // Faded acrylic: the shader's colour and alpha blended with what is below, by a constant.
+        let constant = wgpu::BlendComponent {
+            src_factor: wgpu::BlendFactor::Constant,
+            dst_factor: wgpu::BlendFactor::OneMinusConstant,
+            operation: wgpu::BlendOperation::Add,
+        };
+        let acrylic_fade_pipeline = make(
+            "acrylic fade",
+            "vs_shape",
+            "fs_shape",
+            shape_layout.clone(),
+            strip,
+            Some(wgpu::BlendState {
+                color: constant,
+                alpha: constant,
+            }),
+        );
         let shape_pipeline = make(
             "shapes",
             "vs_shape",
@@ -332,6 +355,7 @@ impl Gpu {
         FormatState {
             format,
             acrylic_pipeline,
+            acrylic_fade_pipeline,
             shape_pipeline,
             stroke_pipeline,
             blur: self.blur.pipelines(device, format),
@@ -360,7 +384,15 @@ impl Gpu {
                 shapes.extend(items.iter().map(GpuShape::from));
                 start..shapes.len() as u32
             };
-            let acrylic = push(&layer.acrylic);
+            let mut acrylic: Vec<AcrylicRun> = Vec::new();
+            for a in &layer.acrylic {
+                let range = push(std::slice::from_ref(&a.shape));
+                let opaque = a.opacity >= 1.0;
+                match acrylic.last_mut() {
+                    Some((run, opacity)) if opaque && *opacity >= 1.0 => run.end = range.end,
+                    _ => acrylic.push((range, if opaque { 1.0 } else { a.opacity })),
+                }
+            }
             let under = push(&layer.under);
             let over = push(&layer.over);
             let start = strokes.len() as u32;
@@ -403,7 +435,19 @@ impl FormatState {
         layer: usize,
     ) {
         let (acrylic, under, _, _) = up.ranges[layer].clone();
-        draw_shapes(pass, globals, up, &self.acrylic_pipeline, acrylic);
+        for (range, opacity) in acrylic {
+            if opacity >= 1.0 {
+                draw_shapes(pass, globals, up, &self.acrylic_pipeline, range);
+            } else {
+                pass.set_blend_constant(wgpu::Color {
+                    r: f64::from(opacity),
+                    g: f64::from(opacity),
+                    b: f64::from(opacity),
+                    a: f64::from(opacity),
+                });
+                draw_shapes(pass, globals, up, &self.acrylic_fade_pipeline, range);
+            }
+        }
         draw_shapes(pass, globals, up, &self.shape_pipeline, under);
     }
 
