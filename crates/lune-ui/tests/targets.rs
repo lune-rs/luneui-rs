@@ -1,5 +1,6 @@
-//! One `Gpu`, many targets: two renderers on one device draw the same pixels as each alone, in
-//! either order, and a second colour format on the same device matches a fresh device.
+//! One `Gpu`, many targets: two renderers on one device, sharing one text cache across two scales,
+//! draw the same pixels as each alone, in either order, and a second colour format on the same
+//! device matches a fresh device.
 //!
 //! GPU test: with no adapter it prints `skipped: no GPU adapter` and passes, unless
 //! `LUNEUI_REQUIRE_GPU=1`, which makes a missing adapter a failure.
@@ -10,7 +11,8 @@ use lune_ui::frame::{FrameParams, FrameRenderer};
 use lune_ui::gpu::{self, Gpu};
 use lune_ui::paint::{LayerId, Painter, Rect, StrokeStyle, Xform};
 use lune_ui::scene::Scene;
-use lune_ui::text::{Spec, Style, TextCache};
+use lune_ui::text::{Spec, Style};
+use lune_ui::text_cache::TextCache;
 use lune_ui::theme::DARK;
 
 const UI_FONT: &str = "RznSans";
@@ -142,12 +144,11 @@ fn paint(spec: SceneSpec, text: &mut TextCache) -> Scene {
     p.scene
 }
 
-/// One target: a renderer, an offscreen texture and the text cache its scene is shaped with.
+/// One target: a renderer and an offscreen texture.
 struct Target {
     spec: SceneSpec,
     renderer: FrameRenderer,
     texture: wgpu::Texture,
-    text: TextCache,
 }
 
 impl Target {
@@ -156,15 +157,17 @@ impl Target {
             spec,
             renderer: FrameRenderer::new(gpu, format),
             texture: dump::target(&gpu.device, format, spec.size()),
-            text: TextCache::new(spec.scale, &fonts(), UI_FONT, MONO_FONT),
         }
     }
 
-    fn draw(&mut self, gpu: &mut Gpu) {
-        let scene = paint(self.spec, &mut self.text);
+    fn paint(&self, text: &mut TextCache) -> Scene {
+        paint(self.spec, text)
+    }
+
+    fn draw(&mut self, gpu: &mut Gpu, text: &mut TextCache, scene: &Scene) {
         let view = self.texture.create_view(&Default::default());
         self.renderer
-            .draw(gpu, &mut self.text, &scene, &view, self.spec.params())
+            .draw(gpu, text, scene, &view, self.spec.params())
             .expect("draw");
     }
 
@@ -173,11 +176,17 @@ impl Target {
     }
 }
 
+fn text_cache() -> TextCache {
+    TextCache::new(&fonts(), UI_FONT, MONO_FONT)
+}
+
 /// A fresh device, renderer and text cache drawing `spec` once: the reference pixels.
 fn solo(spec: SceneSpec, format: wgpu::TextureFormat) -> Option<Vec<u8>> {
     let mut gpu = headless_gpu()?;
+    let mut text = text_cache();
     let mut t = Target::new(&mut gpu, spec, format);
-    t.draw(&mut gpu);
+    let scene = t.paint(&mut text);
+    t.draw(&mut gpu, &mut text, &scene);
     let px = t.read(&gpu);
     let covered = px.chunks_exact(4).filter(|p| p[3] > 0).count();
     assert!(
@@ -194,6 +203,8 @@ fn assert_same(what: &str, got: &[u8], want: &[u8]) {
     assert_eq!(diff, 0, "{what}: {diff} bytes differ");
 }
 
+/// C2's contract test: one `Gpu` and ONE `TextCache` serve two targets at scales 2 and 1. Both
+/// scenes are painted (shaped at their own scale) before either is drawn.
 #[test]
 fn two_targets_on_one_gpu_match_each_alone() {
     let format = wgpu::TextureFormat::Bgra8Unorm;
@@ -203,20 +214,22 @@ fn two_targets_on_one_gpu_match_each_alone() {
     let Some(mut gpu) = headless_gpu() else {
         return;
     };
+    let mut text = text_cache();
     let mut ta = Target::new(&mut gpu, A, format);
     let mut tb = Target::new(&mut gpu, B, format);
 
-    // Frame 1: A, then B; read both; end the frame.
-    ta.draw(&mut gpu);
-    tb.draw(&mut gpu);
+    // Frame 1: paint A and B, draw A, then B; read both; end the frame.
+    let (sa, sb) = (ta.paint(&mut text), tb.paint(&mut text));
+    ta.draw(&mut gpu, &mut text, &sa);
+    tb.draw(&mut gpu, &mut text, &sb);
     assert_same("frame 1, A", &ta.read(&gpu), &ref_a);
     assert_same("frame 1, B", &tb.read(&gpu), &ref_b);
-    gpu.end_frame(&mut ta.text);
-    tb.text.end_frame();
+    gpu.end_frame(&mut text);
 
-    // Frame 2: B, then A.
-    tb.draw(&mut gpu);
-    ta.draw(&mut gpu);
+    // Frame 2: paint both, draw B, then A.
+    let (sa, sb) = (ta.paint(&mut text), tb.paint(&mut text));
+    tb.draw(&mut gpu, &mut text, &sb);
+    ta.draw(&mut gpu, &mut text, &sa);
     assert_same("frame 2, B", &tb.read(&gpu), &ref_b);
     assert_same("frame 2, A", &ta.read(&gpu), &ref_a);
 }
@@ -229,9 +242,12 @@ fn second_format_on_one_gpu_matches_a_fresh_gpu() {
     let Some(mut gpu) = headless_gpu() else {
         return;
     };
+    let mut text = text_cache();
     let mut ta = Target::new(&mut gpu, A, wgpu::TextureFormat::Bgra8Unorm);
-    ta.draw(&mut gpu);
+    let scene = ta.paint(&mut text);
+    ta.draw(&mut gpu, &mut text, &scene);
     let mut tc = Target::new(&mut gpu, A, wgpu::TextureFormat::Rgba8Unorm);
-    tc.draw(&mut gpu);
+    let scene = tc.paint(&mut text);
+    tc.draw(&mut gpu, &mut text, &scene);
     assert_same("Rgba8Unorm on a shared Gpu", &tc.read(&gpu), &ref_c);
 }

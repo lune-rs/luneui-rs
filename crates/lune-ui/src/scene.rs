@@ -10,6 +10,7 @@
 //!   the remaining layers follow.
 
 use crate::paint::Rect;
+use crate::text::TextKey;
 
 /// Draw order, back to front. Each layer interleaves shapes and text correctly.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -60,7 +61,7 @@ pub struct LayerGeometry {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TextItem {
-    pub key: u64,
+    pub key: TextKey,
     pub x: f32,
     pub y: f32,
     pub clip: Rect,

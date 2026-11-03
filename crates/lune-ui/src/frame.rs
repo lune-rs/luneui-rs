@@ -14,7 +14,7 @@ use crate::blur::Blur;
 use crate::custom::{CustomDraw, CustomFrame, CustomItem};
 use crate::gpu::{Globals, Gpu};
 use crate::scene::{LAYER_COUNT, SCENE_LAYERS, Scene};
-use crate::text::TextCache;
+use crate::text_cache::TextCache;
 
 pub use crate::scene::FrameParams;
 

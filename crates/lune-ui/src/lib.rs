@@ -10,7 +10,8 @@
 //! - [`color`], [`theme`] (the `Theme` tokens and the dark preset with its glass
 //!   layers), [`acrylic`] (Avalonia acrylic colour math);
 //! - [`paint`] (the `Painter`), [`scene`] (the display list it builds: plain data and the
-//!   draw-order contract), [`custom`] (app-owned GPU drawing inside a layer), [`text`], [`icon`],
+//!   draw-order contract), [`custom`] (app-owned GPU drawing inside a layer), [`text`] (specs and the
+//!   `TextSystem` seam), [`text_cache`] (its glyphon implementation), [`icon`],
 //!   [`widgets`] (controls, menus, dropdowns, dialogs), [`chrome`] (tab outline geometry);
 //! - [`gpu`] (the GPU every target shares), [`frame`] (one target's renderer: the scene → blur →
 //!   target pass sequence), [`blur`] (backdrop blur), [`surface`] (a window's swapchain), [`dump`]
@@ -18,7 +19,8 @@
 //! - [`material`] (OS backdrop per platform, [`GlassLayer`] and [`Backdrop`] describe the layers
 //!   and capability levels), [`window`] (glass window attributes, edge resize, double click,
 //!   caption buttons);
-//! - [`testing`] (fakes of the seams for tests: the display-list recorder).
+//! - [`testing`] (fakes of the seams for tests: the display-list recorder, a fake text system
+//!   and its contract suite).
 //!
 //! Values in the dark preset are copied from the house look's `DarkTheme.axaml` and `App.axaml`, so
 //! apps styled after it match.
@@ -38,6 +40,7 @@ pub mod scene;
 pub mod surface;
 pub mod testing;
 pub mod text;
+pub mod text_cache;
 pub mod theme;
 pub mod widgets;
 pub mod window;

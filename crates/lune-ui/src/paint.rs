@@ -5,7 +5,7 @@ use crate::color::{Rgba, premul};
 use crate::scene::{
     BackdropRequest, CustomItem, LayerGeometry, Scene, Shape, StrokeVertex, TextItem,
 };
-use crate::text::{Spec, TextCache};
+use crate::text::{Spec, TextSystem};
 use crate::theme::Theme;
 
 pub use crate::scene::{LAYER_COUNT, LayerId};
@@ -106,7 +106,6 @@ impl Xform {
     }
 }
 
-#[derive(Debug)]
 pub struct Painter<'a, H> {
     pub s: f32,
     pub window: Rect,
@@ -115,18 +114,34 @@ pub struct Painter<'a, H> {
     layer: usize,
     clip: Option<Rect>,
     pub hits: Vec<(Rect, H)>,
-    pub text: &'a mut TextCache,
+    pub text: &'a mut dyn TextSystem,
     pub hover: Option<H>,
     /// Tokens the toolkit widgets read.
     pub theme: Theme,
     xform: Option<Xform>,
 }
 
+impl<H: std::fmt::Debug> std::fmt::Debug for Painter<'_, H> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Painter")
+            .field("s", &self.s)
+            .field("window", &self.window)
+            .field("scene", &self.scene)
+            .field("layer", &self.layer)
+            .field("clip", &self.clip)
+            .field("hits", &self.hits)
+            .field("hover", &self.hover)
+            .field("theme", &self.theme)
+            .field("xform", &self.xform)
+            .finish_non_exhaustive()
+    }
+}
+
 impl<'a, H: Copy + PartialEq> Painter<'a, H> {
     pub fn new(
         s: f32,
         window: Rect,
-        text: &'a mut TextCache,
+        text: &'a mut dyn TextSystem,
         hover: Option<H>,
         theme: Theme,
     ) -> Self {
@@ -257,17 +272,17 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
     }
 
     pub fn text(&mut self, spec: &Spec, x: f32, y: f32) -> (f32, f32) {
-        let size = self.text.prepare(spec).1;
+        let size = self.text.prepare(spec, self.s).1;
         let (key, scale) = match self.xform {
             Some(xf) if xf.alpha < 0.999 => {
                 let mut faded = spec.clone();
                 for (_, style) in &mut faded.runs {
                     style.color[3] = (f32::from(style.color[3]) * xf.alpha).round() as u8;
                 }
-                (self.text.prepare(&faded).0, xf.scale)
+                (self.text.prepare(&faded, self.s).0, xf.scale)
             }
-            Some(xf) => (self.text.prepare(spec).0, xf.scale),
-            None => (self.text.prepare(spec).0, 1.0),
+            Some(xf) => (self.text.prepare(spec, self.s).0, xf.scale),
+            None => (self.text.prepare(spec, self.s).0, 1.0),
         };
         let clip = self.tr(self.clip.unwrap_or(self.window));
         let (x, y) = self.xform.map_or((x, y), |xf| xf.point(x, y));
@@ -283,18 +298,18 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
 
     /// Text vertically centred in `r` at its left edge (plus `pad`).
     pub fn text_in(&mut self, spec: &Spec, r: Rect, pad: f32) -> (f32, f32) {
-        let (_, (w, h)) = self.text.prepare(spec);
+        let (_, (w, h)) = self.text.prepare(spec, self.s);
         self.text(spec, r.x + pad, r.y + (r.h - h) / 2.0);
         (w, h)
     }
 
     pub fn text_centered(&mut self, spec: &Spec, r: Rect) {
-        let (_, (w, h)) = self.text.prepare(spec);
+        let (_, (w, h)) = self.text.prepare(spec, self.s);
         self.text(spec, r.x + (r.w - w) / 2.0, r.y + (r.h - h) / 2.0);
     }
 
     pub fn measure(&mut self, spec: &Spec) -> (f32, f32) {
-        self.text.prepare(spec).1
+        self.text.measure(spec, self.s)
     }
 
     pub fn hit(&mut self, r: Rect, h: H) {
@@ -425,10 +440,11 @@ pub fn polyline_length(pts: &[[f32; 2]]) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testing::FakeText;
     use crate::theme::lunegit_dark::THEME;
 
     fn with_painter(f: impl FnOnce(&mut Painter<'_, u8>)) {
-        let mut text = TextCache::new(2.0, &[], "sans-serif", "monospace");
+        let mut text = FakeText;
         let mut p = Painter::new(
             2.0,
             Rect::new(0.0, 0.0, 200.0, 100.0),

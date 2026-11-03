@@ -7,7 +7,7 @@ use wgpu::util::DeviceExt;
 
 use crate::blur;
 use crate::scene::{Scene, Shape, StrokeVertex};
-use crate::text::TextCache;
+use crate::text_cache::TextCache;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]

@@ -29,7 +29,7 @@ use lune_ui::lunegit_dark;
 use lune_ui::material::{self, Material};
 use lune_ui::paint::{Painter, Rect};
 use lune_ui::surface::{Acquired, WindowSurface};
-use lune_ui::text::TextCache;
+use lune_ui::text_cache::TextCache;
 use lune_ui::window;
 use scenes::{BLUR_SATURATION, BLUR_SIGMA, H, SCENES, Scene, W};
 
@@ -123,9 +123,8 @@ const UI_FONT: &str = "RznSans";
 const MONO_FONT: &str = "RobotoMono Nerd Font Mono";
 
 /// The gallery's fonts, loaded in a fixed order.
-fn text_cache(scale: f32) -> TextCache {
+fn text_cache() -> TextCache {
     TextCache::new(
-        scale,
         &[
             include_bytes!("../assets/RobotoMonoNerdFontMono-Regular.ttf").as_slice(),
             include_bytes!("../assets/RznSans-Regular.ttf"),
@@ -144,7 +143,7 @@ fn run_dump(dir: &Path) -> Result<(), String> {
     let fill = custom::Fill::new(&gpu.device, format);
     let mut r = Renderer {
         gpu,
-        text: text_cache(1.0),
+        text: text_cache(),
         frame,
         fill,
     };
@@ -174,7 +173,7 @@ impl App {
         let mut gpu = pollster::block_on(Gpu::new(instance, Some(&surface)))?;
         let size = window.inner_size();
         let surface = WindowSurface::new(&gpu, surface, (size.width, size.height))?;
-        let text = text_cache(window.scale_factor() as f32);
+        let text = text_cache();
         let frame = FrameRenderer::new(&mut gpu, surface.format());
         let fill = custom::Fill::new(&gpu.device, surface.format());
         Ok(Shown {
@@ -258,7 +257,6 @@ fn draw_scene(
     size: (u32, u32),
 ) -> Result<(), String> {
     let win = Rect::new(0.0, 0.0, size.0 as f32 / s, size.1 as f32 / s);
-    r.text.set_scale(s);
     let mut p = Painter::new(s, win, &mut r.text, scene.hover, lunegit_dark::THEME);
     (scene.draw)(&mut p, scene.time);
     let Painter { scene, .. } = p;

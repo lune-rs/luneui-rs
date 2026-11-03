@@ -124,7 +124,8 @@ impl RecordingRenderer {
 mod tests {
     use super::*;
     use crate::paint::{LayerId, Painter, Rect, StrokeStyle};
-    use crate::text::{Spec, Style, TextCache};
+    use crate::testing::FakeText;
+    use crate::text::{Spec, Style};
     use crate::theme::lunegit_dark::THEME;
 
     /// What a call is, without its payload: (kind, layer).
@@ -146,7 +147,7 @@ mod tests {
 
     #[test]
     fn records_the_documented_draw_order() {
-        let mut text = TextCache::new(1.0, &[], "sans-serif", "monospace");
+        let mut text = FakeText;
         let mut p: Painter<'_, u8> = Painter::new(
             1.0,
             Rect::new(0.0, 0.0, 200.0, 100.0),
