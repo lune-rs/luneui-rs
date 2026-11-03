@@ -6,30 +6,115 @@ status: in-progress
 consumers: luneterm, wane
 source: crates/lune-ui-core/src/widgets/mod.rs
 owner: orch/toolkit-v1
-summary: Checkbox
+summary: Checkbox: 16 px box, accent fill and check when checked, label beside it
 ---
 
 ## What it is
 
-`checkbox`.
+`checkbox`: 16 px box with a label beside it, accent fill and check mark when checked. Picks items from a list; an on/off setting is a `widget.toggle` [W docs/ui/components.md:311].
 
 ## Needs
 
 - Drawn through the painter and generic over the app's hit type (R-widget-1).
-- Wane — States: unchecked; checked (accent fill, 12 px check); hover (`--surface-hover` fill); focus (1 px outline, offset 2); disabled (opacity .4). (R-widget-1)
-- Wane — Sizes: 16 x 16, radius 3 (`--radius-check`), 1 px `--text-secondary` ring; label 13 secondary, gap 8; min height 24. (R-widget-1)
-- Wane — Behaviour: Click and Space toggle. Used for first-run import rows and the Local models filters only (D7). (R-widget-1)
+- Space toggles; Tab stop and focus-visible ring (R-widget-3).
+- Semantic node with the checkbox role (R-infra-4).
+- Hover and focus motion under the animation tiers (R-motion-2).
 
 ## Existing code
 
-`crates/lune-ui-core/src/widgets/mod.rs:176`; the glass-ui spike calls it from `src/widgets.rs`. `widgets/mod.rs` has 203 lines and mostly no tests.
+`crates/lune-ui-core/src/widgets/mod.rs:176` (`checkbox`, 22 lines). Drawn in the gallery's `controls` scene (`apps/gallery/src/scenes.rs:262-275`, checked and unchecked). The glass-ui spike calls it from `src/widgets.rs`.
+
+## Spec
+
+### Evidence
+
+Pinned: Lunegit 33a1dd41, Wane 69931d6, this repo fa2958b. Read: `crates/lune-ui-core/src/widgets/mod.rs:176-197`;
+`crates/lune-ui-core/src/theme.rs:62,67,83`; `apps/gallery/src/scenes.rs:262-275`; Wane `docs/ui/components.md:319-331`;
+Lunegit `src/Lunegit.Desktop/Themes/DarkTheme.axaml:174-181`, `src/Lunegit.Desktop/Views/Dialogs/StashDialogView.axaml:97-100` (use site), `.claude/docs/animation-rules.md:102,104,110`.
+Lunegit has no `CheckBox` style or template override (rg over `src/Lunegit.Desktop` at 33a1dd41: only the `CheckBox*` colour keys).
+Conflicts: (1) Wane gives a hover fill `--surface-hover` and a focus outline [W docs/ui/components.md:323]; the moved code draws neither, so Wane supplies them. (2) Wane's min height 24 [W docs/ui/components.md:324] is a layout rule the moved code does not set; the caller's rect decides. (3) Lunegit's checked fill and border are the accent in every pointer state [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:174-179] and the moved code agrees [R crates/lune-ui-core/src/widgets/mod.rs:186].
+
+### Anatomy
+
+- Box 16 x 16, vertically centred in the rect, at the rect's left edge; corner radius 3 [R crates/lune-ui-core/src/widgets/mod.rs:184,186,189]; Wane 16 x 16 radius 3 (`--radius-check`) [W docs/ui/components.md:324].
+- Unchecked: 1 px ring `fg_secondary` [R crates/lune-ui-core/src/widgets/mod.rs:189].
+- Checked: fill `accent` [R crates/lune-ui-core/src/widgets/mod.rs:186] with a 12 px check glyph in `on_accent` [R crates/lune-ui-core/src/widgets/mod.rs:187]; Wane checked: 12 px check [W docs/ui/components.md:323].
+- Label: 13 px secondary UI text (`fg_secondary`), starts 8 px after the box [R crates/lune-ui-core/src/widgets/mod.rs:192-195]; Wane label 13 secondary, gap 8 [W docs/ui/components.md:324].
+- Hit area: 24 px plus the label width, full rect height [R crates/lune-ui-core/src/widgets/mod.rs:196].
+- Min height 24 [W docs/ui/components.md:324] (rect height is set by the caller).
+
+### States
+
+| state | look | cite |
+|---|---|---|
+| unchecked | 1 px ring `fg_secondary`, no fill | [R crates/lune-ui-core/src/widgets/mod.rs:189] |
+| checked | fill `accent`, check glyph `on_accent` | [R crates/lune-ui-core/src/widgets/mod.rs:186-187] |
+| hover (unchecked) | fill `surface_hover` behind the box | [W docs/ui/components.md:323]; not drawn by the moved code |
+| hover (checked) | accent fill unchanged | [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:175,178] |
+| focus-visible | 1 px outline, offset 2 | [W docs/ui/components.md:323]; not drawn by the moved code |
+| disabled | opacity 0.4, inert | [W docs/ui/components.md:323], [L src/Lunegit.Desktop/App.axaml:481-483] |
+
+### Transitions
+
+| change | property | kind | duration | easing | reduced | cite |
+|---|---|---|---|---|---|---|
+| unchecked ↔ checked | fill and check | selection | fast | linear | keep | [L .claude/docs/animation-rules.md:110], [D40] |
+| rest ↔ hover | box fill | hover | instant | linear | keep | [L .claude/docs/animation-rules.md:102], [D40] |
+| focus-visible on/off | outline opacity | focus | fast | linear | keep | [L .claude/docs/animation-rules.md:104], [D40] |
+
+Lunegit has no `CheckBox` motion selector (`Themes/Animations.axaml`), so every row is the general rule under [D40]. Never animated: virtualized rows on scroll, high-frequency content [L .claude/docs/animation-rules.md:145-149].
+
+### Input and focus
+
+- Pointer: click toggles; hover over the hit area [R crates/lune-ui-core/src/widgets/mod.rs:196]; pointer capture while pressed [core.input].
+- Keyboard: Space toggles [W docs/ui/components.md:325]; Tab stop yes; focus-visible after keyboard navigation [core.focus].
+- Layer: whatever layer the app draws it on; no overlay, no focus scope.
+- Disabled: no hit, no toggle [W docs/ui/components.md:323].
+
+### Retained state
+
+- Transient: hover, focus-ring opacity, fill transitions [core.ui].
+- Persistent: none.
+- App-owned: `checked` (passed every frame), the label text [R crates/lune-ui-core/src/widgets/mod.rs:176-182].
+- Exit retention: no.
+
+### Accessibility
+
+- Role `checkbox`; name = the label the app passes; description none; states checked (mixed not used), focusable, focused, disabled; action `default` toggles [infra.accessibility], [W docs/ui/components.md:325].
+
+### Strings
+
+None: the label is app text.
+
+### Gallery scenes
+
+- `controls` (existing): checked and unchecked, settled.
+- `checkbox-states`: unchecked, checked, unchecked hovered, checked hovered, focus-visible, disabled; settled.
+- `checkbox-fill-mid`: unchecked → checked, t = 90 ms (half of `fast`).
+- `checkbox-hover-mid`: unchecked rest → hover, t = 60 ms (half of `instant`).
+- `checkbox-focus-mid`: focus-visible on, t = 90 ms (half of `fast`).
+
+### Painter primitives
+
+- Existing: fill, ring, icon, text
+- New: none
+
+### Acceptance
+
+- Scripted Space and click each flip `checked` once; a disabled checkbox reports no toggle [core.ui].
+- Pixel probes at scale 2: box 32 x 32 px, radius 6 px; checked centre fill = `accent`; check glyph 24 px; label starts 16 px past the box edge.
+- Conformance: fill change over 60 Hz samples is monotonic, ends exact, settles within 180 ms + 1 frame; Reduced keeps the fill change.
+- Semantic node: role checkbox, checked follows `checked`, injected `AccessAction` default toggles.
+
+### Build
+
+- Milestone: M4 (retrofit: transitions, focus, semantic node); done by M11.
+- Depends on: core.ui, core.focus, infra.accessibility, motion.transitions.
 
 ## Open questions
 
-- Keyboard focus and key handling for this control are not in the inventory (R-widget-3).
+- None.
 
 ## Notes for the planner
 
-Moves in the behaviour-preserving extraction (R-ext-1); the pixel gate covers it only where a glass-ui scene draws it.
-
-Wane (2026-11-04): lune-ui status for Wane's use: exists widgets/mod.rs:176; Wane priority P1. Full spec: Wane `docs/ui/components.md`, section `widget.checkbox`; mock: Wane `docs/ui/mocks/components.html`.
+Moves in the behaviour-preserving extraction (R-ext-1); the pixel gate covers the checked and unchecked boxes in `controls`. Wane P1.
