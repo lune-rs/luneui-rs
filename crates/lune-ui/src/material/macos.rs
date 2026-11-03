@@ -15,6 +15,10 @@ use window_vibrancy::{
 
 use super::Material;
 
+/// The best backdrop kind this platform shows.
+pub(super) const BEST_SUPPORTED: crate::backdrop::BackdropKind =
+    crate::backdrop::BackdropKind::Blur;
+
 // `Light` is deprecated by Apple but is exactly what Avalonia uses.
 #[allow(deprecated)]
 pub(super) fn apply(window: &winit::window::Window, material: Material) -> Result<(), String> {

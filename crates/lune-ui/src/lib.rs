@@ -18,16 +18,17 @@
 //!   (offscreen targets and PNG readback);
 //! - [`input`] (the input seam: `RawInput` in, `FrameOutput` out, plain data), [`winit_input`]
 //!   (its winit translation and output application);
-//! - [`material`] (OS backdrop per platform, [`GlassLayer`] and [`Backdrop`] describe the layers
-//!   and capability levels), [`window`] (edge resize, double click, caption buttons),
+//! - [`backdrop`] (the material seam: [`GlassLayer`], [`BackdropKind`], `Material` and the
+//!   [`Backdrop`] capability), [`material`] (its OS implementation per platform), [`window`] (edge resize, double click, caption buttons),
 //!   [`winit_window`] (glass window attributes, edge → winit direction);
 //! - [`testing`] (fakes of the seams for tests: the display-list recorder, a fake text system
-//!   and its contract suite, a scripted input source).
+//!   and its contract suite, a scripted input source, a null material and its contract suite).
 //!
 //! Values in the dark preset are copied from the house look's `DarkTheme.axaml` and `App.axaml`, so
 //! apps styled after it match.
 
 pub mod acrylic;
+pub mod backdrop;
 pub mod blur;
 pub mod chrome;
 pub mod color;
@@ -50,32 +51,5 @@ pub mod window;
 pub mod winit_input;
 pub mod winit_window;
 
+pub use backdrop::{Backdrop, BackdropKind, GlassLayer};
 pub use theme::lunegit_dark;
-
-use color::Rgba;
-
-/// One app-drawn acrylic layer, in Avalonia `ExperimentalAcrylicMaterial` terms.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct GlassLayer {
-    pub tint: Rgba,
-    pub tint_opacity: f32,
-    pub material_opacity: f32,
-}
-
-/// OS backdrop material requested for the window.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BackdropKind {
-    /// Strongest blur the platform offers (macOS vibrancy, Windows acrylic, KDE blur).
-    Blur,
-    /// Transparent window without blur (Linux compositors without a blur protocol).
-    Transparent,
-    /// Opaque fallback (no compositor, or the user turned glass off).
-    Opaque,
-}
-
-/// Applies an OS backdrop to a native window. One implementation per platform.
-pub trait Backdrop {
-    /// Best kind this platform/session supports; callers fall back down
-    /// `Blur → Transparent → Opaque` like Avalonia's `TransparencyLevelHint`.
-    fn best_supported(&self) -> BackdropKind;
-}

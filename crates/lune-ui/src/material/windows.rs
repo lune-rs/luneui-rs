@@ -8,6 +8,10 @@ use window_vibrancy::{
 
 use super::Material;
 
+/// The best backdrop kind this platform shows.
+pub(super) const BEST_SUPPORTED: crate::backdrop::BackdropKind =
+    crate::backdrop::BackdropKind::Blur;
+
 pub(super) fn apply(window: &winit::window::Window, material: Material) -> Result<(), String> {
     // Clearing a backdrop that was never applied is harmless.
     let _ = clear_acrylic(window);
