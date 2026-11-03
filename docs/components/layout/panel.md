@@ -109,7 +109,7 @@ None: title, meta, note and button labels are app text (Wane mock content, [W do
 
 ## Open questions
 
-- Whether the panel's `--card` variant needs its own clip-rounded primitive or the page's: decided with layout.page; open.
+- The panel's `--card` variant uses the same `clip-rounded` primitive as the page: one row in the `core.painter` table.
 - Whether this is a toolkit component or app code composed from the painter: the planner decides (Wane needs it either way).
 - Native rendering: outline only, so nothing to approximate; the panel must clip children to the radius.
 

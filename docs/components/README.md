@@ -36,12 +36,12 @@ counters.
 - `text`: shaping, measuring, editing and viewing text
 - `motion`: animation curves and timing
 - `infra`: cross-cutting machinery (localization, shortcuts, theming reload, accessibility)
-- `lunegit`: needs that are shaped like the Lunegit app, until a planner generalises them into a
-  library area
+- `lunegit`: needs that are shaped like the Lunegit app and stay in it (`external` entries only)
 - `luneterm`: the same for Luneterm (the terminal grid itself stays in Luneterm)
 
-App areas hold app-shaped needs only. Once generalised, move the entry into a library area and
-change its id (nothing else cites ids yet).
+App areas hold app-shaped needs only. Since M3 they hold only `external` entries; a reusable shape
+lives under a library area with a neutral id (DECISIONS D42). To generalise an app-area entry, move
+it with `git mv` and change its id and area.
 
 ## Front matter
 
@@ -62,12 +62,60 @@ Between two `---` lines, one `key: value` per line, no nesting, every key presen
 
 - `in-luneterm`: the code exists today in Luneterm's `lune-ui` (`source:` points at it) and moves in the extraction
 - `planned`: a consumer has named the need; no code anywhere
-- `stub`: rough placeholder, not analysed; a planner must look before anyone builds
+- `stub`: rough placeholder, not analysed; a planner must look before anyone builds (none left since M3: an analysed stub becomes `planned`, DECISIONS D49)
 - `in-progress`: someone owns it (`owner:`)
 - `done`: lives in this repo
 - `external`: needed by a consumer but stays in the consumer's repo
 
 ## Body sections
 
-What it is; Needs (bullets, each citing an `R-` id); Existing code (`path:line` or "none"); Open
-questions; Notes for the planner. State only what is verified; write unknowns as open questions.
+Five sections, in this order, with `## Spec` after `## Existing code` (DECISIONS D49):
+
+1. `## What it is`
+2. `## Needs` (bullets, each citing an `R-` id)
+3. `## Existing code` (`path:line`, or "none")
+4. `## Spec` with exactly these twelve `###` subsections in this order: `Evidence`, `Anatomy`, `States`,
+   `Transitions`, `Input and focus`, `Retained state`, `Accessibility`, `Strings`, `Gallery scenes`,
+   `Painter primitives`, `Acceptance`, `Build`. A subsection that does not apply reads
+   `n/a — <reason>`; none is omitted.
+5. `## Open questions` (only what is still open, else `- None.`) and `## Notes for the planner`
+
+An `external` entry (status `external`) has a short `## Spec` of three subsections only: `Evidence`,
+`Reusable parts` (the library entry ids that cover the reusable pieces, with cites) and `Build`
+(`- Milestone: external — stays in <app>`).
+
+Rules for the spec subsections:
+
+- **Evidence**: first line `Pinned: Lunegit <rev>, Wane <rev>, this repo <rev>`; then the files and line
+  ranges read; then every conflict between sources and its winner. Precedence: this repo's moved
+  code (pixel-gated), then Lunegit, then Wane; for a component only Wane draws, Wane.
+- **Cites**: every claim in Anatomy, States, Transitions and Input and focus carries a tag:
+  `[L path:n]` Lunegit, `[W path:n]` Wane, `[R path:n]` this repo, `[LT path:n]` Luneterm (`:n-m` and
+  `:n,m` allowed), `[D<n>]` a DECISIONS row, `[derived: <from what>]` only when no source has the
+  value, `[core.ui]`, `[core.focus]`, `[infra.accessibility]` or `[motion]` for toolkit-model
+  statements, or `[<entry id>]` for another entry. A claim with no source and no derivation is an
+  open question.
+- **States**: table `| state | look | cite |`. **Transitions**: table
+  `| change | property | kind | duration | easing | reduced | cite |` using the vocabulary of
+  `../motion.md` (15 kinds, 5 durations, 7 easings; reduced is `keep`, `fade` or `snap`); a transition
+  Lunegit lacks cites `[D40]`; name what never animates.
+- **Input and focus**: pointer senses, keys, Tab stop, layer (`Base` < `Page` < `Popup` < `Modal`, and
+  `Toast` above them by D54), and for overlays the focus scope, dismiss rules and pointer capture.
+- **Retained state**: Transient, Persistent (owned by the container, survives `ui.keep_alive`),
+  App-owned, Exit retention.
+- **Accessibility**: role, name, description and value sources, states and actions from
+  `infra.accessibility`'s enums; a role or action the enums lack is an open question `role-gap: ...`.
+- **Strings**: keys `luneui.<slug>.<name>` with the English default and the Lunegit `en.json` line it
+  comes from, or `None: <why>`.
+- **Gallery scenes**: `- `<id>`: <setup>, t = <ms or settled>`; ids are lowercase-hyphen and unique
+  across the catalogue except the existing scene ids, which are reused by name. Every state appears in
+  a scene; every transition gets a mid-transition scene at half its Full duration.
+- **Painter primitives**: `- Existing: <list>` and `- New: <list or none>` using the primitive names in
+  `core.painter`; each new item cites the drawing that needs it and is added to `core.painter`'s
+  aggregate table.
+- **Acceptance**: behaviour tests with scripted input and injected time, pixel probes at scale 2, one
+  conformance line per transition, the semantic-node test. Infrastructure entries with no UI name the
+  existing tests by path.
+- **Build**: `- Milestone: <M4..M11>` and `- Depends on: <entry ids>`.
+
+State only what is verified; write unknowns as open questions.

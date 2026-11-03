@@ -11,7 +11,7 @@ summary: 640 px search dialog over commits, branches, tags, stash, reflog, repos
 
 ## What it is
 
-Lunegit's global search dialog, renamed to the command palette (D11, `git mv` from `lunegit.global-search-dialog`): a 640 px dialog with one search box and grouped result sections (commits, branches, tags, stash, reflog, repos, settings, commands); a footer lists the keys and the prefix filters [L src/Lunegit.Desktop/Views/Dialogs/GlobalSearchDialogView.axaml:10-16,77,127,179,238,298], [L src/Lunegit.Infrastructure/Localization/en.json:281-294].
+Lunegit's global search dialog, renamed to the command palette (D11, D42): a 640 px dialog with one search box and grouped result sections (commits, branches, tags, stash, reflog, repos, settings, commands); a footer lists the keys and the prefix filters [L src/Lunegit.Desktop/Views/Dialogs/GlobalSearchDialogView.axaml:10-16,77,127,179,238,298], [L src/Lunegit.Infrastructure/Localization/en.json:281-294].
 
 ## Needs
 
@@ -69,7 +69,7 @@ Animation is empty); if hosted by the dialog overlay it takes [overlay.dialog]'s
 - Keyboard: Up and Down select; Enter opens; Esc closes [L src/Lunegit.Infrastructure/Localization/en.json:293-294]. Prefix filters: `#` branches, `:` settings, `>` commands, `date:7d` [L src/Lunegit.Infrastructure/Localization/en.json:293]. The routing lives in the view model, not read (Open question).
 - Tab stop: the search box, then the rows (derived: the rows are buttons, [L src/Lunegit.Desktop/Views/Dialogs/GlobalSearchDialogView.axaml:80]) [core.focus].
 - Layer: Modal (the dialog overlay, [L src/Lunegit.Desktop/MainWindow.axaml:232]) [derived].
-- Focus scope: push on open; the search box takes focus; pop restores focus to the previous widget [core.focus]. Esc closes the top overlay only [core.focus].
+- Focus scope: push on open; as a `Modal` overlay it traps Tab [core.focus]; the search box takes focus; pop restores focus to the previous widget [core.focus]. Esc closes the top overlay only [core.focus].
 - Pointer capture while pressed: none in the view.
 
 ### Retained state
@@ -139,4 +139,4 @@ Animation is empty); if hosted by the dialog overlay it takes [overlay.dialog]'s
 
 ## Notes for the planner
 
-The stub said "rough stub — not analysed"; this entry reads the view's markup and the English strings. The view model is the next read before M7 builds the keyboard path.
+Renamed by `git mv` from `lunegit.global-search-dialog` (D10 mapping, D42). The stub said "rough stub — not analysed"; this entry reads the view's markup and the English strings. The view model is the next read before M7 builds the keyboard path.

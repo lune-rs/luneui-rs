@@ -94,7 +94,7 @@ Lunegit's kind `focus`. Never animated: nothing beyond the motion.md list.
 - Pointer: press focuses a focusable widget; the ring stays hidden for pointer focus.
 - Keyboard: Tab, Shift+Tab move; arrows rove inside composites; Enter and Space activate; Escape dismisses the top overlay [core.ui].
 - Tab stop: yes for every focusable widget, once per composite.
-- Layer: a scope belongs to its overlay's layer; scopes stack `Base` < `Page` < `Popup` < `Modal` with the overlay stack [core.ui].
+- Layer: a scope belongs to its overlay's layer; scopes stack `Base` < `Page` < `Popup` < `Modal` < `Toast` with the overlay stack ([D54]) [core.ui].
 - Scope rules: push on open; a modal traps Tab; pop restores focus to the previous widget or the anchor; Escape and an outside click act on the top overlay only; focus loss closes a flyout and a light-dismiss popup [W docs/ui/components.md:577], [L src/Lunegit.Desktop/Controls/FieldSearchPicker.axaml:57].
 - Pointer capture: a pressed widget keeps the pointer until release; it does not move focus on release [core.ui].
 

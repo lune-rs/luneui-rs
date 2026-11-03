@@ -75,7 +75,7 @@ Lunegit's tween is on the Border side-panel item; the Button variant has none, s
 
 ### Accessibility
 
-- Role `list-item` inside a `list`; name = the screen name; state `selected` for the current screen (`aria-current` in Wane) [W docs/ui/components.md:423]; states focusable, focused, disabled; action `default` navigates [infra.accessibility].
+- Role `list-item` inside a `list`; name = the screen name; states `selected` and `current` for the current screen (`aria-current` in Wane) [W docs/ui/components.md:423], [D55]; states focusable, focused, disabled; action `default` navigates [infra.accessibility].
 
 ### Strings
 

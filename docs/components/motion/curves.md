@@ -87,7 +87,7 @@ None: no user-visible text.
 
 - `menu` (existing): settled, hover item 1, scale 2 [R apps/gallery/src/scenes.rs:96-101].
 - `menu-opening` (existing): open at t = 90 ms (half of `fast`), scale 2 [R apps/gallery/src/scenes.rs:103-108].
-- `menu-closing`: the same menu closing at t = 60 ms (half of `instant`); new, drawn once `menu_close_anim` has a scene.
+- `curves-menu-closing`: the same menu closing at t = 60 ms (half of `instant`); new, drawn once `menu_close_anim` has a scene.
 - `motion-curve-cubic-out`, `motion-curve-ease-in`: the curve plotted over 0..1 beside its token name, settled; shared with `motion.transitions`' `motion-easings` page.
 
 ### Painter primitives

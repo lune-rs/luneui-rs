@@ -73,7 +73,7 @@ Never animated: the split sizes during a drag (layout properties on large surfac
 
 ### Accessibility
 
-- The splitter is a separator: no role in the SF8 list. `role-gap: separator (splitter, resizable)`.
+- The splitter has role `separator` (resizable, with a value) [infra.accessibility], [D55].
 - Live region: none.
 
 ### Strings
@@ -96,7 +96,7 @@ None: the splitter draws no text.
 - Behaviour (scripted input, injected time): a drag of N px changes the column width by N px, clamped to the minimum and maximum (open question); a hidden column snaps shown with no animation. None exists.
 - Pixel probes at scale 2: splitter 8 px wide or high; hit area open question.
 - Conformance: the column snap is instant under all tiers.
-- Semantic node: `role-gap` above; the sizes are exposed as a value (open question).
+- Semantic node: role `separator` [D55]; the sizes are exposed as a value (open question).
 
 ### Build
 
@@ -109,7 +109,6 @@ None: the splitter draws no text.
 - Keyboard resize and the splitter's Tab stop: not in the sources read; open.
 - Whether the sizes persist across launches (Lunegit `TerminalPanelHeight` persistence): not read; open.
 - The stub named `infra.drag-and-drop` for drag handling; a splitter drag is pointer input, not DnD: confirm with the planner; open.
-- `role-gap: separator`: add the role to the SF8 list or accept the `group` fallback; open.
 - Hit area of the 4 px splitter (wider than the paint): not read; open.
 
 ## Notes for the planner

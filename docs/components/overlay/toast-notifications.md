@@ -37,7 +37,7 @@ Pinned: Lunegit 33a1dd41, this repo fa2958b. Read: `src/Lunegit.Desktop/MainWind
 `src/Lunegit.Desktop/Themes/DarkTheme.axaml:333-341`; `src/Lunegit.Infrastructure/Localization/en.json:8,390-392,402-405`;
 `src/Lunegit.Desktop/Themes/Animations.axaml` and `AnimationsReduced.axaml` (no toast selector, `grep -i toast` empty).
 Conflicts: none between sources (Wane has no toast entry). The layer order: Lunegit draws toasts above dialogs
-[L src/Lunegit.Desktop/MainWindow.axaml:232,272]; the toolkit's top layer is Modal [R crates/lune-ui-core/src/scene.rs:17-22]. Open question.
+[L src/Lunegit.Desktop/MainWindow.axaml:232,272]; the toolkit's top layer today is Modal [R crates/lune-ui-core/src/scene.rs:17-22]; a `Toast` layer above `Modal` is added in M4 ([D54], [core.ui]).
 
 ### Anatomy
 
@@ -73,8 +73,8 @@ n/a — Lunegit has no toast motion (no toast selector in Animations.axaml or An
 - Pointer: a click on the toast toggles expansion [L src/Lunegit.Desktop/MainWindow.axaml:294]; action buttons on prompts [L src/Lunegit.Desktop/MainWindow.axaml:387-389]; cancel on cancellable loading toasts [L src/Lunegit.Desktop/MainWindow.axaml:325-330]; clear-all in the history [L src/Lunegit.Desktop/Views/SidePanels/NotificationHistoryPanelView.axaml:14-21].
 - Keyboard: none in the Lunegit sources read; open question.
 - Tab stop: action and cancel buttons only, not the toast body [core.focus] (derived: the body is a click target, MainWindow.axaml:294).
-- Layer: Popup [derived: drawn over content, MainWindow.axaml:272]. Lunegit draws toasts above dialogs [L src/Lunegit.Desktop/MainWindow.axaml:232,272]; open question.
-- Focus scope: none; toasts do not take focus [derived: no focus code found in the toast markup, MainWindow.axaml:272-399].
+- Layer: `Toast`, above `Modal` [L src/Lunegit.Desktop/MainWindow.axaml:232,272], [D54], [core.ui].
+- Focus scope: none; toasts push no scope, so their buttons are tab stops of the scope below and a modal's Tab trap does not reach them [core.focus]; toasts do not take focus on appear [derived: no focus code found in the toast markup, MainWindow.axaml:272-399].
 - Dismiss: timed (see Acceptance); an expanded toast is not dismissed; prompts and errors are dismissed only by a button or the clear-all [L src/Lunegit.Desktop/Services/NotificationService.cs:147-170].
 - Pointer capture while pressed: none.
 
@@ -127,7 +127,6 @@ n/a — Lunegit has no toast motion (no toast selector in Animations.axaml or An
 
 ## Open questions
 
-- Toast layer above dialogs (Lunegit draws them over the dialog overlay, MainWindow.axaml:232,272) and the toolkit's top layer is Modal (scene.rs:17-22): open for M7.
 - Toast appear and dismiss motion: none in Lunegit; open.
 - Keyboard: no key handling found in the Lunegit toast markup; open.
 - Role for error toasts: `alert` or `status` (plan says polite live region for all); open.

@@ -50,7 +50,7 @@ real file.
 Conflict: Lunegit's `Format` hands the whole template back unchanged when `string.Format` throws, which a missing
 argument does [L src/Lunegit.Infrastructure/Localization/LocalizationService.cs:58-70]; C4 fills what it can and leaves a
 missing argument's placeholder in place. The entry follows C4 (the contract M4 builds, and it never panics); the two differ only when an
-argument is missing. Lunegit's `{0:N0}` and date formats are not plain `{n}`: see Open questions.
+argument is missing. Lunegit's `{0:N0}` and date formats parse as `{n:spec}`, with the spec handed to an app-supplied `ArgFormat` hook ([D52]).
 
 ### Anatomy
 
@@ -58,7 +58,7 @@ argument is missing. Lunegit's `{0:N0}` and date formats are not plain `{n}`: se
 - Toolkit keys start with `luneui.`; every other key is the app's; the prefix keeps the two apart [derived: C4 string rules].
 - English defaults for every `luneui.` key are compiled into core as a static table; no file is read [derived: C4], [D2]. Lunegit's equivalent is the embedded `en.json`, "the canonical key registry", overlaid first under every language [L src/Lunegit.Infrastructure/Localization/LocalizationService.cs:16-18,104-130].
 - `ui.tr(key)`: the active locale's value, else the English default, else the key; no panic for any key, including an empty one [derived: C4], [L src/Lunegit.Infrastructure/Localization/LocalizationService.cs:47-56]. For an app's own keys the app's English text is the locale table it loads when no other locale is active [derived: core holds English defaults for `luneui.` keys only].
-- `ui.tr_fmt(key, &args)`: positional `{0}` to `{n}` over the `tr` result; `{{` and `}}` are literal braces; a missing argument leaves its placeholder; extra arguments are ignored [derived: C4 string rules; Lunegit's `string.Format` subset, `src/Lunegit.Infrastructure/Localization/LocalizationService.cs:58-70`]. Parsing runs left to right, so `stash@{{{0}}}` yields `stash@{`, argument 0, `}` [L src/Lunegit.Infrastructure/Localization/en.json:593].
+- `ui.tr_fmt(key, &args)`: positional `{0}` to `{n}` over the `tr` result; `{{` and `}}` are literal braces; a missing argument leaves its placeholder; extra arguments are ignored; `{n:spec}` parses, and the argument and the spec text go to the app-supplied `ArgFormat` hook, whose default is the argument's `Display` with the spec ignored, so the toolkit ships no number or date locale data [D52]; [derived: C4 string rules; Lunegit's `string.Format` subset, `src/Lunegit.Infrastructure/Localization/LocalizationService.cs:58-70`]. Parsing runs left to right, so `stash@{{{0}}}` yields `stash@{`, argument 0, `}` [L src/Lunegit.Infrastructure/Localization/en.json:593].
 - No plural rules in v1: Lunegit has none either; it uses a separate key (`toast.storage.cacheClearedPlural`) or a "(s)" suffix, and apps do the same [L src/Lunegit.Infrastructure/Localization/en.json:446,491,522].
 - Active locale: a table the app holds and passes in; switching it takes effect on the next frame. Lunegit needs observers, a language epoch and a binding per key to push a change [L src/Lunegit.Desktop/Localization/LocalizationSource.cs:13-21,36]; an immediate-mode frame re-reads every key, and the shaped-text cache is keyed by content, so changed text re-shapes [D27].
 - Catalog JSON (M10): `{ "code", "displayName", "version", "strings": { key: value } }` [L src/Lunegit.Infrastructure/Localization/en.json:1-5]. Required: `code`, `displayName`, `strings`; `version` is an integer for app-managed refresh and the loader ignores it [L src/Lunegit.Core/Localization/LanguageFile.cs:7-8,12-20], [L src/Lunegit.Infrastructure/Localization/JsonLanguageRegistry.cs:83-91].
@@ -106,10 +106,10 @@ n/a — no drawing.
 
 - Defaults test: every `luneui.` key referenced by toolkit source has a non-empty English default, and every default key matches `luneui.[a-z0-9-]+(\.[a-z0-9-]+)+` [derived: C4 defaults test].
 - Fallback chain: with a locale lacking key K, `tr(K)` returns the English default; with neither, the key; `tr("")` and a 10,000-character key return without panic.
-- `tr_fmt` known answers (copied from Lunegit's real strings): `Drop stash@{{{0}}} '{1}'? This cannot be undone via the UI.` with `["3", "wip"]` gives `Drop stash@{3} 'wip'? This cannot be undone via the UI.` [L src/Lunegit.Infrastructure/Localization/en.json:593]; `"{0} and {1}"` with one argument gives `x and {1}`; extra arguments are ignored; `{{` and `}}` give `{` and `}`; an unmatched `{` is kept literally and never panics [derived: C4].
+- `tr_fmt` known answers (copied from Lunegit's real strings): `Drop stash@{{{0}}} '{1}'? This cannot be undone via the UI.` with `["3", "wip"]` gives `Drop stash@{3} 'wip'? This cannot be undone via the UI.` [L src/Lunegit.Infrastructure/Localization/en.json:593]; `"{0} and {1}"` with one argument gives `x and {1}`; extra arguments are ignored; `{{` and `}}` give `{` and `}`; an unmatched `{` is kept literally and never panics [derived: C4]. `"{0:N0}"` with `["1234"]` gives `1234` under the default hook; under a hook that groups thousands it gives `1,234`; the spec text reaches the hook unchanged [D52].
 - Switching the locale between two frames changes the shaped text on the second frame and nothing else (no stale cache) [D27].
 - M10: `Catalog::from_json` loads a copy of Lunegit's real `en.json` (1019 strings) and each sample language file; non-object `strings`, a missing `code`, a depth bomb, an oversize input and invalid UTF-8 each return an error and never panic [D44], [L src/Lunegit.Core/Localization/LanguageFile.cs:12-20].
-- M10: a placeholder audit over the real `en.json` reports the 119 placeholder-bearing keys, 111 plain and 8 with a format specifier (see Open questions); it fails on any form C4 does not format until the roadmap is revised.
+- M10: a placeholder audit over the real `en.json` reports the 119 placeholder-bearing keys, 111 plain and 8 with a format specifier ([D52]); all 119 parse, and it fails on any form `tr_fmt` does not parse.
 - No file, clock or environment access in library source (boundary rules stay green; R-nfr-1).
 
 ### Build
@@ -119,7 +119,6 @@ n/a — no drawing.
 
 ## Open questions
 
-- Eight `en.json` keys use .NET format specifiers that plain `{n}` does not cover: `{0:N0}` (a thousands-grouped count, `toast.git.fsmonitorPromptDetail`) and date and time forms `{0:t}`, `{0:ddd}`, `{0:d MMM}`, `{0:d MMM yyyy}`, `{0:ddd d MMM yyyy}` (seven `aiSessions.time.*` keys) [L src/Lunegit.Infrastructure/Localization/en.json:396,1000-1006]. C6 says any other form extends C4 through a roadmap revision. Options: the toolkit stays plain `{n}` and the app pre-formats numbers and dates into the argument (then the Lunegit keys change to plain `{n}` when ported); or C4 gains a small specifier set. Until decided, a placeholder with a specifier is left literal by `tr_fmt`.
 - An app key that starts with `luneui.` or a catalog that defines one: C4 reserves the prefix but does not say whether the table rejects it or ignores it. M4 decides; rejecting with an error at load is the fail-closed choice.
 
 ## Notes for the planner

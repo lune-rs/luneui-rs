@@ -109,7 +109,7 @@ None: the control draws no text; the legend and values are app text.
 
 - Single-slice full circle: the arc from a point to the same point is not verified in the control; open.
 - Slice labels and a legend: none in the control; open (the app or a new entry).
-- Colour keys: the toolkit's theme keys for slices are not defined; open.
+- Colour keys: the toolkit adds the chart series colour `data` (token to add, M4, [D56], [data.bar-chart]); slice colours beyond it are app-supplied per slice, as Lunegit looks them up at render [L src/Lunegit.Desktop/Controls/StoragePieChartControl.cs:165-173].
 - Hover on a slice: none in the control; open.
 
 ## Notes for the planner

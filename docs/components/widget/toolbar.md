@@ -11,7 +11,7 @@ summary: Toolbar: three-column command bar of 40 px toolbar-action buttons with 
 
 ## What it is
 
-`toolbar`: Lunegit's main command bar. A three-column grid; the left group holds the 40 x 40 action buttons (fetch, pull, push, branch) with 20 px icons. Commands and labels are the app's. Renamed from `lunegit.toolbar` (step 8, `git mv`).
+`toolbar`: Lunegit's main command bar. A three-column grid; the left group holds the 40 x 40 action buttons (fetch, pull, push, branch) with 20 px icons. Commands and labels are the app's.
 
 ## Needs
 

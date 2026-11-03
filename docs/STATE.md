@@ -1,32 +1,31 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-04 (M2 review round 2: dependency rules read cargo metadata; rule 12 pins compiled sources)
+Last updated: 2026-11-04 (M3 close: painter aggregate, README and template spec layout, INDEX regenerated)
 
 ## Now
 
-M2 (seams and crate split) is implemented on branch `orch/toolkit-v1`, awaiting review and merge. The
-toolkit is five crates: pure `lune-ui-core` (no dependencies: painter, `Scene`, widgets, theme, seam
-types and the `testing` fakes), adapters `lune-ui-wgpu`, `lune-ui-winit`, `lune-ui-platform`, and the
-facade `lune-ui` that keeps every old module path. The four seams (display list, text, input and
-output, OS glass) each have a core model, a fake and a contract test. One `Gpu` and one `TextCache`
-serve any number of windows and headless targets; the gallery's `--dump` runs headless, with the 15
-scenes at zero pixel delta against M1. `scripts/check-boundaries.sh` enforces rules 1 to 12 (core
-purity, adapter dependency lists, `unsafe` and OS-cfg placement, facade only; dependency edges and build targets read from `cargo metadata`, multi-line `cfg` included). DECISIONS D24 to D39
-record the M2 choices; `docs/architecture.md` holds the module map, seam table and multi-window model;
-the catalogue has five new entries (`core.scene`, `core.input`, `core.testing`, `render.surface`,
-`platform.input`).
+M3 (catalogue specs) is implemented on branch `orch/toolkit-v1`, awaiting review and merge, on top of
+M2 (seams and crate split). All 97 catalogue entries carry a `## Spec` (format: DECISIONS
+D49, README "Body sections") with Lunegit, Wane or repo `file:line` cites; none is a `stub`.
+`docs/motion.md` fixes the motion vocabulary (D50); `docs/requirements.md` has no open item;
+`core.painter` holds the aggregate table of new painter primitives (image, rotate, dash,
+clip-rounded, sector, path-fill, arc), the list M5 builds. DECISIONS D40 to D57 record the M3 choices,
+including the interaction-model additions M4 builds from: a `Toast` layer above `Modal` (D54), the
+36 roles and 15 states (D55), new `Theme` tokens (D56), `{n:spec}` formatting through an `ArgFormat`
+hook (D52). The code is the M2 five-crate toolkit (pure `lune-ui-core`, adapters `lune-ui-wgpu`,
+`lune-ui-winit`, `lune-ui-platform`, facade `lune-ui`); M3 changed docs only, so the 15 gallery scenes
+are unchanged. Window-mode code is compile- and review-checked only: no gate opens a visible window.
 
-Window-mode code (surfaces, present, output commands, OS glass) is compile- and review-checked only:
-no gate opens a visible window.
-
-Wane is a third consumer (2026-11-04): 20 `planned` catalogue entries from its UI spec, `wane` added to
-15 existing entries, and requirements R-platform-6, R-widget-4 and R-data-2.
+Wane is a third consumer (2026-11-04): its UI spec is catalogued, R-platform-6 narrowed (tray, flyout
+and glass menu in toolkit; close-to-tray, single instance, autostart and notifications app-side).
 
 ## Next
 
-1. M3 (roadmap): catalogue analysis, docs only: deep-analyse the `lunegit.*` stubs and the stubs in
-   library areas by reading Lunegit's code, confirm the planned entries against Wane's spec.
+1. Review and merge M3, then M4 (roadmap): the interaction model in core (`Ui`, ids, retained state,
+   layers, focus, semantic tree, string table, motion system) and the retrofit of the moved widgets,
+   built from the `core.ui`, `core.focus`, `infra.accessibility`, `infra.localization` and
+   `motion.transitions` specs.
 2. CI (fmt, clippy `-D warnings`, tests on macOS, Windows and Linux) now that there is code to run.
 3. `scripts/export-snapshot.sh` for Luneterm's vendored snapshot (D13), before Luneterm M9. The
    migration map for M11 is "API changes since M1" in `docs/architecture.md`.

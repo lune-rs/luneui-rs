@@ -66,7 +66,7 @@ n/a — no focus of its own. The optional action button takes focus as a `widget
 
 ### Accessibility
 
-- Role `static-text`; live region polite when the notice appears after an action, since the callouts report state changes (budget alert, proxy offline) [W docs/ui/components.md:491]; name = the text.
+- Role `note` (Wane's callouts are `role="note"` [W docs/ui/mocks/overview.html:28]; [D55]); live region polite when the notice appears after an action, since the callouts report state changes (budget alert, proxy offline) [W docs/ui/components.md:491]; name = the text.
 
 ### Strings
 

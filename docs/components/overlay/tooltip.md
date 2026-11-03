@@ -36,7 +36,7 @@ Pinned: Lunegit 33a1dd41, Wane 69931d6, this repo fa2958b. Read: Lunegit src/Lun
 Views/AiProjectDetailView.axaml:88-118, Views/RepositoryContentView.axaml:396-424, Themes/Animations.axaml and Themes/AnimationsReduced.axaml (no `ToolTip` selector in either: `grep -c ToolTip` gives 0 and 0);
 greps over `src/Lunegit.Desktop/**/*.axaml`: `ToolTip.Tip=` on 108 lines, `ShowDelay` on one line (counted 2026-11-04, `[derived: grep count]`); Wane docs/ui/components.md:213,647,726,756-758.
 Conflict, the two numbers: the 150 ms in `LazyHoverHost` is a dwell before a hover branch label is built on a commit row, a filter for rows that flick under a parked cursor while a list scrolls [L src/Lunegit.Desktop/Controls/LazyHoverHost.cs:16-22,61]; it is not a tooltip delay.
-The 800 ms is the only explicit tooltip delay, on the terminal tab tooltip [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:263-264]. The roadmap's C5 line "dwell 150 ms, delay token" joins the two. Resolution: the tooltip `show_delay` is 800 ms of continuous hover
+The 800 ms is the only explicit tooltip delay, on the terminal tab tooltip [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:263-264]. The roadmap's C5 line "dwell 150 ms, delay token" joins the two. Resolution ([D57]): the tooltip `show_delay` is 800 ms of continuous hover
 (`Theme` motion token, app-overridable); the 150 ms dwell is the minimum continuous hover for lazily built hover content and is subsumed by the 800 ms for tooltips. Every other Lunegit tooltip uses Avalonia's default delay, which is not stated in the Lunegit source.
 
 ### Anatomy
@@ -71,7 +71,7 @@ Lunegit's tooltip has no transition in any tier: neither tier file has a `ToolTi
 
 ### Input and focus
 
-- Pointer: hover over the anchor for `show_delay` starts it; leaving the anchor hides it at once (teardown is never delayed, only the build: the same shape as `LazyHoverHost`) [L src/Lunegit.Desktop/Controls/LazyHoverHost.cs:9-14]. A press on the anchor hides it [derived: the Avalonia default is not read].
+- Pointer: hover over the anchor for `show_delay` starts it; leaving the anchor starts the dismiss at once (teardown is never delayed, only the build; the 120 ms dismiss fade then runs: the same shape as `LazyHoverHost`) [L src/Lunegit.Desktop/Controls/LazyHoverHost.cs:9-14]. A press on the anchor hides it [derived: the Avalonia default is not read].
 - Keys: the tooltip owns none; Escape dismisses it as the topmost overlay [core.ui]. Keyboard focus on the anchor shows it after the same delay [derived: keyboard users have no hover; no source states it; Open questions].
 - Tab stop: no. Layer: `Popup`. No focus scope: a tooltip never takes or moves focus [core.focus].
 - A hover that begins while a list scrolls restarts the timer for each new anchor, so a row flicking under a parked cursor never shows one [L src/Lunegit.Desktop/Controls/LazyHoverHost.cs:16-22].
@@ -109,7 +109,7 @@ None: the text is supplied by the app (Lunegit's are app strings such as `termin
 
 ### Acceptance
 
-- Behaviour (scripted pointer, injected time): hover for 799 ms draws nothing; 800 ms draws the tooltip; leaving hides it at once; moving to another anchor restarts the timer; a hover on an anchor that stops being called never shows one; a disabled anchor shows it; scrolling a list under a parked pointer shows none [core.ui].
+- Behaviour (scripted pointer, injected time): hover for 799 ms draws nothing; 800 ms draws the tooltip; leaving starts the dismiss at once (fully hidden after 120 ms); moving to another anchor restarts the timer; a hover on an anchor that stops being called never shows one; a disabled anchor shows it; scrolling a list under a parked pointer shows none [core.ui].
 - Placement: the tooltip stays inside the window with an 8 px margin (the popover acceptance) [overlay.popover].
 - Pixel probes at scale 2: radius 16 device px, padding 20 px horizontal and 16 px vertical around the text, 2 px border.
 - Conformance: appear and dismiss pass `motion::conformance`; Reduced keeps the fade, Off snaps [motion].

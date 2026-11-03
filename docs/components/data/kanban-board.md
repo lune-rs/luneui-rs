@@ -79,7 +79,7 @@ n/a — no motion in the board markup read; the drag follows the pointer and the
 ### Accessibility
 
 - Board: role `list` of columns; each column `group` named by its title with the card count as description [infra.accessibility].
-- Card: `list-item` with `button` default (open) and `delete` and `edit` actions; drag is not a listed action: `role-gap: drag (card move)`.
+- Card: `list-item` with `button` default (open) and `delete` and `edit` actions; the card under a drag has the `dragging` state [infra.accessibility], [D55]; a keyboard move action stays open with `infra.drag-and-drop`.
 - Error state: `alert` text for the message (open question: `alert` is not the status role of the other entries).
 - Live region: none.
 
@@ -103,7 +103,7 @@ None in the sources read: column, card and error labels come from the view model
 - Behaviour (scripted input, injected time): a press and a move under 4 px is a click; a move of 4 px or more starts a drag; release in a column commits at the computed index; capture loss cancels the drag. None exists.
 - Pixel probes at scale 2: column header and card list at the markup sizes; the 4 px threshold is 8 px at scale 2.
 - Conformance: none (no motion).
-- Semantic node: list of columns; each card a `list-item`; the drag role-gap above.
+- Semantic node: list of columns; each card a `list-item`; a card under a drag has `dragging` [D55].
 
 ### Build
 

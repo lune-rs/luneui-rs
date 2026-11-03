@@ -62,7 +62,7 @@ n/a — not clickable [W docs/ui/components.md:507]. Back and Continue are the o
 
 ### Accessibility
 
-- Role `list` of `list-item`s; the current row is state `selected`; name = the step label; `done` has no state in the vocabulary, see Open questions [infra.accessibility].
+- Role `navigation` (Wane's steps list is a labelled navigation landmark [W docs/ui/mocks/js/shell.js:117], [D55]) wrapping a `list` of `list-item`s; the current row is state `selected` and `current`; name = the step label; `done` has no state in the vocabulary, see Open questions [infra.accessibility].
 
 ### Strings
 
@@ -81,7 +81,7 @@ None: step labels are app data.
 
 - Pixel probes at scale 2: row 64 px high; number circle 40 px; label column 296 px and never wraps.
 - Conformance: n/a — no transition.
-- Semantic node: role list; the current item is selected; a long label is shortened, not wrapped.
+- Semantic node: role navigation over a list; the current item is selected and current; a long label is shortened, not wrapped.
 
 ### Build
 

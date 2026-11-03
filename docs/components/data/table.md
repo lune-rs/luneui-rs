@@ -76,7 +76,7 @@ n/a — no motion in Wane or Lunegit for a table; rows are a virtualized list an
 ### Accessibility
 
 - Role `table`, rows `row`, cells `cell`, headers `column-header` [infra.accessibility].
-- Selected row: `selected` state; sorted header: sort direction is not a listed state, so `role-gap: sort-direction (column-header)`.
+- Selected row: `selected` state; a sorted header carries the `sort` field (ascending, descending or none) [infra.accessibility], [D55].
 - Live region: none.
 
 ### Strings
@@ -109,7 +109,6 @@ None: column titles and cell values are app text.
 ## Open questions
 
 - Tone colours for warn, err, dim and strong cells: no values in the sources; open.
-- Sorted-header role: `role-gap: sort-direction`; open.
 - Keyboard row navigation: a requirement, not mocked; open.
 - Column resize and reorder: requirements, not mocked; open.
 - Whether this is a toolkit component or app code composed from the painter: the planner decides (Wane needs it either way).

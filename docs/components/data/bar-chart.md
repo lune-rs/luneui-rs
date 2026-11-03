@@ -31,7 +31,7 @@ None in luneui-rs or Luneterm's `lune-ui` (Wane: missing). Design source (not co
 Pinned: Lunegit 33a1dd41, Wane 69931d6, this repo fa2958b. Read: Wane `docs/ui/components.md:641-654`; Lunegit `src/Lunegit.Desktop/Controls/StoragePieChartControl.cs:15-21` (custom control, `ChartDiameter` 160); `crates/lune-ui-core/src/theme.rs:57-64,63`
 (`fg_secondary`, `fg_tertiary`, `border_subtle`, `accent`).
 Conflicts:
-- Series colour `--data`: no repo token (`grep -n 'data' crates/lune-ui-core/src/theme.rs` has no series token). Open question.
+- Series colour `--data`: no repo token (`grep -n 'data' crates/lune-ui-core/src/theme.rs` has no series token): token to add (M4), `data` = #5C8FE6 [W docs/ui/mocks/css/tokens.css:58], [D56].
 - Accent: `accent` #767D85FF [R crates/lune-ui-core/src/theme.rs:64] is used for the uncached and write series, as Wane says.
 
 ### Anatomy
@@ -41,7 +41,7 @@ Conflicts:
 - Grid: three 1 px `border_subtle` lines at 0, 50 and 100% [W docs/ui/components.md:641-654], [R crates/lune-ui-core/src/theme.rs:63].
 - X labels: every 3 h [W docs/ui/components.md:641-654].
 - Bars: 12 wide, centred in equal slots; flat ends; 1 px gap between segments [W docs/ui/components.md:641-654].
-- Series: cache read `--data` (no repo token); uncached and cache write `accent` [W docs/ui/components.md:641-654], [R crates/lune-ui-core/src/theme.rs:64].
+- Series: cache read `--data` (token to add, [D56]); uncached and cache write `accent` [W docs/ui/components.md:641-654], [R crates/lune-ui-core/src/theme.rs:64].
 - Legend: 8 px swatch, radius 3 [W docs/ui/components.md:641-654].
 
 ### States
@@ -109,7 +109,7 @@ None: axis labels and legend names are app text (the mock's hour labels and seri
 
 ## Open questions
 
-- Series colour `--data`: no repo token; open (theme decision).
+- Series colour `--data`: token to add (M4), #5C8FE6 [W docs/ui/mocks/css/tokens.css:58], [D56]; further series colours (more than two) are not in the sources.
 - The chart's summary text for the `image` name: not in the mock; open.
 - Whether bars animate on a data change: no source; open.
 - Drawn by a `render.custom-draw` hook or painter rectangles: the planner decides; the painter path is the default here.

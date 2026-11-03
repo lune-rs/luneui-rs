@@ -34,7 +34,7 @@ Pinned: Lunegit 33a1dd41, Wane 69931d6, this repo fa2958b. Read: `crates/lune-ui
 `src/Lunegit.Desktop/Views/SettingsPageView.axaml:9-20`, `src/Lunegit.Desktop/Themes/Animations.axaml:295-311`,
 `src/Lunegit.Desktop/App.axaml:769-770`; Wane `docs/ui/components.md:235-248`.
 Conflicts (winner):
-- Card layer: Wane `--glass-card` 50 50 50 .808 is Lunegit's content acrylic (tint 0.8, material 0.7) [W docs/ui/components.md:235-248]; the moved CARD layer is tint 1.0, material 0.8 [R crates/lune-ui-core/src/theme.rs:105-109]; the moved PANEL layer is tint 0.8, material 0.7 [R crates/lune-ui-core/src/theme.rs:98-102] and matches the Lunegit values exactly. The look follows Lunegit (CLAUDE.md), so the page is the PANEL values or a new layer; which one is an Open question (hard rule 8, a DECISIONS row).
+- Card layer: Wane `--glass-card` 50 50 50 .808 is Lunegit's content acrylic (tint 0.8, material 0.7) [W docs/ui/components.md:235-248]; the moved CARD layer is tint 1.0, material 0.8 [R crates/lune-ui-core/src/theme.rs:105-109]; the moved PANEL layer is tint 0.8, material 0.7 [R crates/lune-ui-core/src/theme.rs:98-102] and matches the Lunegit values exactly. The look follows Lunegit (CLAUDE.md), so the page card uses the PANEL values (tint 0.8, material 0.7), decided in [D53].
 - Radius: 8 in Wane [W docs/ui/components.md:235-248], the moved CARD_CORNER_RADIUS [R crates/lune-ui-core/src/theme.rs:115] and Lunegit's side and settings hosts [L src/Lunegit.Desktop/Views/SidePanelView.axaml:9; src/Lunegit.Desktop/Views/SettingsPageView.axaml:10]. All agree.
 - Inactive window: the solid inactive fill is `INACTIVE_FALLBACK` #333333FF [R crates/lune-ui-core/src/theme.rs:113], which Wane's "solid inactive colour" names without a value; the moved value wins.
 
@@ -51,7 +51,7 @@ Conflicts (winner):
 
 | state | look | cite |
 |---|---|---|
-| active | acrylic card (layer: open question, see Evidence) | [R crates/lune-ui-core/src/theme.rs:98-109] |
+| active | acrylic card with the PANEL values (tint 0.8, material 0.7, [D53]) | [R crates/lune-ui-core/src/theme.rs:98-109] |
 | inactive window | solid #333333FF; no acrylic | [R crates/lune-ui-core/src/theme.rs:113], [W docs/ui/components.md:235-248] |
 | footer primary disabled | the primary keeps its place; the disabled look is the button's (widget.button) | [W docs/ui/components.md:235-248] |
 | body scrolling | scrollbar visible while scrolling (widget.scrollbar) | [W docs/ui/components.md:235-248] |
@@ -120,10 +120,9 @@ None: title, subtitle and actions are app text.
 
 ## Open questions
 
-- Which layer the card uses: the moved CARD (tint 1.0, material 0.8) or Lunegit's content values (tint 0.8, material 0.7, = PANEL). The look follows Lunegit; a DECISIONS row is needed (hard rule 8).
 - Whether the page owns focus on a page change (first control) or the app does: open.
 - Whether this is a toolkit component or app code composed from the painter: the planner decides (Wane needs it either way).
-- Native rendering: CSS `--glass-card` flattens Lunegit's content acrylic (black tint 0.8, material 0.7; derivation in `mocks/css/tokens.css`), not lune-ui's denser CARD layer (rgba 37 37 37 .89); luneui-rs paints the real layer (`core.acrylic`) and should take these Lunegit levels as its CARD material. The card needs scroll clipping with the radius.
+- Native rendering: CSS `--glass-card` flattens Lunegit's content acrylic (black tint 0.8, material 0.7; derivation in `mocks/css/tokens.css`), not lune-ui's denser CARD layer (rgba 37 37 37 .89); luneui-rs paints the real layer (`core.acrylic`) and takes these Lunegit levels (the PANEL values) for the page card, [D53]. The card needs scroll clipping with the radius.
 
 ## Notes for the planner
 

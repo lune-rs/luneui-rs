@@ -89,7 +89,7 @@ Never animated: the popover's position while it follows a moving anchor (it snap
 - Transient: the open animation phase, hover and press of its content [core.ui].
 - Persistent: none; the popover's content owns its own (a list inside keeps its selection) under keep-alive.
 - App-owned: whether it is open, the anchor rect, the content, the preferred side and alignment, the dismiss callback result.
-- Exit retention: yes: Full 120 / Reduced 120 / Off 0 ms. The id stays alive after the app stops calling it, draws from retained state and reports `Repaint::Now` until it settles [core.ui], [R crates/lune-ui-core/src/widgets/menu.rs:22]; Reduced uses the shortest token as Lunegit's dialog exit does [L src/Lunegit.Desktop/Services/DialogService.cs:87-92].
+- Exit retention: yes: Full 120 / Reduced 120 / Off 0 ms; a consumer with no motion of its own (the moved dropdown, [overlay.dropdown]) snaps and retains nothing. The id stays alive after the app stops calling it, draws from retained state and reports `Repaint::Now` until it settles [core.ui], [R crates/lune-ui-core/src/widgets/menu.rs:22]; Reduced uses the shortest token as Lunegit's dialog exit does [L src/Lunegit.Desktop/Services/DialogService.cs:87-92].
 
 ### Accessibility
 

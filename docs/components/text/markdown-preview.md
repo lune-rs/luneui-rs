@@ -103,7 +103,7 @@ n/a — the preview is document content: no change in it animates (a document re
 
 ### Strings
 
-- `luneui.markdown.copy-code` is `luneui.code-block.copy` (reused, [text.code-block]).
+- The copy button of a fenced code block reuses the code block's copy key, defined once in [text.code-block]; this entry adds no key for it.
 - `luneui.markdown.image-remote-blocked`: "Remote image not loaded" [L src/Lunegit.Infrastructure/Localization/en.json:858].
 - `luneui.markdown.mermaid-failed`: "Diagram could not be rendered — showing source" [L src/Lunegit.Infrastructure/Localization/en.json:859].
 - `luneui.markdown.math-failed`: "Formula could not be rendered — showing source" [L src/Lunegit.Infrastructure/Localization/en.json:860].

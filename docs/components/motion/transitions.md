@@ -77,7 +77,7 @@ n/a — no input. Time and tier arrive as frame inputs [R crates/lune-ui-core/sr
 
 - Transient: one `Transition` per animated id (current value, velocity, target, start time); dropped after one frame without use [core.ui].
 - Persistent: none.
-- Exit retention: yes: an id whose exit transition is still running stays alive and keeps `Repaint::Now` until it settles (a closing dialog, popover, menu or toast: Full 180 / Reduced 120 / Off 0 ms) [core.ui], [L src/Lunegit.Desktop/Services/DialogService.cs:87-92].
+- Exit retention: yes: an id whose exit transition is still running stays alive and keeps `Repaint::Now` until it settles (a closing dialog: Full 180 / Reduced 120 / Off 0 ms; a closing menu, popover, flyout or tooltip: Full 120 / Reduced 120 / Off 0 ms, the moved `MENU_OUT`; a toast is removed at once) [core.ui], [L src/Lunegit.Desktop/Services/DialogService.cs:87-92].
 - App-owned: `Time`, `MotionTier`, the theme's motion tokens.
 
 ### Accessibility

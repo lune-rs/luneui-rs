@@ -103,7 +103,7 @@ None: title, description and meta text are app data.
 
 ## Open questions
 
-- `token-gap`: Lunegit's description uses `ForegroundMuted` [L src/Lunegit.Desktop/Views/Settings/GeneralSettingsView.axaml:155] and Wane's is `--text-secondary` [W docs/ui/components.md:464]. The value of `ForegroundMuted` is not read; M6 maps it or confirms Wane's token.
+- `token-gap`: Lunegit's description uses `ForegroundMuted` [L src/Lunegit.Desktop/Views/Settings/GeneralSettingsView.axaml:155] and Wane's is `--text-secondary` [W docs/ui/components.md:464]. `ForegroundMuted` is #B0B0B0 [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:13] and becomes the `fg_muted` token (M4, [D56], [widget.tab-strip]); the row uses it for the description (Lunegit wins, hard rule 8).
 
 ## Notes for the planner
 

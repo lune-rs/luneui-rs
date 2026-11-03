@@ -88,6 +88,7 @@ n/a — text items carry strings from the caller.
 
 ## Open questions
 
+- A fifth layer `Toast` above `Modal` is added by M4 ([D54]): `LAYER_COUNT` becomes 5 and `SCENE_LAYERS` stays 2; no existing scene draws on it, so the pixel gate stays at zero delta.
 - A second renderer (a software one, say) is the real test of the data shape; none exists. No renderer trait on purpose (DECISIONS D25).
 
 ## Notes for the planner

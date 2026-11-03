@@ -74,7 +74,7 @@ n/a — no motion in Wane or the spike. The content it switches (the page) anima
 
 ### Accessibility
 
-- Nav: role `group` for the main variant. The wizard's `role=navigation` has no role in the SF8 list: `role-gap: navigation (Wane wizard, docs/ui/components.md:221-234)`.
+- Nav: role `group` for the main variant. The wizard's nav has role `navigation` (Wane `role=navigation` [W docs/ui/components.md:221-234]) [infra.accessibility], [D55].
 - Items: `button` nodes; the selected one has the `selected` state [infra.accessibility].
 - Footer: `status` node (polite) for the ok or error text [infra.accessibility].
 
@@ -108,7 +108,6 @@ None: nav labels and footer text are app text (Wane mock content, [W docs/ui/com
 ## Open questions
 
 - Below what window width the sidebar collapses or hides: not mocked (Wane native note, W docs/ui/components.md:221-234); the layout responds to width only; open.
-- `role-gap: navigation` (wizard nav): add a role or use `group`; open.
 - Up and Down keyboard between nav items: not in any source; open.
 - Lunegit's side panel column width: not read; open.
 - Whether this is a toolkit component or app code composed from the painter: the planner decides (Wane needs it either way).
