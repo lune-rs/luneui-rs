@@ -4,11 +4,14 @@
 //! time of a scene is its table value.
 
 use lune_ui::chrome;
+use lune_ui::chrome::TabSpan;
 use lune_ui::color::{Rgba, over, premul};
 use lune_ui::icon;
 use lune_ui::lunegit_dark::{self, THEME};
-use lune_ui::paint::{LayerId, Painter, Rect};
+use lune_ui::paint::{LayerId, Painter, Rect, StrokeStyle};
 use lune_ui::text::{Spec, Style};
+use lune_ui::widgets::dialog::{DialogGlass, DialogHits, DialogSpec, dialog};
+use lune_ui::widgets::dropdown::dropdown;
 use lune_ui::widgets::menu::{MENU_IN, MenuEntry, menu, menu_open_anim};
 use lune_ui::widgets::{self, button, button_width, checkbox, combo, field, stepper, toggle};
 
@@ -43,6 +46,11 @@ pub(crate) enum Hit {
     Combo,
     Dismiss,
     MenuItem(u8),
+    Option(usize),
+    Block,
+    Confirm,
+    Cancel,
+    Caption(u8),
 }
 
 pub(crate) type P<'a> = Painter<'a, Hit>;
@@ -104,6 +112,76 @@ pub(crate) const SCENES: &[Scene] = &[
         time: SETTLED,
         hover: None,
         draw: custom_draw_scene,
+    },
+    Scene {
+        id: "dropdown",
+        scale: 2,
+        time: SETTLED,
+        hover: None,
+        draw: dropdown_scene,
+    },
+    Scene {
+        id: "dropdown-flipped",
+        scale: 2,
+        time: SETTLED,
+        hover: None,
+        draw: dropdown_flipped_scene,
+    },
+    Scene {
+        id: "dialog-confirm",
+        scale: 2,
+        time: SETTLED,
+        hover: None,
+        draw: dialog_confirm_scene,
+    },
+    Scene {
+        id: "dialog-message",
+        scale: 2,
+        time: SETTLED,
+        hover: None,
+        draw: dialog_message_scene,
+    },
+    Scene {
+        id: "dialog-body",
+        scale: 2,
+        time: SETTLED,
+        hover: None,
+        draw: dialog_body_scene,
+    },
+    Scene {
+        id: "glass-off",
+        scale: 2,
+        time: SETTLED,
+        hover: Some(Hit::Secondary),
+        draw: glass_off_scene,
+    },
+    Scene {
+        id: "unfocused",
+        scale: 2,
+        time: SETTLED,
+        hover: Some(Hit::Secondary),
+        draw: unfocused_scene,
+    },
+    Scene {
+        id: "blur-contrast",
+        scale: 2,
+        time: SETTLED,
+        hover: None,
+        draw: blur_contrast_scene,
+    },
+    Scene {
+        id: "chrome",
+        scale: 2,
+        time: SETTLED,
+        hover: Some(Hit::Caption(2)),
+        draw: chrome_scene,
+    },
+    Scene {
+        id: "acrylic",
+        scale: 2,
+        time: SETTLED,
+        hover: None,
+        draw: acrylic_scene,
     },
 ];
 
@@ -329,4 +407,204 @@ fn custom_draw_scene(p: &mut P<'_>, _t: f32) {
         x,
         slot.bottom() + 12.0,
     );
+}
+
+// Dropdown geometry (logical px, window 1040 x 660). The list is `4 * 32 + 8 = 136` tall and
+// opens above its anchor when `anchor.bottom() + 4 + 136 > 660 - 8`. The flipped scene puts the
+// anchor at y 560, h 32: 596 + 136 = 732 > 652, so the list's top edge is at
+// `560 - 4 - 136 = 420`, above the anchor.
+const FLIPPED_ANCHOR: Rect = Rect::new(34.0, 560.0, 210.0, 32.0);
+const _: () = assert!(
+    FLIPPED_ANCHOR.y + FLIPPED_ANCHOR.h + 4.0 + 136.0 > H as f32 - 8.0
+        && FLIPPED_ANCHOR.y - 4.0 - 136.0 < FLIPPED_ANCHOR.y
+);
+
+const OPTIONS: [(&str, bool); 4] = [
+    ("RznSans", true),
+    ("Sans Serif", true),
+    ("Monospace", true),
+    ("Coming soon", false),
+];
+
+fn open_dropdown(p: &mut P<'_>, anchor: Rect) {
+    p.on(LayerId::Popup);
+    let win = p.window;
+    p.hit(win, Hit::Dismiss);
+    dropdown(p, anchor, &OPTIONS, 0, Hit::Option);
+}
+
+fn dropdown_scene(p: &mut P<'_>, _t: f32) {
+    let card = background(p, true, true, "luneui gallery");
+    let anchor = controls_content(p, card, true);
+    open_dropdown(p, anchor);
+}
+
+fn dropdown_flipped_scene(p: &mut P<'_>, _t: f32) {
+    let card = background(p, true, true, "luneui gallery");
+    heading(
+        p,
+        "COMBO NEAR THE BOTTOM EDGE: THE LIST OPENS ABOVE",
+        card.x + 24.0,
+        card.y + 24.0,
+    );
+    combo(p, FLIPPED_ANCHOR, "RznSans", false, true, Hit::Combo);
+    open_dropdown(p, FLIPPED_ANCHOR);
+}
+
+fn dialog_glass() -> DialogGlass {
+    DialogGlass {
+        panel: lunegit_dark::PANEL.premultiplied(),
+        fill: lunegit_dark::WINDOW.premultiplied(),
+        noise: true,
+    }
+}
+
+const DIALOG_HITS: DialogHits<Hit> = DialogHits {
+    block: Hit::Block,
+    confirm: Hit::Confirm,
+    cancel: Hit::Cancel,
+};
+
+fn dialog_confirm_scene(p: &mut P<'_>, _t: f32) {
+    let card = background(p, true, true, "luneui gallery");
+    controls_content(p, card, false);
+    let spec = DialogSpec {
+        title: "Discard changes",
+        message: "The document has unsaved changes. Closing it will discard them.",
+        extra_h: 0.0,
+        confirm: "Discard",
+        cancel: Some("Cancel"),
+    };
+    dialog(p, &spec, &dialog_glass(), &DIALOG_HITS, |_, _, _, _| {});
+}
+
+fn dialog_message_scene(p: &mut P<'_>, _t: f32) {
+    let card = background(p, true, true, "luneui gallery");
+    controls_content(p, card, false);
+    let spec = DialogSpec {
+        title: "About",
+        message: "A message with a single button and no cancel.",
+        extra_h: 0.0,
+        confirm: "OK",
+        cancel: None,
+    };
+    dialog(p, &spec, &dialog_glass(), &DIALOG_HITS, |_, _, _, _| {});
+}
+
+fn dialog_body_scene(p: &mut P<'_>, _t: f32) {
+    let card = background(p, true, true, "luneui gallery");
+    controls_content(p, card, false);
+    let spec = DialogSpec {
+        title: "Rename",
+        message: "Enter a new name for this item.",
+        // 12 gap + 18 caption + 32 field + 12 gap + 22 checkbox, plus 4 spare.
+        extra_h: 100.0,
+        confirm: "Rename",
+        cancel: Some("Cancel"),
+    };
+    dialog(p, &spec, &dialog_glass(), &DIALOG_HITS, |p, x, y, inner| {
+        let y = y + 12.0;
+        heading(p, "NAME", x, y);
+        let y = y + 18.0;
+        field(
+            p,
+            Rect::new(x, y, inner, 32.0),
+            "Untitled",
+            "Name",
+            true,
+            Hit::FieldFocused,
+        );
+        checkbox(
+            p,
+            Rect::new(x, y + 44.0, inner, 22.0),
+            false,
+            "Do not ask again",
+            Hit::CheckOff,
+        );
+    });
+}
+
+fn glass_off_scene(p: &mut P<'_>, _t: f32) {
+    let card = background(p, false, true, "luneui gallery");
+    controls_content(p, card, false);
+}
+
+fn unfocused_scene(p: &mut P<'_>, _t: f32) {
+    let card = background(p, true, false, "luneui gallery");
+    controls_content(p, card, false);
+}
+
+fn blur_contrast_scene(p: &mut P<'_>, _t: f32) {
+    let t = THEME;
+    p.on(LayerId::Base);
+    let win = p.window;
+    // 16 px black and white stripes across the whole window (1040 / 16 = 65 stripes).
+    for i in 0..65 {
+        let c: Rgba = if i % 2 == 0 {
+            [0, 0, 0, 255]
+        } else {
+            [255, 255, 255, 255]
+        };
+        p.fill(Rect::new(i as f32 * 16.0, 0.0, 16.0, win.h), 0.0, c);
+    }
+    // A panel whose backdrop is the blurred stripes.
+    p.on(LayerId::Popup);
+    let panel = Rect::new(320.0, 180.0, 400.0, 300.0);
+    p.backdrop(panel, 9.0);
+    p.fill(panel, 9.0, t.menu_glass);
+    p.ring(panel, 9.0, 1.0, t.menu_popup_border, false);
+    p.text_centered(
+        &widgets::label(&t, "Backdrop blur over stripes", t.menu_text_primary),
+        panel,
+    );
+}
+
+fn chrome_scene(p: &mut P<'_>, _t: f32) {
+    let card = background(p, true, true, "luneui gallery");
+    let t = THEME;
+    let tab = TabSpan {
+        left: 140.0,
+        right: 300.0,
+    };
+    let outline = chrome::outline(card.w, card.h, 32.0, Some(tab));
+    let pts: Vec<[f32; 2]> = outline
+        .iter()
+        .map(|q| [q[0] + card.x, q[1] + card.y])
+        .collect();
+    p.stroke(&pts, true, StrokeStyle::solid(t.border, chrome::STROKE));
+    for (left, text, color) in [
+        (0.0, "Inactive", t.fg_tertiary),
+        (tab.left, "Active tab", t.fg_primary),
+    ] {
+        let r = Rect::new(card.x + left, card.y, tab.right - tab.left, 32.0);
+        p.text_centered(&widgets::label(&t, text, color), r);
+    }
+    let win = p.window;
+    lune_ui::window::caption_buttons(
+        p,
+        win,
+        TITLE_BAND - 4.0,
+        false,
+        [Hit::Caption(0), Hit::Caption(1), Hit::Caption(2)],
+    );
+}
+
+fn acrylic_scene(p: &mut P<'_>, _t: f32) {
+    let t = THEME;
+    p.on(LayerId::Base);
+    let win = p.window;
+    let base: Rgba = [0x70, 0x70, 0x70, 0xFF];
+    p.fill(win, 0.0, base);
+    // Acrylic replaces what is below it, so the panels go on the page layer above the base fill.
+    p.on(LayerId::Page);
+    let layers = [
+        ("WINDOW", lunegit_dark::WINDOW),
+        ("PANEL", lunegit_dark::PANEL),
+        ("CARD", lunegit_dark::CARD),
+    ];
+    for (i, (name, layer)) in layers.into_iter().enumerate() {
+        let r = Rect::new(40.0 + i as f32 * 330.0, 120.0, 300.0, 400.0);
+        p.acrylic(r, 8.0, layer.premultiplied(), premul(base), true);
+        p.text_centered(&widgets::label(&t, name, t.fg_primary), r);
+    }
 }
