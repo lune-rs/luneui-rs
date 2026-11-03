@@ -132,7 +132,7 @@ Lunegit's copy button has no transition (neither tier file styles it). Never ani
 
 - Which text size, padding and border the Wane look uses (13/20, 10 by 12, 1 px ring) against Lunegit's defaults: parameters; the decision is the Wane app's at M9 (no source resolves it).
 - How long the check mark stays: no source states a time; the value is an app-passed parameter and M9 picks the default.
-- Whether the Wane operator tone is `fg_tertiary` or `fg_quaternary`: Wane says "quaternary" [W docs/ui/components.md:658]; the dark preset has no `fg_quaternary` field today [R crates/lune-ui-core/src/theme.rs:11-18], so M9 adds a token or maps it.
+- Whether the Wane operator tone is `fg_tertiary` or `fg_quaternary`: Wane says "quaternary" [W docs/ui/components.md:658]; the dark preset has no `fg_quaternary` field today [R crates/lune-ui-core/src/theme.rs:11-18]; [D58] adds it (#FFFFFF66, [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:10]), so only the choice between tertiary and quaternary is open.
 
 ## Notes for the planner
 

@@ -45,7 +45,7 @@ Conflict: none between sources. D20 against the mock: the mock draws the surface
 
 - Glyph: 16 px square, monochrome, colour `--text-primary` (`#ffffffcc`, the dark preset's `fg_primary`) [W docs/ui/mocks/css/components.css:694], [W docs/ui/mocks/css/tokens.css:12], [R crates/lune-ui-core/src/theme.rs:56]. OS tray icons are monochrome [W docs/ui/mocks/css/components.css:691]. The glyph is the provisional crescent, one stroke 1.5 px at 16 px; the final mark is the user's call and nothing here depends on it [W docs/ui/components.md:752]. A path of arcs is flattened to a polyline and stroked, as `chrome.rs` does for the tab outline [R crates/lune-ui-core/src/chrome.rs:1-4].
 - Dot: 6 px diameter, a 1.5 px cut-out ring around it in the surface colour, so the outer circle is 9 px; positioned `right: -2px; bottom: -2px` from the 16 px box; the fill is clipped to the inner circle so no tone bleeds into the ring [W docs/ui/mocks/css/components.css:691-697].
-- Dot colours: serving `--ok` `#6fd39a`, degraded `--warn` `#f2a65a`, paused `--paused` `#8a9099`; the ring defaults to `--tray-ring`, falling back to `--glass-inactive` `#0b0b0b` [W docs/ui/mocks/css/tokens.css:49,52,62,97], [W docs/ui/mocks/css/components.css:696-699].
+- Dot colours, the tokens of [D58]: serving `ok` `#73C991` and degraded `warn` `#E2B93D` (Lunegit's tones, which win over Wane's `--ok` #6fd39a and `--warn` #f2a65a), paused `paused` `#8a9099` [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:116,115]; the ring defaults to `--tray-ring`, falling back to `--glass-inactive` `#0b0b0b` [W docs/ui/mocks/css/tokens.css:49,52,62,97], [W docs/ui/mocks/css/components.css:696-699].
 - High-DPI variant `--2x`: 32 px glyph, 12 px dot, 3 px ring, dot at `right: -4px; bottom: -4px` [W docs/ui/mocks/css/components.css:700-701]. Both sizes are produced from the same vector at 1x and 2x.
 - Overhang: the dot's outer circle (9 px at 1x, 18 px at 2x) reaches 2 px (4 px at 2x) past the 16 px glyph box on the right and bottom, since the dot sits at -2 px [derived: 9 = 6 + 2 * 1.5; `right: -2px` puts the outer edge 2 px outside]. A real bitmap holds the dot inside its bounds; the bitmap size or the glyph scale is an Open question.
 - Rendering: the icon is drawn by the painter into an offscreen RGBA target at 16 and 32 px and handed to the OS as a bitmap; the OS draws the slot [W docs/ui/components.md:218]. On macOS D20 leaves the form to M10: a template glyph with the dot drawn separately, or a non-template image matched to the menu-bar appearance, because a coloured dot cannot survive a template image [D20].
@@ -59,8 +59,8 @@ Conflict: none between sources. D20 against the mock: the mock draws the surface
 
 | state | look | cite |
 |---|---|---|
-| serving | glyph with a green dot `#6fd39a` | [W docs/ui/mocks/css/tokens.css:49], [W docs/ui/mocks/css/components.css:697] |
-| degraded | glyph with an amber dot `#f2a65a` | [W docs/ui/mocks/css/tokens.css:52], [W docs/ui/mocks/css/components.css:698] |
+| serving | glyph with a green dot `#73C991` | [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:116], [W docs/ui/mocks/css/components.css:697], [D58] |
+| degraded | glyph with an amber dot `#E2B93D` | [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:115], [W docs/ui/mocks/css/components.css:698], [D58] |
 | paused | glyph with a grey dot `#8a9099` | [W docs/ui/mocks/css/tokens.css:62], [W docs/ui/mocks/css/components.css:699] |
 | 1x and 2x | the same icon at 16 px, or 32 px with the 12 px dot and 3 px ring | [W docs/ui/mocks/css/components.css:694,700-701] |
 | hover, pressed, focus-visible | the OS highlights the tray slot; the toolkit draws none | [W docs/ui/components.md:218] |
@@ -102,7 +102,7 @@ None: the tooltip texts are app strings [W docs/ui/components.md:758].
 
 ### Acceptance
 
-- Pixel probes (offscreen, scale 1 and 2): at 1x the dot's inner circle is 6 px across and filled `#6fd39a`, `#f2a65a` or `#8a9099` for the three states, the ring is 1.5 px in the ring colour, the glyph box is 16 px; at 2x 12 px, 3 px and 32 px [W docs/ui/mocks/css/components.css:694-701], [W docs/ui/mocks/css/tokens.css:49,52,62]. The three icons differ only in the dot pixels.
+- Pixel probes (offscreen, scale 1 and 2): at 1x the dot's inner circle is 6 px across and filled `#73C991`, `#E2B93D` or `#8a9099` for the three states, the ring is 1.5 px in the ring colour, the glyph box is 16 px; at 2x 12 px, 3 px and 32 px [W docs/ui/mocks/css/components.css:694-701], [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:115-116], [W docs/ui/mocks/css/tokens.css:62], [D58]. The three icons differ only in the dot pixels.
 - Placement (pure function, known answers): menu bar bottom at y 24 (an example height), the macOS menu's top is 28 and its right edge is the screen's right edge; taskbar top at y 1040 on a 1080 screen, the flyout's bottom is 1028 and its right edge 12 px inside the screen's right edge, the menu's bottom is 1032 [W docs/ui/components.md:707,757].
 - Behaviour (fake tray, scripted clicks): a left click opens the flyout and a second closes it; an outside click and focus loss close it; a right click on Windows opens the menu [W docs/ui/components.md:577].
 - Real tray behaviour on macOS and Windows (icon in the OS slot, template images, non-activating windows) is unverified here: no GUI run, no VM (D15); Wane's hands-on run covers it later.

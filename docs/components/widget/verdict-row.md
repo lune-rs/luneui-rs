@@ -25,8 +25,8 @@ None in luneui-rs or Luneterm's `lune-ui` [W docs/ui/components.md:524]. Wane is
 
 ### Evidence
 
-Pinned: Lunegit 33a1dd41, Wane 69931d6, this repo fa2958b. Read: `docs/ui/components.md:515-527,686`; `docs/ui/mocks/css/tokens.css:13,14,49,52,55,125`.
-No conflict: one source.
+Pinned: Lunegit 33a1dd41, Wane 69931d6, this repo fa2958b. Read: `docs/ui/components.md:515-527,686`; `docs/ui/mocks/css/tokens.css:13,14,49,52,55,125`; Lunegit `src/Lunegit.Desktop/Themes/DarkTheme.axaml:115-117`.
+Conflict: the mark tones. Wane's `--ok` #6fd39a and `--warn` #f2a65a against Lunegit's tones for the same meanings; Lunegit's win, the tokens `ok` #73C991, `warn` #E2B93D, `err` #E06C75 of [D58], as in `widget.badge`.
 
 ### Anatomy
 
@@ -38,9 +38,9 @@ No conflict: one source.
 
 | state | look | cite |
 |---|---|---|
-| OK | mark in `ok` | [W docs/ui/components.md:519], [W docs/ui/mocks/css/tokens.css:49] |
-| WARN | mark in `warn` | [W docs/ui/components.md:519], [W docs/ui/mocks/css/tokens.css:52] |
-| NO | mark in `err` | [W docs/ui/components.md:519], [W docs/ui/mocks/css/tokens.css:55] |
+| OK | mark in `ok` #73C991 | [W docs/ui/components.md:519], [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:116], [D58] |
+| WARN | mark in `warn` #E2B93D | [W docs/ui/components.md:519], [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:115], [D58] |
+| NO | mark in `err` #E06C75 | [W docs/ui/components.md:519], [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:117], [D58] |
 
 Static: no hover, focus or disabled look [W docs/ui/components.md:521].
 

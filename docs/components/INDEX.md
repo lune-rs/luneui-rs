@@ -49,7 +49,7 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
-| [platform.clipboard](platform/clipboard.md) | Clipboard | planned | any | Text clipboard through FrameOutput requests and input events; platform adapter in M10; fake for tests |
+| [platform.clipboard](platform/clipboard.md) | Clipboard | planned | any | Text clipboard through FrameOutput requests and input events; types in M4, fake in M5, platform adapter in M10 |
 | [platform.input](platform/input.md) | winit input translation and output | in-progress | any | Translator turns winit events into RawInput; OutputState applies FrameOutput to a window |
 | [platform.material](platform/material.md) | OS glass materials | in-progress | luneterm | Backdrop seam in core (Material, Backdrop, NullMaterial); OS glass behind it: macOS NSVisualEffect and Liquid Glass, Windows acrylic and mica, opaque elsewhere |
 | [platform.tray-icon](platform/tray-icon.md) | Tray icon with status dot | planned | wane | 16 px monochrome glyph with a status dot (green serving, amber degraded, grey paused), rendered to OS bitmaps at 1x and 2x; opens toolkit glass menus |

@@ -36,7 +36,7 @@ Conflicts:
 
 ### Anatomy
 
-- Track: 4 high; radius 4; fill `--surface-overlay` [W docs/ui/components.md:627-640]. The repo has no `surface_overlay` token (`grep -n surface_overlay crates/lune-ui-core/src/theme.rs` empty): token to add (M4), #FFFFFF15 [W docs/ui/mocks/css/tokens.css:22], [D56].
+- Track: 4 high; radius 4; fill `--surface-overlay` [W docs/ui/components.md:627-640]. The repo has no `surface_overlay` token (`grep -n surface_overlay crates/lune-ui-core/src/theme.rs` empty): token to add (M4), #FFFFFF15 [W docs/ui/mocks/css/tokens.css:22], [D58].
 - Fill: `accent`, from the track's left, width = value fraction [W docs/ui/components.md:627-640], [R crates/lune-ui-core/src/theme.rs:64].
 - Variants: warn, err (colours not in the sources read; Open questions).
 - Head: name 13 at the left; value RznMono at the right; 13/20 with 4 px below [W docs/ui/components.md:627-640].
@@ -103,12 +103,12 @@ None: the head text is app text.
 
 ### Build
 
-- Milestone: M8.
+- Milestone: M6.
 - Depends on: core.painter, core.theme.
 
 ## Open questions
 
-- The track colour `--surface-overlay`: token to add (M4), #FFFFFF15 [W docs/ui/mocks/css/tokens.css:22], [D56].
+- The track colour `--surface-overlay`: token to add (M4), #FFFFFF15 [W docs/ui/mocks/css/tokens.css:22], [D58].
 - Warn and err colours: not in the sources read (the Lunegit toast accents at DarkTheme.axaml:337-338 are a candidate, not confirmed); open.
 - Indeterminate motion: Lunegit has a moving bar and Wane does not mock it; the motion kind and duration are open.
 - Indeterminate height 3 (Lunegit) versus determinate 4 (Wane): both kept as stated; open for the look owner.

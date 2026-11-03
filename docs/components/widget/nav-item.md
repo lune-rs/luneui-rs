@@ -42,7 +42,7 @@ Conflicts: (1) Padding: Lunegit's side-panel button pads 8 horizontal and 6 vert
 |---|---|---|
 | rest | label `fg_secondary`, no fill | [W docs/ui/components.md:421], [W docs/ui/mocks/css/tokens.css:13] |
 | hover | fill `surface_hover`; label primary | [L src/Lunegit.Desktop/App.axaml:379-381], [W docs/ui/components.md:421] |
-| active | fill `surface_selected`; label bright, weight 500; no accent bar | [L src/Lunegit.Desktop/App.axaml:390-392], [W docs/ui/components.md:421], [W docs/ui/mocks/css/tokens.css:16,23] |
+| active | fill `surface_selected`; label `fg_bright` ([D58]), weight 500; no accent bar | [L src/Lunegit.Desktop/App.axaml:390-392], [W docs/ui/components.md:421], [W docs/ui/mocks/css/tokens.css:16,23] |
 | active + hover | fill `surface_active` | [L src/Lunegit.Desktop/App.axaml:394-396] |
 | focus-visible | 1 px outline, offset 2 | [widget.button] (Wane lists "focus" with no value here) |
 | pressed | fill `surface_active` | [widget.button], [W docs/ui/mocks/css/tokens.css:24] |

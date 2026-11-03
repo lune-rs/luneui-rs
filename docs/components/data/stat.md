@@ -36,10 +36,10 @@ Conflicts: none. The repo has no RznMono face token; the value font is an open q
 
 - Cell: padding 12 16 [W docs/ui/components.md:585-598].
 - Label: 11/16, `fg_tertiary` [W docs/ui/components.md:585-598], [R crates/lune-ui-core/src/theme.rs:58,82].
-- Value: RznMono Medium 20/28, tabular figures, bright, ellipsis; at most 22 px [W docs/ui/components.md:585-598].
-- Sub-line: 11/16; tone ok or warn [W docs/ui/components.md:585-598].
+- Value: RznMono Medium 20/28, tabular figures, `fg_bright` (#FFFFFFDD, [D58]), ellipsis; at most 22 px [W docs/ui/components.md:585-598].
+- Sub-line: 11/16; tone `ok` or `warn` [W docs/ui/components.md:585-598], the tokens of [D58] (#73C991, #E2B93D, [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:116,115]).
 - Strip: cells share the width; 1 px hairline between cells [W docs/ui/components.md:585-598], [R crates/lune-ui-core/src/theme.rs:63] (`border_subtle`).
-- Gold: `--gold` on the net-saved figure only [W docs/ui/components.md:585-598].
+- Gold: `gold` (#E9C46A, [W docs/ui/mocks/css/tokens.css:48], [D58]) on the net-saved figure only [W docs/ui/components.md:585-598].
 - Compact (flyout): padding 6 8; value 14/20 [W docs/ui/components.md:585-598].
 - Meter: a `data.progress` closes the cell [W docs/ui/components.md:585-598].
 
@@ -111,7 +111,7 @@ None: the label, value and sub-line are app text; the placeholder "—" and "No 
 
 ### Build
 
-- Milestone: M8.
+- Milestone: M6.
 - Depends on: core.painter, core.theme, data.progress (meter), motion.transitions.
 
 ## Open questions

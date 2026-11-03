@@ -116,12 +116,12 @@ None: chords are formatted with fixed ASCII names (Cmd, Ctrl, Alt, Shift, then t
 
 ### Build
 
-- Milestone: M10.
+- Milestone: M5 (the registry is core, no platform code; `overlay.command-palette` of M7 binds through it; `core.ui`'s key phase and `core.focus` of M4 have an empty registry until then).
 - Depends on: core.input, core.focus, core.ui.
 
 ## Open questions
 
-- Whether the registry reports `Fired` through `FrameOutput` or through the `Response` of a `ui.shortcut(command)` call: both are cheap; the choice affects how an app reads it and is M10's to make with the gallery's shortcut page.
+- Whether the registry reports `Fired` through `FrameOutput` or through the `Response` of a `ui.shortcut(command)` call: both are cheap; the choice affects how an app reads it and is M5's to make with the gallery's shortcut page.
 - Whether a user-visible remap needs a persisted form (a JSON chord string): Lunegit has none, so no source gives a format; it would use `infra.json` if an app asks.
 
 ## Notes for the planner

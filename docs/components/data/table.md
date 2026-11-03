@@ -47,7 +47,7 @@ Conflicts: none between sources. Wane's header 11/16 and body 13 are the only va
 |---|---|---|
 | row rest | no fill; text `fg_primary` | [W docs/ui/components.md:599-612], [R crates/lune-ui-core/src/theme.rs:55-56] |
 | row hover | fill `surface_hover` #FFFFFF10 | [W docs/ui/components.md:599-612], [R crates/lune-ui-core/src/theme.rs:60] |
-| row selected | fill `surface_selected` #FFFFFF18; bright text | [W docs/ui/components.md:599-612], [R crates/lune-ui-core/src/theme.rs:61] |
+| row selected | fill `surface_selected` #FFFFFF18; `fg_bright` text ([D58]) | [W docs/ui/components.md:599-612], [R crates/lune-ui-core/src/theme.rs:61] |
 | header sorted | secondary text; 12 px arrow | [W docs/ui/components.md:599-612], [R crates/lune-ui-core/src/theme.rs:57] |
 | cell tone warn, err, dim, strong | the cell's colour; the values are not in the source | open question |
 | focus-visible row | not in the source | open question |

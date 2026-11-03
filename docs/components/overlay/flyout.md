@@ -79,7 +79,7 @@ Never animated: the stats and routes content (values change, [motion] list: high
 - Transient: row hover, open and close progress [motion].
 - Persistent: none.
 - App-owned: tray state (text, status dot), the stats values, the routes list, action rows, the open flag [W docs/ui/components.md:571-584].
-- Exit retention: yes: 120 ms (the menu close, [overlay.menu]).
+- Exit retention: yes: Full 120 / Reduced 120 / Off 0 ms [core.ui] (the menu close, [overlay.menu]).
 
 ### Accessibility
 
@@ -116,7 +116,7 @@ None: the header, stats, route and action labels are app text (Wane mock content
 
 ### Build
 
-- Milestone: M7.
+- Milestone: M7 (the surface: header, stats strip, routes, action rows, open and close motion, drawn from the app's anchor point) and M10 (placement from the tray icon's rect and the separate glass window, with `platform.tray-icon`). M7 uses `data.stat` and `data.kv-list` (both M6) and `overlay.menu` (M7).
 - Depends on: overlay.popup-panel, overlay.menu, data.stat, data.kv-list, platform.tray-icon, platform.window, render.blur.
 
 ## Open questions

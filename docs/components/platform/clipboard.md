@@ -6,7 +6,7 @@ status: planned
 consumers: any
 source: —
 owner: —
-summary: Text clipboard through FrameOutput requests and input events; platform adapter in M10; fake for tests
+summary: Text clipboard through FrameOutput requests and input events; types in M4, fake in M5, platform adapter in M10
 ---
 
 ## What it is
@@ -19,7 +19,7 @@ asynchronous, all reached through one helper. Files, images and rich text are no
 
 ## Needs
 
-- OS clipboard (R-platform-5, narrowed in M3: clipboard is in scope, M10).
+- OS clipboard (R-platform-5, narrowed in M3: clipboard is in scope; types M4, fake M5, adapter M10).
 - Cut, copy and paste for the editing engine (R-text-5): `text.text-edit`.
 - Copy buttons and copy-selected-rows (code block, diff rows, detail fields) (R-text-3).
 - Third-party crates only for platform layers (hard rule 4); a new dependency needs a DECISIONS row and a size note (hard rule 5).
@@ -47,7 +47,7 @@ Lunegit's reads and writes are text only; no `SetDataObject`, no file or image f
 - A missing clipboard is silent: Lunegit's helper returns without error when there is no main window [L src/Lunegit.Desktop/ViewModels/SidePanels/ClipboardHelper.cs:11-12,17-23]. The toolkit reports a failed read as an event and ignores a failed write (the adapter may log).
 - Secrets: a password field never emits a write [W docs/ui/components.md:353], [text.text-edit].
 - Untrusted input: pasted text comes from outside the app. The widget that receives it applies its own bounds (`text.text-edit`'s max length); the adapter caps the size it forwards (Open questions) [derived: hard rule on parsing untrusted input; no Lunegit cap read].
-- Platform adapter: in `lune-ui-winit` or `lune-ui-platform`, behind `#[cfg(target_os)]` modules; the core holds only the request and event types and the fake (`testing::ScriptedInput` gains a clipboard event, a fake adapter records writes) [R crates/lune-ui-core/src/input.rs:28-67], [D36].
+- Platform adapter: in `lune-ui-winit` or `lune-ui-platform`, behind `#[cfg(target_os)]` modules; the core holds only the request and event types (M4) and the fake (M5; `testing::ScriptedInput` gains a clipboard event, a fake adapter records writes) [R crates/lune-ui-core/src/input.rs:28-67], [D36].
 
 ### States
 
@@ -93,8 +93,8 @@ None: no text of its own.
 
 ### Build
 
-- Milestone: M10 (platform adapter); the core request and event types and the fake land with `text.text-edit` in M5, because its acceptance tests need them.
-- Depends on: core.input, platform.input
+- Milestone: M4 (`ClipboardRequest` and the reply `Event` variants, with `core.ui`'s `FrameOutput.clipboard` and `core.input`'s reserved variant); M5 (the fake adapter and `ScriptedInput` clipboard event, with `text.text-edit`, whose acceptance tests need them); M10 (the platform adapter, per the roadmap's M10 row). Until M10 the code views of M9 (copy buttons) run on the fake.
+- Depends on: core.ui, core.input, platform.input
 
 ## Open questions
 

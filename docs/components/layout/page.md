@@ -41,7 +41,7 @@ Conflicts (winner):
 ### Anatomy
 
 - Card: radius 8 [R crates/lune-ui-core/src/theme.rs:115]; 1 px `border_subtle` #FFFFFF1A [R crates/lune-ui-core/src/theme.rs:63]; margin 0 10 10 6 [W docs/ui/components.md:235-248].
-- Header: padding 16; title 18/24 Medium, bright; subtitle 13/20 tertiary; actions at the right, 8 apart [W docs/ui/components.md:235-248].
+- Header: padding 16; title 18/24 Medium, `fg_bright` ([D58]); subtitle 13/20 tertiary; actions at the right, 8 apart [W docs/ui/components.md:235-248].
 - Body: padding 0 16 16; vertical scroll only, with `widget.scrollbar` [W docs/ui/components.md:235-248].
 - Footer: padding 12 16; top hairline; secondary action left, primary group right [W docs/ui/components.md:235-248].
 - Inactive window: the card is the solid `INACTIVE_FALLBACK` #333333FF instead of the acrylic [R crates/lune-ui-core/src/theme.rs:111-113].

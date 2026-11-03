@@ -50,7 +50,7 @@ Additions (new variants on the `#[non_exhaustive]` enums, so no break) [D35]:
 - M4: `Event::Access(AccessAction { target: WidgetId, action, value })`, routed by the `Ui` as the matching pointer or key input [infra.accessibility]. `FrameOutput` gains `repaint`, the semantic `tree`, `focused` and `clipboard` requests (the shapes are in [core.ui] and [platform.clipboard]); the existing three fields keep their types [R crates/lune-ui-core/src/input.rs:155-164].
 - M10: file-drop events `Event::FileHover { pos, path }`, `Event::FileHoverCancelled` and `Event::FileDrop { pos, path }` (one event per file; `pos` is the last pointer position, because winit's events carry none) [D43], [derived: winit 0.30.13 `WindowEvent::HoveredFile(PathBuf)`, `HoveredFileCancelled`, `DroppedFile(PathBuf)` at `src/event.rs:180-192` in the cargo registry].
 - M10: touch and gesture events stay out of v1 (no source needs them) [D35].
-- Clipboard text arriving from the OS is an event the clipboard entry defines; `core.input` only reserves the variant [platform.clipboard].
+- Clipboard text arriving from the OS is an event the clipboard entry defines; `core.input` reserves the variant in M4, with the `clipboard` field of `FrameOutput` [platform.clipboard].
 - Coordinates stay logical (physical divided by scale) and time stays app-supplied: the toolkit reads no clock [R crates/lune-ui-core/src/input.rs:5-6], [D3].
 
 ### States

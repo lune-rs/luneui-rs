@@ -40,7 +40,7 @@ No conflict: one source. The row language is `widget.nav-item` [W docs/ui/compon
 | state | look | cite |
 |---|---|---|
 | upcoming | tertiary label; ring number | [W docs/ui/components.md:505], [W docs/ui/mocks/css/tokens.css:14] |
-| current | fill `surface_selected`; bright label, weight 500 | [W docs/ui/components.md:505], [W docs/ui/mocks/css/tokens.css:16,23] |
+| current | fill `surface_selected`; `fg_bright` label ([D58]), weight 500 | [W docs/ui/components.md:505], [W docs/ui/mocks/css/tokens.css:16,23] |
 | done | accent circle with a 12 px check in `on_accent`; secondary label | [W docs/ui/components.md:505], [W docs/ui/mocks/css/tokens.css:40,43] |
 
 Not interactive, so no hover, press, focus or disabled look [W docs/ui/components.md:507].

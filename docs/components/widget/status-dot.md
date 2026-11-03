@@ -25,24 +25,24 @@ None in luneui-rs or Luneterm's `lune-ui` [W docs/ui/components.md:398]. Wane is
 
 ### Evidence
 
-Pinned: Lunegit 33a1dd41, Wane 69931d6, this repo fa2958b. Read: `docs/ui/components.md:389-401,677`; `docs/ui/mocks/css/tokens.css:12-14,49-61,107`. No Lunegit or Luneterm line for a dot was read; no conflict to resolve.
+Pinned: Lunegit 33a1dd41, Wane 69931d6, this repo fa2958b. Read: `docs/ui/components.md:389-401,677`; `docs/ui/mocks/css/tokens.css:12-14,49-61,107`. No Lunegit or Luneterm line for a dot was read. Conflict: Wane's tone hexes (`--ok` #6fd39a, `--warn` #f2a65a) against Lunegit's tones for the same meanings (#73C991, #E2B93D, [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:115-116]); Lunegit's win, as in `widget.badge` [D58].
 
 ### Anatomy
 
 - Circle 8 px [W docs/ui/components.md:394]; radius `--radius-round` 50% [W docs/ui/mocks/css/tokens.css:107].
-- Tone fills: ok `--ok` #6fd39a [W docs/ui/mocks/css/tokens.css:49]; warn `--warn` #f2a65a [W docs/ui/mocks/css/tokens.css:52]; err `--err` #e06c75 [W docs/ui/mocks/css/tokens.css:55]; data `--data` #5c8fe6 [W docs/ui/mocks/css/tokens.css:58].
-- Paused: neutral, no token named [W docs/ui/components.md:392] (see Open questions).
+- Tone fills, the tokens of [D58]: `ok` #73C991 [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:116]; `warn` #E2B93D [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:115]; `err` #E06C75 [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:117]; `data` #5c8fe6 [W docs/ui/mocks/css/tokens.css:58].
+- Paused: neutral; the token is `paused` #8a9099 [W docs/ui/mocks/css/tokens.css:62], added by [D58] (Wane's components text names none, [W docs/ui/components.md:392]).
 - The tray icon's dot is a separate part of `platform.tray-icon` [W docs/ui/components.md:394].
 
 ### States
 
 | state | look | cite |
 |---|---|---|
-| ok | circle, fill `ok` | [W docs/ui/components.md:392], [W docs/ui/mocks/css/tokens.css:49] |
-| warn | circle, fill `warn` | [W docs/ui/mocks/css/tokens.css:52] |
-| err | circle, fill `err` | [W docs/ui/mocks/css/tokens.css:55] |
-| data | circle, fill `data` | [W docs/ui/mocks/css/tokens.css:58] |
-| paused | circle, neutral fill (token open) | [W docs/ui/components.md:392-393,677] |
+| ok | circle, fill `ok` | [W docs/ui/components.md:392], [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:116], [D58] |
+| warn | circle, fill `warn` | [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:115], [D58] |
+| err | circle, fill `err` | [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:117], [D58] |
+| data | circle, fill `data` | [W docs/ui/mocks/css/tokens.css:58], [D58] |
+| paused | circle, fill `paused` | [W docs/ui/components.md:392-393,677], [W docs/ui/mocks/css/tokens.css:62], [D58] |
 
 Static: none; no glow, ring or pulse [W docs/ui/components.md:393].
 
@@ -91,7 +91,7 @@ None: the status words come from the app.
 
 ## Open questions
 
-- `token-gap`: Wane gives paused the neutral tone but names no token [W docs/ui/components.md:392]. M6 picks a token and cites it.
+- `token-gap` resolved by [D58]: Wane's components text gives paused the neutral tone and names no token [W docs/ui/components.md:392]; its CSS defines `--paused` #8a9099 [W docs/ui/mocks/css/tokens.css:62], which becomes the `paused` token (M4). Nothing open.
 
 ## Notes for the planner
 

@@ -73,7 +73,7 @@ n/a — pure functions of progress; the menu's own input and focus are `overlay.
 
 - Transient: none held here; the caller keeps the open time and passes `t` [R crates/lune-ui-core/src/widgets/menu.rs:45-46].
 - Persistent: none. App-owned: until M4, the open and close start times.
-- Exit retention: the close animation is the exit: `MENU_OUT` = 120 ms = `instant`; in M4 the menu's `WidgetId` stays alive until it ends [core.ui].
+- Exit retention: the close animation is the exit: Full 120 / Reduced 120 / Off 0 ms [core.ui] (`MENU_OUT` = 120 ms = `instant`); in M4 the menu's `WidgetId` stays alive until it ends [core.ui].
 
 ### Accessibility
 

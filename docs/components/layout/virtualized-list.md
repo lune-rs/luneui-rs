@@ -57,7 +57,7 @@ lists are replaced [core.ui]. The key set wins (C4); an index is only the row's 
 | row rest | transparent | [L src/Lunegit.Desktop/Views/RepositoryContentView.axaml:356] |
 | row hover | `surface_hover` fill | [L src/Lunegit.Desktop/Views/RepositoryContentView.axaml:361-364] |
 | row selected | `surface_selected` (white at alpha 0x18) | [L src/Lunegit.Desktop/Views/RepositoryContentView.axaml:365-368], [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:28], [R crates/lune-ui-core/src/theme.rs:11-20] |
-| row selected and hovered | Lunegit's `SurfaceActive`; the `Theme` has no such token, so the token `surface_active` is added in M4 ([D56], [widget.button]) | [L src/Lunegit.Desktop/Views/RepositoryContentView.axaml:369-372] |
+| row selected and hovered | Lunegit's `SurfaceActive`; the `Theme` has no such token, so the token `surface_active` is added in M4 ([D58], [widget.button]) | [L src/Lunegit.Desktop/Views/RepositoryContentView.axaml:369-372] |
 | row pressed | as hover [derived: Lunegit's row style has no pressed rule] | [L src/Lunegit.Desktop/Views/RepositoryContentView.axaml:350-373] |
 | focus-visible (keyboard cursor row) | outline on the cursor row after keyboard navigation | [core.focus] |
 | disabled | list inert, rows at opacity 0.4 | [derived: 0.4 is Lunegit's disabled opacity on its toolbar buttons, App.axaml:482] |

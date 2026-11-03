@@ -91,7 +91,7 @@ Never animated: the rows and their hover fill, and the panel's size (the menu si
 - Transient: item hover; the open and close progress, passed in by the app as elapsed/duration [R crates/lune-ui-core/src/widgets/menu.rs:45-58] [motion].
 - Persistent: none (no submenus, no selection).
 - App-owned: entries (`MenuEntry`), anchor point, `interactive`, the animation value [R crates/lune-ui-core/src/widgets/menu.rs:9-17,64-69].
-- Exit retention: yes: 120 ms in Full (MENU_OUT, menu.rs:22); Reduced: 120 ms (the same MENU_OUT, open question); Off 0 ms.
+- Exit retention: yes: Full 120 / Reduced 120 / Off 0 ms [core.ui] (Full is MENU_OUT, menu.rs:22).
 
 ### Accessibility
 

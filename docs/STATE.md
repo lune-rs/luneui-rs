@@ -1,7 +1,7 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-04 (M3 close: painter aggregate, README and template spec layout, INDEX regenerated)
+Last updated: 2026-11-04 (M3 review round 1 fixes: milestone order of new-code dependencies, clipboard types in M4, colour tokens in D58)
 
 ## Now
 
@@ -10,12 +10,15 @@ M2 (seams and crate split). All 97 catalogue entries carry a `## Spec` (format: 
 D49, README "Body sections") with Lunegit, Wane or repo `file:line` cites; none is a `stub`.
 `docs/motion.md` fixes the motion vocabulary (D50); `docs/requirements.md` has no open item;
 `core.painter` holds the aggregate table of new painter primitives (image, rotate, dash,
-clip-rounded, sector, path-fill, arc), the list M5 builds. DECISIONS D40 to D57 record the M3 choices,
+clip-rounded, sector, path-fill, arc), the list M5 builds. DECISIONS D40 to D58 record the M3 choices,
 including the interaction-model additions M4 builds from: a `Toast` layer above `Modal` (D54), the
-36 roles and 15 states (D55), new `Theme` tokens (D56), `{n:spec}` formatting through an `ArgFormat`
+36 roles and 15 states (D55), new `Theme` tokens (D58, which supersedes D56), `{n:spec}` formatting through an `ArgFormat`
 hook (D52). The code is the M2 five-crate toolkit (pure `lune-ui-core`, adapters `lune-ui-wgpu`,
 `lune-ui-winit`, `lune-ui-platform`, facade `lune-ui`); M3 changed docs only, so the 15 gallery scenes
 are unchanged. Window-mode code is compile- and review-checked only: no gate opens a visible window.
+Review round 1 moved `data.stat`, `data.kv-list` and `data.progress` to M6 and `infra.shortcut-routing` to M5
+(entries come after what they depend on); `overlay.flyout` ships its surface in M7 and tray anchoring in M10; the
+`ClipboardRequest` type is M4, its fake M5, its adapter M10.
 
 Wane is a third consumer (2026-11-04): its UI spec is catalogued, R-platform-6 narrowed (tray, flyout
 and glass menu in toolkit; close-to-tray, single instance, autostart and notifications app-side).

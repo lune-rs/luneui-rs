@@ -96,7 +96,7 @@ None: keys and values are app text.
 
 ### Build
 
-- Milestone: M8.
+- Milestone: M6.
 - Depends on: core.painter, core.theme, infra.accessibility.
 
 ## Open questions

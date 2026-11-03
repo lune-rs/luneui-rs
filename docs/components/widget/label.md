@@ -38,8 +38,8 @@ Conflicts: (1) Wane gives the base size 13/20 at weight 400 in primary text [W d
 - Base: 13 px at `font_base` [R crates/lune-ui-core/src/theme.rs:83]; Lunegit's `FontSizeBase` is 13 [L src/Lunegit.Desktop/App.axaml:160].
 - Small: 11 px at `font_s`, tertiary colour [R crates/lune-ui-core/src/theme.rs:82]; Lunegit `FontSizeS` 11 [L src/Lunegit.Desktop/App.axaml:159]; Wane small 11/16 tertiary [W docs/ui/components.md:280].
 - Section: 14 px Medium at `font_m` [R crates/lune-ui-core/src/theme.rs:84]; Wane 14 Medium [W docs/ui/components.md:280].
-- Title: 18 px / 24 Medium bright [W docs/ui/components.md:280,282]; not in the moved theme.
-- Mono, strong: Wane RznMono and 500 bright [W docs/ui/components.md:280].
+- Title: 18 px / 24 Medium `fg_bright` [W docs/ui/components.md:280,282]; not in the moved theme, added by [D58].
+- Mono, strong: Wane RznMono and 500 `fg_bright` [W docs/ui/components.md:280].
 - Colour: the caller's `Rgba`; Lunegit's labels use `ForegroundPrimary` and `ForegroundMuted` [L src/Lunegit.Desktop/Views/Settings/GeneralSettingsView.axaml:152,155].
 
 ### States
