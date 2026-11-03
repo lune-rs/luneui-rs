@@ -930,6 +930,7 @@ dependencies = [
  "glyphon",
  "objc2-app-kit 0.3.2",
  "png",
+ "pollster",
  "raw-window-handle",
  "wgpu",
  "window-vibrancy",

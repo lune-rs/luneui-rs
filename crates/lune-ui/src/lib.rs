@@ -10,10 +10,11 @@
 //! - [`color`], [`theme`] (the `Theme` tokens and the dark preset with its glass
 //!   layers), [`acrylic`] (Avalonia acrylic colour math);
 //! - [`paint`] (the `Painter`), [`scene`] (the display list it builds: plain data and the
-//!   draw-order contract), [`custom`] (app-owned GPU drawing inside a layer), [`text`], [`icon`], [`widgets`] (controls, menus, dropdowns,
-//!   dialogs), [`chrome`] (tab outline geometry);
-//! - [`gpu`], [`blur`], [`frame`] (wgpu setup, backdrop blur, the scene → blur → target pass
-//!   sequence), [`dump`] (offscreen targets and PNG readback);
+//!   draw-order contract), [`custom`] (app-owned GPU drawing inside a layer), [`text`], [`icon`],
+//!   [`widgets`] (controls, menus, dropdowns, dialogs), [`chrome`] (tab outline geometry);
+//! - [`gpu`] (the GPU every target shares), [`frame`] (one target's renderer: the scene → blur →
+//!   target pass sequence), [`blur`] (backdrop blur), [`surface`] (a window's swapchain), [`dump`]
+//!   (offscreen targets and PNG readback);
 //! - [`material`] (OS backdrop per platform, [`GlassLayer`] and [`Backdrop`] describe the layers
 //!   and capability levels), [`window`] (glass window attributes, edge resize, double click,
 //!   caption buttons);
@@ -34,6 +35,7 @@ pub mod icon;
 pub mod material;
 pub mod paint;
 pub mod scene;
+pub mod surface;
 pub mod testing;
 pub mod text;
 pub mod theme;

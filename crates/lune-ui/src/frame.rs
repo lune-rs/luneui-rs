@@ -1,66 +1,96 @@
-//! The frame renderer: owns the glyphon state and the scene → blur → target pass sequence.
+//! The frame renderer of one target: its uniforms, viewport, text renderers and blur textures,
+//! and the scene → blur → target pass sequence.
 //!
 //! The app paints into a [`Painter`](crate::paint::Painter) and hands the finished [`Scene`] to
-//! [`FrameRenderer::draw`], which renders it in the scene module's documented draw order into any target view at an explicit size and scale:
-//! the window surface (see [`Gpu::acquire`] and [`Gpu::present`]) or an offscreen texture (frame dumps).
+//! [`FrameRenderer::draw`], which renders it in the [`scene`](crate::scene) module's draw order
+//! into any target view at an explicit size and scale: a window surface (see
+//! [`WindowSurface`](crate::surface::WindowSurface)) or an offscreen texture (frame dumps). Any
+//! number of renderers share one [`Gpu`]; everything a draw writes belongs to its renderer, except
+//! the shared glyph atlas of its format and the glyph rasterizer cache.
 
-use glyphon::{
-    Cache, Color, Resolution, SwashCache, TextArea, TextAtlas, TextBounds, TextRenderer, Viewport,
-};
+use glyphon::{Color, Resolution, TextArea, TextBounds, TextRenderer, Viewport};
 
 use crate::blur::Blur;
 use crate::custom::{CustomDraw, CustomFrame, CustomItem};
-use crate::gpu::Gpu;
+use crate::gpu::{Globals, Gpu};
 use crate::scene::{LAYER_COUNT, SCENE_LAYERS, Scene};
 use crate::text::TextCache;
 
 pub use crate::scene::FrameParams;
 
+/// Draws scenes into targets of one colour format. Use it only with the [`Gpu`] that made it.
 pub struct FrameRenderer {
+    format: wgpu::TextureFormat,
+    /// Index of the format's shared state in the [`Gpu`].
+    format_index: usize,
+    globals: wgpu::Buffer,
+    /// Globals, the shared noise texture and sampler (the shape and stroke pipelines' group 0).
+    bind_group: wgpu::BindGroup,
     viewport: Viewport,
-    atlas: TextAtlas,
     /// One text renderer per paint layer, so text interleaves correctly with shapes.
     layers: Vec<TextRenderer>,
-    swash: SwashCache,
     /// Offscreen scene + blur for glass menus.
     blur: Blur,
 }
 
 impl std::fmt::Debug for FrameRenderer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("FrameRenderer").finish_non_exhaustive()
+        f.debug_struct("FrameRenderer")
+            .field("format", &self.format)
+            .finish_non_exhaustive()
     }
 }
 
 impl FrameRenderer {
-    pub fn new(gpu: &Gpu) -> Self {
-        let cache = Cache::new(&gpu.device);
-        let viewport = Viewport::new(&gpu.device, &cache);
-        let mut atlas = TextAtlas::with_color_mode(
-            &gpu.device,
-            &gpu.queue,
-            &cache,
-            gpu.config.format,
-            glyphon::ColorMode::Web,
-        );
+    /// A renderer for targets of `format`; creates the format's shared pipelines and glyph atlas
+    /// in `gpu` on first use.
+    pub fn new(gpu: &mut Gpu, format: wgpu::TextureFormat) -> Self {
+        let format_index = gpu.format_index(format);
+        let device = &gpu.device;
+        let globals = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("globals"),
+            size: std::mem::size_of::<Globals>() as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("globals"),
+            layout: &gpu.globals_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: globals.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(&gpu.noise_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::Sampler(&gpu.noise_sampler),
+                },
+            ],
+        });
+        let viewport = Viewport::new(device, &gpu.glyph_cache);
+        let atlas = &mut gpu.formats[format_index].atlas;
         let layers = (0..LAYER_COUNT)
-            .map(|_| {
-                TextRenderer::new(
-                    &mut atlas,
-                    &gpu.device,
-                    wgpu::MultisampleState::default(),
-                    None,
-                )
-            })
+            .map(|_| TextRenderer::new(atlas, device, wgpu::MultisampleState::default(), None))
             .collect();
-        let blur = Blur::new(&gpu.device, gpu.config.format);
+        let blur = Blur::new(device, format);
         Self {
+            format,
+            format_index,
+            globals,
+            bind_group,
             viewport,
-            atlas,
             layers,
-            swash: SwashCache::new(),
             blur,
         }
+    }
+
+    /// The colour format of the targets this renderer draws into.
+    pub fn format(&self) -> wgpu::TextureFormat {
+        self.format
     }
 
     /// The blur stage, for debug dumps of its intermediate textures.
@@ -73,7 +103,7 @@ impl FrameRenderer {
     /// popup layers are drawn over it.
     pub fn draw(
         &mut self,
-        gpu: &Gpu,
+        gpu: &mut Gpu,
         text: &mut TextCache,
         scene: &Scene,
         target: &wgpu::TextureView,
@@ -85,16 +115,23 @@ impl FrameRenderer {
     /// [`draw`](Self::draw) with app-owned draws: each layer's [`CustomItem`]s render after the
     /// layer's acrylic and under shapes and before its text, scissored to the item's clip.
     /// `customs[slot]` draws the items recorded with that slot. Every element of `customs` gets
-    /// one `prepare` call before the first render pass.
+    /// one `prepare` call before the first render pass. One queue submit per call.
     pub fn draw_with(
         &mut self,
-        gpu: &Gpu,
+        gpu: &mut Gpu,
         text: &mut TextCache,
         scene: &Scene,
         target: &wgpu::TextureView,
         params: FrameParams,
         customs: &mut [&mut dyn CustomDraw],
     ) -> Result<(), String> {
+        if gpu
+            .formats
+            .get(self.format_index)
+            .is_none_or(|f| f.format != self.format)
+        {
+            return Err("frame renderer used with a Gpu that did not make it".into());
+        }
         let layers = &scene.layers;
         let backdrop = scene.backdrop;
         if let Some(bad) = layers
@@ -107,7 +144,7 @@ impl FrameRenderer {
         let custom_frame = CustomFrame {
             size: params.size,
             scale: params.scale,
-            format: gpu.config.format,
+            format: self.format,
         };
         for c in customs.iter_mut() {
             c.prepare(&gpu.device, &gpu.queue, &custom_frame);
@@ -119,8 +156,18 @@ impl FrameRenderer {
             blur_sigma: sigma,
             saturation,
         } = params;
+        // Disjoint borrows: the format's atlas and the rasterizer cache are the only shared state
+        // this draw writes.
+        let Gpu {
+            device,
+            queue,
+            formats,
+            swash,
+            ..
+        } = gpu;
+        let atlas = &mut formats[self.format_index].atlas;
         self.viewport.update(
-            &gpu.queue,
+            queue,
             Resolution {
                 width: size.0,
                 height: size.1,
@@ -147,20 +194,24 @@ impl FrameRenderer {
                 })
             });
             renderer
-                .prepare(
-                    &gpu.device,
-                    &gpu.queue,
-                    fonts,
-                    &mut self.atlas,
-                    &self.viewport,
-                    areas,
-                    &mut self.swash,
-                )
+                .prepare(device, queue, fonts, atlas, &self.viewport, areas, swash)
                 .map_err(|e| e.to_string())?;
         }
 
-        let uploaded = gpu.upload(scene, size, s);
-        self.blur.prepare(&gpu.device, &gpu.queue, size, s, sigma);
+        queue.write_buffer(
+            &self.globals,
+            0,
+            bytemuck::bytes_of(&Globals {
+                size: [size.0 as f32, size.1 as f32],
+                scale: s,
+                _pad: 0.0,
+            }),
+        );
+        let gpu: &Gpu = gpu;
+        let fs = &gpu.formats[self.format_index];
+        let uploaded = gpu.upload(scene);
+        self.blur
+            .prepare(&gpu.device, &gpu.queue, &gpu.blur, size, s, sigma);
         let mut encoder = gpu.device.create_command_encoder(&Default::default());
         let pass_desc = |target: &wgpu::TextureView,
                          f: &mut dyn FnMut(&mut wgpu::RenderPass<'_>) -> Result<(), String>,
@@ -183,17 +234,18 @@ impl FrameRenderer {
             });
             f(&mut pass)
         };
+        let globals = &self.bind_group;
         let scene_view = self.blur.scene_view().ok_or("no scene target")?;
         pass_desc(
             scene_view,
             &mut |pass| {
                 for (i, layer) in layers.iter().enumerate().take(SCENE_LAYERS) {
-                    gpu.draw_below_text(pass, &uploaded, i);
+                    fs.draw_below_text(pass, globals, &uploaded, i);
                     draw_customs(pass, &layer.customs, customs, &custom_frame);
                     self.layers[i]
-                        .render(&self.atlas, &self.viewport, pass)
+                        .render(&fs.atlas, &self.viewport, pass)
                         .map_err(|e| e.to_string())?;
-                    gpu.draw_above_text(pass, &uploaded, i);
+                    fs.draw_above_text(pass, globals, &uploaded, i);
                 }
                 Ok(())
             },
@@ -201,22 +253,22 @@ impl FrameRenderer {
         )?;
         if let Some(b) = backdrop {
             self.blur.set_backdrop(&gpu.queue, b, saturation);
-            self.blur.run(&mut encoder);
+            self.blur.run(&mut encoder, &fs.blur);
         }
         pass_desc(
             target,
             &mut |pass| {
-                self.blur.blit_scene(pass);
+                self.blur.blit_scene(pass, &fs.blur);
                 if backdrop.is_some() {
-                    self.blur.draw_backdrop(pass);
+                    self.blur.draw_backdrop(pass, &fs.blur);
                 }
                 for (i, layer) in layers.iter().enumerate().skip(SCENE_LAYERS) {
-                    gpu.draw_below_text(pass, &uploaded, i);
+                    fs.draw_below_text(pass, globals, &uploaded, i);
                     draw_customs(pass, &layer.customs, customs, &custom_frame);
                     self.layers[i]
-                        .render(&self.atlas, &self.viewport, pass)
+                        .render(&fs.atlas, &self.viewport, pass)
                         .map_err(|e| e.to_string())?;
-                    gpu.draw_above_text(pass, &uploaded, i);
+                    fs.draw_above_text(pass, globals, &uploaded, i);
                 }
                 Ok(())
             },
@@ -224,13 +276,6 @@ impl FrameRenderer {
         )?;
         gpu.queue.submit(Some(encoder.finish()));
         Ok(())
-    }
-
-    /// Per-frame housekeeping after the frame is finished: trims the glyph atlas and ages the
-    /// text cache.
-    pub fn end_frame(&mut self, text: &mut TextCache) {
-        self.atlas.trim();
-        text.end_frame();
     }
 }
 

@@ -28,6 +28,7 @@ use lune_ui::gpu::{self, Gpu};
 use lune_ui::lunegit_dark;
 use lune_ui::material::{self, Material};
 use lune_ui::paint::{Painter, Rect};
+use lune_ui::surface::{Acquired, WindowSurface};
 use lune_ui::text::TextCache;
 use lune_ui::window;
 use scenes::{BLUR_SATURATION, BLUR_SIGMA, H, SCENES, Scene, W};
@@ -50,7 +51,9 @@ fn parse(args: &[String]) -> Result<Command, String> {
 }
 
 struct Renderer {
+    window: Arc<Window>,
     gpu: Gpu,
+    surface: WindowSurface,
     text: TextCache,
     frame: FrameRenderer,
     fill: custom::Fill,
@@ -109,7 +112,7 @@ const UI_FONT: &str = "RznSans";
 const MONO_FONT: &str = "RobotoMono Nerd Font Mono";
 
 impl App {
-    fn setup(&self, event_loop: &ActiveEventLoop) -> Result<(Arc<Window>, Renderer), String> {
+    fn setup(&self, event_loop: &ActiveEventLoop) -> Result<Renderer, String> {
         // Dump runs render offscreen only; keep their window out of sight.
         let attrs = window::glass_attributes(
             "luneui gallery",
@@ -127,8 +130,13 @@ impl App {
         {
             eprintln!("glass: {e}");
         }
-        let instance = gpu::instance(event_loop.owned_display_handle());
-        let gpu = pollster::block_on(Gpu::new(window.clone(), &instance))?;
+        let instance = gpu::instance(Some(Box::new(event_loop.owned_display_handle())));
+        let surface = instance
+            .create_surface(window.clone())
+            .map_err(|e| format!("surface: {e}"))?;
+        let mut gpu = pollster::block_on(Gpu::new(instance, Some(&surface)))?;
+        let size = window.inner_size();
+        let surface = WindowSurface::new(&gpu, surface, (size.width, size.height))?;
         let text = TextCache::new(
             window.scale_factor() as f32,
             &[
@@ -139,17 +147,16 @@ impl App {
             UI_FONT,
             MONO_FONT,
         );
-        let frame = FrameRenderer::new(&gpu);
-        let fill = custom::Fill::new(&gpu.device, gpu.config.format);
-        Ok((
+        let frame = FrameRenderer::new(&mut gpu, surface.format());
+        let fill = custom::Fill::new(&gpu.device, surface.format());
+        Ok(Renderer {
             window,
-            Renderer {
-                gpu,
-                text,
-                frame,
-                fill,
-            },
-        ))
+            gpu,
+            surface,
+            text,
+            frame,
+            fill,
+        })
     }
 }
 
@@ -158,7 +165,7 @@ impl ApplicationHandler for App {
         if self.renderer.is_some() {
             return;
         }
-        let (window, mut renderer) = match self.setup(event_loop) {
+        let mut renderer = match self.setup(event_loop) {
             Ok(v) => v,
             Err(e) => {
                 eprintln!("{e}");
@@ -177,7 +184,7 @@ impl ApplicationHandler for App {
             event_loop.exit();
             return;
         }
-        window.request_redraw();
+        renderer.window.request_redraw();
         self.renderer = Some(renderer);
     }
 
@@ -187,11 +194,11 @@ impl ApplicationHandler for App {
             return;
         }
         let Some(r) = &mut self.renderer else { return };
-        let window = r.gpu.window.clone();
+        let window = r.window.clone();
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::Resized(size) => {
-                r.gpu.resize(size.width, size.height);
+                r.surface.resize(&r.gpu, size.width, size.height);
                 window.request_redraw();
             }
             WindowEvent::ScaleFactorChanged { .. } => window.request_redraw(),
@@ -242,21 +249,33 @@ fn draw_scene(
         saturation: BLUR_SATURATION,
     };
     let mut customs: [&mut dyn CustomDraw; 1] = [&mut r.fill];
-    r.frame
-        .draw_with(&r.gpu, &mut r.text, &scene, target, params, &mut customs)
+    r.frame.draw_with(
+        &mut r.gpu,
+        &mut r.text,
+        &scene,
+        target,
+        params,
+        &mut customs,
+    )
 }
 
 /// Draws one frame of `scene` into the window's surface.
 fn render_window(r: &mut Renderer, scene: &Scene) -> Result<(), String> {
-    let Some(frame) = r.gpu.acquire()? else {
-        return Ok(());
+    let frame = match r.surface.acquire(&r.gpu)? {
+        Acquired::Frame(frame) => frame,
+        Acquired::Skip => return Ok(()),
+        Acquired::Redraw => {
+            r.window.request_redraw();
+            return Ok(());
+        }
     };
     let view = frame.texture.create_view(&Default::default());
-    let size = (r.gpu.config.width, r.gpu.config.height);
-    let s = r.gpu.window.scale_factor() as f32;
+    let size = r.surface.size();
+    let s = r.window.scale_factor() as f32;
     draw_scene(r, scene, s, &view, size)?;
-    r.gpu.present(frame);
-    r.frame.end_frame(&mut r.text);
+    r.window.pre_present_notify();
+    r.surface.present(&r.gpu, frame);
+    r.gpu.end_frame(&mut r.text);
     Ok(())
 }
 
@@ -268,11 +287,11 @@ fn dump_scenes(r: &mut Renderer, dir: &Path) -> Result<(), String> {
         let name = scene.name();
         let s = scene.scale as f32;
         let size = (W * scene.scale, H * scene.scale);
-        let texture = dump::target(&r.gpu.device, r.gpu.config.format, size);
+        let texture = dump::target(&r.gpu.device, r.surface.format(), size);
         let view = texture.create_view(&Default::default());
         for _ in 0..2 {
             draw_scene(r, scene, s, &view, size).map_err(|e| format!("scene {name}: {e}"))?;
-            r.frame.end_frame(&mut r.text);
+            r.gpu.end_frame(&mut r.text);
         }
         let rgba = dump::read_rgba(&r.gpu.device, &r.gpu.queue, &texture)
             .map_err(|e| format!("scene {name}: {e}"))?;

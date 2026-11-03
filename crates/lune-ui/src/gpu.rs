@@ -1,12 +1,13 @@
-//! wgpu setup and the two non-text pipelines (shapes, strokes).
-
-use std::sync::Arc;
+//! The shared GPU: device, queue, the noise texture and, per colour target format, the shape and
+//! stroke pipelines, the blur pipelines and one glyph atlas.
 
 use bytemuck::{Pod, Zeroable};
+use glyphon::{Cache, SwashCache, TextAtlas};
 use wgpu::util::DeviceExt;
-use winit::window::Window;
 
+use crate::blur;
 use crate::scene::{Scene, Shape, StrokeVertex};
+use crate::text::TextCache;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
@@ -70,24 +71,45 @@ impl From<&StrokeVertex> for GpuStrokeVertex {
     }
 }
 
-pub struct Gpu {
-    pub window: Arc<Window>,
-    pub device: wgpu::Device,
-    pub queue: wgpu::Queue,
-    pub surface: wgpu::Surface<'static>,
-    pub config: wgpu::SurfaceConfiguration,
-    pub alpha_mode: wgpu::CompositeAlphaMode,
-    globals: wgpu::Buffer,
-    bind_group: wgpu::BindGroup,
+/// The pipelines and the glyph atlas of one colour target format, shared by every
+/// [`FrameRenderer`](crate::frame::FrameRenderer) that draws in that format.
+pub(crate) struct FormatState {
+    pub(crate) format: wgpu::TextureFormat,
     acrylic_pipeline: wgpu::RenderPipeline,
     shape_pipeline: wgpu::RenderPipeline,
     stroke_pipeline: wgpu::RenderPipeline,
+    pub(crate) blur: blur::Pipelines,
+    pub(crate) atlas: TextAtlas,
+}
+
+/// The GPU shared by every target of the app: one device and queue, the noise texture, and per
+/// colour target format the pipelines and one glyph atlas. Holds no window and no surface; each
+/// target is a [`FrameRenderer`](crate::frame::FrameRenderer) (plus a
+/// [`WindowSurface`](crate::surface::WindowSurface) for a window).
+pub struct Gpu {
+    pub instance: wgpu::Instance,
+    pub adapter: wgpu::Adapter,
+    pub device: wgpu::Device,
+    pub queue: wgpu::Queue,
+    /// Globals (binding 0), noise texture (1) and sampler (2) of the shape and stroke pipelines.
+    pub(crate) globals_layout: wgpu::BindGroupLayout,
+    pipeline_layout: wgpu::PipelineLayout,
+    shader: wgpu::ShaderModule,
+    pub(crate) noise_view: wgpu::TextureView,
+    pub(crate) noise_sampler: wgpu::Sampler,
+    pub(crate) blur: blur::Shared,
+    pub(crate) glyph_cache: Cache,
+    pub(crate) swash: SwashCache,
+    /// Created on first use, looked up linearly (a handful of formats at most).
+    pub(crate) formats: Vec<FormatState>,
 }
 
 impl std::fmt::Debug for Gpu {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let formats: Vec<_> = self.formats.iter().map(|s| s.format).collect();
         f.debug_struct("Gpu")
-            .field("config", &self.config)
+            .field("adapter", &self.adapter.get_info().name)
+            .field("formats", &formats)
             .finish_non_exhaustive()
     }
 }
@@ -102,11 +124,15 @@ pub struct Uploaded {
     ranges: Vec<(Range, Range, Range, Range)>,
 }
 
-/// The wgpu instance for a winit event loop. On Windows this is DX12 presented through a
-/// DirectComposition visual, the wgpu path that supports a transparent window.
-pub fn instance(display: winit::event_loop::OwnedDisplayHandle) -> wgpu::Instance {
+/// The wgpu instance. `display` is the windowing system's display handle (an event loop's owned
+/// display handle, say); `None` for a headless instance. On Windows this is DX12 presented
+/// through a DirectComposition visual, the wgpu path that supports a transparent window.
+pub fn instance(display: Option<Box<dyn wgpu::wgt::WgpuHasDisplayHandle>>) -> wgpu::Instance {
     #[allow(unused_mut)]
-    let mut desc = wgpu::InstanceDescriptor::new_with_display_handle(Box::new(display));
+    let mut desc = match display {
+        Some(display) => wgpu::InstanceDescriptor::new_with_display_handle(display),
+        None => wgpu::InstanceDescriptor::new_without_display_handle(),
+    };
     #[cfg(target_os = "windows")]
     {
         desc.backends = wgpu::Backends::DX12;
@@ -116,13 +142,15 @@ pub fn instance(display: winit::event_loop::OwnedDisplayHandle) -> wgpu::Instanc
 }
 
 impl Gpu {
-    pub async fn new(window: Arc<Window>, instance: &wgpu::Instance) -> Result<Self, String> {
-        let surface = instance
-            .create_surface(window.clone())
-            .map_err(|e| e.to_string())?;
+    /// Opens the device. `compatible` is a surface the adapter must be able to present to;
+    /// `None` opens a headless device (offscreen targets only).
+    pub async fn new(
+        instance: wgpu::Instance,
+        compatible: Option<&wgpu::Surface<'_>>,
+    ) -> Result<Gpu, String> {
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
-                compatible_surface: Some(&surface),
+                compatible_surface: compatible,
                 ..Default::default()
             })
             .await
@@ -132,48 +160,8 @@ impl Gpu {
             .await
             .map_err(|e| e.to_string())?;
 
-        let caps = surface.get_capabilities(&adapter);
-        // Blend in gamma space like Skia/Avalonia, so colours match Avalonia.
-        let format = [
-            wgpu::TextureFormat::Bgra8Unorm,
-            wgpu::TextureFormat::Rgba8Unorm,
-        ]
-        .into_iter()
-        .find(|f| caps.formats.contains(f))
-        .unwrap_or(caps.formats[0]);
-        // Our output is premultiplied. DirectComposition (Windows) offers PreMultiplied; Metal only
-        // offers PostMultiplied, which CoreAnimation composites as premultiplied anyway.
-        let alpha_mode = [
-            wgpu::CompositeAlphaMode::PreMultiplied,
-            wgpu::CompositeAlphaMode::PostMultiplied,
-        ]
-        .into_iter()
-        .find(|m| caps.alpha_modes.contains(m))
-        .unwrap_or(caps.alpha_modes[0]);
-
-        let size = window.inner_size();
-        let config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format,
-            width: size.width.max(1),
-            height: size.height.max(1),
-            present_mode: wgpu::PresentMode::Fifo,
-            alpha_mode,
-            view_formats: vec![],
-            desired_maximum_frame_latency: 2,
-            color_space: wgpu::SurfaceColorSpace::Auto,
-        };
-        surface.configure(&device, &config);
-
-        let globals = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("globals"),
-            size: std::mem::size_of::<Globals>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-
         let (noise_view, noise_sampler) = noise_texture(&device, &queue)?;
-        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        let globals_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("globals layout"),
             entries: &[
                 wgpu::BindGroupLayoutEntry {
@@ -204,35 +192,47 @@ impl Gpu {
                 },
             ],
         });
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("globals"),
-            layout: &layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: globals.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(&noise_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::Sampler(&noise_sampler),
-                },
-            ],
-        });
-
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("shapes"),
             source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
         });
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("shapes"),
-            bind_group_layouts: &[Some(&layout)],
+            bind_group_layouts: &[Some(&globals_layout)],
             ..Default::default()
         });
+        let blur = blur::Shared::new(&device);
+        let glyph_cache = Cache::new(&device);
 
+        Ok(Self {
+            instance,
+            adapter,
+            device,
+            queue,
+            globals_layout,
+            pipeline_layout,
+            shader,
+            noise_view,
+            noise_sampler,
+            blur,
+            glyph_cache,
+            swash: SwashCache::new(),
+            formats: Vec::new(),
+        })
+    }
+
+    /// The index of `format`'s shared state in `formats`, created on first use.
+    pub(crate) fn format_index(&mut self, format: wgpu::TextureFormat) -> usize {
+        if let Some(i) = self.formats.iter().position(|f| f.format == format) {
+            return i;
+        }
+        let state = self.format_state(format);
+        self.formats.push(state);
+        self.formats.len() - 1
+    }
+
+    fn format_state(&self, format: wgpu::TextureFormat) -> FormatState {
+        let device = &self.device;
         let shape_attrs = wgpu::vertex_attr_array![
             0 => Float32x4, 1 => Float32x4, 2 => Float32x4, 3 => Float32x4, 4 => Float32x4,
             5 => Float32x4
@@ -261,15 +261,15 @@ impl Gpu {
                     blend: Option<wgpu::BlendState>| {
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some(label),
-                layout: Some(&pipeline_layout),
+                layout: Some(&self.pipeline_layout),
                 vertex: wgpu::VertexState {
-                    module: &shader,
+                    module: &self.shader,
                     entry_point: Some(vs),
                     buffers: &[Some(buffer)],
                     compilation_options: Default::default(),
                 },
                 fragment: Some(wgpu::FragmentState {
-                    module: &shader,
+                    module: &self.shader,
                     entry_point: Some(fs),
                     targets: &[Some(wgpu::ColorTargetState {
                         format,
@@ -313,67 +313,35 @@ impl Gpu {
             wgpu::PrimitiveTopology::TriangleList,
             Some(premultiplied_over),
         );
-
-        Ok(Self {
-            window,
+        let atlas = TextAtlas::with_color_mode(
             device,
-            queue,
-            surface,
-            config,
-            alpha_mode,
-            globals,
-            bind_group,
+            &self.queue,
+            &self.glyph_cache,
+            format,
+            glyphon::ColorMode::Web,
+        );
+        FormatState {
+            format,
             acrylic_pipeline,
             shape_pipeline,
             stroke_pipeline,
-        })
-    }
-
-    pub fn resize(&mut self, width: u32, height: u32) {
-        self.config.width = width.max(1);
-        self.config.height = height.max(1);
-        self.surface.configure(&self.device, &self.config);
-    }
-
-    /// The next surface texture, or `None` when this frame should be skipped. An outdated or
-    /// lost surface is reconfigured and a redraw requested; a hidden or minimised window is
-    /// skipped (macOS sends a redraw when it is visible again).
-    pub fn acquire(&mut self) -> Result<Option<wgpu::SurfaceTexture>, String> {
-        match self.surface.get_current_texture() {
-            wgpu::CurrentSurfaceTexture::Success(t) => Ok(Some(t)),
-            wgpu::CurrentSurfaceTexture::Outdated
-            | wgpu::CurrentSurfaceTexture::Suboptimal(_)
-            | wgpu::CurrentSurfaceTexture::Lost => {
-                let (w, h) = (self.config.width, self.config.height);
-                self.resize(w, h);
-                self.window.request_redraw();
-                Ok(None)
-            }
-            wgpu::CurrentSurfaceTexture::Occluded | wgpu::CurrentSurfaceTexture::Timeout => {
-                Ok(None)
-            }
-            other => Err(format!("surface: {other:?}")),
+            blur: self.blur.pipelines(device, format),
+            atlas,
         }
     }
 
-    /// Shows a finished surface texture.
-    pub fn present(&self, frame: wgpu::SurfaceTexture) {
-        self.window.pre_present_notify();
-        self.queue.present(frame);
+    /// Per-app-frame housekeeping, once after every target of the frame drew: trims every glyph
+    /// atlas and ages the text cache.
+    pub fn end_frame(&mut self, text: &mut TextCache) {
+        for f in &mut self.formats {
+            f.atlas.trim();
+        }
+        text.end_frame();
     }
 
-    /// Writes the globals and copies every layer's shapes and stroke vertices of `scene` into
-    /// fresh vertex buffers.
-    pub fn upload(&self, scene: &Scene, size: (u32, u32), scale: f32) -> Uploaded {
-        self.queue.write_buffer(
-            &self.globals,
-            0,
-            bytemuck::bytes_of(&Globals {
-                size: [size.0 as f32, size.1 as f32],
-                scale,
-                _pad: 0.0,
-            }),
-        );
+    /// Copies every layer's shapes and stroke vertices of `scene` into fresh vertex buffers,
+    /// created for this draw.
+    pub fn upload(&self, scene: &Scene) -> Uploaded {
         let mut shapes: Vec<GpuShape> = Vec::new();
         let mut strokes: Vec<GpuStrokeVertex> = Vec::new();
         let mut ranges = Vec::with_capacity(scene.layers.len());
@@ -414,43 +382,57 @@ impl Gpu {
             ranges,
         }
     }
+}
 
-    /// Everything of `layer` that goes below its text.
-    pub fn draw_below_text(&self, pass: &mut wgpu::RenderPass<'_>, up: &Uploaded, layer: usize) {
+impl FormatState {
+    /// Everything of `layer` that goes below its text; `globals` is the target's bind group.
+    pub(crate) fn draw_below_text(
+        &self,
+        pass: &mut wgpu::RenderPass<'_>,
+        globals: &wgpu::BindGroup,
+        up: &Uploaded,
+        layer: usize,
+    ) {
         let (acrylic, under, _, _) = up.ranges[layer].clone();
-        self.draw_shapes(pass, up, &self.acrylic_pipeline, acrylic);
-        self.draw_shapes(pass, up, &self.shape_pipeline, under);
+        draw_shapes(pass, globals, up, &self.acrylic_pipeline, acrylic);
+        draw_shapes(pass, globals, up, &self.shape_pipeline, under);
     }
 
-    /// Everything of `layer` that goes above its text.
-    pub fn draw_above_text(&self, pass: &mut wgpu::RenderPass<'_>, up: &Uploaded, layer: usize) {
+    /// Everything of `layer` that goes above its text; `globals` is the target's bind group.
+    pub(crate) fn draw_above_text(
+        &self,
+        pass: &mut wgpu::RenderPass<'_>,
+        globals: &wgpu::BindGroup,
+        up: &Uploaded,
+        layer: usize,
+    ) {
         let (_, _, over, stroke_range) = up.ranges[layer].clone();
-        self.draw_shapes(pass, up, &self.shape_pipeline, over);
+        draw_shapes(pass, globals, up, &self.shape_pipeline, over);
         if let Some(strokes) = &up.strokes
             && !stroke_range.is_empty()
         {
             pass.set_pipeline(&self.stroke_pipeline);
-            pass.set_bind_group(0, &self.bind_group, &[]);
+            pass.set_bind_group(0, globals, &[]);
             pass.set_vertex_buffer(0, strokes.slice(..));
             pass.draw(stroke_range, 0..1);
         }
     }
+}
 
-    fn draw_shapes(
-        &self,
-        pass: &mut wgpu::RenderPass<'_>,
-        up: &Uploaded,
-        pipeline: &wgpu::RenderPipeline,
-        range: Range,
-    ) {
-        if range.is_empty() {
-            return;
-        }
-        pass.set_pipeline(pipeline);
-        pass.set_bind_group(0, &self.bind_group, &[]);
-        pass.set_vertex_buffer(0, up.shapes.slice(..));
-        pass.draw(0..4, range);
+fn draw_shapes(
+    pass: &mut wgpu::RenderPass<'_>,
+    globals: &wgpu::BindGroup,
+    up: &Uploaded,
+    pipeline: &wgpu::RenderPipeline,
+    range: Range,
+) {
+    if range.is_empty() {
+        return;
     }
+    pass.set_pipeline(pipeline);
+    pass.set_bind_group(0, globals, &[]);
+    pass.set_vertex_buffer(0, up.shapes.slice(..));
+    pass.draw(0..4, range);
 }
 
 /// Avalonia's 256×256 acrylic noise (MIT, `licenses/avalonia-LICENSE`), as straight-alpha RGBA.

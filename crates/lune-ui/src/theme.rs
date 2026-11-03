@@ -42,6 +42,10 @@ pub struct Theme {
     pub item_radius: f32,
 }
 
+/// The dark preset's theme under a neutral name, for code and tests that need a theme but not a
+/// particular preset.
+pub const DARK: Theme = lunegit_dark::THEME;
+
 /// Lunegit dark theme (`Lunegit.Desktop/Themes/DarkTheme.axaml`, `App.axaml`).
 pub mod lunegit_dark {
     use super::Theme;

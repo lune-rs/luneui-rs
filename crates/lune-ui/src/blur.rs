@@ -40,24 +40,25 @@ struct Targets {
     groups: [wgpu::BindGroup; 6],
 }
 
+/// The blur state every target shares: shader, bind group layout, pipeline layout, sampler.
 #[derive(Debug)]
-pub struct Blur {
-    format: wgpu::TextureFormat,
+pub(crate) struct Shared {
+    shader: wgpu::ShaderModule,
     layout: wgpu::BindGroupLayout,
+    pipeline_layout: wgpu::PipelineLayout,
     sampler: wgpu::Sampler,
+}
+
+/// The blur pipelines of one colour target format (shared by every target of that format).
+#[derive(Debug)]
+pub(crate) struct Pipelines {
     copy: wgpu::RenderPipeline,
     blur: wgpu::RenderPipeline,
     backdrop: wgpu::RenderPipeline,
-    copy_params: wgpu::Buffer,
-    h_params: wgpu::Buffer,
-    v_params: wgpu::Buffer,
-    backdrop_buf: wgpu::Buffer,
-    size: (u32, u32),
-    targets: Option<Targets>,
 }
 
-impl Blur {
-    pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
+impl Shared {
+    pub(crate) fn new(device: &wgpu::Device) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("blur"),
             source: wgpu::ShaderSource::Wgsl(include_str!("blur.wgsl").into()),
@@ -100,18 +101,38 @@ impl Blur {
             bind_group_layouts: &[Some(&layout)],
             ..Default::default()
         });
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("blur"),
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
+        Self {
+            shader,
+            layout,
+            pipeline_layout,
+            sampler,
+        }
+    }
+
+    /// The copy, blur and backdrop pipelines for targets of `format`.
+    pub(crate) fn pipelines(
+        &self,
+        device: &wgpu::Device,
+        format: wgpu::TextureFormat,
+    ) -> Pipelines {
         let make = |label: &str, vs: &str, fs: &str, blend: wgpu::BlendState, strip: bool| {
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some(label),
-                layout: Some(&pipeline_layout),
+                layout: Some(&self.pipeline_layout),
                 vertex: wgpu::VertexState {
-                    module: &shader,
+                    module: &self.shader,
                     entry_point: Some(vs),
                     buffers: &[],
                     compilation_options: Default::default(),
                 },
                 fragment: Some(wgpu::FragmentState {
-                    module: &shader,
+                    module: &self.shader,
                     entry_point: Some(fs),
                     targets: &[Some(wgpu::ColorTargetState {
                         format,
@@ -155,6 +176,29 @@ impl Blur {
             wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING,
             true,
         );
+        Pipelines {
+            copy,
+            blur,
+            backdrop,
+        }
+    }
+}
+
+/// One target's offscreen scene and blur: its textures, bind groups and uniform buffers. The
+/// pipelines, layout and sampler are shared ([`Gpu`](crate::gpu::Gpu)).
+#[derive(Debug)]
+pub struct Blur {
+    format: wgpu::TextureFormat,
+    copy_params: wgpu::Buffer,
+    h_params: wgpu::Buffer,
+    v_params: wgpu::Buffer,
+    backdrop_buf: wgpu::Buffer,
+    size: (u32, u32),
+    targets: Option<Targets>,
+}
+
+impl Blur {
+    pub(crate) fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
         let buffer = |label, size: usize| {
             device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some(label),
@@ -163,19 +207,8 @@ impl Blur {
                 mapped_at_creation: false,
             })
         };
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("blur"),
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
-            ..Default::default()
-        });
         Self {
             format,
-            layout,
-            sampler,
-            copy,
-            blur,
-            backdrop,
             copy_params: buffer("blur copy params", size_of::<Params>()),
             h_params: buffer("blur h params", size_of::<Params>()),
             v_params: buffer("blur v params", size_of::<Params>()),
@@ -186,10 +219,11 @@ impl Blur {
     }
 
     /// (Re)creates the offscreen targets for the surface size; cheap when unchanged.
-    pub fn prepare(
+    pub(crate) fn prepare(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
+        shared: &Shared,
         size: (u32, u32),
         scale: f32,
         sigma_px: f32,
@@ -241,7 +275,7 @@ impl Blur {
         let group = |src: &wgpu::TextureView, params: &wgpu::Buffer| {
             device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("blur"),
-                layout: &self.layout,
+                layout: &shared.layout,
                 entries: &[
                     wgpu::BindGroupEntry {
                         binding: 0,
@@ -249,7 +283,7 @@ impl Blur {
                     },
                     wgpu::BindGroupEntry {
                         binding: 1,
-                        resource: wgpu::BindingResource::Sampler(&self.sampler),
+                        resource: wgpu::BindingResource::Sampler(&shared.sampler),
                     },
                     wgpu::BindGroupEntry {
                         binding: 2,
@@ -283,14 +317,14 @@ impl Blur {
     }
 
     /// Downsample the scene to 1/8 and blur it. Call after the scene pass, before the main pass.
-    pub fn run(&self, encoder: &mut wgpu::CommandEncoder) {
+    pub(crate) fn run(&self, encoder: &mut wgpu::CommandEncoder, p: &Pipelines) {
         let Some(t) = &self.targets else { return };
         let steps: [(&wgpu::TextureView, &wgpu::BindGroup, &wgpu::RenderPipeline); 5] = [
-            (&t.levels[0], &t.groups[0], &self.copy),
-            (&t.levels[1], &t.groups[1], &self.copy),
-            (&t.levels[2], &t.groups[2], &self.copy),
-            (&t.pong, &t.groups[3], &self.blur),
-            (&t.levels[2], &t.groups[4], &self.blur),
+            (&t.levels[0], &t.groups[0], &p.copy),
+            (&t.levels[1], &t.groups[1], &p.copy),
+            (&t.levels[2], &t.groups[2], &p.copy),
+            (&t.pong, &t.groups[3], &p.blur),
+            (&t.levels[2], &t.groups[4], &p.blur),
         ];
         for (target, group, pipeline) in steps {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -316,14 +350,14 @@ impl Blur {
     }
 
     /// Copy the scene into the current pass (first draw of the main pass).
-    pub fn blit_scene(&self, pass: &mut wgpu::RenderPass<'_>) {
+    pub(crate) fn blit_scene(&self, pass: &mut wgpu::RenderPass<'_>, p: &Pipelines) {
         let Some(t) = &self.targets else { return };
-        pass.set_pipeline(&self.copy);
+        pass.set_pipeline(&p.copy);
         pass.set_bind_group(0, &t.groups[0], &[]);
         pass.draw(0..3, 0..1);
     }
 
-    pub fn set_backdrop(&self, queue: &wgpu::Queue, b: BackdropRequest, saturation: f32) {
+    pub(crate) fn set_backdrop(&self, queue: &wgpu::Queue, b: BackdropRequest, saturation: f32) {
         let u = BackdropUniform {
             rect: b.rect,
             target_size: [self.size.0 as f32, self.size.1 as f32],
@@ -336,9 +370,9 @@ impl Blur {
     }
 
     /// Draw the blurred scene inside the backdrop rect (set with `set_backdrop`).
-    pub fn draw_backdrop(&self, pass: &mut wgpu::RenderPass<'_>) {
+    pub(crate) fn draw_backdrop(&self, pass: &mut wgpu::RenderPass<'_>, p: &Pipelines) {
         let Some(t) = &self.targets else { return };
-        pass.set_pipeline(&self.backdrop);
+        pass.set_pipeline(&p.backdrop);
         pass.set_bind_group(0, &t.groups[5], &[]);
         pass.draw(0..4, 0..1);
     }
