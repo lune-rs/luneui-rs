@@ -3,7 +3,7 @@
 #
 # The theme preset module is the one place that names the look it reproduces; its file may carry
 # the word on any line (per-line prefix match on grep's `path:line:text`).
-crates/lune-ui/src/theme.rs:
+crates/lune-ui-core/src/theme.rs:
 # The public re-export of the preset; the pub API pins the identifier.
 pub use theme::lunegit_dark;
 # In-crate test imports of the preset: they name the pinned identifier and cannot be reworded.

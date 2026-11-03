@@ -1,8 +1,8 @@
 //! Gallery: the reference scenes of the toolkit.
 //!
 //! - no arguments: a glass window showing one scene (Left / Right cycle, Escape quits);
-//! - `--dump <dir>`: renders every scene offscreen on a hidden window and writes
-//!   `<id>@<scale>x.png` files, the frames the pixel gate compares;
+//! - `--dump <dir>`: renders every scene offscreen on a headless GPU device (no event loop, no
+//!   window) and writes `<id>@<scale>x.png` files, the frames the pixel gate compares;
 //! - `--list`: prints the scene names.
 //!
 //! Dump mode reads no clock and no environment: time comes from the scene table, pixels from
@@ -28,8 +28,9 @@ use lune_ui::gpu::{self, Gpu};
 use lune_ui::lunegit_dark;
 use lune_ui::material::{self, Material};
 use lune_ui::paint::{Painter, Rect};
+use lune_ui::surface::{Acquired, WindowSurface};
 use lune_ui::text::TextCache;
-use lune_ui::window;
+use lune_ui::window::glass_attributes;
 use scenes::{BLUR_SATURATION, BLUR_SIGMA, H, SCENES, Scene, W};
 
 const USAGE: &str = "usage: gallery [--dump <dir> | --list]";
@@ -49,6 +50,7 @@ fn parse(args: &[String]) -> Result<Command, String> {
     }
 }
 
+/// What draws a scene into a target: the GPU, text, one renderer and the custom draw.
 struct Renderer {
     gpu: Gpu,
     text: TextCache,
@@ -56,13 +58,18 @@ struct Renderer {
     fill: custom::Fill,
 }
 
+/// Window mode: the window, its surface and the renderer drawing into it.
+struct Shown {
+    window: Arc<Window>,
+    surface: WindowSurface,
+    r: Renderer,
+}
+
 struct App {
-    /// `Some` in dump mode.
-    dump_dir: Option<PathBuf>,
-    renderer: Option<Renderer>,
-    /// Window mode: the scene on screen.
+    shown: Option<Shown>,
+    /// The scene on screen.
     index: usize,
-    /// Process exit status (non-zero when a dump failed).
+    /// Process exit status (non-zero when setup or a frame failed).
     exit_code: u8,
 }
 
@@ -75,16 +82,24 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    let dump_dir = match cmd {
+    match cmd {
         Command::List => {
             for scene in SCENES {
                 println!("{}", scene.name());
             }
             return ExitCode::SUCCESS;
         }
-        Command::Window => None,
-        Command::Dump(dir) => Some(dir),
-    };
+        Command::Dump(dir) => {
+            return match run_dump(&dir) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(e) => {
+                    eprintln!("dump: {e}");
+                    ExitCode::from(1)
+                }
+            };
+        }
+        Command::Window => {}
+    }
     let event_loop = match EventLoop::new() {
         Ok(l) => l,
         Err(e) => {
@@ -93,8 +108,7 @@ fn main() -> ExitCode {
         }
     };
     let mut app = App {
-        dump_dir,
-        renderer: None,
+        shown: None,
         index: 0,
         exit_code: 0,
     };
@@ -108,57 +122,79 @@ fn main() -> ExitCode {
 const UI_FONT: &str = "RznSans";
 const MONO_FONT: &str = "RobotoMono Nerd Font Mono";
 
+/// The gallery's fonts, loaded in a fixed order.
+fn text_cache() -> TextCache {
+    TextCache::new(
+        &[
+            include_bytes!("../assets/RobotoMonoNerdFontMono-Regular.ttf").as_slice(),
+            include_bytes!("../assets/RznSans-Regular.ttf"),
+            include_bytes!("../assets/RznSans-Medium.ttf"),
+        ],
+        UI_FONT,
+        MONO_FONT,
+    )
+}
+
+/// Dump mode: a headless device, `Bgra8Unorm` targets, every scene written to `dir`.
+fn run_dump(dir: &Path) -> Result<(), String> {
+    let format = wgpu::TextureFormat::Bgra8Unorm;
+    let mut gpu = pollster::block_on(Gpu::new(gpu::instance(None), None))?;
+    let frame = FrameRenderer::new(&mut gpu, format);
+    let fill = custom::Fill::new(&gpu.device, format);
+    let mut r = Renderer {
+        gpu,
+        text: text_cache(),
+        frame,
+        fill,
+    };
+    dump_scenes(&mut r, dir)
+}
+
 impl App {
-    fn setup(&self, event_loop: &ActiveEventLoop) -> Result<(Arc<Window>, Renderer), String> {
-        // Dump runs render offscreen only; keep their window out of sight.
-        let attrs = window::glass_attributes(
+    fn setup(&self, event_loop: &ActiveEventLoop) -> Result<Shown, String> {
+        let attrs = glass_attributes(
             "luneui gallery",
             (f64::from(W), f64::from(H)),
             (560.0, 360.0),
-            self.dump_dir.is_none(),
+            true,
         );
         let window = Arc::new(
             event_loop
                 .create_window(attrs)
                 .map_err(|e| format!("window: {e}"))?,
         );
-        if self.dump_dir.is_none()
-            && let Err(e) = material::apply(&window, Material::Vibrancy)
-        {
+        if let Err(e) = material::apply(&window, Material::Vibrancy) {
             eprintln!("glass: {e}");
         }
-        let instance = gpu::instance(event_loop.owned_display_handle());
-        let gpu = pollster::block_on(Gpu::new(window.clone(), &instance))?;
-        let text = TextCache::new(
-            window.scale_factor() as f32,
-            &[
-                include_bytes!("../assets/RobotoMonoNerdFontMono-Regular.ttf").as_slice(),
-                include_bytes!("../assets/RznSans-Regular.ttf"),
-                include_bytes!("../assets/RznSans-Medium.ttf"),
-            ],
-            UI_FONT,
-            MONO_FONT,
-        );
-        let frame = FrameRenderer::new(&gpu);
-        let fill = custom::Fill::new(&gpu.device, gpu.config.format);
-        Ok((
+        let instance = gpu::instance(Some(Box::new(event_loop.owned_display_handle())));
+        let surface = instance
+            .create_surface(window.clone())
+            .map_err(|e| format!("surface: {e}"))?;
+        let mut gpu = pollster::block_on(Gpu::new(instance, Some(&surface)))?;
+        let size = window.inner_size();
+        let surface = WindowSurface::new(&gpu, surface, (size.width, size.height))?;
+        let text = text_cache();
+        let frame = FrameRenderer::new(&mut gpu, surface.format());
+        let fill = custom::Fill::new(&gpu.device, surface.format());
+        Ok(Shown {
             window,
-            Renderer {
+            surface,
+            r: Renderer {
                 gpu,
                 text,
                 frame,
                 fill,
             },
-        ))
+        })
     }
 }
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        if self.renderer.is_some() {
+        if self.shown.is_some() {
             return;
         }
-        let (window, mut renderer) = match self.setup(event_loop) {
+        let shown = match self.setup(event_loop) {
             Ok(v) => v,
             Err(e) => {
                 eprintln!("{e}");
@@ -167,18 +203,8 @@ impl ApplicationHandler for App {
                 return;
             }
         };
-        if let Some(dir) = &self.dump_dir {
-            // `window_event` returns early once exiting, so nothing reaches `render` after this.
-            if let Err(e) = dump_scenes(&mut renderer, dir) {
-                eprintln!("dump: {e}");
-                self.exit_code = 1;
-            }
-            self.renderer = Some(renderer);
-            event_loop.exit();
-            return;
-        }
-        window.request_redraw();
-        self.renderer = Some(renderer);
+        shown.window.request_redraw();
+        self.shown = Some(shown);
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
@@ -186,12 +212,12 @@ impl ApplicationHandler for App {
         if event_loop.exiting() {
             return;
         }
-        let Some(r) = &mut self.renderer else { return };
-        let window = r.gpu.window.clone();
+        let Some(shown) = &mut self.shown else { return };
+        let window = shown.window.clone();
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::Resized(size) => {
-                r.gpu.resize(size.width, size.height);
+                shown.surface.resize(&shown.r.gpu, size.width, size.height);
                 window.request_redraw();
             }
             WindowEvent::ScaleFactorChanged { .. } => window.request_redraw(),
@@ -211,7 +237,7 @@ impl ApplicationHandler for App {
                 }
             }
             WindowEvent::RedrawRequested => {
-                if let Err(e) = render_window(r, &SCENES[self.index]) {
+                if let Err(e) = render_window(shown, &SCENES[self.index]) {
                     eprintln!("render: {e}");
                     self.exit_code = 1;
                     event_loop.exit();
@@ -231,12 +257,9 @@ fn draw_scene(
     size: (u32, u32),
 ) -> Result<(), String> {
     let win = Rect::new(0.0, 0.0, size.0 as f32 / s, size.1 as f32 / s);
-    r.text.set_scale(s);
     let mut p = Painter::new(s, win, &mut r.text, scene.hover, lunegit_dark::THEME);
     (scene.draw)(&mut p, scene.time);
-    let Painter {
-        layers, backdrop, ..
-    } = p;
+    let Painter { scene, .. } = p;
     let params = FrameParams {
         size,
         scale: s,
@@ -245,10 +268,9 @@ fn draw_scene(
     };
     let mut customs: [&mut dyn CustomDraw; 1] = [&mut r.fill];
     r.frame.draw_with(
-        &r.gpu,
+        &mut r.gpu,
         &mut r.text,
-        layers,
-        backdrop,
+        &scene,
         target,
         params,
         &mut customs,
@@ -256,16 +278,23 @@ fn draw_scene(
 }
 
 /// Draws one frame of `scene` into the window's surface.
-fn render_window(r: &mut Renderer, scene: &Scene) -> Result<(), String> {
-    let Some(frame) = r.gpu.acquire()? else {
-        return Ok(());
+fn render_window(shown: &mut Shown, scene: &Scene) -> Result<(), String> {
+    let Shown { window, surface, r } = shown;
+    let frame = match surface.acquire(&r.gpu)? {
+        Acquired::Frame(frame) => frame,
+        Acquired::Skip => return Ok(()),
+        Acquired::Redraw => {
+            window.request_redraw();
+            return Ok(());
+        }
     };
     let view = frame.texture.create_view(&Default::default());
-    let size = (r.gpu.config.width, r.gpu.config.height);
-    let s = r.gpu.window.scale_factor() as f32;
+    let size = surface.size();
+    let s = window.scale_factor() as f32;
     draw_scene(r, scene, s, &view, size)?;
-    r.gpu.present(frame);
-    r.frame.end_frame(&mut r.text);
+    window.pre_present_notify();
+    surface.present(&r.gpu, frame);
+    r.gpu.end_frame(&mut r.text);
     Ok(())
 }
 
@@ -277,11 +306,11 @@ fn dump_scenes(r: &mut Renderer, dir: &Path) -> Result<(), String> {
         let name = scene.name();
         let s = scene.scale as f32;
         let size = (W * scene.scale, H * scene.scale);
-        let texture = dump::target(&r.gpu.device, r.gpu.config.format, size);
+        let texture = dump::target(&r.gpu.device, r.frame.format(), size);
         let view = texture.create_view(&Default::default());
         for _ in 0..2 {
             draw_scene(r, scene, s, &view, size).map_err(|e| format!("scene {name}: {e}"))?;
-            r.frame.end_frame(&mut r.text);
+            r.gpu.end_frame(&mut r.text);
         }
         let rgba = dump::read_rgba(&r.gpu.device, &r.gpu.queue, &texture)
             .map_err(|e| format!("scene {name}: {e}"))?;

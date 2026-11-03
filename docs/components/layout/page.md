@@ -22,7 +22,7 @@ The card that holds a screen: header with title and actions, scrolling body, opt
 
 ## Existing code
 
-None in luneui-rs or Luneterm's `lune-ui` (Wane: partial: the CARD glass layer exists (theme.rs:101, CARD_CORNER_RADIUS theme.rs:111); header, scroll body and footer are missing). Design source (not code to move): Lunegit Desktop App/src/Lunegit.Desktop/Themes/DarkTheme.axaml:226-233 (GlassTintLightOpacity 0.8, GlassMaterialLightOpacity 0.7) used at Views/RepositoryContentView.axaml:47-58 (content acrylic); Luneterm docs/glass-styling.md section 4 (card layer, radius 8); Luneterm crates/lune-ui/src/theme.rs:101; Luneterm spikes/glass-ui dump 06.
+None in luneui-rs or Luneterm's `lune-ui` (Wane: partial: the CARD glass layer exists (theme.rs:105, CARD_CORNER_RADIUS theme.rs:115); header, scroll body and footer are missing). Design source (not code to move): Lunegit Desktop App/src/Lunegit.Desktop/Themes/DarkTheme.axaml:226-233 (GlassTintLightOpacity 0.8, GlassMaterialLightOpacity 0.7) used at Views/RepositoryContentView.axaml:47-58 (content acrylic); Luneterm docs/glass-styling.md section 4 (card layer, radius 8); Luneterm crates/lune-ui/src/theme.rs:101; Luneterm spikes/glass-ui dump 06.
 
 ## Open questions
 

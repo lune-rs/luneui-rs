@@ -4,7 +4,7 @@ title: Popup panel surface
 area: overlay
 status: in-progress
 consumers: luneterm
-source: crates/lune-ui/src/widgets/mod.rs
+source: crates/lune-ui-core/src/widgets/mod.rs
 owner: orch/toolkit-v1
 summary: Menu and dropdown surface (popup_panel)
 ---
@@ -19,7 +19,7 @@ summary: Menu and dropdown surface (popup_panel)
 
 ## Existing code
 
-`crates/lune-ui/src/widgets/mod.rs:200` (`popup_panel`).
+`crates/lune-ui-core/src/widgets/mod.rs:200` (`popup_panel`).
 
 ## Open questions
 

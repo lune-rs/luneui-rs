@@ -4,7 +4,7 @@ title: Codicon glyph constants
 area: core
 status: in-progress
 consumers: luneterm, wane
-source: crates/lune-ui/src/icon.rs
+source: crates/lune-ui-core/src/icon.rs
 owner: orch/toolkit-v1
 summary: Codicon glyph constants and a glyph helper; the app supplies the icon font
 ---
@@ -23,7 +23,7 @@ Constants such as `ADD`, `GEAR`, `ELLIPSIS`, `CHROME_CLOSE`, `CHECK`, `CHROME_MI
 
 ## Existing code
 
-`crates/lune-ui/src/icon.rs:7-19` (constants), `:22` (`glyph`); 24 lines.
+`crates/lune-ui-core/src/icon.rs:7-19` (constants), `:22` (`glyph`); 24 lines.
 
 ## Open questions
 

@@ -1,0 +1,15 @@
+[package]
+name = "lune-ui-winit"
+description = "winit adapter for the glass UI toolkit: window attributes, input translation and output application"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+lune-ui-core = { path = "../lune-ui-core" }
+winit = "0.30"
+
+[lints]
+workspace = true

@@ -1,67 +1,41 @@
-//! App-agnostic glass UI toolkit: an immediate-mode painter on wgpu, widgets, OS backdrop
-//! materials and window helpers, styled after the house look (Fluent/Avalonia; see `docs/glass-styling.md`).
+//! App-agnostic glass UI toolkit: the facade. It re-exports the five crates under the paths the
+//! toolkit has always had, so apps write `lune_ui::…` whichever crate holds the item:
 //!
-//! lune-ui knows nothing about the app that uses it. The app owns the winit event loop and passes
-//! in everything else: fonts, the [`theme::Theme`], hit values (the painter and widgets are
-//! generic over the app's hit type), sizes, scale and time. The crate reads neither the clock nor
+//! - `lune-ui-core`: the painter, display list, widgets, theme and seam types (no GPU or window);
+//! - `lune-ui-wgpu`: the shared GPU, frame renderers, window surfaces, dumps and glyphon text;
+//! - `lune-ui-winit`: window attributes, input translation and output;
+//! - `lune-ui-platform`: the OS glass material.
+//!
+//! The app owns the winit event loop; the toolkit never starts one and never reads the clock or
 //! the environment, so frames are deterministic.
-//!
-//! Modules:
-//! - [`color`], [`theme`] (the `Theme` tokens and the dark preset with its glass
-//!   layers), [`acrylic`] (Avalonia acrylic colour math);
-//! - [`paint`] (the `Painter`), [`custom`] (app-owned GPU drawing inside a layer), [`text`], [`icon`], [`widgets`] (controls, menus, dropdowns,
-//!   dialogs), [`chrome`] (tab outline geometry);
-//! - [`gpu`], [`blur`], [`frame`] (wgpu setup, backdrop blur, the scene → blur → target pass
-//!   sequence), [`dump`] (offscreen targets and PNG readback);
-//! - [`material`] (OS backdrop per platform, [`GlassLayer`] and [`Backdrop`] describe the layers
-//!   and capability levels), [`window`] (glass window attributes, edge resize, double click,
-//!   caption buttons).
-//!
-//! Values in the dark preset are copied from the Avalonia dark theme (`DarkTheme.axaml`) so apps
-//! styled after it match.
 
-pub mod acrylic;
-pub mod blur;
-pub mod chrome;
-pub mod color;
-pub mod custom;
-pub mod dump;
-pub mod frame;
-pub mod gpu;
-pub mod icon;
-pub mod material;
-pub mod paint;
-pub mod text;
-pub mod theme;
-pub mod widgets;
-pub mod window;
+#![forbid(unsafe_code)]
 
+pub use lune_ui_core::{Backdrop, BackdropKind, GlassLayer};
+pub use lune_ui_core::{
+    acrylic, backdrop, chrome, color, icon, paint, scene, testing, theme, widgets,
+};
 pub use theme::lunegit_dark;
 
-use color::Rgba;
+pub use lune_ui_wgpu::{blur, custom, dump, frame, gpu, surface};
 
-/// One app-drawn acrylic layer, in Avalonia `ExperimentalAcrylicMaterial` terms.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct GlassLayer {
-    pub tint: Rgba,
-    pub tint_opacity: f32,
-    pub material_opacity: f32,
+pub use lune_ui_platform::material;
+
+/// Text: the core's specs and `TextSystem` seam, and the glyphon `TextCache` that implements it.
+pub mod text {
+    pub use lune_ui_core::text::*;
+    pub use lune_ui_wgpu::text_cache::TextCache;
 }
 
-/// OS backdrop material requested for the window.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BackdropKind {
-    /// Strongest blur the platform offers (macOS vibrancy, Windows acrylic, KDE blur).
-    Blur,
-    /// Transparent window without blur (Linux compositors without a blur protocol).
-    Transparent,
-    /// Opaque fallback (no compositor, or the user turned glass off).
-    Opaque,
+/// Window helpers: the core's edge resize, double click and caption buttons, and the winit glass
+/// attributes and resize direction.
+pub mod window {
+    pub use lune_ui_core::window::*;
+    pub use lune_ui_winit::window::*;
 }
 
-/// Applies an OS backdrop to a native window. One implementation per platform.
-pub trait Backdrop {
-    /// Best kind this platform/session supports; callers fall back down
-    /// `Blur → Transparent → Opaque` like Avalonia's `TransparencyLevelHint`.
-    fn best_supported(&self) -> BackdropKind;
+/// Input: the core's plain-data `RawInput` and `FrameOutput`, and the winit translation and output.
+pub mod input {
+    pub use lune_ui_core::input::*;
+    pub use lune_ui_winit::input::*;
 }

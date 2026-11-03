@@ -4,14 +4,14 @@ title: Glass window helpers
 area: platform
 status: in-progress
 consumers: luneterm, wane
-source: crates/lune-ui/src/window.rs
+source: crates/lune-ui-core/src/window.rs, crates/lune-ui-winit/src/window.rs
 owner: orch/toolkit-v1
 summary: Glass window attributes, edge resize, double-click detection and caption buttons
 ---
 
 ## What it is
 
-`glass_attributes`, `EDGE_BORDER`, `edge_at`, `DoubleClick` and `caption_buttons`.
+Core (`lune-ui-core`): `EDGE_BORDER`, `ResizeEdge`, `edge_at`, `DoubleClick` and `caption_buttons`, with no windowing type. winit adapter (`lune-ui-winit`): `glass_attributes` (per-platform window attributes from `platform/`) and `resize_direction` (`ResizeEdge` to winit's `ResizeDirection`).
 
 ## Needs
 
@@ -23,14 +23,14 @@ summary: Glass window attributes, edge resize, double-click detection and captio
 
 ## Existing code
 
-`crates/lune-ui/src/window.rs:52` (`glass_attributes`), `:71` (`edge_at`), `:93` (`DoubleClick`), `:115` (`caption_buttons`); 144 lines. Integration test `crates/lune-ui/tests/window.rs` (edges, 6 px border, double-click gap under 400 ms).
+`crates/lune-ui-core/src/window.rs:26` (`edge_at`), `:48` (`DoubleClick`), `:70` (`caption_buttons`); 99 lines; `crates/lune-ui-winit/src/window.rs:12` (`glass_attributes`), `:28` (`resize_direction`). Integration test `crates/lune-ui-core/tests/window.rs` (edges, 6 px border, double-click gap under 400 ms); `crates/lune-ui-winit/tests/input.rs` covers the direction mapping.
 
 ## Open questions
 
-- It uses winit types (the integration test imports `winit::window::ResizeDirection`); whether that stays is a seam question.
+- None on the seam: the core half has no winit type; the winit mapping is in `lune-ui-winit` (M2 step 8). `edge_at` returns `ResizeEdge` (was winit's `ResizeDirection`).
 
 ## Notes for the planner
 
-Moves in the behaviour-preserving extraction (R-ext-1); the pixel gate covers it only where a glass-ui scene draws it.
+Moved in the behaviour-preserving extraction (R-ext-1); split across core and winit in M2 step 8.
 
-Wane (2026-11-04): lune-ui status for Wane's use: partial: caption buttons window.rs:115 and glass attributes window.rs:52 exist; the title strip and the wordmark are app composition; Wane priority P0. Native note: `backdrop-filter: blur(40px) saturate(1.6)` over a CSS backdrop approximates the window material. luneui-rs uses the real OS material (`platform.material`: acrylic or Mica on Windows, vibrancy or liquid glass on macOS) and the in-app blur pass (`render.blur`). The flattened colours (`--glass-window` rgba 54 54 54 .81) are measured from lune-ui dumps: reuse lune-ui's WINDOW layer, not these numbers. The mocks do not draw macOS traffic lights. Full spec: Wane `docs/ui/components.md`, section `platform.window`; mock: Wane `docs/ui/mocks/components.html`.
+Wane (2026-11-04): lune-ui status for Wane's use: partial: caption buttons (core window.rs:70) and glass attributes (lune-ui-winit window.rs:12) exist; the title strip and the wordmark are app composition; Wane priority P0. Native note: `backdrop-filter: blur(40px) saturate(1.6)` over a CSS backdrop approximates the window material. luneui-rs uses the real OS material (`platform.material`: acrylic or Mica on Windows, vibrancy or liquid glass on macOS) and the in-app blur pass (`render.blur`). The flattened colours (`--glass-window` rgba 54 54 54 .81) are measured from lune-ui dumps: reuse lune-ui's WINDOW layer, not these numbers. The mocks do not draw macOS traffic lights. Full spec: Wane `docs/ui/components.md`, section `platform.window`; mock: Wane `docs/ui/mocks/components.html`.

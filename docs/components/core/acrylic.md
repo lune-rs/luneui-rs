@@ -4,7 +4,7 @@ title: Acrylic colour math and noise opacity
 area: core
 status: in-progress
 consumers: luneterm
-source: crates/lune-ui/src/acrylic.rs
+source: crates/lune-ui-core/src/acrylic.rs
 owner: orch/toolkit-v1
 summary: Avalonia acrylic colour math with tests, and the noise opacity
 ---
@@ -20,7 +20,7 @@ summary: Avalonia acrylic colour math with tests, and the noise opacity
 
 ## Existing code
 
-`crates/lune-ui/src/acrylic.rs:16` (`NOISE_OPACITY`), `:20` (`AcrylicColors`), `:30` (`acrylic_colors`), `:52` (`premultiplied`); tests at `:99`.
+`crates/lune-ui-core/src/acrylic.rs:16` (`NOISE_OPACITY`), `:20` (`AcrylicColors`), `:30` (`acrylic_colors`), `:52` (`premultiplied`); tests at `:99`.
 
 ## Open questions
 

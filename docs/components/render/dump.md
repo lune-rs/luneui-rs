@@ -4,7 +4,7 @@ title: Offscreen frame dump
 area: render
 status: in-progress
 consumers: luneterm
-source: crates/lune-ui/src/dump.rs
+source: crates/lune-ui-wgpu/src/dump.rs
 owner: orch/toolkit-v1
 summary: Offscreen target, GPU readback and PNG writer for frame goldens
 ---
@@ -19,7 +19,7 @@ summary: Offscreen target, GPU readback and PNG writer for frame goldens
 
 ## Existing code
 
-`crates/lune-ui/src/dump.rs:9` (`target`), `:31` (`read_rgba`), `:102` (`write_png`); 146 lines; tests at `:113`.
+`crates/lune-ui-wgpu/src/dump.rs:9` (`target`), `:31` (`read_rgba`), `:102` (`write_png`); 146 lines; tests at `:113`.
 
 ## Open questions
 

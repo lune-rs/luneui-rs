@@ -1,0 +1,13 @@
+use winit::platform::windows::{CornerPreference, WindowAttributesExtWindows};
+use winit::window::WindowAttributes;
+
+pub(crate) fn glass(attrs: WindowAttributes) -> WindowAttributes {
+    // Borderless so the glass reaches the top edge; the app draws the caption buttons. No
+    // redirection bitmap: wgpu presents through DirectComposition, which keeps alpha.
+    attrs
+        .with_decorations(false)
+        .with_no_redirection_bitmap(true)
+        .with_undecorated_shadow(true)
+        .with_corner_preference(CornerPreference::Round)
+        .with_theme(Some(winit::window::Theme::Dark))
+}

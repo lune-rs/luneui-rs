@@ -1,17 +1,17 @@
 ---
 id: render.gpu
-title: wgpu instance, surface and pipelines
+title: Shared GPU
 area: render
 status: in-progress
 consumers: luneterm
-source: crates/lune-ui/src/gpu.rs
+source: crates/lune-ui-wgpu/src/gpu.rs
 owner: orch/toolkit-v1
-summary: wgpu instance, surface, pipelines and the noise texture
+summary: One shared Gpu (device, queue, noise texture, per-format pipelines and glyph atlas) for any number of targets
 ---
 
 ## What it is
 
-`Gpu` (resize, acquire, present, upload, draw_below_text, draw_above_text), `Globals`, `Shape`, `StrokeVertex`, `LayerGeometry`, `Uploaded`, `instance`. The noise texture decodes `assets/acrylic-noise.png` through `include_bytes!`.
+`Gpu` (`new`, `upload`, `end_frame`), `Globals`, `Uploaded`, `instance`. One `Gpu` serves every target: it owns the device, the queue, the noise texture and, per colour format, the pipelines and the glyph atlas; each target (`render.frame`, `render.surface`) owns everything a draw writes. `Gpu::new` needs no window (headless works); `Gpu::end_frame` ages the text cache once per app frame. `Shape`, `StrokeVertex` and `LayerGeometry` are core plain data (`core.scene`); the adapter copies them into private Pod structs. The noise texture decodes `assets/acrylic-noise.png` through `include_bytes!`.
 
 ## Needs
 
@@ -20,13 +20,13 @@ summary: wgpu instance, surface, pipelines and the noise texture
 
 ## Existing code
 
-`crates/lune-ui/src/gpu.rs:40` (`Gpu`), `:436` (noise texture); 481 lines; shaders `src/shader.wgsl` (161 lines). No tests.
+`crates/lune-ui-wgpu/src/gpu.rs:90` (`Gpu`), `:143` (`Gpu::new`), `:331` (`end_frame`), `:340` (`upload`), `:131` (`instance`), `:435` (noise texture); 544 lines; shaders `src/shader.wgsl` (161 lines). Two-target contract tests in `crates/lune-ui-wgpu/tests/targets.rs`.
 
 ## Open questions
 
 - How the `.wgsl` files are compiled in was not checked.
-- Provenance of `assets/acrylic-noise.png` beyond the comment at `gpu.rs:431` is unverified.
+- Provenance of `assets/acrylic-noise.png` beyond the comment at `gpu.rs:434` is unverified.
 
 ## Notes for the planner
 
-Moves in the behaviour-preserving extraction (R-ext-1); the pixel gate covers it only where a glass-ui scene draws it.
+The one-GPU, many-targets shape landed in M2 steps 3 and 4 (DECISIONS D28, D30).

@@ -5,11 +5,11 @@ Paths are repo paths. Luneterm's own notices are in Luneterm, not here.
 
 | Component | Use | Licence |
 |---|---|---|
-| Avalonia 12.1.2 acrylic noise texture and colour formulas | `crates/lune-ui/assets/acrylic-noise.png`, `crates/lune-ui/src/acrylic.rs`, comments in `crates/lune-ui/src/material/windows.rs` | MIT — `licenses/avalonia-LICENSE` |
+| Avalonia 12.1.2 acrylic noise texture and colour formulas | `crates/lune-ui-wgpu/assets/acrylic-noise.png`, `crates/lune-ui-core/src/acrylic.rs`, comments in `crates/lune-ui-platform/src/material/windows.rs` | MIT — `licenses/avalonia-LICENSE` |
 | RznSans | UI font, `apps/gallery/assets/RznSans-Regular.ttf`, `apps/gallery/assets/RznSans-Medium.ttf` | OFL 1.1 — `licenses/RznSans-OFL-1.1.txt` |
 | RobotoMono Nerd Font Mono | terminal font, `apps/gallery/assets/RobotoMonoNerdFontMono-Regular.ttf` | Apache 2.0 — `licenses/Apache-2.0.txt`; Nerd Fonts patcher MIT — `licenses/NerdFonts-MIT.txt`; glyph sources below |
 
-`crates/lune-ui/src/icon.rs` holds Codicons codepoints only. The glyphs come from the app's font
+`crates/lune-ui-core/src/icon.rs` holds Codicons codepoints only. The glyphs come from the app's font
 (the Nerd Font above in the gallery), so no Codicons font file is bundled.
 
 ## Nerd Font glyph sources

@@ -4,7 +4,7 @@ title: Easing curves and menu motion
 area: motion
 status: in-progress
 consumers: luneterm
-source: crates/lune-ui/src/widgets/menu.rs
+source: crates/lune-ui-core/src/widgets/menu.rs
 owner: orch/toolkit-v1
 summary: cubic_bezier easing and the menu open and close animation values
 ---
@@ -19,7 +19,7 @@ summary: cubic_bezier easing and the menu open and close animation values
 
 ## Existing code
 
-`crates/lune-ui/src/widgets/menu.rs:28` (`cubic_bezier`), `:25` (`MenuAnim`), `:21-22` (`MENU_IN`, `MENU_OUT`).
+`crates/lune-ui-core/src/widgets/menu.rs:28` (`cubic_bezier`), `:25` (`MenuAnim`), `:21-22` (`MENU_IN`, `MENU_OUT`).
 
 ## Open questions
 
