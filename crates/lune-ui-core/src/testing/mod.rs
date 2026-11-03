@@ -9,13 +9,16 @@
 //!   [`backdrop_contract`], the properties every [`Backdrop`](crate::backdrop::Backdrop) must have.
 //! - [`ScriptedInput`]: the input seam's fake, a scripted window producing [`RawInput`](crate::input::RawInput)
 //!   frames.
+//! - [`UiHarness`]: a `Ui` test bench (store, fake text, default strings, scripted input).
 
 mod backdrop;
 mod input;
 mod recording;
 mod text;
+mod ui;
 
 pub use backdrop::{NullMaterial, backdrop_contract};
 pub use input::ScriptedInput;
 pub use recording::{DrawCall, RecordedFrame, RecordingRenderer};
 pub use text::{FakeText, text_system_contract};
+pub use ui::UiHarness;
