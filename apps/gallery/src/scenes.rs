@@ -409,14 +409,16 @@ fn custom_draw_scene(p: &mut P<'_>, _t: f32) {
     );
 }
 
-// Dropdown geometry (logical px, window 1040 x 660). The list is `4 * 32 + 8 = 136` tall and
-// opens above its anchor when `anchor.bottom() + 4 + 136 > 660 - 8`. The flipped scene puts the
-// anchor at y 560, h 32: 596 + 136 = 732 > 652, so the list's top edge is at
-// `560 - 4 - 136 = 420`, above the anchor.
+// Dropdown geometry (logical px, window 1040 x 660), from `widgets/dropdown.rs:18-23`: the list
+// is `options.len() * 32 + 8` tall and opens above its anchor when
+// `anchor.bottom() + 4 + h > 660 - 8`; its flipped top is `(anchor.y - 4 - h).max(8)`. The assert
+// checks that this scene's list flips and that the flipped list fits above the anchor without the
+// 8 px clamp.
+const LIST_H: f32 = OPTIONS.len() as f32 * 32.0 + 8.0;
 const FLIPPED_ANCHOR: Rect = Rect::new(34.0, 560.0, 210.0, 32.0);
 const _: () = assert!(
-    FLIPPED_ANCHOR.y + FLIPPED_ANCHOR.h + 4.0 + 136.0 > H as f32 - 8.0
-        && FLIPPED_ANCHOR.y - 4.0 - 136.0 < FLIPPED_ANCHOR.y
+    FLIPPED_ANCHOR.y + FLIPPED_ANCHOR.h + 4.0 + LIST_H > H as f32 - 8.0
+        && FLIPPED_ANCHOR.y - 4.0 - LIST_H >= 8.0
 );
 
 const OPTIONS: [(&str, bool); 4] = [

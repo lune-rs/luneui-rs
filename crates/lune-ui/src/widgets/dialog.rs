@@ -1,4 +1,4 @@
-//! Fluent dialog: dim backdrop, 448 px acrylic card, 24 px padding, darker footer block.
+//! The house look's dialog: dim backdrop, 448 px acrylic card, 24 px padding, darker footer block.
 
 use super::{button, button_width};
 use crate::color::{over, premul};

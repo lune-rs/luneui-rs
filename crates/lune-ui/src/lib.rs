@@ -17,8 +17,8 @@
 //!   and capability levels), [`window`] (glass window attributes, edge resize, double click,
 //!   caption buttons).
 //!
-//! Values in the dark preset are copied from the Avalonia dark theme (`DarkTheme.axaml`) so apps
-//! styled after it match.
+//! Values in the dark preset are copied from the house look's `DarkTheme.axaml` and `App.axaml`, so
+//! apps styled after it match.
 
 pub mod acrylic;
 pub mod blur;

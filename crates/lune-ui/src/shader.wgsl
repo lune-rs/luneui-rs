@@ -131,7 +131,7 @@ fn vs_stroke(s: StrokeIn) -> StrokeOut {
     return o;
 }
 
-// The Avalonia conic stop table: alpha 1 → 64/255 → 0 … 0 → 64/255 → 1.
+// The house look's conic stop table: alpha 1 → 64/255 → 0 … 0 → 64/255 → 1.
 fn sweep_alpha(t: f32) -> f32 {
     let faint = 64.0 / 255.0;
     if t < 0.1528 { return mix(1.0, faint, t / 0.1528); }

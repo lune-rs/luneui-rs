@@ -123,7 +123,9 @@ Source of truth for the original text: `git -C <Luneterm> show 296cfdc:crates/lu
 
 A drawing change must not move pixels unless the look change is intended (hard rule 8, D11). Dumps
 are PNGs written by offscreen readback (no screen capture); they need a logged-in macOS GUI session
-because the hidden winit window is still created. Each gate writes only under `target/`.
+because the hidden winit window is still created. Each gate writes only under `target/`, except that
+`scripts/pixel-gate.sh` extracts its base source under `$TMPDIR` (outside the repo, so no cargo
+config in the repo tree reaches the base build).
 
 | Gate | Proves | Compare | Exit codes |
 |---|---|---|---|

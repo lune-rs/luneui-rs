@@ -1,5 +1,5 @@
-//! Controls, styled after the Fluent theme overrides (`DarkTheme.axaml`). Every widget is
-//! generic over the app's hit type and reads its tokens from the painter's [`Theme`].
+//! Controls, styled after the house look's overrides of the Fluent theme (`DarkTheme.axaml`). Every
+//! widget is generic over the app's hit type and reads its tokens from the painter's [`Theme`].
 
 pub mod dialog;
 pub mod dropdown;

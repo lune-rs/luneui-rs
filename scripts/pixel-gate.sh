@@ -4,20 +4,25 @@
 #
 #   scripts/pixel-gate.sh [--base <rev>] [--allow <scene-id>]...
 #
-#   --base   revision to compare against (default HEAD). Built from `git archive <rev>` in
-#            target/pixel-gate/base-src with its own target dir, so the two builds do not share
-#            binaries; the base's local crates always rebuild from exactly <rev>'s sources (a stale
-#            binary from an earlier base run is never reused). A base without apps/gallery is an
-#            error: nothing to compare is not a pass.
+#   --base   revision to compare against (default HEAD), resolved once to a commit sha. Built
+#            from `git archive <sha>` in a base source dir outside the repo,
+#            ${TMPDIR:-/tmp}/luneui-pixel-gate-<cksum of the repo root>/base-src (fixed per checkout),
+#            with its own target dir, so the two builds do not share binaries; the base's local crates
+#            always rebuild from exactly <rev>'s sources (a stale binary from an earlier base run is
+#            never reused). Guard: if any parent dir of the base source holds a .cargo/config.toml or
+#            .cargo/config other than ${CARGO_HOME:-$HOME/.cargo}'s, exit 2 naming it (no cargo
+#            config from elsewhere reaches the base build). A base without apps/gallery is an error:
+#            nothing to compare is not a pass.
 #   --allow  a scene id (the part of a `gallery --list` name before `@`, for example `chrome`)
 #            whose frames may differ: its files move aside and are compared report-only.
 #
 # The candidate is the working tree (committed or not).
 # Exit 0: zero delta on every common non-allowed scene and no scene missing from the candidate.
 # Exit 1: a pixel delta or a scene missing from the candidate.
-# Exit 2: usage or setup error (bad rev, no gallery in the base, unknown --allow id, a build or
-# dump failure, a dump dir with no PNGs, no compare summary).
-# Writes only under target/pixel-gate/ (plus cargo's own caches); never prints the environment.
+# Exit 2: usage or setup error (bad rev, no gallery in the base, a cargo config above the base
+# source, unknown --allow id, a build or dump failure, a dump dir with no PNGs, no compare summary).
+# Writes only under target/pixel-gate/ and the base source dir above (plus cargo's own caches);
+# never prints the environment.
 # Dumps are offscreen but need a logged-in macOS GUI session (hidden winit window). bash 3.2 safe.
 set -euo pipefail
 
@@ -39,20 +44,22 @@ while [ "$#" -gt 0 ]; do
       ALLOW+=("$2")
       shift 2
       ;;
-    -h | --help) sed -n '2,21p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h | --help) sed -n '2,/^set -euo pipefail$/p' "${BASH_SOURCE[0]}" | sed '$d'; exit 0 ;;
     *) die "unknown argument: $1 (see --help)" ;;
   esac
 done
 
 S="$ROOT/target/pixel-gate"
-BASE_SRC="$S/base-src"
+BASE_TMP="${TMPDIR:-/tmp}"
+BASE_TMP="${BASE_TMP%/}/luneui-pixel-gate-$(printf '%s' "$ROOT" | cksum | cut -d ' ' -f 1)"
+BASE_SRC="$BASE_TMP/base-src"
 BASE_TARGET="$S/base-target"
 OUT_BASE="$S/base"
 OUT_CAND="$S/cand"
 ALLOWED="$S/allowed"
 
 # --- base revision ------------------------------------------------------------------------------
-git -C "$ROOT" rev-parse --verify "$REV^{commit}" > /dev/null 2>&1 || die "not a commit: $REV"
+SHA="$(git -C "$ROOT" rev-parse --verify "$REV^{commit}" 2> /dev/null)" || die "not a commit: $REV"
 mkdir -p "$S"
 rm -rf "$BASE_SRC"
 mkdir -p "$BASE_SRC"
@@ -61,8 +68,23 @@ mkdir -p "$BASE_SRC"
 # commit-time mtimes a base older than the last base build would reuse that build's binary and the
 # gate would compare against the wrong revision. With -m every local crate rebuilds from exactly
 # $REV's sources (registry dependencies stay cached).
-git -C "$ROOT" archive "$REV" | tar -x -m -C "$BASE_SRC" || die "git archive of $REV failed"
+git -C "$ROOT" archive "$SHA" | tar -x -m -C "$BASE_SRC" || die "git archive of $REV failed"
 [ -f "$BASE_SRC/apps/gallery/Cargo.toml" ] || die "base $REV has no apps/gallery (nothing to compare)"
+echo "pixel-gate: base source in $BASE_SRC"
+
+# --- guard: no cargo config above the base source, except CARGO_HOME's ----------------------------
+CARGO_HOME_DIR="${CARGO_HOME:-$HOME/.cargo}"
+CARGO_HOME_DIR="$(cd "$CARGO_HOME_DIR" 2> /dev/null && pwd -P || printf '%s' "$CARGO_HOME_DIR")"
+d="$(cd "$BASE_SRC/.." && pwd -P)"
+while :; do
+  if [ -d "$d/.cargo" ] && [ "$(cd "$d/.cargo" && pwd -P)" != "$CARGO_HOME_DIR" ]; then
+    for f in "$d/.cargo/config.toml" "$d/.cargo/config"; do
+      [ -e "$f" ] && die "cargo config above the base source would reach the base build: $f"
+    done
+  fi
+  [ "$d" = "/" ] && break
+  d="$(dirname "$d")"
+done
 
 # --- candidate scene list, --allow validation ---------------------------------------------------
 LIST="$(cd "$ROOT" && cargo run -q --locked -p gallery -- --list)" || die "candidate gallery --list failed"
@@ -79,7 +101,7 @@ count_pngs() {
 
 rm -rf "$OUT_BASE" "$OUT_CAND" "$ALLOWED"
 mkdir -p "$OUT_BASE" "$OUT_CAND"
-echo "pixel-gate: dumping base $REV ($(git -C "$ROOT" rev-parse --short "$REV^{commit}"))"
+echo "pixel-gate: dumping base $REV ($(printf '%s' "$SHA" | cut -c 1-7))"
 (cd "$BASE_SRC" && cargo run -q --locked --target-dir "$BASE_TARGET" -p gallery -- --dump "$OUT_BASE") \
   || die "base build or dump failed"
 echo "pixel-gate: dumping the working tree"

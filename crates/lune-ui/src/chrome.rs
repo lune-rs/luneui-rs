@@ -1,6 +1,6 @@
 //! Tab chrome loop: one closed outline that wraps the active tab and the card body.
 //!
-//! Port of the Fluent tab chrome geometry (`BuildLoopFigure`), flattened to
+//! Port of the house look's tab chrome geometry (`BuildLoopFigure`), flattened to
 //! a polyline. Card-local coordinates, logical pixels, y down. Clockwise on screen.
 
 pub const CARD_RADIUS: f32 = 8.0;
