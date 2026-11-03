@@ -2,10 +2,10 @@
 id: platform.material
 title: OS glass materials
 area: platform
-status: in-luneterm
+status: in-progress
 consumers: luneterm
 source: crates/lune-ui/src/material.rs
-owner: —
+owner: orch/toolkit-v1
 summary: Material enum and apply: macOS NSVisualEffect and Liquid Glass, Windows acrylic and mica, opaque elsewhere
 ---
 

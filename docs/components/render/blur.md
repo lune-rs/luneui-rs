@@ -2,10 +2,10 @@
 id: render.blur
 title: Backdrop blur pass
 area: render
-status: in-luneterm
+status: in-progress
 consumers: luneterm
 source: crates/lune-ui/src/blur.rs
-owner: —
+owner: orch/toolkit-v1
 summary: Backdrop blur pass with its WGSL shader
 ---
 

@@ -2,10 +2,10 @@
 id: core.icon
 title: Codicon glyph constants
 area: core
-status: in-luneterm
+status: in-progress
 consumers: luneterm, wane
 source: crates/lune-ui/src/icon.rs
-owner: —
+owner: orch/toolkit-v1
 summary: Codicon glyph constants and a glyph helper; the app supplies the icon font
 ---
 

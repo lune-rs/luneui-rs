@@ -2,10 +2,10 @@
 id: core.tab-outline
 title: Tab outline geometry
 area: core
-status: in-luneterm
+status: in-progress
 consumers: luneterm
 source: crates/lune-ui/src/chrome.rs
-owner: —
+owner: orch/toolkit-v1
 summary: Tab-chrome outline loop geometry
 ---
 

@@ -2,10 +2,10 @@
 id: widget.text-field
 title: Text field
 area: widget
-status: in-luneterm
+status: in-progress
 consumers: luneterm, wane
 source: crates/lune-ui/src/widgets/mod.rs
-owner: —
+owner: orch/toolkit-v1
 summary: TextBox with placeholder and a caret when focused
 ---
 

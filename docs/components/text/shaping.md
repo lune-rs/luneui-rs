@@ -2,10 +2,10 @@
 id: text.shaping
 title: Shaped-text cache
 area: text
-status: in-luneterm
+status: in-progress
 consumers: luneterm
 source: crates/lune-ui/src/text.rs
-owner: —
+owner: orch/toolkit-v1
 summary: Shaped-text cache over glyphon keyed by content; the app registers its fonts
 ---
 

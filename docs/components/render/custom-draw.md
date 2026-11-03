@@ -2,10 +2,10 @@
 id: render.custom-draw
 title: App-owned drawing hook
 area: render
-status: in-luneterm
+status: in-progress
 consumers: luneterm
 source: crates/lune-ui/src/custom.rs
-owner: —
+owner: orch/toolkit-v1
 summary: CustomDraw trait: app-owned GPU drawing inside a layer
 ---
 

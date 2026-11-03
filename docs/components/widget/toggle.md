@@ -2,10 +2,10 @@
 id: widget.toggle
 title: Toggle switch
 area: widget
-status: in-luneterm
+status: in-progress
 consumers: luneterm, wane
 source: crates/lune-ui/src/widgets/mod.rs
-owner: —
+owner: orch/toolkit-v1
 summary: Fluent ToggleSwitch: 40x20 track, accent fill when on
 ---
 

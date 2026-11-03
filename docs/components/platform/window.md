@@ -2,10 +2,10 @@
 id: platform.window
 title: Glass window helpers
 area: platform
-status: in-luneterm
+status: in-progress
 consumers: luneterm, wane
 source: crates/lune-ui/src/window.rs
-owner: —
+owner: orch/toolkit-v1
 summary: Glass window attributes, edge resize, double-click detection and caption buttons
 ---
 

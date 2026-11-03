@@ -2,10 +2,10 @@
 id: render.gpu
 title: wgpu instance, surface and pipelines
 area: render
-status: in-luneterm
+status: in-progress
 consumers: luneterm
 source: crates/lune-ui/src/gpu.rs
-owner: —
+owner: orch/toolkit-v1
 summary: wgpu instance, surface, pipelines and the noise texture
 ---
 

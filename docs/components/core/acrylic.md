@@ -2,10 +2,10 @@
 id: core.acrylic
 title: Acrylic colour math and noise opacity
 area: core
-status: in-luneterm
+status: in-progress
 consumers: luneterm
 source: crates/lune-ui/src/acrylic.rs
-owner: —
+owner: orch/toolkit-v1
 summary: Avalonia acrylic colour math with tests, and the noise opacity
 ---
 

@@ -2,10 +2,10 @@
 id: render.dump
 title: Offscreen frame dump
 area: render
-status: in-luneterm
+status: in-progress
 consumers: luneterm
 source: crates/lune-ui/src/dump.rs
-owner: —
+owner: orch/toolkit-v1
 summary: Offscreen target, GPU readback and PNG writer for frame goldens
 ---
 

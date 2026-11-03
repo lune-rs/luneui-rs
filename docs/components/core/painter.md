@@ -2,10 +2,10 @@
 id: core.painter
 title: Immediate-mode painter
 area: core
-status: in-luneterm
+status: in-progress
 consumers: luneterm
 source: crates/lune-ui/src/paint.rs
-owner: —
+owner: orch/toolkit-v1
 summary: Painter: ordered layers, fills, rings, strokes, acrylic, text, clip, transform and hit regions
 ---
 

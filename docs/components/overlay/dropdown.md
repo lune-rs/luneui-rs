@@ -2,10 +2,10 @@
 id: overlay.dropdown
 title: Drop-down list
 area: overlay
-status: in-luneterm
+status: in-progress
 consumers: luneterm, wane
 source: crates/lune-ui/src/widgets/dropdown.rs
-owner: —
+owner: orch/toolkit-v1
 summary: Combo drop-down option list that flips above its anchor near the window bottom
 ---
 

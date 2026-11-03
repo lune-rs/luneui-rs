@@ -2,10 +2,10 @@
 id: render.frame
 title: Frame pass sequence
 area: render
-status: in-luneterm
+status: in-progress
 consumers: luneterm
 source: crates/lune-ui/src/frame.rs
-owner: —
+owner: orch/toolkit-v1
 summary: FrameRenderer: scene, blur, target pass sequence
 ---
 
