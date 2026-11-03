@@ -144,6 +144,16 @@ impl Gpu {
         instance: wgpu::Instance,
         compatible: Option<&wgpu::Surface<'_>>,
     ) -> Result<Gpu, String> {
+        Self::new_with_features(instance, compatible, wgpu::Features::empty()).await
+    }
+
+    /// [`new`](Self::new) that also asks for the optional device `wanted` features. Only those
+    /// the adapter offers are requested; read what was granted from `device.features()`.
+    pub async fn new_with_features(
+        instance: wgpu::Instance,
+        compatible: Option<&wgpu::Surface<'_>>,
+        wanted: wgpu::Features,
+    ) -> Result<Gpu, String> {
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 compatible_surface: compatible,
@@ -152,7 +162,10 @@ impl Gpu {
             .await
             .map_err(|e| e.to_string())?;
         let (device, queue) = adapter
-            .request_device(&wgpu::DeviceDescriptor::default())
+            .request_device(&wgpu::DeviceDescriptor {
+                required_features: wanted & adapter.features(),
+                ..Default::default()
+            })
             .await
             .map_err(|e| e.to_string())?;
 

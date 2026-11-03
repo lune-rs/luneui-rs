@@ -3,11 +3,13 @@
 //! - no arguments: a glass window showing one scene (Left / Right cycle, Escape quits);
 //! - `--dump <dir>`: renders every scene offscreen on a headless GPU device (no event loop, no
 //!   window) and writes `<id>@<scale>x.png` files, the frames the pixel gate compares;
-//! - `--list`: prints the scene names.
+//! - `--list`: prints the scene names;
+//! - `--bench [--runs N] [--frames N] [--size WxH]`: times frames offscreen (see `bench`).
 //!
 //! Dump mode reads no clock and no environment: time comes from the scene table, pixels from
 //! the offscreen target's readback (no screen or window capture).
 
+mod bench;
 mod custom;
 mod scenes;
 
@@ -33,12 +35,14 @@ use lune_ui::text::TextCache;
 use lune_ui::window::glass_attributes;
 use scenes::{BLUR_SATURATION, BLUR_SIGMA, H, SCENES, Scene, W};
 
-const USAGE: &str = "usage: gallery [--dump <dir> | --list]";
+const USAGE: &str =
+    "usage: gallery [--dump <dir> | --list | --bench [--runs N] [--frames N] [--size WxH]]";
 
 enum Command {
     Window,
     Dump(PathBuf),
     List,
+    Bench(bench::Options),
 }
 
 fn parse(args: &[String]) -> Result<Command, String> {
@@ -46,6 +50,7 @@ fn parse(args: &[String]) -> Result<Command, String> {
         [] => Ok(Command::Window),
         [a] if a == "--list" => Ok(Command::List),
         [a, dir] if a == "--dump" => Ok(Command::Dump(PathBuf::from(dir))),
+        [a, rest @ ..] if a == "--bench" => bench::Options::parse(rest).map(Command::Bench),
         _ => Err(USAGE.to_owned()),
     }
 }
@@ -98,6 +103,7 @@ fn main() -> ExitCode {
                 }
             };
         }
+        Command::Bench(opts) => return bench::run(&opts),
         Command::Window => {}
     }
     let event_loop = match EventLoop::new() {
@@ -135,18 +141,23 @@ fn text_cache() -> TextCache {
     )
 }
 
-/// Dump mode: a headless device, `Bgra8Unorm` targets, every scene written to `dir`.
-fn run_dump(dir: &Path) -> Result<(), String> {
+/// A renderer over `gpu` for `Bgra8Unorm` offscreen targets.
+fn offscreen_renderer(mut gpu: Gpu) -> Renderer {
     let format = wgpu::TextureFormat::Bgra8Unorm;
-    let mut gpu = pollster::block_on(Gpu::new(gpu::instance(None), None))?;
     let frame = FrameRenderer::new(&mut gpu, format);
     let fill = custom::Fill::new(&gpu.device, format);
-    let mut r = Renderer {
+    Renderer {
         gpu,
         text: text_cache(),
         frame,
         fill,
-    };
+    }
+}
+
+/// Dump mode: a headless device, `Bgra8Unorm` targets, every scene written to `dir`.
+fn run_dump(dir: &Path) -> Result<(), String> {
+    let gpu = pollster::block_on(Gpu::new(gpu::instance(None), None))?;
+    let mut r = offscreen_renderer(gpu);
     dump_scenes(&mut r, dir)
 }
 
