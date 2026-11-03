@@ -3,32 +3,137 @@ id: text.code-block
 title: Code block
 area: text
 status: planned
-consumers: wane
+consumers: lunegit, wane
 source: —
 owner: —
-summary: Read-only mono block with a copy button
+summary: Read-only mono block with optional app-supplied highlight spans, horizontal scroll, selectable text and a copy button with feedback
 ---
 
 ## What it is
 
-Read-only mono block with a copy button. Named by Wane's UI mocks (2026-11-04); the look is Lunegit's dark glass. Behaviour: Select and copy text; the copy button copies the whole block to the clipboard (platform need). Used for the Claude Code env block and the data folder listing.
+A read-only block of monospace text on a faint fill: no wrap, horizontal scroll, text you can select
+and copy, and a copy button in the top-right corner that copies the whole block. Colours come from
+app-supplied highlight spans (D45); with none, every character is `fg_primary`. Lunegit draws it in
+its Markdown preview (fenced code, with TextMate colours); Wane needs it for the Claude Code env block
+and the data folder listing (key, operator and value in three text tones).
 
 ## Needs
 
-- Wane — Variants: none; token classes: key (secondary), op (quaternary), value (primary); no syntax colours (R-text-3)
-- Wane — States: none; copy feedback (a short checkmark or toast) is not mocked. (R-text-3)
-- Wane — Sizes: `--surface-input` fill, 1 px `--border-subtle`, radius 6; pre padding 10 12; RznMono 13/20, no wrap, horizontal scroll; copy icon button at top 6, right 6. (R-text-3)
-- Wane — Behaviour: Select and copy text; the copy button copies the whole block to the clipboard (platform need). Used for the Claude Code env block and the data folder listing. (R-text-3)
+- Multi-line text view with optional highlighting (R-text-3).
+- Select and copy: the read-only text engine (R-text-5), the clipboard (R-platform-5).
+- Horizontal overflow through the scroll area and scrollbar (R-layout-2, R-widget-2).
 
 ## Existing code
 
-None in luneui-rs or Luneterm's `lune-ui` (Wane: missing). Design source (not code to move): Wane `docs/ui/mocks/css/components.css` (text.code-block); no lune-ui source.
+None in `lune-ui` or Luneterm (Wane: missing). Design sources (not code to move): Lunegit `src/Lunegit.Desktop/Views/MarkdownPreviewView.axaml:68-80,176-187` (the block and its copy button),
+`Markdown/TextMateInlineHighlighter.cs` (per-line colour segments), `Views/MarkdownPreviewView.axaml.cs:386-402` (copy); Wane `docs/ui/components.md:655-667`.
+
+## Spec
+
+### Evidence
+
+Pinned: Lunegit 33a1dd41, Wane 69931d6, this repo fa2958b. Read: Lunegit src/Lunegit.Desktop/Views/MarkdownPreviewView.axaml:56-80,134-141,176-187, Views/MarkdownPreviewView.axaml.cs:386-402, Markdown/TextMateInlineHighlighter.cs:1-106,
+Markdown/MarkdownBlocks.cs:19-20, Themes/DarkTheme.axaml:132-141, src/Lunegit.Infrastructure/Localization/en.json:857; Wane docs/ui/components.md:655-667; this repo crates/lune-ui-core/src/theme.rs:55-62.
+Conflicts (Lunegit wins where both draw the block, PD6): (1) text size: Lunegit mono at `FontSizeS` 11 [L src/Lunegit.Desktop/Views/MarkdownPreviewView.axaml:68-72], [L src/Lunegit.Desktop/App.axaml:158]; Wane RznMono 13 on a 20 line [W docs/ui/components.md:660].
+(2) padding: Lunegit 10 all round [L src/Lunegit.Desktop/Views/MarkdownPreviewView.axaml:177]; Wane 10 vertical and 12 horizontal [W docs/ui/components.md:660]. (3) border: Lunegit none; Wane 1 px `--border-subtle` [W docs/ui/components.md:660].
+(4) colour: Lunegit TextMate colours; Wane none, three token tones [W docs/ui/components.md:658]. The fill agrees: `#0AFFFFFF` is the dark preset's `surface_input` [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:135], [R crates/lune-ui-core/src/theme.rs:59]; the radius agrees (6).
+The block therefore takes text size, padding and an optional border as parameters whose defaults are Lunegit's; Wane's values are an app override (Open questions).
+
+### Anatomy
+
+- Shell: fill `surface_input`, radius 6, padding 10 [L src/Lunegit.Desktop/Views/MarkdownPreviewView.axaml:177], [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:135]; an optional 1 px `border_subtle` ring (Wane) [W docs/ui/components.md:660].
+- Text: mono face, 11 px, `fg_primary`, no wrap [L src/Lunegit.Desktop/Views/MarkdownPreviewView.axaml:68-72,179]; one line per source line; long lines scroll horizontally with the overlay scrollbar [W docs/ui/components.md:660,666], [layout.scroll-area], [widget.scrollbar].
+- Highlight spans: per line, a list of (start, end, colour or tone). Lunegit's segments are (text, optional hex colour) per line [L src/Lunegit.Desktop/Markdown/TextMateInlineHighlighter.cs:10,73-95]; the toolkit takes spans from the app and never tokenizes (D45) [D45]. Wane's three tones are key secondary, operator quaternary and value primary [W docs/ui/components.md:658].
+- Bad spans: a span past the line end is clamped to it and an empty or inverted span is skipped, as Lunegit does when building segments [L src/Lunegit.Desktop/Markdown/TextMateInlineHighlighter.cs:78-80]; the block never panics on spans. A span list for lines that do not exist is ignored.
+- Copy button: top-right of the block, no fill, padding 4, a 13 px copy icon in `fg_tertiary`; Wane places it 6 px from the top and right [L src/Lunegit.Desktop/Views/MarkdownPreviewView.axaml:73-80,181-184], [W docs/ui/components.md:660].
+- Copy: the whole block's text, not the selection, goes to the clipboard [L src/Lunegit.Desktop/Views/MarkdownPreviewView.axaml.cs:386-402], [W docs/ui/components.md:661]. Selected text copies with the shortcut like any read-only text [text.text-edit].
+- Copy feedback: Lunegit gives none (the handler only sets the text) [L src/Lunegit.Desktop/Views/MarkdownPreviewView.axaml.cs:401]; Wane names "a short checkmark or toast", not mocked [W docs/ui/components.md:659]. The toolkit swaps the copy icon for a check mark for a period the app sets (Open questions) and announces "Copied" as a polite status.
+- Large text: Lunegit's viewer skips highlighting above 1,500,000 bytes and warns [L src/Lunegit.Desktop/ViewModels/Explorer/FileViewerViewModel.cs:86-87], [L src/Lunegit.Desktop/Views/FileViewerView.axaml:309-313]; the block draws only what the app passes, so the cut-off is the app's.
+
+### States
+
+| state | look | cite |
+|---|---|---|
+| rest | fill `surface_input`, text `fg_primary` (or span colours), copy icon `fg_tertiary` | [L src/Lunegit.Desktop/Views/MarkdownPreviewView.axaml:73-80,177] |
+| hover (copy button) | button fill `surface_hover` | [derived: Lunegit sets the button background transparent and no hover rule, MarkdownPreviewView.axaml:73-80; the toolkit button hover is used, widget.button] |
+| pressed (copy button) | as the toolkit icon button | [widget.button] |
+| focus-visible (copy button) | outline per the focus ring | [core.focus] |
+| copied | copy icon replaced by a check mark | [W docs/ui/components.md:659] |
+| text selected | selection fill over the range (read-only text engine) | [text.text-edit] |
+| overflow | horizontal thumb on hover | [widget.scrollbar] |
+| empty | an empty block at the padding height, copy button disabled | [derived: nothing to copy] |
+| disabled | not applicable to a read-only block; the copy button is disabled only when empty | [derived: same] |
+
+### Transitions
+
+| change | property | kind | duration | easing | reduced | cite |
+|---|---|---|---|---|---|---|
+| copy button hover | button fill | hover | instant | linear | keep | [L .claude/docs/animation-rules.md:102] |
+| copy icon to check mark and back | icon opacity (crossfade) | appear | instant | linear | keep | [D40], [L .claude/docs/animation-rules.md:105] |
+
+Lunegit's copy button has no transition (neither tier file styles it). Never animated: the text, selection, scroll content [L .claude/docs/animation-rules.md:148].
+
+### Input and focus
+
+- Pointer: press and drag selects text; double-click selects a word; click on the copy button copies and shows the feedback [text.text-edit], [L src/Lunegit.Desktop/Views/MarkdownPreviewView.axaml:181-182]. Wheel and trackpad scroll horizontally when the block overflows [layout.scroll-area].
+- Keys: select-all and copy on the shortcut modifier when the block has focus; Enter and Space on the focused copy button copy [core.focus], [text.text-edit].
+- Tab stop: the block (to select by keyboard) and the copy button in call order. Layer: the host's. No focus scope.
+
+### Retained state
+
+- Transient: copy-button hover and press, the check-mark timer (from the frame time the app passes), selection while dragging [core.ui].
+- Persistent: the selection and the horizontal scroll offset, kept under keep-alive [core.ui].
+- App-owned: the text, the highlight spans, the feedback duration.
+- Exit retention: no.
+
+### Accessibility
+
+- Role `multiline-text` with state read-only; name = the label the app passes (Wane: "Claude Code env block"); value = the text [infra.accessibility].
+- Copy button: role `button`, name `luneui.code-block.copy`; action default copies. After a copy a node of role `status` with a polite live region says `luneui.code-block.copied` [infra.accessibility].
+
+### Strings
+
+- `luneui.code-block.copy`: "Copy code" [L src/Lunegit.Infrastructure/Localization/en.json:857].
+- `luneui.code-block.copied`: "Copied" [derived: Lunegit gives no feedback text; Wane names a check mark or toast, components.md:659].
+
+### Gallery scenes
+
+- `code-block-rest`: five lines of plain text, settled.
+- `code-block-highlighted`: the same lines with key, operator and value spans, settled.
+- `code-block-overflow`: one line wider than the block, pointer over, thumb visible, settled.
+- `code-block-hover-copy`: pointer over the copy button, settled.
+- `code-block-focus-copy`: keyboard focus on the copy button, settled.
+- `code-block-selection`: two lines selected, settled.
+- `code-block-copied`: the check mark shown, settled.
+- `code-block-empty`: empty text, copy disabled, settled.
+- `code-block-bad-spans`: spans past the line end and an inverted span, clamped, settled.
+- `code-block-copy-hover-fade`: t = 60 ms (half of `instant`).
+- `code-block-copied-fade`: the icon crossfade, t = 60 ms.
+
+### Painter primitives
+
+- Existing: fill-radii, ring, text, icon, clip-rect, xform (scroll offset).
+- New: none.
+
+### Acceptance
+
+- Behaviour (scripted input, injected time): click on the copy button emits one clipboard request with the whole text and shows the check mark for the set period, then restores the icon; selection plus the copy shortcut copies the selection only; a disabled (empty) copy button emits nothing [core.ui], [platform.clipboard].
+- Spans: a span (3, 99) on a 10-character line draws 3 to 10; (5, 5) and (7, 2) draw nothing; spans for line 50 of a 5-line block are ignored; none panics [L src/Lunegit.Desktop/Markdown/TextMateInlineHighlighter.cs:78-80].
+- Pixel probes at scale 2: radius 12, padding 20 device px, fill `surface_input`, copy icon 26 px; a 1 px ring (2 device px) only when the border is on.
+- Conformance: the two transitions pass `motion::conformance`; Reduced keeps them, Off snaps [motion].
+- Semantic node: role `multiline-text` read-only; the copy button's default action copies; the `status` node appears after the copy.
+
+### Build
+
+- Milestone: M9
+- Depends on: text.text-edit, platform.clipboard, layout.scroll-area, widget.scrollbar, widget.button, core.ui, core.focus, infra.accessibility, motion.transitions
 
 ## Open questions
 
-- Whether this is a toolkit component or app code composed from the painter: the planner decides (Wane needs it either way).
-- Native rendering: Long lines scroll horizontally with `widget.scrollbar`; selectable mono text needs the text layer's selection support.
+- Which text size, padding and border the Wane look uses (13/20, 10 by 12, 1 px ring) against Lunegit's defaults: parameters; the decision is the Wane app's at M9 (no source resolves it).
+- How long the check mark stays: no source states a time; the value is an app-passed parameter and M9 picks the default.
+- Whether the Wane operator tone is `fg_tertiary` or `fg_quaternary`: Wane says "quaternary" [W docs/ui/components.md:658]; the dark preset has no `fg_quaternary` field today [R crates/lune-ui-core/src/theme.rs:11-18], so M9 adds a token or maps it.
 
 ## Notes for the planner
 
-Wane priority P0 (P0 = needed by Overview, Requests or Settings). Full spec: Wane `docs/ui/components.md`, section `text.code-block`; mock: Wane `docs/ui/mocks/components.html`. Screens using it: components, first-run, routes, settings.
+Named by Wane's UI mocks (P0, screens components, first-run, routes, settings, [W docs/ui/components.md:667]); Lunegit's Markdown preview is the second consumer (`text.markdown-preview` reuses this block for fenced code).
