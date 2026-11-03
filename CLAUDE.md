@@ -15,21 +15,21 @@ for the extraction; Luneterm's `docs/architecture.md` sections "lune-ui modules"
 
 ## Commands
 
-All not yet runnable (no code); the first plan creates the workspace and these scripts.
-- Build: `cargo build --workspace` (not yet runnable (no code))
-- Test (all): `cargo test --workspace` (not yet runnable (no code))
-- Test (one): `cargo test -p <crate> <name>` (not yet runnable (no code))
-- Format: `cargo fmt --all` (not yet runnable (no code))
-- Lint: `cargo clippy --workspace --all-targets -- -D warnings` (not yet runnable (no code))
-- Boundaries: `scripts/check-boundaries.sh` (not yet runnable (no code))
-- Gate (before every commit; must be green): `cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && scripts/check-boundaries.sh` (not yet runnable (no code)); the first plan adds the catalogue index staleness check to it
+- Build: `cargo build --workspace`
+- Test (all): `cargo test --workspace`
+- Test (one): `cargo test -p <crate> <name>`
+- Format: `cargo fmt --all`
+- Lint: `cargo clippy --workspace --all-targets -- -D warnings`
+- Boundaries: `scripts/check-boundaries.sh`
+- Catalogue index (regenerate after adding or editing a component file): `scripts/gen-component-index.sh`
+- Gate (before every commit; must be green): `cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && scripts/check-boundaries.sh && scripts/gen-component-index.sh --check`
 - Pixel gate (any drawing change): dump offscreen frames of the reference scenes to a dir before and
   after the change, then compare with the compare tool; zero delta unless the look change is intended
-  and re-baselined in the same commit with the reason. Exact commands: set by the first plan
-  (not yet runnable (no code)).
+  and re-baselined in the same commit with the reason. Exact commands: set by the extraction plan
+  (not yet runnable (no drawing code)).
 
 Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, resolver 3: in
-`rust-toolchain.toml` and the root manifest (to be created by the first plan).
+`rust-toolchain.toml` and the root manifest.
 
 ## Architecture rules
 
@@ -50,7 +50,7 @@ Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, r
 ## Hard rules
 
 1. App-agnostic: no app, terminal or domain words in library source. Enforced by
-   `scripts/check-boundaries.sh` and its allow list (to be created by the first plan; `lunegit` is
+   `scripts/check-boundaries.sh` and its allow list (`scripts/boundaries.allow`; `lunegit` is
    allowed only in the theme preset module).
 2. No clock, environment or event-loop access in library `src` (same script; tests and examples may).
 3. `unsafe` only in platform modules, each block with a `// SAFETY:` comment; `unsafe_op_in_unsafe_fn`
@@ -68,11 +68,11 @@ Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, r
 8. A drawing change passes the pixel gate (see Commands). Look values follow Lunegit; a deliberate
    deviation is a DECISIONS.md row.
 9. Library API: `unreachable_pub`, `missing_debug_implementations` warn; `unwrap_used`, `dbg_macro`,
-   `todo` warn (workspace lints, to be created by the first plan).
+   `todo` warn (workspace lints in the root manifest).
 10. Every component has one catalogue file `docs/components/<area>/<id>.md` with front matter; the id
     is an area-prefixed slug (`core.painter`, `lunegit.commit-graph`), no numeric counter. Nobody
     hand-edits `docs/components/INDEX.md`: a script generates it and the gate fails when it is stale
-    (script and check to be created by the first plan).
+    (`scripts/gen-component-index.sh`; its `--check` is in the gate).
 
 ## Git
 
@@ -83,7 +83,7 @@ Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, r
 
 - `docs/STATE.md` - current work and next steps
 - `docs/DECISIONS.md` - decisions and what was rejected
-- `docs/requirements.md` - what the toolkit must provide (to be created by the first plan)
+- `docs/requirements.md` - what the toolkit must provide (requirement ids `R-<area>-<n>`)
 - `docs/components/INDEX.md` - generated catalogue index; open a component's file under
-  `docs/components/<area>/<id>.md` for its detail (to be created by the first plan)
+  `docs/components/<area>/<slug>.md` for its detail; `docs/components/README.md` explains how to add one
 - `docs/architecture.md` - crates, seams, module map (to be created by the first plan)
