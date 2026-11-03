@@ -6,7 +6,9 @@
 #
 #   --base   revision to compare against (default HEAD). Built from `git archive <rev>` in
 #            target/pixel-gate/base-src with its own target dir, so the two builds do not share
-#            binaries. A base without apps/gallery is an error: nothing to compare is not a pass.
+#            binaries; the base's local crates always rebuild from exactly <rev>'s sources (a stale
+#            binary from an earlier base run is never reused). A base without apps/gallery is an
+#            error: nothing to compare is not a pass.
 #   --allow  a scene id (the part of a `gallery --list` name before `@`, for example `chrome`)
 #            whose frames may differ: its files move aside and are compared report-only.
 #
@@ -37,7 +39,7 @@ while [ "$#" -gt 0 ]; do
       ALLOW+=("$2")
       shift 2
       ;;
-    -h | --help) sed -n '2,19p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h | --help) sed -n '2,20p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) die "unknown argument: $1 (see --help)" ;;
   esac
 done
@@ -54,7 +56,12 @@ git -C "$ROOT" rev-parse --verify "$REV^{commit}" > /dev/null 2>&1 || die "not a
 mkdir -p "$S"
 rm -rf "$BASE_SRC"
 mkdir -p "$BASE_SRC"
-git -C "$ROOT" archive "$REV" | tar -x -C "$BASE_SRC" || die "git archive of $REV failed"
+# tar -m: files get the extraction time, not the commit time of $REV. Cargo's freshness check for
+# path packages is mtime-based and the package path and target dir are the same every run, so with
+# commit-time mtimes a base older than the last base build would reuse that build's binary and the
+# gate would compare against the wrong revision. With -m every local crate rebuilds from exactly
+# $REV's sources (registry dependencies stay cached).
+git -C "$ROOT" archive "$REV" | tar -x -m -C "$BASE_SRC" || die "git archive of $REV failed"
 [ -f "$BASE_SRC/apps/gallery/Cargo.toml" ] || die "base $REV has no apps/gallery (nothing to compare)"
 
 # --- candidate scene list, --allow validation ---------------------------------------------------
@@ -72,7 +79,7 @@ count_pngs() {
 
 rm -rf "$OUT_BASE" "$OUT_CAND" "$ALLOWED"
 mkdir -p "$OUT_BASE" "$OUT_CAND"
-echo "pixel-gate: dumping base $REV"
+echo "pixel-gate: dumping base $REV ($(git -C "$ROOT" rev-parse --short "$REV^{commit}"))"
 (cd "$BASE_SRC" && cargo run -q --locked --target-dir "$BASE_TARGET" -p gallery -- --dump "$OUT_BASE") \
   || die "base build or dump failed"
 echo "pixel-gate: dumping the working tree"
