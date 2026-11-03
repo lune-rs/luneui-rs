@@ -1,34 +1,20 @@
 //! The frame renderer: owns the glyphon state and the scene → blur → target pass sequence.
 //!
-//! The app paints into a [`Painter`](crate::paint::Painter) and hands the finished layers to
-//! [`FrameRenderer::draw`], which renders into any target view at an explicit size and scale:
+//! The app paints into a [`Painter`](crate::paint::Painter) and hands the finished [`Scene`] to
+//! [`FrameRenderer::draw`], which renders it in the scene module's documented draw order into any target view at an explicit size and scale:
 //! the window surface (see [`Gpu::acquire`] and [`Gpu::present`]) or an offscreen texture (frame dumps).
 
 use glyphon::{
     Cache, Color, Resolution, SwashCache, TextArea, TextAtlas, TextBounds, TextRenderer, Viewport,
 };
 
-use crate::blur::{self, Blur};
+use crate::blur::Blur;
 use crate::custom::{CustomDraw, CustomFrame, CustomItem};
-use crate::gpu::{self, Gpu};
-use crate::paint::{LAYER_COUNT, Layer};
+use crate::gpu::Gpu;
+use crate::scene::{LAYER_COUNT, SCENE_LAYERS, Scene};
 use crate::text::TextCache;
 
-/// Layers under popups go to an offscreen scene, so a glass menu can blur them.
-const SCENE_LAYERS: usize = 2;
-
-/// What one frame is drawn at, and how its glass backdrop is blurred.
-#[derive(Debug, Clone, Copy)]
-pub struct FrameParams {
-    /// Target size in physical pixels.
-    pub size: (u32, u32),
-    /// Device pixels per logical pixel.
-    pub scale: f32,
-    /// Gaussian σ of the backdrop blur, in physical pixels.
-    pub blur_sigma: f32,
-    /// Saturation boost applied to the blurred backdrop.
-    pub saturation: f32,
-}
+pub use crate::scene::FrameParams;
 
 pub struct FrameRenderer {
     viewport: Viewport,
@@ -82,41 +68,40 @@ impl FrameRenderer {
         &self.blur
     }
 
-    /// Draws one frame of painted `layers` into `target`: the scene layers go to the offscreen
-    /// scene, which is blitted to `target` (blurred under `backdrop` if one is set), then the
+    /// Draws one painted `scene` into `target`: the scene layers go to the offscreen scene,
+    /// which is blitted to `target` (blurred under the backdrop request if one is set), then the
     /// popup layers are drawn over it.
     pub fn draw(
         &mut self,
         gpu: &Gpu,
         text: &mut TextCache,
-        layers: Vec<Layer>,
-        backdrop: Option<blur::Backdrop>,
+        scene: &Scene,
         target: &wgpu::TextureView,
         params: FrameParams,
     ) -> Result<(), String> {
-        self.draw_with(gpu, text, layers, backdrop, target, params, &mut [])
+        self.draw_with(gpu, text, scene, target, params, &mut [])
     }
 
     /// [`draw`](Self::draw) with app-owned draws: each layer's [`CustomItem`]s render after the
     /// layer's acrylic and under shapes and before its text, scissored to the item's clip.
     /// `customs[slot]` draws the items recorded with that slot. Every element of `customs` gets
     /// one `prepare` call before the first render pass.
-    #[allow(clippy::too_many_arguments)]
     pub fn draw_with(
         &mut self,
         gpu: &Gpu,
         text: &mut TextCache,
-        mut layers: Vec<Layer>,
-        backdrop: Option<blur::Backdrop>,
+        scene: &Scene,
         target: &wgpu::TextureView,
         params: FrameParams,
         customs: &mut [&mut dyn CustomDraw],
     ) -> Result<(), String> {
-        let items: Vec<Vec<CustomItem>> = layers
-            .iter_mut()
-            .map(|l| std::mem::take(&mut l.customs))
-            .collect();
-        if let Some(bad) = items.iter().flatten().find(|i| i.slot >= customs.len()) {
+        let layers = &scene.layers;
+        let backdrop = scene.backdrop;
+        if let Some(bad) = layers
+            .iter()
+            .flat_map(|l| &l.customs)
+            .find(|i| i.slot >= customs.len())
+        {
             return Err(format!("custom draw slot {} not supplied", bad.slot));
         }
         let custom_frame = CustomFrame {
@@ -174,8 +159,7 @@ impl FrameRenderer {
                 .map_err(|e| e.to_string())?;
         }
 
-        let geometry: Vec<gpu::LayerGeometry> = layers.into_iter().map(|l| l.geometry).collect();
-        let uploaded = gpu.upload(&geometry, size, s);
+        let uploaded = gpu.upload(scene, size, s);
         self.blur.prepare(&gpu.device, &gpu.queue, size, s, sigma);
         let mut encoder = gpu.device.create_command_encoder(&Default::default());
         let pass_desc = |target: &wgpu::TextureView,
@@ -199,13 +183,13 @@ impl FrameRenderer {
             });
             f(&mut pass)
         };
-        let scene = self.blur.scene_view().ok_or("no scene target")?;
+        let scene_view = self.blur.scene_view().ok_or("no scene target")?;
         pass_desc(
-            scene,
+            scene_view,
             &mut |pass| {
-                for (i, layer_items) in items.iter().enumerate().take(SCENE_LAYERS) {
+                for (i, layer) in layers.iter().enumerate().take(SCENE_LAYERS) {
                     gpu.draw_below_text(pass, &uploaded, i);
-                    draw_customs(pass, layer_items, customs, &custom_frame);
+                    draw_customs(pass, &layer.customs, customs, &custom_frame);
                     self.layers[i]
                         .render(&self.atlas, &self.viewport, pass)
                         .map_err(|e| e.to_string())?;
@@ -226,9 +210,9 @@ impl FrameRenderer {
                 if backdrop.is_some() {
                     self.blur.draw_backdrop(pass);
                 }
-                for (i, layer_items) in items.iter().enumerate().skip(SCENE_LAYERS) {
+                for (i, layer) in layers.iter().enumerate().skip(SCENE_LAYERS) {
                     gpu.draw_below_text(pass, &uploaded, i);
-                    draw_customs(pass, layer_items, customs, &custom_frame);
+                    draw_customs(pass, &layer.customs, customs, &custom_frame);
                     self.layers[i]
                         .render(&self.atlas, &self.viewport, pass)
                         .map_err(|e| e.to_string())?;

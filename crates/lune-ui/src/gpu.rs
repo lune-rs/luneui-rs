@@ -6,6 +6,8 @@ use bytemuck::{Pod, Zeroable};
 use wgpu::util::DeviceExt;
 use winit::window::Window;
 
+use crate::scene::{Scene, Shape, StrokeVertex};
+
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 pub struct Globals {
@@ -14,27 +16,58 @@ pub struct Globals {
     pub _pad: f32,
 }
 
+/// GPU copy of [`Shape`]: same fields, same order.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
-pub struct Shape {
-    pub rect: [f32; 4],
-    pub radii: [f32; 4],
-    pub color: [f32; 4],
-    pub under: [f32; 4],
-    pub params: [f32; 4],
+struct GpuShape {
+    rect: [f32; 4],
+    radii: [f32; 4],
+    color: [f32; 4],
+    under: [f32; 4],
+    params: [f32; 4],
     /// Physical clip rect (x, y, w, h); zero width = no clip.
-    pub clip: [f32; 4],
+    clip: [f32; 4],
 }
 
+/// GPU copy of [`StrokeVertex`]: same fields, same order.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
-pub struct StrokeVertex {
-    pub pos: [f32; 2],
-    pub aa: [f32; 2],
-    pub color: [f32; 4],
-    pub style: [f32; 4],
-    pub extra: [f32; 4],
-    pub clip: [f32; 4],
+struct GpuStrokeVertex {
+    pos: [f32; 2],
+    aa: [f32; 2],
+    color: [f32; 4],
+    style: [f32; 4],
+    extra: [f32; 4],
+    clip: [f32; 4],
+}
+
+const _: () = assert!(size_of::<GpuShape>() == 96);
+const _: () = assert!(size_of::<GpuStrokeVertex>() == 80);
+
+impl From<&Shape> for GpuShape {
+    fn from(s: &Shape) -> Self {
+        Self {
+            rect: s.rect,
+            radii: s.radii,
+            color: s.color,
+            under: s.under,
+            params: s.params,
+            clip: s.clip,
+        }
+    }
+}
+
+impl From<&StrokeVertex> for GpuStrokeVertex {
+    fn from(v: &StrokeVertex) -> Self {
+        Self {
+            pos: v.pos,
+            aa: v.aa,
+            color: v.color,
+            style: v.style,
+            extra: v.extra,
+            clip: v.clip,
+        }
+    }
 }
 
 pub struct Gpu {
@@ -57,16 +90,6 @@ impl std::fmt::Debug for Gpu {
             .field("config", &self.config)
             .finish_non_exhaustive()
     }
-}
-
-/// One z-layer of the frame: acrylic (replace blend), shapes under text, text (drawn by the
-/// caller), then shapes and strokes over text.
-#[derive(Debug, Default)]
-pub struct LayerGeometry {
-    pub acrylic: Vec<Shape>,
-    pub under: Vec<Shape>,
-    pub over: Vec<Shape>,
-    pub strokes: Vec<StrokeVertex>,
 }
 
 type Range = std::ops::Range<u32>;
@@ -215,7 +238,7 @@ impl Gpu {
             5 => Float32x4
         ];
         let shape_layout = wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<Shape>() as u64,
+            array_stride: std::mem::size_of::<GpuShape>() as u64,
             step_mode: wgpu::VertexStepMode::Instance,
             attributes: &shape_attrs,
         };
@@ -224,7 +247,7 @@ impl Gpu {
             5 => Float32x4
         ];
         let stroke_layout = wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<StrokeVertex>() as u64,
+            array_stride: std::mem::size_of::<GpuStrokeVertex>() as u64,
             step_mode: wgpu::VertexStepMode::Vertex,
             attributes: &stroke_attrs,
         };
@@ -339,7 +362,9 @@ impl Gpu {
         self.queue.present(frame);
     }
 
-    pub fn upload(&self, layers: &[LayerGeometry], size: (u32, u32), scale: f32) -> Uploaded {
+    /// Writes the globals and copies every layer's shapes and stroke vertices of `scene` into
+    /// fresh vertex buffers.
+    pub fn upload(&self, scene: &Scene, size: (u32, u32), scale: f32) -> Uploaded {
         self.queue.write_buffer(
             &self.globals,
             0,
@@ -349,24 +374,24 @@ impl Gpu {
                 _pad: 0.0,
             }),
         );
-        let mut shapes: Vec<Shape> = Vec::new();
-        let mut strokes: Vec<StrokeVertex> = Vec::new();
-        let mut ranges = Vec::with_capacity(layers.len());
-        for layer in layers {
+        let mut shapes: Vec<GpuShape> = Vec::new();
+        let mut strokes: Vec<GpuStrokeVertex> = Vec::new();
+        let mut ranges = Vec::with_capacity(scene.layers.len());
+        for layer in scene.layers.iter().map(|l| &l.geometry) {
             let mut push = |items: &[Shape]| {
                 let start = shapes.len() as u32;
-                shapes.extend_from_slice(items);
+                shapes.extend(items.iter().map(GpuShape::from));
                 start..shapes.len() as u32
             };
             let acrylic = push(&layer.acrylic);
             let under = push(&layer.under);
             let over = push(&layer.over);
             let start = strokes.len() as u32;
-            strokes.extend_from_slice(&layer.strokes);
+            strokes.extend(layer.strokes.iter().map(GpuStrokeVertex::from));
             ranges.push((acrylic, under, over, start..strokes.len() as u32));
         }
         if shapes.is_empty() {
-            shapes.push(Shape::zeroed());
+            shapes.push(GpuShape::zeroed());
         }
         let shapes = self
             .device
@@ -478,4 +503,64 @@ fn noise_texture(
         ..Default::default()
     });
     Ok((texture.create_view(&Default::default()), sampler))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Pairwise distinct values, starting with the awkward ones: -0.0, a subnormal, f32::MAX and
+    /// a NaN with a payload.
+    fn values(n: usize) -> Vec<f32> {
+        let mut v = vec![
+            -0.0,
+            f32::from_bits(1),
+            f32::MAX,
+            f32::from_bits(0x7fc0_1234),
+        ];
+        v.extend((0..n).map(|i| i as f32 * 1.25 + 3.0));
+        v.truncate(n);
+        v
+    }
+
+    fn bytes(fields: &[f32]) -> Vec<u8> {
+        fields.iter().flat_map(|f| f.to_ne_bytes()).collect()
+    }
+
+    fn quad(v: &[f32]) -> [f32; 4] {
+        [v[0], v[1], v[2], v[3]]
+    }
+
+    #[test]
+    fn gpu_records_are_bit_exact() {
+        let v = values(24);
+        let distinct: std::collections::HashSet<u32> = v.iter().map(|f| f.to_bits()).collect();
+        assert_eq!(distinct.len(), 24);
+        let shape = Shape {
+            rect: quad(&v[0..]),
+            radii: quad(&v[4..]),
+            color: quad(&v[8..]),
+            under: quad(&v[12..]),
+            params: quad(&v[16..]),
+            clip: quad(&v[20..]),
+        };
+        assert_eq!(
+            bytemuck::bytes_of(&GpuShape::from(&shape)),
+            bytes(&v).as_slice()
+        );
+
+        let v = values(20);
+        let vertex = StrokeVertex {
+            pos: [v[0], v[1]],
+            aa: [v[2], v[3]],
+            color: quad(&v[4..]),
+            style: quad(&v[8..]),
+            extra: quad(&v[12..]),
+            clip: quad(&v[16..]),
+        };
+        assert_eq!(
+            bytemuck::bytes_of(&GpuStrokeVertex::from(&vertex)),
+            bytes(&v).as_slice()
+        );
+    }
 }

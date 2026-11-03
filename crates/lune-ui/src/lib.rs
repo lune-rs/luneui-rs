@@ -9,13 +9,15 @@
 //! Modules:
 //! - [`color`], [`theme`] (the `Theme` tokens and the dark preset with its glass
 //!   layers), [`acrylic`] (Avalonia acrylic colour math);
-//! - [`paint`] (the `Painter`), [`custom`] (app-owned GPU drawing inside a layer), [`text`], [`icon`], [`widgets`] (controls, menus, dropdowns,
+//! - [`paint`] (the `Painter`), [`scene`] (the display list it builds: plain data and the
+//!   draw-order contract), [`custom`] (app-owned GPU drawing inside a layer), [`text`], [`icon`], [`widgets`] (controls, menus, dropdowns,
 //!   dialogs), [`chrome`] (tab outline geometry);
 //! - [`gpu`], [`blur`], [`frame`] (wgpu setup, backdrop blur, the scene → blur → target pass
 //!   sequence), [`dump`] (offscreen targets and PNG readback);
 //! - [`material`] (OS backdrop per platform, [`GlassLayer`] and [`Backdrop`] describe the layers
 //!   and capability levels), [`window`] (glass window attributes, edge resize, double click,
-//!   caption buttons).
+//!   caption buttons);
+//! - [`testing`] (fakes of the seams for tests: the display-list recorder).
 //!
 //! Values in the dark preset are copied from the house look's `DarkTheme.axaml` and `App.axaml`, so
 //! apps styled after it match.
@@ -31,6 +33,8 @@ pub mod gpu;
 pub mod icon;
 pub mod material;
 pub mod paint;
+pub mod scene;
+pub mod testing;
 pub mod text;
 pub mod theme;
 pub mod widgets;

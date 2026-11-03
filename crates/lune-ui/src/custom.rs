@@ -6,6 +6,8 @@
 //! clip. Because the item lives in a layer, a popup's backdrop blur sees it when the layer is
 //! below the popup.
 
+pub use crate::scene::CustomItem;
+
 /// What the current frame is drawn at; handed to [`CustomDraw`] on both calls.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CustomFrame {
@@ -28,13 +30,4 @@ pub trait CustomDraw {
     /// pass and the final pass are separate; a slot is normally used by one layer only). The
     /// scissor is already set to the item's clip.
     fn render(&self, pass: &mut wgpu::RenderPass<'_>, frame: &CustomFrame);
-}
-
-/// One recorded custom draw: which supplied implementation, and where it may paint.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct CustomItem {
-    /// Index into the `customs` slice given to `draw_with`.
-    pub slot: usize,
-    /// Clip as x, y, width, height in physical pixels.
-    pub clip: [u32; 4],
 }

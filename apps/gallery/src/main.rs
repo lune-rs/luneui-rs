@@ -234,9 +234,7 @@ fn draw_scene(
     r.text.set_scale(s);
     let mut p = Painter::new(s, win, &mut r.text, scene.hover, lunegit_dark::THEME);
     (scene.draw)(&mut p, scene.time);
-    let Painter {
-        layers, backdrop, ..
-    } = p;
+    let Painter { scene, .. } = p;
     let params = FrameParams {
         size,
         scale: s,
@@ -244,15 +242,8 @@ fn draw_scene(
         saturation: BLUR_SATURATION,
     };
     let mut customs: [&mut dyn CustomDraw; 1] = [&mut r.fill];
-    r.frame.draw_with(
-        &r.gpu,
-        &mut r.text,
-        layers,
-        backdrop,
-        target,
-        params,
-        &mut customs,
-    )
+    r.frame
+        .draw_with(&r.gpu, &mut r.text, &scene, target, params, &mut customs)
 }
 
 /// Draws one frame of `scene` into the window's surface.

@@ -3,6 +3,8 @@
 
 use bytemuck::{Pod, Zeroable};
 
+use crate::scene::BackdropRequest;
+
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct Params {
@@ -22,14 +24,6 @@ struct BackdropUniform {
     alpha: f32,
     saturation: f32,
     _pad: [f32; 3],
-}
-
-/// A blurred-backdrop region to draw, in physical pixels.
-#[derive(Debug, Clone, Copy)]
-pub struct Backdrop {
-    pub rect: [f32; 4],
-    pub radius: f32,
-    pub alpha: f32,
 }
 
 // The blur strength comes from Settings (`BlurLevel::sigma`). Luneium's CSS says `blur(30px)`, but
@@ -329,7 +323,7 @@ impl Blur {
         pass.draw(0..3, 0..1);
     }
 
-    pub fn set_backdrop(&self, queue: &wgpu::Queue, b: Backdrop, saturation: f32) {
+    pub fn set_backdrop(&self, queue: &wgpu::Queue, b: BackdropRequest, saturation: f32) {
         let u = BackdropUniform {
             rect: b.rect,
             target_size: [self.size.0 as f32, self.size.1 as f32],

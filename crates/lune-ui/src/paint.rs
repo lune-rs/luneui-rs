@@ -2,10 +2,13 @@
 //! text placements and hit regions. Clicks resolve against the previous frame's hit regions.
 
 use crate::color::{Rgba, premul};
-use crate::custom::CustomItem;
-use crate::gpu::{LayerGeometry, Shape, StrokeVertex};
+use crate::scene::{
+    BackdropRequest, CustomItem, LayerGeometry, Scene, Shape, StrokeVertex, TextItem,
+};
 use crate::text::{Spec, TextCache};
 use crate::theme::Theme;
+
+pub use crate::scene::{LAYER_COUNT, LayerId};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct Rect {
@@ -55,35 +58,6 @@ impl Rect {
     pub fn phys(&self, s: f32) -> [f32; 4] {
         [self.x * s, self.y * s, self.w * s, self.h * s]
     }
-}
-
-/// Draw order, back to front. Each layer interleaves shapes and text correctly.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LayerId {
-    Base = 0,
-    Page = 1,
-    Popup = 2,
-    Modal = 3,
-}
-
-pub const LAYER_COUNT: usize = 4;
-
-#[derive(Debug, Clone, Copy)]
-pub struct TextItem {
-    pub key: u64,
-    pub x: f32,
-    pub y: f32,
-    pub clip: Rect,
-    /// Glyph scale relative to the shaped size (popup open/close animation).
-    pub scale: f32,
-}
-
-#[derive(Debug, Default)]
-pub struct Layer {
-    pub geometry: LayerGeometry,
-    pub texts: Vec<TextItem>,
-    /// App-owned draws, in record order; drawn after the under shapes, before the text.
-    pub customs: Vec<CustomItem>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -136,7 +110,8 @@ impl Xform {
 pub struct Painter<'a, H> {
     pub s: f32,
     pub window: Rect,
-    pub layers: Vec<Layer>,
+    /// The display list painted so far: every layer and the backdrop request.
+    pub scene: Scene,
     layer: usize,
     clip: Option<Rect>,
     pub hits: Vec<(Rect, H)>,
@@ -145,8 +120,6 @@ pub struct Painter<'a, H> {
     /// Tokens the toolkit widgets read.
     pub theme: Theme,
     xform: Option<Xform>,
-    /// Blurred-backdrop region requested by a glass menu (physical px).
-    pub backdrop: Option<crate::blur::Backdrop>,
 }
 
 impl<'a, H: Copy + PartialEq> Painter<'a, H> {
@@ -160,7 +133,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         Self {
             s,
             window,
-            layers: (0..LAYER_COUNT).map(|_| Layer::default()).collect(),
+            scene: Scene::default(),
             layer: 0,
             clip: None,
             hits: Vec::new(),
@@ -168,7 +141,6 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
             hover,
             theme,
             xform: None,
-            backdrop: None,
         }
     }
 
@@ -201,7 +173,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
     /// Ask for the blurred scene inside `r` (drawn under this layer).
     pub fn backdrop(&mut self, r: Rect, radius: f32) {
         let k = self.xform.map_or(1.0, |x| x.scale);
-        self.backdrop = Some(crate::blur::Backdrop {
+        self.scene.backdrop = Some(BackdropRequest {
             rect: self.tr(r).phys(self.s),
             radius: radius * k * self.s,
             alpha: self.xform.map_or(1.0, |x| x.alpha),
@@ -209,7 +181,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
     }
 
     fn geo(&mut self) -> &mut LayerGeometry {
-        &mut self.layers[self.layer].geometry
+        &mut self.scene.layers[self.layer].geometry
     }
 
     fn shape(&self, r: Rect, radii: [f32; 4], color: [f32; 4]) -> Shape {
@@ -260,7 +232,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         self.geo().acrylic.push(sh);
     }
 
-    /// Records an app-owned draw ([`CustomDraw`](crate::custom::CustomDraw) number `slot`) on the
+    /// Records an app-owned draw (the renderer's `CustomDraw` number `slot`) on the
     /// current layer, clipped to `r`, the current clip and the window. Nothing is recorded when
     /// that is empty. The clip is in physical px, left and top floored, right and bottom
     /// ceiled. The popup transform is ignored: custom items are not animated.
@@ -278,7 +250,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         if x1 <= x0 || y1 <= y0 {
             return;
         }
-        self.layers[self.layer].customs.push(CustomItem {
+        self.scene.layers[self.layer].customs.push(CustomItem {
             slot,
             clip: [x0 as u32, y0 as u32, (x1 - x0) as u32, (y1 - y0) as u32],
         });
@@ -299,7 +271,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         };
         let clip = self.tr(self.clip.unwrap_or(self.window));
         let (x, y) = self.xform.map_or((x, y), |xf| xf.point(x, y));
-        self.layers[self.layer].texts.push(TextItem {
+        self.scene.layers[self.layer].texts.push(TextItem {
             key,
             x,
             y,
@@ -415,7 +387,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         let expand = half + 1.0;
         let mut along = 0.0;
         let segs = if closed { n } else { n - 1 };
-        let out = &mut self.layers[self.layer].geometry.strokes;
+        let out = &mut self.scene.layers[self.layer].geometry.strokes;
         for i in 0..segs {
             let j = (i + 1) % n;
             let len = ((p[j][0] - p[i][0]).powi(2) + (p[j][1] - p[i][1]).powi(2)).sqrt();
@@ -472,7 +444,7 @@ mod tests {
         with_painter(|p| {
             p.custom(3, Rect::new(10.0, 20.0, 30.25, 40.0));
             assert_eq!(
-                p.layers[0].customs,
+                p.scene.layers[0].customs,
                 [CustomItem {
                     slot: 3,
                     clip: [20, 40, 61, 80]
@@ -487,7 +459,7 @@ mod tests {
             p.set_clip(Some(Rect::new(0.0, 0.0, 15.0, 100.0)));
             p.custom(3, Rect::new(10.0, 20.0, 30.25, 40.0));
             assert_eq!(
-                p.layers[0].customs,
+                p.scene.layers[0].customs,
                 [CustomItem {
                     slot: 3,
                     clip: [20, 40, 10, 80]
@@ -502,7 +474,7 @@ mod tests {
             p.custom(0, Rect::new(300.0, 20.0, 30.0, 40.0));
             p.custom(0, Rect::new(-50.0, 20.0, 30.0, 40.0));
             p.custom(0, Rect::new(10.0, 20.0, 0.0, 40.0));
-            assert!(p.layers.iter().all(|l| l.customs.is_empty()));
+            assert!(p.scene.layers.iter().all(|l| l.customs.is_empty()));
         });
     }
 
@@ -511,9 +483,9 @@ mod tests {
         with_painter(|p| {
             p.on(LayerId::Popup);
             p.custom(1, Rect::new(10.0, 20.0, 30.0, 40.0));
-            assert!(p.layers[0].customs.is_empty());
-            assert_eq!(p.layers[2].customs.len(), 1);
-            assert_eq!(p.layers[2].customs[0].slot, 1);
+            assert!(p.scene.layers[0].customs.is_empty());
+            assert_eq!(p.scene.layers[2].customs.len(), 1);
+            assert_eq!(p.scene.layers[2].customs[0].slot, 1);
         });
     }
 }
