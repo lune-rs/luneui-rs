@@ -1,6 +1,7 @@
 # Fixed strings that may appear on a line the boundary rules 2 and 3 would otherwise reject.
 # One per line; blank lines and # comments are ignored.
 #
-# Reserved exception slot: the future theme preset module may name `lunegit` (a preset that
-# reproduces Lunegit's look). Add the one fixed string for that module here when it exists,
-# with the reason. No live entry yet.
+# Reserved: the extraction needs entries here (for example the theme preset that reproduces
+# Lunegit's look, and doc-comment mentions in moved files). Matching is per line, so one entry
+# covers only the lines containing that fixed string. Add each entry with a reason; the extraction
+# plan decides between allow entries and rewording the comments. No live entry yet.

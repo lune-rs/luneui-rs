@@ -13,6 +13,7 @@ COMP="${COMPONENTS_DIR:-$ROOT/docs/components}"
 INDEX="$COMP/INDEX.md"
 AREAS="core render platform widget overlay layout data text motion infra lunegit luneterm"
 STATUSES="in-luneterm planned stub in-progress done external"
+CONSUMERS="luneterm lunegit any"
 KEYS="id title area status consumers source owner summary"
 
 mode=write
@@ -33,7 +34,11 @@ MISSING="$(printf '\001')"
 EMPTY="$(printf '\002')"
 
 err() { printf '%s: %s\n' "$1" "$2" >> "$ERRS"; }
-in_list() { case " $2 " in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
+# in_list <token> <space-separated words>: exact whole-word match; a token with whitespace never matches.
+in_list() {
+  case "$1" in *[[:space:]]* | '') return 1 ;; esac
+  case " $2 " in *" $1 "*) return 0 ;; *) return 1 ;; esac
+}
 
 # parse <file>: prints one tab-separated line: state, then the value of each key in $KEYS.
 # state is ok | nofm | unclosed; a missing key prints \001, an empty one \002.
@@ -88,6 +93,18 @@ EOF2
   if [ "$id" != "$dir.$slug" ]; then err "$rel" "id '$id' does not match path (expected '$dir.$slug')"; bad=1; fi
   if [ "$area" != "$dir" ]; then err "$rel" "area '$area' does not match directory '$dir'"; bad=1; fi
   if ! in_list "$status" "$STATUSES"; then err "$rel" "status '$status' is not one of: $STATUSES"; bad=1; fi
+  # consumers: comma list; every item (trimmed) must be an exact token of $CONSUMERS (also rules out `|`).
+  cbad=""
+  oldifs="$IFS"; IFS=','
+  set -f
+  for item in $consumers; do
+    item="$(printf '%s' "$item" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+    in_list "$item" "$CONSUMERS" || cbad="$cbad,'$item'"
+  done
+  set +f
+  IFS="$oldifs"
+  case "$consumers" in *, | ,*) cbad="$cbad,''" ;; esac
+  if [ -n "$cbad" ]; then err "$rel" "consumers '$consumers' has an item that is not one of: $CONSUMERS"; bad=1; fi
   # Duplicate id: report both files.
   prev="$(awk -F'\t' -v id="$id" '$1 == id { print $7; exit }' "$REC")"
   if [ -n "$prev" ]; then err "$rel" "duplicate id '$id' (also in $prev)"; bad=1; fi

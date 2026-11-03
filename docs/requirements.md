@@ -121,8 +121,10 @@ planner".
 - R-nfr-1 [existing] Deterministic frames: library `src` never reads the clock or the environment
   and never starts an event loop; the app passes time, sizes, fonts, theme and hit values in.
   Enforced by `scripts/check-boundaries.sh` rule 4.
-- R-nfr-2 [existing] App-agnostic: no app, terminal or domain words in library source (boundary
-  rules 1 to 3).
+- R-nfr-2 [new] App-agnostic: no app, terminal or domain words in library source (boundary
+  rules 1 to 3). Not met by today's Luneterm `crates/lune-ui`: it names Lunegit in docs and in the
+  `lunegit_dark` preset (21 lines in 11 files under rule 3 as written here). The extraction plan
+  must rename or allow-list those before the move passes the gate (`scripts/boundaries.allow`).
 - R-nfr-3 [existing] `unsafe` only in platform modules, each block with a `// SAFETY:` comment
   (boundary rule 6, `CLAUDE.md` hard rule 3). Luneterm's three blocks are in `material/macos.rs`.
 - R-nfr-4 [existing] Size: the release profile is LTO, one codegen unit, abort on panic, stripped;
