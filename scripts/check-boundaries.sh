@@ -21,7 +21,8 @@
 #      [workspace.dependencies]) is an offender (fail closed)
 #   10 no OS predicate (target_os, target_family, target_vendor, windows, unix) inside cfg(, cfg!(
 #      or cfg_attr( in crates/*/src outside a /platform/ or /material/ directory, unless it is a
-#      #[cfg(...)] attribute whose next code line is `mod <name>;` or a `use` declaration
+#      #[cfg(...)] attribute whose next code line is `mod <name>;` or a `use` declaration; a
+#      statement wrapped over several lines (rustfmt) is joined before it is tested
 #   11 crates/lune-ui/src holds only lib.rs, with no item definitions (fn, struct, enum, trait,
 #      impl, const, static, type, macro_rules)
 set -euo pipefail
@@ -105,16 +106,20 @@ for dir in crates/*/; do
   if [ ! -f "crates/$name/src/lib.rs" ]; then
     echo "rule 6: crates/$name/src/lib.rs: missing, cannot check #![forbid(unsafe_code)]"
     fail=1
-  elif ! grep -q -F '#![forbid(unsafe_code)]' "crates/$name/src/lib.rs"; then
+  elif ! grep -q -E '^#!\[forbid\(unsafe_code\)\]' "crates/$name/src/lib.rs"; then
     echo "rule 6: crates/$name/src/lib.rs: no #![forbid(unsafe_code)]"
     fail=1
   fi
 done
 
 # Manifest parsing (rules 7 and 9): POSIX awk over section headers and keys. Prints one line per
-# dependency: `dep <name>` (normal, build, target-specific) or `dev <name>`, and `package <line>`
-# for any `package =` (a rename) inside a dependency section. A continuation line of a multi-line
-# inline value that looks like a key is reported as a dependency too (fail closed).
+# dependency: `dep <name>` (normal, build, target-specific) or `dev <name>`, `package <line>` for
+# any `package =` (a rename) inside a dependency section, and `unknown <line>` for a key outside a
+# dependency table whose dotted path names `dependencies`, `dev-dependencies` or
+# `build-dependencies` (a dotted key such as `dependencies.x = ...` under another table, or an
+# inline `dependencies = { ... }`). Headers are matched with spaces, tabs and quotes removed, so
+# `[ dependencies ]` and `["dependencies"]` count. A continuation line of a multi-line inline value
+# that looks like a key is reported as a dependency too (fail closed).
 read -r -d '' AWK_DEPS <<'AWKEOF' || true
 BEGIN { mode = ""; kind = "dep" }
 {
@@ -127,6 +132,7 @@ BEGIN { mode = ""; kind = "dep" }
     h = line
     gsub(/^\[+/, "", h)
     gsub(/\]+$/, "", h)
+    gsub(/[ \t"\047]/, "", h)
     mode = ""
     kind = "dep"
     if (h ~ /dev-dependencies/) kind = "dev"
@@ -136,12 +142,14 @@ BEGIN { mode = ""; kind = "dep" }
       mode = "single"
       name = h
       sub(/.*dependencies\./, "", name)
-      gsub(/["\047]/, "", name)
       print kind, name
     }
     next
   }
-  if (mode == "") next
+  if (mode == "") {
+    if (line ~ /(^|[.{,])[ \t]*["\047]?(dev-|build-)?dependencies["\047]?[ \t]*[.=]/) print "unknown", line
+    next
+  }
   if (mode == "table" && match(line, /^[A-Za-z0-9_"\047-]+/)) {
     key = substr(line, RSTART, RLENGTH)
     rest = substr(line, RLENGTH + 1)
@@ -228,6 +236,10 @@ for dir in crates/*/; do
         echo "rule 9: crates/$name/Cargo.toml: package rename: $dep"
         fail=1
         ;;
+      unknown)
+        echo "rule 9: crates/$name/Cargo.toml: unrecognised dependency form: $dep"
+        fail=1
+        ;;
       dep)
         case " $allowed " in *" $dep "*) ;; *)
           echo "rule 9: crates/$name/Cargo.toml: dependency '$dep' not allowed"
@@ -247,29 +259,51 @@ for dir in crates/*/; do
 $SCAN
 EOF2
 done
-# A rename in the root manifest's [workspace.dependencies] would be inherited by name.
+# A rename in the root manifest's [workspace.dependencies] would be inherited by name; an
+# unrecognised dependency form there is an offender too.
 scan_manifest Cargo.toml
 if [ -n "$SCAN" ]; then
   while IFS= read -r l; do
-    if [ "${l%% *}" = package ]; then
-      echo "rule 9: Cargo.toml: package rename in a dependency table: ${l#* }"
-      fail=1
-    fi
+    case "${l%% *}" in
+      package)
+        echo "rule 9: Cargo.toml: package rename in a dependency table: ${l#* }"
+        fail=1
+        ;;
+      unknown)
+        echo "rule 9: Cargo.toml: unrecognised dependency form: ${l#* }"
+        fail=1
+        ;;
+    esac
   done <<EOF2
 $SCAN
 EOF2
 fi
 
-# Rule 10: OS predicates in cfg outside platform/ and material/ directories. A line is an
-# offender when it holds cfg(/cfg!(/cfg_attr( with an OS predicate; the one exception is a whole
-# `#[cfg(...)]` attribute line whose next code line (blank lines, comments and other attributes
-# skipped) is `mod <name>;` or a `use` declaration.
+# Rule 10: OS predicates in cfg outside platform/ and material/ directories. A statement is an
+# offender when it holds cfg(/cfg!(/cfg_attr( (also `cfg!` with [] or {}) with an OS predicate; the
+# one exception is a whole `#[cfg(...)]` attribute whose next code line (blank lines, comments and
+# other attributes skipped) is `mod <name>;` or a `use` declaration. A statement that opens a
+# bracket it does not close on its line (rustfmt wraps long predicates) is joined with the
+# following lines, up to 40, before it is tested; the first line's number is reported.
 read -r -d '' AWK_CFG <<'AWKEOF' || true
+BEGIN { CFGRE = "cfg(_attr)?[ \t]*\\(|cfg[ \t]*![ \t]*[[({]" }
 function os_cfg(s) {
-  if (s !~ /(cfg\(|cfg!\(|cfg_attr\()/) return 0
+  if (s !~ CFGRE) return 0
   if (s ~ /(target_os|target_family|target_vendor)/) return 1
   if (s ~ /(^|[^A-Za-z0-9_])(windows|unix)([^A-Za-z0-9_]|$)/) return 1
   return 0
+}
+# open_depth: bracket depth still open after the first bracket group of s, scanned from `from`.
+function open_depth(s, from,   i, c, d, seen) {
+  d = 0
+  seen = 0
+  for (i = from; i <= length(s); i++) {
+    c = substr(s, i, 1)
+    if (c ~ /[[({]/) { d++; seen = 1 }
+    else if (c ~ /[])}]/) d--
+    if (seen && d <= 0) return 0
+  }
+  return d
 }
 function flush(   ) {
   if (pending != "") {
@@ -282,15 +316,30 @@ function flush(   ) {
   t = $0
   sub(/^[ \t]+/, "", t)
   if (t == "" || t ~ /^\/\//) next
+  ln = FNR
+  from = 0
+  if (t ~ /^#\[/) from = 1
+  else if (match(t, CFGRE)) from = RSTART
+  if (from > 0) {
+    n = 0
+    while (open_depth(t, from) > 0 && n < 40) {
+      if ((getline nxt) <= 0) break
+      n++
+      sub(/^[ \t]+/, "", nxt)
+      if (nxt == "" || nxt ~ /^\/\//) continue
+      sub(/[ \t]*\/\/.*$/, "", nxt)
+      t = t " " nxt
+    }
+  }
   if (t ~ /^#\[/) {
     if (os_cfg(t)) {
       if (t ~ /^#\[cfg\(.*\)\]$/) {
         flush()
         pending = t
-        pline = FNR
+        pline = ln
       } else {
         flush()
-        print FILENAME ":" FNR ": " t
+        print FILENAME ":" ln ": " t
         bad = 1
       }
     }
@@ -304,7 +353,7 @@ function flush(   ) {
     }
   }
   if (os_cfg(t)) {
-    print FILENAME ":" FNR ": " t
+    print FILENAME ":" ln ": " t
     bad = 1
   }
 }
