@@ -27,13 +27,25 @@ pub struct TextCache {
 impl TextCache {
     /// `font_data` is loaded in order; `ui_family` and `mono_family` are the family names
     /// that [`Font::Ui`] and [`Font::Mono`] resolve to. The caller supplies all of it; this
-    /// crate embeds no fonts.
+    /// crate embeds no fonts; with none, every text is an empty layout of zero size. The locale is `en-US`; see [`TextCache::with_locale`].
     pub fn new(font_data: &[&[u8]], ui_family: &str, mono_family: &str) -> Self {
-        let mut fonts = FontSystem::new();
-        let db = fonts.db_mut();
+        Self::with_locale(font_data, ui_family, mono_family, "en-US")
+    }
+
+    /// As [`TextCache::new`], with the shaping locale given. No system font is loaded and the
+    /// system locale is not read: the app supplies every font, so the result depends only on
+    /// its arguments.
+    pub fn with_locale(
+        font_data: &[&[u8]],
+        ui_family: &str,
+        mono_family: &str,
+        locale: &str,
+    ) -> Self {
+        let mut db = glyphon::fontdb::Database::new();
         for data in font_data {
             db.load_font_data(data.to_vec());
         }
+        let fonts = FontSystem::new_with_locale_and_db(locale.to_owned(), db);
         Self {
             fonts,
             ui_family: ui_family.to_owned(),
@@ -73,6 +85,20 @@ impl TextSystem for TextCache {
         if let Some(e) = self.entries.get_mut(&key) {
             e.last_used = frame;
             return (key, e.size);
+        }
+        if self.fonts.db().faces().next().is_none() {
+            // No font face was supplied: shaping would panic inside cosmic-text, so the text
+            // is an empty, zero-sized layout and draws nothing.
+            let buffer = Buffer::new_empty(Metrics::new(1.0, 1.0));
+            self.entries.insert(
+                key,
+                Entry {
+                    buffer,
+                    size: (0.0, 0.0),
+                    last_used: frame,
+                },
+            );
+            return (key, (0.0, 0.0));
         }
         let s = scale;
         let first = spec

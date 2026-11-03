@@ -175,7 +175,7 @@ offender, 2 when a scanned path or a tool is missing):
 | 9 | Every crate dir is registered with its allowed dependency names and is the workspace member of that name; every dependency cargo reports is within its lists; an unregistered dir, a rename, a path dependency outside `crates/<name>`, or a root `package =`, `[patch]` or `[replace]` fails; adapters name no `lune-ui-*` crate but the core | crate rule (adapters depend on the core only) |
 | 10 | No OS predicate in `cfg` outside `platform/` or `material/` dirs, except `#[cfg]` on `mod x;` or `use`; a wrapped statement is joined (strings and comments skipped), one open after 40 lines fails | hard rule 3 |
 | 11 | `crates/lune-ui/src` holds only `lib.rs`, with no item definitions | crate rule (facade only) |
-| 12 | Compiled code comes only from the scanned files: build targets are `src/lib.rs` and `tests/` files; no `path = "..."` attribute or `include!` in `crates/*/src` | rules 6, 10, 11 (what they scan is what is built) |
+| 12 | Compiled code comes only from the scanned files: build targets are `src/lib.rs` and its modules (`tests/` files are not library code and are not scanned); no `path = "..."` attribute or `include!` in `crates/*/src` (comment lines and `let path =` bindings are not attributes) | rules 6, 10, 11 (what they scan is what is built) |
 
 The script does not cover hard rules 4 (a new dependency needs a DECISIONS row; rule 9 forces a
 script edit but does not check the row), 5, 6 (licence rows), 8, 9 or 10 (`gen-component-index.sh

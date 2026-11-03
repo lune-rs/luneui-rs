@@ -118,7 +118,7 @@ impl std::fmt::Debug for Gpu {
 type Range = std::ops::Range<u32>;
 
 #[derive(Debug)]
-pub struct Uploaded {
+pub(crate) struct Uploaded {
     shapes: wgpu::Buffer,
     strokes: Option<wgpu::Buffer>,
     /// Per layer: acrylic, under, over shape ranges and the stroke vertex range.
@@ -350,7 +350,7 @@ impl Gpu {
 
     /// Copies every layer's shapes and stroke vertices of `scene` into fresh vertex buffers,
     /// created for this draw.
-    pub fn upload(&self, scene: &Scene) -> Uploaded {
+    pub(crate) fn upload(&self, scene: &Scene) -> Uploaded {
         let mut shapes: Vec<GpuShape> = Vec::new();
         let mut strokes: Vec<GpuStrokeVertex> = Vec::new();
         let mut ranges = Vec::with_capacity(scene.layers.len());
