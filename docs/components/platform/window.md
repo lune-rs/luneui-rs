@@ -25,9 +25,109 @@ Core (`lune-ui-core`): `EDGE_BORDER`, `ResizeEdge`, `edge_at`, `DoubleClick` and
 
 `crates/lune-ui-core/src/window.rs:26` (`edge_at`), `:48` (`DoubleClick`), `:70` (`caption_buttons`); 99 lines; `crates/lune-ui-winit/src/window.rs:12` (`glass_attributes`), `:28` (`resize_direction`). Integration test `crates/lune-ui-core/tests/window.rs` (edges, 6 px border, double-click gap under 400 ms); `crates/lune-ui-winit/tests/input.rs` covers the direction mapping.
 
+## Spec
+
+### Evidence
+
+Pinned: Lunegit 33a1dd41, Wane 69931d6, this repo fa2958b, Luneterm 296cfdc. Read: this repo crates/lune-ui-core/src/window.rs:1-99, crates/lune-ui-core/tests/window.rs:1-60, crates/lune-ui-winit/src/window.rs:1-39, crates/lune-ui-winit/src/platform/macos.rs:1-9, platform/windows.rs:1-13, platform/other.rs:1-5,
+crates/lune-ui-core/src/input.rs:61-62,166-181,183-223, crates/lune-ui-core/src/theme.rs:78-81,111-113; Lunegit src/Lunegit.Desktop/Theming/ThemeApplicator.cs:284-301, Views/DiffView.axaml:73-83; Wane docs/ui/components.md:193-205,714, docs/ui/mocks/css/components.css:30-50; Luneterm docs/glass-styling.md:7-28.
+Conflicts: (1) caption glyph colour at rest: the moved code draws `fg_primary` [R crates/lune-ui-core/src/window.rs:89], Wane `--text-secondary` [W docs/ui/mocks/css/components.css:43]; the moved code wins (pixel-gated).
+(2) inactive fill: the moved preset and Lunegit give a solid `#333333`, the tint lightened 20 percent [R crates/lune-ui-core/src/theme.rs:111-113], [L src/Lunegit.Desktop/Theming/ThemeApplicator.cs:284-301], [LT docs/glass-styling.md:24-28]; Wane asks for near-black `#0b0b0b` and a `#141414` card by the user's decision of 2026-11-03 [W docs/ui/components.md:197].
+The preset keeps `#333333` (a pixel-gated gallery value); Wane's look is a theme value that overrides it (`infra.theme-hot-reload`). A user decision is recorded in the Wane entry, not overruled here.
+Caption sizes agree: 46 x 32 [R crates/lune-ui-core/src/window.rs:87], [W docs/ui/components.md:198]; the close fill `#c42b1c` agrees [R crates/lune-ui-core/src/theme.rs:80], [W docs/ui/components.md:197].
+
+### Anatomy
+
+- Resize border: 6 logical px around a borderless window; `edge_at(point, w, h)` returns the corner first (north-west, north-east, south-west, south-east), else the side (west, east, north, south), else none; the right and bottom bounds are `>= w - 6` and `>= h - 6` [R crates/lune-ui-core/src/window.rs:9-41].
+- Double click: two clicks closer than 400 ms (strictly less) are a double click; the caller passes the click time [R crates/lune-ui-core/src/window.rs:43-65], [R crates/lune-ui-core/tests/window.rs:40-47].
+- Caption buttons: three 46 px wide buttons along the top right of the window rect, each as tall as the caller says (Wane 32), minimize, maximize (restore while maximized) and close, with 10 px Codicon glyphs in `fg_primary`; hover fills `surface_hover`, and the close button fills `caption_close_hover` with a white glyph [R crates/lune-ui-core/src/window.rs:68-98], [R crates/lune-ui-core/src/theme.rs:80-81], [W docs/ui/components.md:197-198].
+- Window attributes (winit adapter): a transparent window with the given logical size and minimum size and a visible flag; macOS: transparent full-size title bar with the title hidden; Windows: no decorations, no redirection bitmap, undecorated shadow, round corners, dark theme; other platforms: unchanged [R crates/lune-ui-winit/src/window.rs:10-25], [R crates/lune-ui-winit/src/platform/macos.rs:4-9], [R crates/lune-ui-winit/src/platform/windows.rs:4-13], [R crates/lune-ui-winit/src/platform/other.rs:3-5].
+- Resize direction: each `ResizeEdge` maps to winit's `ResizeDirection` [R crates/lune-ui-winit/src/window.rs:27-39].
+- Window commands the app performs, in order: drag move, drag resize from an edge, minimize, toggle maximize, close, redraw [R crates/lune-ui-core/src/input.rs:166-181]. The helpers do not call them; the app wires hits and edges to commands.
+- Title strip, brand cell and wordmark: app composition; the strip is 32 px high with a 208 px brand cell, padding 0 16 0 18 [W docs/ui/components.md:198,202]; Wane's own status line says the title strip and the wordmark are app composition. Window radius 10 and the 1 px `--border-subtle` are the page card's look [W docs/ui/components.md:198].
+- Active and inactive: while the window is inactive the app swaps the acrylic layers for a solid fill; Lunegit does so with `IsVisible` bound to the window's active state, a hard cut [L src/Lunegit.Desktop/Views/DiffView.axaml:73-83], [LT docs/glass-styling.md:24-28]. The core delivers the focus change as `Event::Focus` [R crates/lune-ui-core/src/input.rs:61-62].
+- Backdrop: the OS material behind the window is `platform.material`; the in-app blur is `render.blur` [W docs/ui/components.md:204].
+- macOS traffic lights: the mocks do not draw them [W docs/ui/components.md:204]; with a transparent full-size title bar the OS keeps them, so the app's title strip must leave room (Open questions).
+
+### States
+
+| state | look | cite |
+|---|---|---|
+| caption button rest | transparent, glyph `fg_primary` | [R crates/lune-ui-core/src/window.rs:89,96] |
+| caption hover (minimize, maximize) | fill `surface_hover` | [R crates/lune-ui-core/src/window.rs:93-95], [W docs/ui/mocks/css/components.css:47] |
+| close hover | fill `caption_close_hover` (`#C42B1C`), glyph white | [R crates/lune-ui-core/src/window.rs:90-92], [R crates/lune-ui-core/src/theme.rs:80-81] |
+| maximized | the middle glyph is "restore" | [R crates/lune-ui-core/src/window.rs:79-84] |
+| pressed | as hover | [derived: the moved code draws no pressed look] |
+| focus-visible | none: the caption buttons are pointer targets; the keyboard path is the OS (Alt+Space system menu) | [W docs/ui/components.md:199] |
+| disabled | not applicable to the helpers | [derived: no source] |
+| window active | acrylic layers shown | [LT docs/glass-styling.md:7-14] |
+| window inactive | solid fill replaces the layers; caption glyphs quaternary (Wane) | [R crates/lune-ui-core/src/theme.rs:111-113], [W docs/ui/mocks/css/components.css:49] |
+| edge hover | the matching resize cursor | [R crates/lune-ui-core/src/input.rs:204-216] |
+
+### Transitions
+
+| change | property | kind | duration | easing | reduced | cite |
+|---|---|---|---|---|---|---|
+| caption hover in and out | button fill | hover | instant | linear | keep | [W docs/ui/mocks/css/components.css:45], [L .claude/docs/animation-rules.md:102] |
+
+The Wane mock eases with `--ease-out`; the animation rules give Linear for hover and colour, which wins (Lunegit wins over Wane, PD6) [L .claude/docs/animation-rules.md:85]. The active and inactive swap is a hard cut in Lunegit [L src/Lunegit.Desktop/Views/DiffView.axaml:73-83]; it stays a snap. Never animated: window size, position, edge resizing.
+
+### Input and focus
+
+- Pointer: a press on an edge (from `edge_at`) starts `DragResize(edge)` and the cursor over it is the matching resize icon; a press on the title strip's free area starts `DragMove`; a double click there toggles maximize; a click on a caption button runs its command [R crates/lune-ui-core/src/window.rs:26-41,43-65], [R crates/lune-ui-core/src/input.rs:166-181], [W docs/ui/components.md:199].
+- Keys: none of the toolkit's; Alt+Space (the system menu) and the OS window shortcuts come from the OS window [W docs/ui/components.md:199]. Tab stops: the caption buttons are not Tab stops [derived: no source].
+- Layer: the window chrome sits on `Page` above the window glass [R crates/lune-ui-core/src/scene.rs:17-22]. Windows snap layouts (the hover menu on the maximize button) need OS hit-testing the helpers do not provide [W docs/ui/components.md:714], (Open questions).
+
+### Retained state
+
+- Transient: caption hover, the double-click time of the last click.
+- Persistent: none. App-owned: maximized flag, window active flag, the resize and maximize decisions.
+- Exit retention: no.
+
+### Accessibility
+
+- The three caption buttons are role `button` with names `luneui.window.minimize`, `luneui.window.maximize` (`luneui.window.restore` while maximized) and `luneui.window.close`; action default runs the command [infra.accessibility]. On Windows the OS also exposes the window's own system buttons when it draws them; here the app draws them [W docs/ui/components.md:714].
+
+### Strings
+
+- `luneui.window.minimize`: "Minimize", `luneui.window.maximize`: "Maximize", `luneui.window.restore`: "Restore", `luneui.window.close`: "Close" [derived: Windows caption button names; no Lunegit key; Lunegit draws no caption buttons of its own in the files read].
+
+### Gallery scenes
+
+- `chrome` (existing): the tab-outline chrome in a window.
+- `unfocused` (existing): the inactive window with the solid fill.
+- `glass-off` (existing): glass turned off.
+- `window-caption`: the three caption buttons, rest, settled; `window-caption-maximized` with the restore glyph; `window-caption-hover-min` and `window-caption-hover-close` with the pointer over the button, settled.
+- `window-caption-hover-fade`: the pointer entering a caption button, t = 60 ms (half of `instant`).
+- `window-edges`: the 6 px resize border outlined with its eight regions, settled.
+- `window-inactive-wane`: the inactive window under Wane's theme values (`#0b0b0b`, `#141414`), settled.
+
+### Painter primitives
+
+- Existing: fill, fill-radii, text (glyphs), icon, ring, clip-rect.
+- New: none.
+
+### Acceptance
+
+- Existing tests stay green: `corners`, `edges`, `border_is_six_pixels`, `interior_is_none`, `double_click_gap_is_strictly_under_400ms` (`crates/lune-ui-core/tests/window.rs`); the direction mapping test in `crates/lune-ui-winit/tests/input.rs`.
+- Edge known answers (window 400 x 300): (5.9, 100) is west and (6.0, 100) none; (0, 0) north-west; (399, 299) south-east [R crates/lune-ui-core/tests/window.rs:11-37].
+- Caption: a scripted pointer over the close button hovers it and fills `caption_close_hover`; a click returns the close hit; `maximized` draws the restore glyph; at scale 2 each button is 92 device px wide.
+- Behaviour: a press on an edge reports the resize edge; a double click within 399 ms toggles maximize and 400 ms does not.
+- Conformance: the hover fill passes `motion::conformance`; Reduced keeps it, Off snaps [motion].
+- Semantic node: the three buttons exist with the names above and `default` runs the command.
+- Real OS behaviour (transparent windows, round corners, snap layouts, traffic lights) is unverified here: no VM or GUI run (D15); Luneterm's M9 and M10 runs cover it. The "done standard" (D18) for this entry still needs the gallery scenes above and the semantic node.
+
+### Build
+
+- Milestone: M11 (done standard; code exists)
+- Depends on: core.painter, core.input, core.theme, platform.input, infra.accessibility, motion.transitions
+
 ## Open questions
 
 - None on the seam: the core half has no winit type; the winit mapping is in `lune-ui-winit` (M2 step 8). `edge_at` returns `ResizeEdge` (was winit's `ResizeDirection`).
+- `DoubleClick::click` takes a `std::time::Instant`, while frames carry an app-supplied `Duration` (`RawInput`'s time): a `Duration` form would make scripted tests need no real clock; M4 decides.
+- Windows 11 snap layouts on the maximize button need non-client hit-testing from the OS window procedure [W docs/ui/components.md:714]; no helper exists; unverified here.
+- Space for the macOS traffic lights in the app's title strip: no source gives the inset.
 
 ## Notes for the planner
 
