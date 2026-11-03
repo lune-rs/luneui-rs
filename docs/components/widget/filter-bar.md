@@ -2,30 +2,101 @@
 id: widget.filter-bar
 title: Filter bar
 area: widget
-status: stub
+status: planned
 consumers: lunegit
 source: Lunegit: src/Lunegit.Desktop/Controls/FilterBar.axaml
 owner: —
-summary: Filter bar control (rough stub)
+summary: Filter bar: search field in an inset surface with a 14 px search icon, a clear button when text is present, and no focus ring
 ---
 
 ## What it is
 
-Rough stub — not analysed. A `FilterBar` user control; contents not read.
+`filter-bar`: input container above file and branch lists. A 14 px search icon at the left, a transparent text box with a watermark, and a clear button (18 px) that shows when text is present [L src/Lunegit.Desktop/Controls/FilterBar.axaml:8-26].
 
 ## Needs
 
-- Text field and toggles (R-widget-1).
+- Drawn through the painter and generic over the app's hit type (R-widget-2).
+- Text entry and caret (`text.text-edit`); Tab stop (R-widget-3); semantic node (R-infra-4).
 
 ## Existing code
 
-Lunegit (`/Users/ijat/Projects/AvaloniaApps/Project Lunegit`, HEAD 33a1dd4), paths relative to the repo root:
-- `src/Lunegit.Desktop/Controls/FilterBar.axaml`
+`src/Lunegit.Desktop/Controls/FilterBar.axaml` (47 lines, one user control ; the watermark is bound from the owner at line 22; the code-behind `FilterBar.axaml.cs` was not read). Surface styles: `src/Lunegit.Desktop/App.axaml:302-309` (`Border.filter-bar`).
+
+## Spec
+
+### Evidence
+
+Pinned: Lunegit 33a1dd41, Wane 69931d6, this repo fa2958b. Read: `src/Lunegit.Desktop/Controls/FilterBar.axaml:1-47`; `src/Lunegit.Desktop/App.axaml:302-309`; Wane `docs/ui/components.md:347-359` (text field search variant).
+Conflicts: (1) Icon: Lunegit draws a 14 px icon [L src/Lunegit.Desktop/Controls/FilterBar.axaml:10]; Wane's search variant is 16 px at the left with padding-left 33 [W docs/ui/components.md:350,352]; Lunegit wins for this control. (2) Radius: the inline `CornerRadius="4"` [L src/Lunegit.Desktop/Controls/FilterBar.axaml:8] overrides the style's 6 [L src/Lunegit.Desktop/App.axaml:303]; the inline 4 wins. Wane's field radius is 6 [W docs/ui/components.md:352]; Lunegit wins. (3) Focus: Lunegit removes the text box border on focus and draws no ring [L src/Lunegit.Desktop/Controls/FilterBar.axaml:33-37]; Wane draws an accent border [W docs/ui/components.md:351]; Lunegit wins for the filter bar.
+
+### Anatomy
+
+- Surface: fill `surface_input` [L src/Lunegit.Desktop/Controls/FilterBar.axaml:8]; radius 4; padding 8 horizontal, 6 vertical; top margin 4 [L src/Lunegit.Desktop/Controls/FilterBar.axaml:8].
+- Search icon: 14 px, `ForegroundDim`, left, right margin 8 [L src/Lunegit.Desktop/Controls/FilterBar.axaml:10-12].
+- Text: UI font at `FontSizeBase` 13 [L src/Lunegit.Desktop/Controls/FilterBar.axaml:24], `ForegroundPrimary`; caret `ForegroundTertiary` [L src/Lunegit.Desktop/Controls/FilterBar.axaml:26]; placeholder = `Watermark` [L src/Lunegit.Desktop/Controls/FilterBar.axaml:22].
+- Clear button: 18 x 18, shown while the text is non-empty, close icon 12 px `ForegroundDim` [L src/Lunegit.Desktop/Controls/FilterBar.axaml:13-19].
+- Text box chrome: transparent background and border in every pseudo-state [L src/Lunegit.Desktop/Controls/FilterBar.axaml:28-41].
+
+### States
+
+| state | look | cite |
+|---|---|---|
+| rest, empty | surface, watermark in tertiary, no clear button | [L src/Lunegit.Desktop/Controls/FilterBar.axaml:8,13-22] |
+| rest, with text | as rest; clear button visible | [L src/Lunegit.Desktop/Controls/FilterBar.axaml:16] |
+| hover | no change in the surface | [L src/Lunegit.Desktop/Controls/FilterBar.axaml:38-41] |
+| focus | caret only; no border or ring | [L src/Lunegit.Desktop/Controls/FilterBar.axaml:33-37,26] |
+| disabled | opacity 0.4, inert | [widget.button], [L src/Lunegit.Desktop/App.axaml:481-483] |
+
+### Transitions
+
+n/a — Lunegit has no motion selector for the filter bar and the clear button appears without one (`src/Lunegit.Desktop/Themes/Animations.axaml` names no filter-bar selector); Wane's text field has none [W docs/ui/components.md:353].
+
+### Input and focus
+
+- Pointer: click focuses the text box; click on the clear button clears the text [L src/Lunegit.Desktop/Controls/FilterBar.axaml:13-17].
+- Keyboard: typing edits the text [text.text-edit]; Tab stop yes [core.focus].
+- Layer: `Base`; no overlay, no focus scope.
+
+### Retained state
+
+- Transient: hover, caret blink [core.ui].
+- Persistent: the text and the caret position, owned by `text.text-edit`.
+- App-owned: `Watermark` (passed by the owner).
+- Exit retention: no.
+
+### Accessibility
+
+- Role `text-input`; name = the owner's label; value = the text; states focusable, focused, disabled; action `set-value`; the clear button is a `button` named by the owner [infra.accessibility].
+
+### Strings
+
+None: `Watermark` is passed by the owner (`src/Lunegit.Desktop/Controls/FilterBar.axaml:22`), so no key is named here.
+
+### Gallery scenes
+
+- `filter-bar-states`: empty with watermark, with text and clear button, focused caret, disabled; settled.
+
+### Painter primitives
+
+- Existing: fill, icon, text
+- New: none
+
+### Acceptance
+
+- Scripted: typing sets the text; the clear button clears it and hides; a disabled filter bar takes no text.
+- Pixel probes at scale 2: radius 8 px; icon 28 px at the left; clear button 36 px.
+- Conformance: n/a — no transition.
+- Semantic node: role text-input; value follows the text.
+
+### Build
+
+- Milestone: M6
+- Depends on: text.text-edit, widget.button, core.painter, text.shaping
 
 ## Open questions
 
-- What it filters and which sub-controls it holds.
+- None.
 
 ## Notes for the planner
 
-A planner must read the Lunegit code before anyone builds this; the lines above come from a file-name survey, not a read.
+Wane's text field search variant (`widget.text-field`) is the nearest Wane look; this entry keeps Lunegit's drawn values where they differ.
