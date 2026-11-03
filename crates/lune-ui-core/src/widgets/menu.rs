@@ -24,22 +24,9 @@ pub const MENU_OUT: f32 = 0.12;
 /// Menu opacity, vertical offset and scale at one moment of its animation.
 pub type MenuAnim = (f32, f32, f32);
 
-/// CSS `cubic-bezier(x1, y1, x2, y2)` at time `t`.
+/// CSS `cubic-bezier(x1, y1, x2, y2)` at time `t`; [`motion::cubic_bezier`](crate::motion::cubic_bezier).
 pub fn cubic_bezier(x1: f32, y1: f32, x2: f32, y2: f32, t: f32) -> f32 {
-    let t = t.clamp(0.0, 1.0);
-    let coord = |a: f32, b: f32, u: f32| {
-        3.0 * a * u * (1.0 - u).powi(2) + 3.0 * b * u * u * (1.0 - u) + u.powi(3)
-    };
-    let (mut lo, mut hi) = (0.0, 1.0);
-    for _ in 0..24 {
-        let mid = (lo + hi) / 2.0;
-        if coord(x1, x2, mid) < t {
-            lo = mid
-        } else {
-            hi = mid
-        }
-    }
-    coord(y1, y2, (lo + hi) / 2.0)
+    crate::motion::cubic_bezier(x1, y1, x2, y2, t)
 }
 
 /// Opening motion at `t` = elapsed / [`MENU_IN`].
