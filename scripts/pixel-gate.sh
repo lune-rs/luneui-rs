@@ -39,7 +39,7 @@ while [ "$#" -gt 0 ]; do
       ALLOW+=("$2")
       shift 2
       ;;
-    -h | --help) sed -n '2,20p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h | --help) sed -n '2,21p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) die "unknown argument: $1 (see --help)" ;;
   esac
 done
