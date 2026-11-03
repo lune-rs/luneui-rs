@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+# Generates docs/components/INDEX.md from the front matter of docs/components/<area>/<slug>.md.
+#   scripts/gen-component-index.sh          write INDEX.md
+#   scripts/gen-component-index.sh --check  fail (exit 1, with a diff) when INDEX.md is stale
+# Exit 2 on a validation error (printed as `file: reason`). Output is byte-stable: LC_ALL=C sort,
+# no dates. bash 3.2 / BSD and GNU sed+awk safe.
+set -euo pipefail
+export LC_ALL=C
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# COMPONENTS_DIR lets tests run against a temp copy; default is the real catalogue.
+COMP="${COMPONENTS_DIR:-$ROOT/docs/components}"
+INDEX="$COMP/INDEX.md"
+AREAS="core render platform widget overlay layout data text motion infra lunegit luneterm"
+STATUSES="in-luneterm planned stub in-progress done external"
+CONSUMERS="luneterm lunegit any"
+KEYS="id title area status consumers source owner summary"
+
+mode=write
+case "${1:-}" in
+  '') ;;
+  --check) mode=check ;;
+  *) echo "usage: gen-component-index.sh [--check]" >&2; exit 2 ;;
+esac
+
+TMP="$(mktemp -d "${TMPDIR:-/tmp}/gen-component-index.XXXXXX")"
+trap 'rm -rf "$TMP"' EXIT
+ERRS="$TMP/errors"
+REC="$TMP/records"
+: > "$ERRS"
+: > "$REC"
+TAB="$(printf '\t')"
+MISSING="$(printf '\001')"
+EMPTY="$(printf '\002')"
+
+err() { printf '%s: %s\n' "$1" "$2" >> "$ERRS"; }
+# in_list <token> <space-separated words>: exact whole-word match; a token with whitespace never matches.
+in_list() {
+  case "$1" in *[[:space:]]* | '') return 1 ;; esac
+  case " $2 " in *" $1 "*) return 0 ;; *) return 1 ;; esac
+}
+
+# parse <file>: prints one tab-separated line: state, then the value of each key in $KEYS.
+# state is ok | nofm | unclosed; a missing key prints \001, an empty one \002.
+parse() {
+  awk -v keys="$KEYS" -v miss="$MISSING" -v empty="$EMPTY" '
+    BEGIN { n = split(keys, K, " ") }
+    { sub(/\r$/, "") }
+    NR == 1 { if ($0 != "---") { nofm = 1; exit } ; infm = 1; next }
+    infm && $0 == "---" { closed = 1; infm = 0; exit }
+    infm {
+      i = index($0, ":")
+      if (i > 0) {
+        k = substr($0, 1, i - 1); v = substr($0, i + 1)
+        sub(/^[ \t]+/, "", v); sub(/[ \t]+$/, "", v); gsub(/\t/, " ", v)
+        if (!(k in V)) V[k] = (v == "" ? empty : v)
+      }
+    }
+    END {
+      state = nofm ? "nofm" : (closed ? "ok" : "unclosed")
+      line = state
+      for (j = 1; j <= n; j++) line = line "\t" ((K[j] in V) ? V[K[j]] : miss)
+      print line
+    }' "$1"
+}
+
+for f in "$COMP"/*/*.md; do
+  [ -e "$f" ] || continue
+  rel="${f#"$COMP"/}"
+  dir="${rel%%/*}"
+  slug="${rel#*/}"
+  slug="${slug%.md}"
+  if ! in_list "$dir" "$AREAS"; then err "$rel" "directory '$dir' is not a known area"; continue; fi
+  case "$slug" in
+    *[!a-z0-9-]* | -* | *- | *--* | '') err "$rel" "slug '$slug' must be lowercase letters, digits and single hyphens"; continue ;;
+  esac
+  line="$(parse "$f")"
+  IFS="$TAB" read -r state id title area status consumers source owner summary <<EOF2
+$line
+EOF2
+  case "$state" in
+    nofm) err "$rel" "no front matter (first line must be ---)"; continue ;;
+    unclosed) err "$rel" "front matter not closed (second --- missing)"; continue ;;
+  esac
+  bad=0
+  for k in $KEYS; do
+    case "$k" in id) v="$id" ;; title) v="$title" ;; area) v="$area" ;; status) v="$status" ;;
+      consumers) v="$consumers" ;; source) v="$source" ;; owner) v="$owner" ;; summary) v="$summary" ;; esac
+    if [ "$v" = "$MISSING" ]; then err "$rel" "missing front matter key '$k'"; bad=1
+    elif [ "$v" = "$EMPTY" ]; then err "$rel" "empty front matter key '$k'"; bad=1; fi
+  done
+  [ "$bad" -eq 0 ] || continue
+  if [ "$id" != "$dir.$slug" ]; then err "$rel" "id '$id' does not match path (expected '$dir.$slug')"; bad=1; fi
+  if [ "$area" != "$dir" ]; then err "$rel" "area '$area' does not match directory '$dir'"; bad=1; fi
+  if ! in_list "$status" "$STATUSES"; then err "$rel" "status '$status' is not one of: $STATUSES"; bad=1; fi
+  # consumers: comma list; every item (trimmed) must be an exact token of $CONSUMERS (also rules out `|`).
+  cbad=""
+  oldifs="$IFS"; IFS=','
+  set -f
+  for item in $consumers; do
+    item="$(printf '%s' "$item" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+    in_list "$item" "$CONSUMERS" || cbad="$cbad,'$item'"
+  done
+  set +f
+  IFS="$oldifs"
+  case "$consumers" in *, | ,*) cbad="$cbad,''" ;; esac
+  if [ -n "$cbad" ]; then err "$rel" "consumers '$consumers' has an item that is not one of: $CONSUMERS"; bad=1; fi
+  # Duplicate id: report both files.
+  prev="$(awk -F'\t' -v id="$id" '$1 == id { print $7; exit }' "$REC")"
+  if [ -n "$prev" ]; then err "$rel" "duplicate id '$id' (also in $prev)"; bad=1; fi
+  # Record even a bad row's id so later duplicates are still caught; but never render it.
+  esc_title="$(printf '%s' "$title" | sed 's/|/\\|/g')"
+  esc_summary="$(printf '%s' "$summary" | sed 's/|/\\|/g')"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$id" "$area" "$esc_title" "$status" "$consumers" \
+    "$esc_summary" "$rel" "$bad" >> "$REC"
+done
+
+if [ -s "$ERRS" ]; then
+  sort "$ERRS" >&2
+  echo "gen-component-index: validation failed" >&2
+  exit 2
+fi
+
+OUT="$TMP/INDEX.md"
+{
+  echo "# Component catalogue index"
+  echo
+  echo "<!-- generated by scripts/gen-component-index.sh — do not edit -->"
+  echo
+  echo "Generated by \`scripts/gen-component-index.sh\` — do not edit. Add or change a component file"
+  echo "under \`docs/components/<area>/\` and re-run the script. See [README](README.md)."
+  echo
+  total="$(awk 'END { print NR }' "$REC")"
+  echo "## Counts"
+  echo
+  echo "| status | count |"
+  echo "| --- | --- |"
+  for s in $STATUSES; do
+    c="$(awk -F'\t' -v s="$s" '$4 == s { n++ } END { print n + 0 }' "$REC")"
+    echo "| $s | $c |"
+  done
+  echo "| **total** | **$total** |"
+  SORTED="$TMP/sorted"
+  sort -t "$TAB" -k1,1 "$REC" > "$SORTED"
+  for a in $AREAS; do
+    awk -F'\t' -v a="$a" '$2 == a { found = 1 } END { exit !found }' "$SORTED" || continue
+    echo
+    echo "## $a"
+    echo
+    echo "| id | title | status | consumers | summary |"
+    echo "| --- | --- | --- | --- | --- |"
+    awk -F'\t' -v a="$a" '$2 == a { printf "| [%s](%s) | %s | %s | %s | %s |\n", $1, $7, $3, $4, $5, $6 }' "$SORTED"
+  done
+} > "$OUT"
+
+if [ "$mode" = check ]; then
+  if [ ! -f "$INDEX" ]; then echo "gen-component-index: INDEX.md is missing; run scripts/gen-component-index.sh" >&2; exit 1; fi
+  if ! diff -u "$INDEX" "$OUT" > "$TMP/diff"; then
+    cat "$TMP/diff" >&2
+    echo "gen-component-index: INDEX.md is stale; run scripts/gen-component-index.sh" >&2
+    exit 1
+  fi
+  echo "gen-component-index: up to date"
+else
+  cp "$OUT" "$INDEX"
+  echo "gen-component-index: wrote ${INDEX#"$ROOT"/} ($total components)"
+fi
