@@ -6,12 +6,12 @@ status: in-progress
 consumers: luneterm
 source: crates/lune-ui-wgpu/src/frame.rs
 owner: orch/toolkit-v1
-summary: FrameRenderer: scene, blur, target pass sequence
+summary: FrameRenderer: one target's scene, blur, target pass sequence over the core Scene
 ---
 
 ## What it is
 
-`FrameParams` and `FrameRenderer` (new, blur, draw, draw_with, end_frame).
+`FrameRenderer` (`new`, `format`, `blur`, `draw`, `draw_with`) draws a core `Scene` into one target; `FrameParams` is a core type re-exported here. Each renderer owns what a draw writes (globals, viewport, text renderers, blur textures), so several targets share one `Gpu` without ordering hazards.
 
 ## Needs
 
@@ -19,7 +19,7 @@ summary: FrameRenderer: scene, blur, target pass sequence
 
 ## Existing code
 
-`crates/lune-ui-wgpu/src/frame.rs:22` (`FrameParams`), `:33` (`FrameRenderer`); 273 lines. No tests.
+`crates/lune-ui-wgpu/src/frame.rs:19` (`FrameParams`, re-exported from `crates/lune-ui-core/src/scene.rs:107`), `:22` (`FrameRenderer`), `:47` (`new`), `:104` (`draw`), `:119` (`draw_with`); 302 lines. Tests: `crates/lune-ui-wgpu/tests/targets.rs`; the fake is `testing::RecordingRenderer` (`core.testing`).
 
 ## Open questions
 

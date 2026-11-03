@@ -20,7 +20,7 @@ summary: Theme token struct and the lunegit_dark preset with the WINDOW, PANEL a
 
 ## Existing code
 
-`crates/lune-ui-core/src/theme.rs:11` (`Theme`), `:46` (`lunegit_dark`), `:51` (`THEME`), `:84` (`TINT`), `:87`/`:94`/`:101` (layers); 114 lines. No tests.
+`crates/lune-ui-core/src/theme.rs:11` (`Theme`), `:47` (`DARK`, the neutral alias), `:50` (`lunegit_dark`), `:55` (`THEME`), `:88` (`TINT`), `:91`/`:98`/`:105` (layers); 118 lines. No tests.
 
 ## Open questions
 

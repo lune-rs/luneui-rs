@@ -11,7 +11,7 @@ summary: Backdrop blur pass with its WGSL shader
 
 ## What it is
 
-`Blur` (new, prepare, scene_view, run, blit_scene, set_backdrop, draw_backdrop, dump) and a `Backdrop` struct. The struct shares a name with the `Backdrop` trait in `lib.rs`.
+`Blur` (public: `scene_view`, `dump`; the rest is crate-private, driven by `FrameRenderer`). It reads the core `BackdropRequest` that the painter records. The private uniform struct is `BackdropUniform`, so no name clashes with the `Backdrop` trait in `lune-ui-core`.
 
 ## Needs
 
@@ -19,11 +19,11 @@ summary: Backdrop blur pass with its WGSL shader
 
 ## Existing code
 
-`crates/lune-ui-wgpu/src/blur.rs:50` (`Blur`), `:29` (`Backdrop` struct); 377 lines; `blur.wgsl` 95 lines. No tests.
+`crates/lune-ui-wgpu/src/blur.rs:190` (`Blur`), `:315` (`scene_view`), `:383` (`dump`), `:20` (`BackdropUniform`); 405 lines; `blur.wgsl` 95 lines. No tests of its own; covered by the gallery's blur scenes.
 
 ## Open questions
 
-- Two items named `Backdrop` (struct here, trait in `lib.rs:62`); whether to rename on extraction is for the planner. Whether any type implements the trait is unverified.
+- None: the old name clash is gone (the struct is private `BackdropUniform`; the trait is `lune-ui-core`'s `Backdrop`, implemented by `WindowBackdrop` and `NullMaterial`).
 
 ## Notes for the planner
 

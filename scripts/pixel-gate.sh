@@ -23,7 +23,8 @@
 # source, unknown --allow id, a build or dump failure, a dump dir with no PNGs, no compare summary).
 # Writes only under target/pixel-gate/ and the base source dir above (plus cargo's own caches);
 # never prints the environment.
-# Dumps are offscreen but need a logged-in macOS GUI session (hidden winit window). bash 3.2 safe.
+# The working tree dumps on a headless device (no window); a base from before M2 step 4 (52b11d6 and
+# older) opens a hidden winit window, so such a base needs a logged-in macOS GUI session. bash 3.2 safe.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"

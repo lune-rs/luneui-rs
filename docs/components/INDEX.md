@@ -12,10 +12,10 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | in-luneterm | 0 |
 | planned | 23 |
 | stub | 29 |
-| in-progress | 26 |
+| in-progress | 31 |
 | done | 0 |
 | external | 1 |
-| **total** | **79** |
+| **total** | **84** |
 
 ## core
 
@@ -24,8 +24,11 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | [core.acrylic](core/acrylic.md) | Acrylic colour math and noise opacity | in-progress | luneterm | Avalonia acrylic colour math with tests, and the noise opacity |
 | [core.color](core/color.md) | Colour helpers | in-progress | luneterm | Straight-alpha RGBA values with premultiply, blend-over and alpha helpers |
 | [core.icon](core/icon.md) | Codicon glyph constants | in-progress | luneterm, wane | Codicon glyph constants and a glyph helper; the app supplies the icon font |
-| [core.painter](core/painter.md) | Immediate-mode painter | in-progress | luneterm | Painter: ordered layers, fills, rings, strokes, acrylic, text, clip, transform and hit regions |
+| [core.input](core/input.md) | Input model | in-progress | any | Plain-data RawInput in, FrameOutput out; the windowing adapter translates both |
+| [core.painter](core/painter.md) | Immediate-mode painter | in-progress | luneterm | Painter: ordered layers, fills, rings, strokes, acrylic, text, clip, transform and hit regions, building a plain-data Scene |
+| [core.scene](core/scene.md) | Display list | in-progress | any | Plain-data Scene the painter builds and a renderer consumes; the draw-order contract |
 | [core.tab-outline](core/tab-outline.md) | Tab outline geometry | in-progress | luneterm | Tab-chrome outline loop geometry |
+| [core.testing](core/testing.md) | Seam fakes and contract suites | in-progress | any | Public testing module: RecordingRenderer, FakeText, ScriptedInput, NullMaterial and the contract suites |
 | [core.theme](core/theme.md) | Theme tokens and Lunegit dark preset | in-progress | luneterm | Theme token struct and the lunegit_dark preset with the WINDOW, PANEL and CARD glass layers |
 
 ## render
@@ -35,14 +38,16 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | [render.blur](render/blur.md) | Backdrop blur pass | in-progress | luneterm | Backdrop blur pass with its WGSL shader |
 | [render.custom-draw](render/custom-draw.md) | App-owned drawing hook | in-progress | luneterm | CustomDraw trait: app-owned GPU drawing inside a layer |
 | [render.dump](render/dump.md) | Offscreen frame dump | in-progress | luneterm | Offscreen target, GPU readback and PNG writer for frame goldens |
-| [render.frame](render/frame.md) | Frame pass sequence | in-progress | luneterm | FrameRenderer: scene, blur, target pass sequence |
-| [render.gpu](render/gpu.md) | wgpu instance, surface and pipelines | in-progress | luneterm | wgpu instance, surface, pipelines and the noise texture |
+| [render.frame](render/frame.md) | Frame pass sequence | in-progress | luneterm | FrameRenderer: one target's scene, blur, target pass sequence over the core Scene |
+| [render.gpu](render/gpu.md) | Shared GPU | in-progress | luneterm | One shared Gpu (device, queue, noise texture, per-format pipelines and glyph atlas) for any number of targets |
+| [render.surface](render/surface.md) | Window surface | in-progress | any | One window's swapchain on the shared Gpu: acquire, present, resize; no winit dependency |
 
 ## platform
 
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
-| [platform.material](platform/material.md) | OS glass materials | in-progress | luneterm | Material enum and apply: macOS NSVisualEffect and Liquid Glass, Windows acrylic and mica, opaque elsewhere |
+| [platform.input](platform/input.md) | winit input translation and output | in-progress | any | Translator turns winit events into RawInput; OutputState applies FrameOutput to a window |
+| [platform.material](platform/material.md) | OS glass materials | in-progress | luneterm | Backdrop seam in core (Material, Backdrop, NullMaterial); OS glass behind it: macOS NSVisualEffect and Liquid Glass, Windows acrylic and mica, opaque elsewhere |
 | [platform.tray-icon](platform/tray-icon.md) | Tray icon with status dot | planned | wane | 16 px monochrome glyph with a status dot: green serving, amber degraded, grey paused |
 | [platform.window](platform/window.md) | Glass window helpers | in-progress | luneterm, wane | Glass window attributes, edge resize, double-click detection and caption buttons |
 
@@ -115,7 +120,7 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | [text.code-block](text/code-block.md) | Code block | planned | wane | Read-only mono block with a copy button |
 | [text.code-editor-view](text/code-editor-view.md) | Code viewer and editor with syntax highlighting | stub | lunegit | Code text view and editor with TextMate syntax highlighting (AvaloniaEdit equivalent) (rough stub) |
 | [text.markdown-preview](text/markdown-preview.md) | Markdown preview | stub | lunegit | Markdown preview rendered from Markdig output (rough stub) |
-| [text.shaping](text/shaping.md) | Shaped-text cache | in-progress | luneterm | Shaped-text cache over glyphon keyed by content; the app registers its fonts |
+| [text.shaping](text/shaping.md) | Shaped-text cache | in-progress | luneterm | TextSystem seam in core; glyphon TextCache behind it, keyed by content and scale; the app registers its fonts |
 
 ## motion
 

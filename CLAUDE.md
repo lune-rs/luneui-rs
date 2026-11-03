@@ -17,7 +17,7 @@ for the extraction; Luneterm's `docs/architecture.md` sections "lune-ui modules"
 
 - Build: `cargo build --workspace`
 - Test (all): `cargo test --workspace`
-- Test (one): `cargo test -p <crate> <name>`
+- Test (one): `cargo test -p <crate> <name>`; crates: `lune-ui-core`, `lune-ui-wgpu`, `lune-ui-winit`, `lune-ui-platform`, `lune-ui` (facade), `gallery`, `dump-compare`. The GPU tests skip without an adapter; `LUNEUI_REQUIRE_GPU=1 cargo test -p lune-ui-wgpu` makes them fail instead
 - Format: `cargo fmt --all`
 - Lint: `cargo clippy --workspace --all-targets -- -D warnings`
 - Boundaries: `scripts/check-boundaries.sh`
@@ -27,10 +27,12 @@ for the extraction; Luneterm's `docs/architecture.md` sections "lune-ui modules"
   gallery's 15 reference scenes for `<rev>` (default `HEAD`) and for the working tree and compares them
   (`dump-compare`); zero delta unless the look change is intended: name its scenes with `--allow <id>`
   and give the reason in a DECISIONS.md row in the same commit. Exit 0 pass, 1 delta, 2 setup error.
-  Needs a logged-in macOS GUI session.
+  The working tree dumps headless (no window); a base from before M2 step 4 (`52b11d6` and older)
+  opens a hidden window, so such a gate needs a logged-in macOS GUI session.
 - Dump the scenes by hand: `cargo run -p gallery -- --dump <dir>` (`-- --list` prints the scene names)
-- M1 proof against Luneterm's 18-scene spike gate: `scripts/pixel-gate-luneterm.sh` (`--parity-only`
-  checks only that `Cargo.lock` holds no version Luneterm's lock lacks)
+- M1-only proof against Luneterm's 18-scene spike gate: `scripts/pixel-gate-luneterm.sh` (its full run
+  cannot build against the M2 API and exits 2; `--parity-only` still checks that `Cargo.lock` holds no
+  version Luneterm's lock lacks)
 - Cross-target (Windows clippy, Linux in Docker; skips Linux when Docker is not running): `scripts/check-targets.sh`
 
 Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, resolver 3: in
@@ -39,18 +41,23 @@ Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, r
 ## Architecture rules
 
 - Swap points: text shaping (glyphon), GPU renderer (wgpu), OS glass (`Material`), windowing (winit).
-  Target, decided by the extraction plan and not true today: each sits behind a trait owned by a pure
-  core with no wgpu, winit or glyphon types in its signatures, adapters depending on the core only.
-- The first extraction is behaviour-preserving: code moves from `lune-ui` as is, pixel gate at zero
-  delta. The seams follow as separate, gated steps (M2). Crate names and split: D9.
+  Each sits behind a core type in the pure `lune-ui-core` (no dependencies; no wgpu, winit or glyphon
+  types in its signatures): `Scene` (display list), `TextSystem`, `RawInput`/`FrameOutput`, `Backdrop`.
+  Crates: `lune-ui-core`; adapters `lune-ui-wgpu`, `lune-ui-winit`, `lune-ui-platform`; the facade
+  `lune-ui` (D9). An adapter depends on the core and its own platform crates only, never on another
+  adapter (boundary rules 7 to 9).
+- M1 was behaviour-preserving (code moved from `lune-ui` as is); M2 cut the seams and split the
+  crates, each step gated at zero pixel delta.
 - The toolkit has no composition root: each consuming app wires adapters. The toolkit never starts an
   event loop and never reads the clock or environment; the app passes time, sizes, fonts, theme and hit
   values in, so frames are deterministic.
-- Extend, don't patch: new OS glass = a `material` submodule; new overlay or widget = a new module plus
+- Extend, don't patch: new OS glass = a `material` submodule of `lune-ui-platform`; new overlay or widget = a new module plus
   a catalogue file; new look = a `Theme` value. App-specific drawing goes through the `CustomDraw`
   hook, not into the toolkit (D8).
-- As each seam lands it gets a contract test and a fake (headless target, null material).
-  `docs/architecture.md` holds the module map, the known deviations and the pixel gates.
+- Each seam has a fake and a contract test in `lune_ui_core::testing` (`RecordingRenderer`, `FakeText`
+  with `text_system_contract`, `ScriptedInput`, `NullMaterial` with `backdrop_contract`); a new adapter
+  passes the same suite. `docs/architecture.md` holds the module map, the seam table, the multi-window
+  model and the pixel gates.
 
 ## Hard rules
 
@@ -58,9 +65,11 @@ Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, r
    `scripts/check-boundaries.sh` and its allow list (`scripts/boundaries.allow`; `lunegit` is
    allowed only in the theme preset module, its re-export and the in-crate tests that import the preset; D14).
 2. No clock, environment or event-loop access in library `src` (same script; tests and examples may).
-3. `unsafe` only in platform modules, each block with a `// SAFETY:` comment; `unsafe_op_in_unsafe_fn`
-   denied. Platform code lives in `#[cfg(target_os = ...)]` modules inside the crate that owns the trait;
-   shared code never branches on OS inline.
+3. `unsafe` only in `lune-ui-platform` under `src/platform/` or `src/material/`, each block with a
+   `// SAFETY:` comment; `unsafe_op_in_unsafe_fn` denied; every other crate is
+   `#![forbid(unsafe_code)]`. Platform code lives in `#[cfg(target_os = ...)]` module files
+   (`src/platform/`, `src/material/`) of the adapter crate that implements the seam; shared code never
+   branches on OS inline (boundary rules 6, 10).
 4. Third-party crates only for platform layers (windowing, GPU, text shaping, OS glass); a new
    dependency needs a DECISIONS.md row.
 5. Size budget: when adding a dependency, build the release profile and note the binary-size change in
