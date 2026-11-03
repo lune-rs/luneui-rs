@@ -3,7 +3,7 @@
 
 use crate::color::{Rgba, premul};
 use crate::scene::{
-    BackdropRequest, CustomItem, LayerGeometry, Scene, Shape, StrokeVertex, TextItem,
+    Acrylic, BackdropRequest, CustomItem, LayerGeometry, Scene, Shape, StrokeVertex, TextItem,
 };
 use crate::text::{Spec, TextSystem};
 use crate::theme::Theme;
@@ -84,6 +84,8 @@ impl StrokeStyle {
 }
 
 /// Animation transform for a popup: scale about `origin`, then move down `dy`, and fade.
+///
+/// Transforms stack ([`Painter::push_xform`]): the innermost applies first, then the next one out.
 #[derive(Debug, Clone, Copy)]
 pub struct Xform {
     pub origin: (f32, f32),
@@ -106,6 +108,43 @@ impl Xform {
     }
 }
 
+/// One recorded painter call (see [`Painter::start_recording`]).
+#[derive(Debug, Clone)]
+enum Op {
+    On(LayerId),
+    SetClip(Option<Rect>),
+    SetXform(Option<Xform>),
+    PushXform(Xform),
+    PopXform,
+    FillRadii(Rect, [f32; 4], Rgba),
+    FillOver(Rect, f32, [f32; 4]),
+    Ring(Rect, f32, f32, Rgba, bool),
+    Acrylic(Rect, f32, [f32; 4], [f32; 4], bool),
+    Backdrop(Rect, f32),
+    Text(Spec, f32, f32),
+    Stroke(Vec<[f32; 2]>, bool, StrokeStyle),
+    Custom(usize, Rect),
+}
+
+/// Painter calls recorded by [`Painter::start_recording`], owned and `'static`, to replay later
+/// with [`Painter::replay`] (an overlay's exit frame replays what the app drew inside it).
+#[derive(Debug, Clone, Default)]
+pub struct Ops {
+    ops: Vec<Op>,
+}
+
+impl Ops {
+    /// The number of recorded calls.
+    pub fn len(&self) -> usize {
+        self.ops.len()
+    }
+
+    /// Whether nothing was recorded.
+    pub fn is_empty(&self) -> bool {
+        self.ops.is_empty()
+    }
+}
+
 pub struct Painter<'a, H> {
     pub s: f32,
     pub window: Rect,
@@ -118,7 +157,12 @@ pub struct Painter<'a, H> {
     pub hover: Option<H>,
     /// Tokens the toolkit widgets read.
     pub theme: Theme,
-    xform: Option<Xform>,
+    /// The transform stack, outermost first.
+    xforms: Vec<Xform>,
+    /// `(layer, tag)` per entry of `hits`, kept in step by [`Self::hit`].
+    hit_meta: Vec<(usize, u32)>,
+    hit_tag: u32,
+    recording: Option<Vec<Op>>,
 }
 
 impl<H: std::fmt::Debug> std::fmt::Debug for Painter<'_, H> {
@@ -132,7 +176,7 @@ impl<H: std::fmt::Debug> std::fmt::Debug for Painter<'_, H> {
             .field("hits", &self.hits)
             .field("hover", &self.hover)
             .field("theme", &self.theme)
-            .field("xform", &self.xform)
+            .field("xforms", &self.xforms)
             .finish_non_exhaustive()
     }
 }
@@ -155,29 +199,137 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
             text,
             hover,
             theme,
-            xform: None,
+            xforms: Vec::new(),
+            hit_meta: Vec::new(),
+            hit_tag: 0,
+            recording: None,
         }
     }
 
+    fn rec(&mut self, op: impl FnOnce() -> Op) {
+        if let Some(ops) = &mut self.recording {
+            ops.push(op());
+        }
+    }
+
+    /// Starts recording the calls that draw or change state (not `hit` and `measure`), dropping
+    /// an earlier unfinished recording.
+    pub fn start_recording(&mut self) {
+        self.recording = Some(Vec::new());
+    }
+
+    /// Stops recording and returns what was recorded; empty when not recording.
+    pub fn take_recording(&mut self) -> Ops {
+        Ops {
+            ops: self.recording.take().unwrap_or_default(),
+        }
+    }
+
+    /// Replays `ops` through this painter's own methods, so the result depends on its current
+    /// state (theme, scale, text system) as if the calls were made here.
+    pub fn replay(&mut self, ops: &Ops) {
+        for op in &ops.ops {
+            match op {
+                Op::On(l) => self.on(*l),
+                Op::SetClip(c) => self.set_clip(*c),
+                Op::SetXform(x) => self.set_xform(*x),
+                Op::PushXform(x) => self.push_xform(*x),
+                Op::PopXform => self.pop_xform(),
+                Op::FillRadii(r, radii, c) => self.fill_radii(*r, *radii, *c),
+                Op::FillOver(r, radius, c) => self.fill_over(*r, *radius, *c),
+                Op::Ring(r, radius, w, c, above) => self.ring(*r, *radius, *w, *c, *above),
+                Op::Acrylic(r, radius, c, under, noise) => {
+                    self.acrylic(*r, *radius, *c, *under, *noise);
+                }
+                Op::Backdrop(r, radius) => self.backdrop(*r, *radius),
+                Op::Text(spec, x, y) => {
+                    self.text(spec, *x, *y);
+                }
+                Op::Stroke(pts, closed, st) => self.stroke(pts, *closed, *st),
+                Op::Custom(slot, r) => self.custom(*slot, *r),
+            }
+        }
+    }
+
+    /// Sets the tag the next [`Self::hit`] calls record with their layer, for the `Ui`'s hit list.
+    #[allow(dead_code)] // first caller arrives with the Ui frame
+    pub(crate) fn set_hit_tag(&mut self, tag: u32) {
+        self.hit_tag = tag;
+    }
+
+    /// `(layer index, tag)` for each entry of `hits`, in the same order. Valid while `hits` is only
+    /// appended to through [`Self::hit`].
+    #[allow(dead_code)] // first caller arrives with the Ui frame
+    pub(crate) fn hit_meta(&self) -> &[(usize, u32)] {
+        &self.hit_meta
+    }
+
     pub fn on(&mut self, layer: LayerId) {
+        self.rec(|| Op::On(layer));
         self.layer = layer as usize;
         self.clip = None;
     }
 
     pub fn set_clip(&mut self, clip: Option<Rect>) {
+        self.rec(|| Op::SetClip(clip));
         self.clip = clip;
     }
 
+    /// Replaces the transform stack: with `xform` as its only entry, or empty for `None`.
     pub fn set_xform(&mut self, xform: Option<Xform>) {
-        self.xform = xform;
+        self.rec(|| Op::SetXform(xform));
+        self.xforms.clear();
+        self.xforms.extend(xform);
+    }
+
+    /// Adds `xform` inside the current ones: it applies first, the earlier ones after it.
+    pub fn push_xform(&mut self, xform: Xform) {
+        self.rec(|| Op::PushXform(xform));
+        self.xforms.push(xform);
+    }
+
+    /// Removes the innermost transform; does nothing on an empty stack.
+    pub fn pop_xform(&mut self) {
+        self.rec(|| Op::PopXform);
+        self.xforms.pop();
+    }
+
+    /// `x, y` through the stack, innermost first.
+    fn point(&self, x: f32, y: f32) -> (f32, f32) {
+        self.xforms
+            .iter()
+            .rev()
+            .fold((x, y), |(x, y), xf| xf.point(x, y))
+    }
+
+    /// The product of the stack's scales (1.0 when empty).
+    fn scale_k(&self) -> f32 {
+        self.xforms.iter().fold(1.0, |k, xf| k * xf.scale)
+    }
+
+    /// The product of the stack's alphas (1.0 when empty).
+    fn alpha_k(&self) -> f32 {
+        self.xforms.iter().fold(1.0, |a, xf| a * xf.alpha)
     }
 
     fn tr(&self, r: Rect) -> Rect {
-        self.xform.map_or(r, |x| x.rect(r))
+        match self.xforms.as_slice() {
+            [] => return r,
+            [only] => return only.rect(r),
+            _ => {}
+        }
+        let (x, y) = self.point(r.x, r.y);
+        let k = self.scale_k();
+        Rect::new(x, y, r.w * k, r.h * k)
+    }
+
+    /// `r` with the transform stack applied and no clip.
+    pub fn transformed(&self, r: Rect) -> Rect {
+        self.tr(r)
     }
 
     fn fade(&self, c: [f32; 4]) -> [f32; 4] {
-        let a = self.xform.map_or(1.0, |x| x.alpha);
+        let a = self.alpha_k();
         c.map(|v| v * a)
     }
 
@@ -187,11 +339,12 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
 
     /// Ask for the blurred scene inside `r` (drawn under this layer).
     pub fn backdrop(&mut self, r: Rect, radius: f32) {
-        let k = self.xform.map_or(1.0, |x| x.scale);
+        self.rec(|| Op::Backdrop(r, radius));
+        let k = self.scale_k();
         self.scene.backdrop = Some(BackdropRequest {
             rect: self.tr(r).phys(self.s),
             radius: radius * k * self.s,
-            alpha: self.xform.map_or(1.0, |x| x.alpha),
+            alpha: self.alpha_k(),
         });
     }
 
@@ -200,7 +353,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
     }
 
     fn shape(&self, r: Rect, radii: [f32; 4], color: [f32; 4]) -> Shape {
-        let k = self.xform.map_or(1.0, |x| x.scale);
+        let k = self.scale_k();
         Shape {
             rect: self.tr(r).phys(self.s),
             radii: radii.map(|v| v * self.s * k),
@@ -217,18 +370,21 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
     }
 
     pub fn fill_radii(&mut self, r: Rect, radii: [f32; 4], color: Rgba) {
+        self.rec(|| Op::FillRadii(r, radii, color));
         let sh = self.shape(r, radii, premul(color));
         self.geo().under.push(sh);
     }
 
     /// Fill above this layer's text (selection, cursor, overlays).
     pub fn fill_over(&mut self, r: Rect, radius: f32, color: [f32; 4]) {
+        self.rec(|| Op::FillOver(r, radius, color));
         let sh = self.shape(r, [radius; 4], color);
         self.geo().over.push(sh);
     }
 
     /// 1px-style outline inside `r`.
     pub fn ring(&mut self, r: Rect, radius: f32, width: f32, color: Rgba, above_text: bool) {
+        self.rec(|| Op::Ring(r, radius, width, color, above_text));
         let mut sh = self.shape(r, [radius; 4], premul(color));
         sh.params = [1.0, width * self.s, 0.0, 0.0];
         if above_text {
@@ -239,12 +395,20 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
     }
 
     /// Acrylic layer with Skia `Src` semantics: replaces what is below, `under` only feeds the
-    /// antialiased edge. Colours premultiplied.
+    /// antialiased edge. Colours premultiplied. The shape keeps `color` unfaded; the transform
+    /// stack's alpha travels as the record's `opacity`, which the renderer blends the layer in
+    /// with. Nothing is recorded when that opacity is not above zero.
     pub fn acrylic(&mut self, r: Rect, radius: f32, color: [f32; 4], under: [f32; 4], noise: bool) {
-        let mut sh = self.shape(r, [radius; 4], color);
-        sh.under = under;
-        sh.params = [0.0, 0.0, 1.0, if noise { 1.0 } else { 0.0 }];
-        self.geo().acrylic.push(sh);
+        self.rec(|| Op::Acrylic(r, radius, color, under, noise));
+        let opacity = self.alpha_k();
+        if opacity.is_nan() || opacity <= 0.0 {
+            return;
+        }
+        let mut shape = self.shape(r, [radius; 4], color);
+        shape.color = color;
+        shape.under = under;
+        shape.params = [0.0, 0.0, 1.0, if noise { 1.0 } else { 0.0 }];
+        self.geo().acrylic.push(Acrylic { shape, opacity });
     }
 
     /// Records an app-owned draw (the renderer's `CustomDraw` number `slot`) on the
@@ -252,6 +416,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
     /// that is empty. The clip is in physical px, left and top floored, right and bottom
     /// ceiled. The popup transform is ignored: custom items are not animated.
     pub fn custom(&mut self, slot: usize, r: Rect) {
+        self.rec(|| Op::Custom(slot, r));
         let mut area = r.intersect(&self.window);
         if let Some(c) = self.clip {
             area = area.intersect(&c);
@@ -272,20 +437,24 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
     }
 
     pub fn text(&mut self, spec: &Spec, x: f32, y: f32) -> (f32, f32) {
+        self.rec(|| Op::Text(spec.clone(), x, y));
         let size = self.text.prepare(spec, self.s).1;
-        let (key, scale) = match self.xform {
-            Some(xf) if xf.alpha < 0.999 => {
+        let (key, scale) = if self.xforms.is_empty() {
+            (self.text.prepare(spec, self.s).0, 1.0)
+        } else {
+            let (alpha, scale) = (self.alpha_k(), self.scale_k());
+            if alpha < 0.999 {
                 let mut faded = spec.clone();
                 for (_, style) in &mut faded.runs {
-                    style.color[3] = (f32::from(style.color[3]) * xf.alpha).round() as u8;
+                    style.color[3] = (f32::from(style.color[3]) * alpha).round() as u8;
                 }
-                (self.text.prepare(&faded, self.s).0, xf.scale)
+                (self.text.prepare(&faded, self.s).0, scale)
+            } else {
+                (self.text.prepare(spec, self.s).0, scale)
             }
-            Some(xf) => (self.text.prepare(spec, self.s).0, xf.scale),
-            None => (self.text.prepare(spec, self.s).0, 1.0),
         };
         let clip = self.tr(self.clip.unwrap_or(self.window));
-        let (x, y) = self.xform.map_or((x, y), |xf| xf.point(x, y));
+        let (x, y) = self.point(x, y);
         self.scene.layers[self.layer].texts.push(TextItem {
             key,
             x,
@@ -319,6 +488,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         };
         let r = self.tr(r);
         self.hits.push((r, h));
+        self.hit_meta.push((self.layer, self.hit_tag));
     }
 
     pub fn hovered(&self, h: H) -> bool {
@@ -327,23 +497,26 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
 
     /// Tessellates a polyline (logical px) into antialiased triangles (physical px).
     pub fn stroke(&mut self, pts: &[[f32; 2]], closed: bool, st: StrokeStyle) {
+        self.rec(|| Op::Stroke(pts.to_vec(), closed, st));
         let s = self.s;
         let clip = self.clip_phys();
-        let (pts, st) = match self.xform {
-            Some(xf) => (
+        let (pts, st) = if self.xforms.is_empty() {
+            (pts.to_vec(), st)
+        } else {
+            let (alpha, scale) = (self.alpha_k(), self.scale_k());
+            (
                 pts.iter()
                     .map(|q| {
-                        let (x, y) = xf.point(q[0], q[1]);
+                        let (x, y) = self.point(q[0], q[1]);
                         [x, y]
                     })
                     .collect::<Vec<_>>(),
                 StrokeStyle {
-                    color: st.color.map(|v| v * xf.alpha),
-                    width: st.width * xf.scale,
+                    color: st.color.map(|v| v * alpha),
+                    width: st.width * scale,
                     ..st
                 },
-            ),
-            None => (pts.to_vec(), st),
+            )
         };
         let pts = pts.as_slice();
         let mut p: Vec<[f32; 2]> = Vec::with_capacity(pts.len());
@@ -491,6 +664,21 @@ mod tests {
             p.custom(0, Rect::new(-50.0, 20.0, 30.0, 40.0));
             p.custom(0, Rect::new(10.0, 20.0, 0.0, 40.0));
             assert!(p.scene.layers.iter().all(|l| l.customs.is_empty()));
+        });
+    }
+
+    #[test]
+    fn hit_records_layer_and_tag_in_step_with_hits() {
+        with_painter(|p| {
+            p.hit(Rect::new(0.0, 0.0, 10.0, 10.0), 1);
+            p.set_hit_tag(7);
+            p.on(LayerId::Popup);
+            p.hit(Rect::new(0.0, 0.0, 10.0, 10.0), 2);
+            p.set_hit_tag(9);
+            p.on(LayerId::Modal);
+            p.hit(Rect::new(0.0, 0.0, 10.0, 10.0), 3);
+            assert_eq!(p.hits.len(), 3);
+            assert_eq!(p.hit_meta(), [(0, 0), (2, 7), (3, 9)]);
         });
     }
 

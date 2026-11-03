@@ -8,8 +8,12 @@ use crate::scene::{
 /// [`Scene::layers`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum DrawCall {
-    /// One acrylic shape (replace blend).
-    Acrylic { layer: usize, shape: Shape },
+    /// One acrylic shape, blended in at `opacity` (1.0 replaces what is below).
+    Acrylic {
+        layer: usize,
+        shape: Shape,
+        opacity: f32,
+    },
     /// One shape below the layer's text.
     Under { layer: usize, shape: Shape },
     /// One app-owned draw.
@@ -76,9 +80,10 @@ impl RecordingRenderer {
             let shapes = |v: &[Shape], f: fn(usize, Shape) -> DrawCall| {
                 v.iter().map(move |s| f(i, *s)).collect::<Vec<_>>()
             };
-            calls.extend(shapes(&g.acrylic, |layer, shape| DrawCall::Acrylic {
-                layer,
-                shape,
+            calls.extend(g.acrylic.iter().map(|a| DrawCall::Acrylic {
+                layer: i,
+                shape: a.shape,
+                opacity: a.opacity,
             }));
             calls.extend(shapes(&g.under, |layer, shape| DrawCall::Under {
                 layer,

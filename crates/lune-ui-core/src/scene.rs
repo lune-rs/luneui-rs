@@ -51,11 +51,20 @@ pub struct StrokeVertex {
     pub clip: [f32; 4],
 }
 
-/// One z-layer of the frame: acrylic (replace blend), shapes under text, text (drawn by the
-/// caller), then shapes and strokes over text.
+/// One acrylic layer. `shape.color` is the unfaded colour; `opacity` (0 to 1) is how much of the
+/// layer replaces what is below: the result is `opacity·layer + (1 − opacity)·below`, so 1.0 is a
+/// plain replace and a smaller value fades the layer in without punching a hole.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Acrylic {
+    pub shape: Shape,
+    pub opacity: f32,
+}
+
+/// One z-layer of the frame: acrylic (replace blend, or a constant blend when faded), shapes under
+/// text, text (drawn by the caller), then shapes and strokes over text.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct LayerGeometry {
-    pub acrylic: Vec<Shape>,
+    pub acrylic: Vec<Acrylic>,
     pub under: Vec<Shape>,
     pub over: Vec<Shape>,
     pub strokes: Vec<StrokeVertex>,
