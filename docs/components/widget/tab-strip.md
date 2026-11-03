@@ -174,4 +174,4 @@ The confirm and rename dialog texts, "Duplicate Tab" and "Copy Working Directory
 
 ## Notes for the planner
 
-Renamed from `luneterm.tab-strip` (D10, D42): the strip is generic, the terminal parts (progress from OSC 9;4, the working directory, the live-session check) are app data passed in. `core.tab-outline` stays the geometry.
+Renamed from the Luneterm-area tab-strip entry (D10, D42): the strip is generic, the terminal parts (progress from OSC 9;4, the working directory, the live-session check) are app data passed in. `core.tab-outline` stays the geometry.
