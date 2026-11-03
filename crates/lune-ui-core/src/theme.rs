@@ -5,8 +5,10 @@
 //! Lunegit's `DarkTheme.axaml` and `App.axaml`, plus its glass layers.
 
 use crate::color::Rgba;
+use crate::motion::MotionTokens;
 
-/// Colours (straight alpha), the font-size scale and the control radius that widgets read.
+/// Colours (straight alpha), the font-size scale, the control radius and the motion tokens that
+/// widgets read.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Theme {
     pub fg_primary: Rgba,
@@ -64,6 +66,8 @@ pub struct Theme {
     pub font_title: f32,
     pub line_title: f32,
     pub item_radius: f32,
+    /// Motion durations and the Reduced map (`docs/motion.md`).
+    pub motion: MotionTokens,
 }
 
 /// The dark preset's theme under a neutral name, for code and tests that need a theme but not a
@@ -128,6 +132,7 @@ pub mod lunegit_dark {
         font_title: 18.0,
         line_title: 24.0,
         item_radius: 6.0,
+        motion: crate::motion::MOTION,
     };
 
     pub const TINT: Rgba = [0, 0, 0, 255];
