@@ -199,6 +199,11 @@ fn resize_edges_map_to_the_same_named_direction() {
 
 #[test]
 fn every_cursor_icon_maps_to_the_same_named_winit_icon() {
+    for icon in C::ALL {
+        if icon != C::Default {
+            assert_ne!(cursor_icon(icon), WC::Default, "{icon:?}");
+        }
+    }
     let all = [
         (C::Default, WC::Default),
         (C::ContextMenu, WC::ContextMenu),
@@ -237,7 +242,7 @@ fn every_cursor_icon_maps_to_the_same_named_winit_icon() {
         (C::DndAsk, WC::DndAsk),
         (C::AllResize, WC::AllResize),
     ];
-    assert_eq!(all.len(), 36);
+    assert_eq!(all.len(), C::ALL.len());
     for (core, winit) in all {
         assert_eq!(cursor_icon(core), winit, "{core:?}");
     }

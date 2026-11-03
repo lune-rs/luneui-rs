@@ -36,9 +36,33 @@ pub struct Theme {
     /// Caption close button fill while hovered, and its glyph colour.
     pub caption_close_hover: Rgba,
     pub caption_close_fg: Rgba,
+    pub fg_muted: Rgba,
+    pub fg_bright: Rgba,
+    pub fg_quaternary: Rgba,
+    pub fg_dim: Rgba,
+    pub fg_faint: Rgba,
+    pub surface_overlay: Rgba,
+    pub surface_active: Rgba,
+    pub surface_separator: Rgba,
+    pub surface_divider: Rgba,
+    /// Status tones: a success, a warning and an error colour (badges, dots, verdict rows).
+    pub ok: Rgba,
+    pub warn: Rgba,
+    pub err: Rgba,
+    pub status_warning: Rgba,
+    pub status_warning_light: Rgba,
+    pub status_warning_dark: Rgba,
+    /// Data tone (chart series) and the text drawn on a data fill.
+    pub data: Rgba,
+    pub data_hi: Rgba,
+    pub gold: Rgba,
+    /// The neutral status dot.
+    pub paused: Rgba,
     pub font_s: f32,
     pub font_base: f32,
     pub font_m: f32,
+    pub font_title: f32,
+    pub line_title: f32,
     pub item_radius: f32,
 }
 
@@ -79,9 +103,30 @@ pub mod lunegit_dark {
         menu_glass: [44, 44, 44, 157],
         caption_close_hover: [0xC4, 0x2B, 0x1C, 0xFF],
         caption_close_fg: [0xFF, 0xFF, 0xFF, 0xFF],
+        fg_muted: [0xB0, 0xB0, 0xB0, 0xFF],
+        fg_bright: [0xFF, 0xFF, 0xFF, 0xDD],
+        fg_quaternary: [0xFF, 0xFF, 0xFF, 0x66],
+        fg_dim: [0xFF, 0xFF, 0xFF, 0x55],
+        fg_faint: [0xFF, 0xFF, 0xFF, 0x44],
+        surface_overlay: [0xFF, 0xFF, 0xFF, 0x15],
+        surface_active: [0xFF, 0xFF, 0xFF, 0x20],
+        surface_separator: [0xFF, 0xFF, 0xFF, 0x22],
+        surface_divider: [0xFF, 0xFF, 0xFF, 0x40],
+        ok: [0x73, 0xC9, 0x91, 0xFF],
+        warn: [0xE2, 0xB9, 0x3D, 0xFF],
+        err: [0xE0, 0x6C, 0x75, 0xFF],
+        status_warning: [0xFF, 0xC1, 0x07, 0xFF],
+        status_warning_light: [0xFF, 0xD6, 0x66, 0xFF],
+        status_warning_dark: [0x5D, 0x43, 0x00, 0xFF],
+        data: [0x5C, 0x8F, 0xE6, 0xFF],
+        data_hi: [0x8F, 0xBB, 0xFF, 0xFF],
+        gold: [0xE9, 0xC4, 0x6A, 0xFF],
+        paused: [0x8A, 0x90, 0x99, 0xFF],
         font_s: 11.0,
         font_base: 13.0,
         font_m: 14.0,
+        font_title: 18.0,
+        line_title: 24.0,
         item_radius: 6.0,
     };
 
@@ -115,4 +160,40 @@ pub mod lunegit_dark {
     pub const CARD_CORNER_RADIUS: f32 = 8.0;
     pub const TAB_HEADER_HEIGHT: f32 = 32.0;
     pub const BODY_PADDING: f32 = 10.0;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::lunegit_dark::THEME;
+
+    #[test]
+    fn the_status_and_surface_tokens_hold_their_values() {
+        let expected = [
+            (THEME.fg_muted, [0xB0, 0xB0, 0xB0, 0xFF]),
+            (THEME.fg_bright, [0xFF, 0xFF, 0xFF, 0xDD]),
+            (THEME.fg_quaternary, [0xFF, 0xFF, 0xFF, 0x66]),
+            (THEME.fg_dim, [0xFF, 0xFF, 0xFF, 0x55]),
+            (THEME.fg_faint, [0xFF, 0xFF, 0xFF, 0x44]),
+            (THEME.surface_overlay, [0xFF, 0xFF, 0xFF, 0x15]),
+            (THEME.surface_active, [0xFF, 0xFF, 0xFF, 0x20]),
+            (THEME.surface_separator, [0xFF, 0xFF, 0xFF, 0x22]),
+            (THEME.surface_divider, [0xFF, 0xFF, 0xFF, 0x40]),
+            (THEME.ok, [0x73, 0xC9, 0x91, 0xFF]),
+            (THEME.warn, [0xE2, 0xB9, 0x3D, 0xFF]),
+            (THEME.err, [0xE0, 0x6C, 0x75, 0xFF]),
+            (THEME.status_warning, [0xFF, 0xC1, 0x07, 0xFF]),
+            (THEME.status_warning_light, [0xFF, 0xD6, 0x66, 0xFF]),
+            (THEME.status_warning_dark, [0x5D, 0x43, 0x00, 0xFF]),
+            (THEME.data, [0x5C, 0x8F, 0xE6, 0xFF]),
+            (THEME.data_hi, [0x8F, 0xBB, 0xFF, 0xFF]),
+            (THEME.gold, [0xE9, 0xC4, 0x6A, 0xFF]),
+            (THEME.paused, [0x8A, 0x90, 0x99, 0xFF]),
+        ];
+        assert_eq!(expected.len(), 19);
+        for (got, want) in expected {
+            assert_eq!(got, want);
+        }
+        assert_eq!(THEME.font_title, 18.0);
+        assert_eq!(THEME.line_title, 24.0);
+    }
 }

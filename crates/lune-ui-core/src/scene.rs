@@ -2,7 +2,7 @@
 //! renderer consumes. Std only; the GPU records are mirrored field by field, in physical pixels.
 //!
 //! Draw-order contract, which every renderer follows:
-//! - layers back to front, `layers[0]` first;
+//! - layers back to front, `layers[0]` first, five of them (see [`LayerId`]);
 //! - inside a layer: the acrylic shapes, the under shapes, the custom items (in record order),
 //!   the text, the over shapes, the strokes;
 //! - layers below [`SCENE_LAYERS`] render into an offscreen scene, the one a backdrop blurs; that
@@ -19,9 +19,11 @@ pub enum LayerId {
     Page = 1,
     Popup = 2,
     Modal = 3,
+    /// Toasts: above modal dialogs, so a toast raised by a dialog stays visible.
+    Toast = 4,
 }
 
-pub const LAYER_COUNT: usize = 4;
+pub const LAYER_COUNT: usize = 5;
 
 /// Layers under popups go to an offscreen scene, so a glass menu can blur them.
 pub const SCENE_LAYERS: usize = 2;

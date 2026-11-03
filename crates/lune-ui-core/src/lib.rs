@@ -18,6 +18,8 @@
 //!   contract), `text` (specs and the `TextSystem` seam), `icon`, `widgets` (controls, menus,
 //!   dropdowns, dialogs), `chrome` (tab outline geometry);
 //! - `input` (the input seam: `RawInput` in, `FrameOutput` out, plain data);
+//! - `ui` (widget ids and, as they land, the per-window frame), `access` (the semantic tree and
+//!   accessibility actions), `motion` (the time type), `strings` (the string table);
 //! - `backdrop` (the material seam: `GlassLayer`, `BackdropKind`, `Material` and the `Backdrop`
 //!   capability);
 //! - `window` (edge resize, double click, caption buttons);
@@ -29,17 +31,21 @@
 
 #![forbid(unsafe_code)]
 
+pub mod access;
 pub mod acrylic;
 pub mod backdrop;
 pub mod chrome;
 pub mod color;
 pub mod icon;
 pub mod input;
+pub mod motion;
 pub mod paint;
 pub mod scene;
+pub mod strings;
 pub mod testing;
 pub mod text;
 pub mod theme;
+pub mod ui;
 pub mod widgets;
 pub mod window;
 
