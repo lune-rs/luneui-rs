@@ -25,7 +25,72 @@ Constants such as `ADD`, `GEAR`, `ELLIPSIS`, `CHROME_CLOSE`, `CHECK`, `CHROME_MI
 
 `crates/lune-ui-core/src/icon.rs:7-19` (constants), `:22` (`glyph`); 24 lines.
 
+## Spec
+
+### Evidence
+
+Pinned: Wane 69931d6, this repo fa2958b. Read: `crates/lune-ui-core/src/icon.rs:1-24` (Codicon constants and `glyph`); Wane `docs/ui/components.md:179-192`;
+`THIRD_PARTY_NOTICES.md:12-13,24` (Codicons CC BY 4.0; no Codicons font file bundled; glyphs from the app's font).
+Lunegit sizes: `src/Lunegit.Desktop/Themes/MenuResources.axaml:13-16` (14 px menu icon), `src/Lunegit.Desktop/Views/IconRailView.axaml:28` (20 px rail icon).
+Conflicts: none. Wane 12, 13, 14 and 16 px sizes are the mock's; the repo takes the size as an argument.
+
+### Anatomy
+
+- `glyph(glyph, size, color)` returns a `Spec` of one code point [R crates/lune-ui-core/src/icon.rs:22].
+- Codicon code points: 13 named constants, for example `ADD` [R crates/lune-ui-core/src/icon.rs:7] and `CHECK` [R crates/lune-ui-core/src/icon.rs:16].
+- Sizes in use: 16 box (`--icon-size`), 14 callout, 13 menu rows, 12 checkbox, combo chevron, dropdown check and table sort arrow [W docs/ui/components.md:179-192]; 14 px menu icon [L src/Lunegit.Desktop/Themes/MenuResources.axaml:13-16]; 12 px dropdown check [R crates/lune-ui-core/src/widgets/dropdown.rs:48].
+- Colour: `currentColor` in the mock, so the icon takes its parent's state [W docs/ui/components.md:179-192]; the repo passes the colour in `glyph`.
+
+### States
+
+| state | look | cite |
+|---|---|---|
+| any | the colour argument; the parent's state in the mock | [W docs/ui/components.md:179-192] |
+
+### Transitions
+
+n/a — an icon has no motion of its own; the owner's transition applies.
+
+### Input and focus
+
+n/a — decorative. An icon-only button carries the label, not the icon [W docs/ui/components.md:179-192].
+
+### Retained state
+
+n/a — stateless.
+
+### Accessibility
+
+- Decorative: hidden from assistive technology; the owning button's name carries the label [W docs/ui/components.md:179-192], [infra.accessibility].
+
+### Strings
+
+n/a — the code points are not strings for the reader; the names are the constants.
+
+### Gallery scenes
+
+- `controls` (existing): icons in the control set, scale 2 and 1. [R apps/gallery/src/scenes.rs:82-93]
+- `menu` (existing): menu item icons at 14 px. [R apps/gallery/src/scenes.rs:96-101]
+- `dropdown` (existing): the check glyph. [R apps/gallery/src/scenes.rs:117-122]
+
+### Painter primitives
+
+- Existing: icon (a glyph drawn through the text path). [R crates/lune-ui-core/src/icon.rs:22]
+- New: none.
+
+### Acceptance
+
+- Existing tests: none in `crates/lune-ui-core/src/icon.rs`.
+- Done standard still needs: each constant checked against the Codicons 0.0.45 table, and a pixel probe of the 16, 14, 13 and 12 px sizes.
+
+### Build
+
+- Milestone: M11 (done standard; code exists).
+- Depends on: core.painter, core.theme.
+
 ## Open questions
+
+- Icon source for Wane's SVG icons: bundle a Codicon font or draw the SVG paths with the painter (Wane native note, [W docs/ui/components.md:179-192]); open.
 
 - The Codicon font licence is not in this repo's plans yet; whether the toolkit bundles the font is open (R-ext-4).
 

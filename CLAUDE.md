@@ -84,7 +84,7 @@ Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, r
 9. Library API: `unreachable_pub`, `missing_debug_implementations` warn; `unwrap_used`, `dbg_macro`,
    `todo` warn (workspace lints in the root manifest).
 10. Every component has one catalogue file `docs/components/<area>/<id>.md` with front matter; the id
-    is an area-prefixed slug (`core.painter`, `lunegit.commit-graph`), no numeric counter. Nobody
+    is an area-prefixed slug (`core.painter`, `data.lane-graph`), no numeric counter. Nobody
     hand-edits `docs/components/INDEX.md`: a script generates it and the gate fails when it is stale
     (`scripts/gen-component-index.sh`; its `--check` is in the gate).
 

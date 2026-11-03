@@ -22,8 +22,73 @@ summary: Plain-data Scene the painter builds and a renderer consumes; the draw-o
 
 `crates/lune-ui-core/src/scene.rs:99` (`Scene`), `:31` (`Shape`), `:55` (`LayerGeometry`), `:74` (`CustomItem`), `:91` (`BackdropRequest`), `:107` (`FrameParams`); 116 lines. Consumers: `crates/lune-ui-wgpu/src/gpu.rs:340` (`upload`), `crates/lune-ui-core/src/testing/recording.rs:57` (the fake).
 
+## Spec
+
+### Evidence
+
+Pinned: this repo fa2958b. Read: `crates/lune-ui-core/src/scene.rs:17-116` (layer id, counts, shape, stroke, layer geometry, text and custom items, layer, backdrop request, scene, frame params);
+`crates/lune-ui-core/src/testing/recording.rs` (the draw-order test); `apps/gallery/src/scenes.rs:369` (the menu on `LayerId::Popup`), `:131-136` (dialogs on the Modal layer through the `dialog` widget, `crates/lune-ui-core/src/widgets/dialog.rs:50`).
+Conflicts: none.
+
+### Anatomy
+
+- Layers in draw order: `Base` 0, `Page` 1, `Popup` 2, `Modal` 3 [R crates/lune-ui-core/src/scene.rs:17-22].
+- `LAYER_COUNT` 4 [R crates/lune-ui-core/src/scene.rs:24].
+- `SCENE_LAYERS` 2: the layers under a popup draw to an offscreen scene so a glass menu can blur them [R crates/lune-ui-core/src/scene.rs:26-27].
+- Items per layer: `Shape` (31), `StrokeVertex` (43), `LayerGeometry` (55), `TextItem` (63), `CustomItem` (74), `Layer` (82), `BackdropRequest` (91), `Scene` (99), `FrameParams` (107) [R crates/lune-ui-core/src/scene.rs:31-107].
+
+### States
+
+| state | look | cite |
+|---|---|---|
+| layer on (Base, Page, Popup, Modal) | items land on the current layer | [R crates/lune-ui-core/src/paint.rs:162] |
+
+### Transitions
+
+n/a — the scene is rebuilt each frame; no motion.
+
+### Input and focus
+
+n/a — the scene holds no input; hit regions belong to the painter (`hit`).
+
+### Retained state
+
+- Transient: the scene is per frame; nothing survives a frame.
+- Persistent: none; the app passes the painter each frame.
+
+### Accessibility
+
+n/a — no UI node.
+
+### Strings
+
+n/a — text items carry strings from the caller.
+
+### Gallery scenes
+
+- `menu` (existing): the menu on `Popup`, scenes.rs:95-101,366-392.
+- `dialog-confirm` (existing): the dialog on `Modal`, scenes.rs:130-136,470-481.
+- `custom-draw` (existing): a custom item on its layer, scenes.rs:109-115.
+
+### Painter primitives
+
+- Existing: none.
+- Note: The painter writes into it.
+- New: none.
+
+### Acceptance
+
+- Existing test: `records_the_documented_draw_order` (`crates/lune-ui-core/src/testing/recording.rs`).
+- Done standard still needs: a test that items land on the layer set by `Painter::on` (the paint.rs test `custom_lands_on_the_current_layer`, `crates/lune-ui-core/src/paint.rs`, covers custom items only).
+
+### Build
+
+- Milestone: M11 (done standard; code exists).
+- Depends on: core.painter, render.frame.
+
 ## Open questions
 
+- A fifth layer `Toast` above `Modal` is added by M4 ([D54]): `LAYER_COUNT` becomes 5 and `SCENE_LAYERS` stays 2; no existing scene draws on it, so the pixel gate stays at zero delta.
 - A second renderer (a software one, say) is the real test of the data shape; none exists. No renderer trait on purpose (DECISIONS D25).
 
 ## Notes for the planner

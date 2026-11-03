@@ -17,14 +17,96 @@ summary: Plain-data RawInput in, FrameOutput out; the windowing adapter translat
 
 - A windowing-free input seam (R-nfr-8); the toolkit never reads a clock (R-nfr-1).
 - Cursor icons and window operations as data (R-platform-4, R-platform-5).
+- An accessibility action as input, routed like a pointer or key event (R-infra-4).
+- Inbound OS file-drop events (R-platform-5, D43).
 
 ## Existing code
 
 `crates/lune-ui-core/src/input.rs:16` (`RawInput`), `:32` (`Event`), `:156` (`FrameOutput`), `:169` (`WindowCommand`), `:185` (`CursorIcon`), `:227` (`printable`); 230 lines. The winit side is `platform.input`; the fake is `testing::ScriptedInput` (`core.testing`).
 
+## Spec
+
+### Evidence
+
+Pinned: Lunegit 33a1dd41, Wane 69931d6, this repo fa2958b. Read: `crates/lune-ui-core/src/input.rs` (all 230 lines),
+`crates/lune-ui-core/src/testing/input.rs:1-170`, `crates/lune-ui-winit/src/input.rs` (all), `crates/lune-ui-winit/tests/input.rs:95-130`;
+Lunegit src/Lunegit.Desktop/Views/Scratchpad/ScratchpadBoardView.axaml.cs:10-30, src/Lunegit.Desktop/MainWindow.axaml.cs:91-113;
+winit 0.30.13 `src/event.rs:178-192` in the local cargo registry (the file-drop events; not a pinned-repo source).
+Conflict: none. Neither Lunegit nor Wane uses OS file drop or touch: Lunegit's kanban deliberately avoids OS
+drag and drop for a pointer-capture gesture [L src/Lunegit.Desktop/Views/Scratchpad/ScratchpadBoardView.axaml.cs:18-24] and Wane mocks show none;
+inbound OS file-drop events are in the toolkit by scope decision D43 alone.
+
+### Anatomy
+
+Moved, today (`crates/lune-ui-core/src/input.rs`):
+- `RawInput { size, scale, time, focused, events }`: logical size, device pixels per logical pixel, app-supplied time as a `Duration`, window focus, events in arrival order [R crates/lune-ui-core/src/input.rs:16-27].
+- `Event` (`#[non_exhaustive]`): `PointerMoved`, `PointerLeft`, `PointerButton { pos, button, pressed, modifiers }`, `Scroll { pos, delta, modifiers }`, `Key { key, pressed, repeat, modifiers }`, `Text`, `Ime`, `Focus`, `ModifiersChanged` [R crates/lune-ui-core/src/input.rs:29-65].
+- `PointerButton` (primary, secondary, middle, back, forward, other) and `ScrollDelta::{Lines, Pixels}` (lines for a notched wheel, logical pixels for a touchpad) [R crates/lune-ui-core/src/input.rs:67-85].
+- `Key::{Named, Character, Unidentified}`; `NamedKey` (`#[non_exhaustive]`) holds Enter, Tab, Space, Backspace, Delete, Insert, Escape, Home, End, PageUp, PageDown, the arrows and F1 to F12 [R crates/lune-ui-core/src/input.rs:87-128].
+- `Modifiers { shift, control, alt, logo }`; `ImeEvent::{Enabled, Preedit { text, cursor }, Commit, Disabled}` with byte offsets as the platform gives them [R crates/lune-ui-core/src/input.rs:130-152], [D35].
+- `FrameOutput { cursor, ime_area, commands }`; `WindowCommand` (`#[non_exhaustive]`: drag move, drag resize, minimize, toggle maximize, close, redraw); `CursorIcon` (the CSS names, `#[non_exhaustive]`); `printable` is the one rule for when a key press also emits `Text` [R crates/lune-ui-core/src/input.rs:154-230].
+
+Additions (new variants on the `#[non_exhaustive]` enums, so no break) [D35]:
+- M4: `Event::Access(AccessAction { target: WidgetId, action, value })`, routed by the `Ui` as the matching pointer or key input [infra.accessibility]. `FrameOutput` gains `repaint`, the semantic `tree`, `focused` and `clipboard` requests (the shapes are in [core.ui] and [platform.clipboard]); the existing three fields keep their types [R crates/lune-ui-core/src/input.rs:155-164].
+- M10: file-drop events `Event::FileHover { pos, path }`, `Event::FileHoverCancelled` and `Event::FileDrop { pos, path }` (one event per file; `pos` is the last pointer position, because winit's events carry none) [D43], [derived: winit 0.30.13 `WindowEvent::HoveredFile(PathBuf)`, `HoveredFileCancelled`, `DroppedFile(PathBuf)` at `src/event.rs:180-192` in the cargo registry].
+- M10: touch and gesture events stay out of v1 (no source needs them) [D35].
+- Clipboard text arriving from the OS is an event the clipboard entry defines; `core.input` reserves the variant in M4, with the `clipboard` field of `FrameOutput` [platform.clipboard].
+- Coordinates stay logical (physical divided by scale) and time stays app-supplied: the toolkit reads no clock [R crates/lune-ui-core/src/input.rs:5-6], [D3].
+
+### States
+
+n/a — plain data, not a component.
+
+### Transitions
+
+n/a — no animation.
+
+### Input and focus
+
+- Consumers: the `Ui` frame (`core.ui`) reads pointer, scroll, key, text, IME and focus events in order; `Event::Focus` and `RawInput.focused` are the window's focus, not a widget's [core.ui], [core.focus].
+- Layer: n/a. Tab stop: n/a.
+- A key press that types text is followed by a `Text` event; both are delivered, and the focused text widget takes `Text`, while shortcuts see `Key` [R crates/lune-ui-core/src/input.rs:57-60], [infra.shortcut-routing].
+- Escape, Enter, Tab and the arrows are the keys Lunegit's own handlers use beyond letters (Escape closes a dialog, Up, Down and Enter drive a search list) and all exist as `NamedKey` [L src/Lunegit.Desktop/MainWindow.axaml.cs:93-97], [L src/Lunegit.Desktop/Views/Dialogs/GlobalSearchDialogView.axaml.cs:23-40], [R crates/lune-ui-core/src/input.rs:100-115].
+
+### Retained state
+
+- Transient: none (plain data; the adapter's `Translator` holds the pointer, modifiers and focus between frames, see `platform.input`).
+- Persistent: none. App-owned: `time`, `size`, `scale`, the events.
+- Exit retention: no.
+
+### Accessibility
+
+`AccessAction` is the one accessibility input; its fields and routing are in [infra.accessibility].
+
+### Strings
+
+None: no user-visible text.
+
+### Gallery scenes
+
+No scene exercises `RawInput` today: the gallery passes hover directly to each scene [R apps/gallery/src/scenes.rs:90-94]. From M4 the gallery pages are driven by a scripted `RawInput`, so every existing scene (`controls`, `menu`, `dropdown`, `dialog-confirm`) exercises it; no new scene id is needed.
+
+### Painter primitives
+
+n/a — no drawing.
+
+### Acceptance
+
+- Existing tests: `crates/lune-ui-winit/tests/input.rs` (`translator_and_scripted_input_agree`, `state_persists_and_events_drain`, `unmapped_keys_are_unidentified`, `other_mouse_button_keeps_its_number`, `every_cursor_icon_maps_to_the_same_named_winit_icon`); core has no inline test for `input.rs` and `printable` is covered through them.
+- The done standard still needs: a unit test of `printable` (control characters dropped, empty gives `None`); an `Access` event round trip through `ScriptedInput`; file-drop events through `ScriptedInput` and the translator (M10); a match over each `#[non_exhaustive]` enum in a downstream test compiles with a wildcard arm.
+- `ScriptedInput` gains `access(...)` and `file_drop(...)` builders (M4, M10); `Translator` and `ScriptedInput` agree on the new events in the same test style [R crates/lune-ui-core/src/testing/input.rs:16-30,161].
+- No clock read: the boundary script stays green; `RawInput.time` is the only time [R crates/lune-ui-core/src/input.rs:5-6].
+
+### Build
+
+- Milestone: M4 (`Access`, the `FrameOutput` additions) and M10 (file-drop events).
+- Depends on: core.ui, infra.accessibility, platform.clipboard.
+
 ## Open questions
 
-- Touch and gestures (M10) and clipboard, file drop and theme events (M5) extend the `#[non_exhaustive]` enums. Whether IME offsets stay winit's byte offsets is for M5 (DECISIONS D35).
+- Lines per notch: `ScrollDelta::Lines` gives lines and nothing converts them to logical pixels; no source states a value. `layout.scroll-area` (M5) decides it.
+- IME offsets stay winit's byte offsets (D35); whether `text.ime` converts them to char offsets at the seam is M5's call.
+- NamedKey gaps: no ContextMenu, CapsLock or keypad keys; nothing in Lunegit's or Wane's specs needs one in the toolkit (the terminal's own keys stay in the terminal app, D8).
 
 ## Notes for the planner
 

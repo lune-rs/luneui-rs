@@ -3,10 +3,12 @@
 What luneui-rs must provide. Each requirement has an id `R-<area>-<n>` that component files in
 `docs/components/` cite in their Needs section. Tags: **[existing]** the code exists today in
 Luneterm's `crates/lune-ui` (from its module inventory, 2026-11-03); **[new]** no code anywhere;
-**[open]** the requirement is real but its shape is not decided or not verified.
+**[open]** reserved for a requirement whose shape is not decided; no item has been open since M3
+(2026-11-04), when each was resolved to `[new]` or `[existing]` with the catalogue entries and
+DECISIONS rows it rests on.
 
-Nothing here is a design. Numbers are given only where Luneterm states one; the rest is "TBD by
-planner".
+Nothing here is a design: the designs are the component specs in `docs/components/` and the motion
+standard in `docs/motion.md`. Numbers appear where a source states one.
 
 ## Consumers
 
@@ -35,6 +37,13 @@ planner".
 - R-core-5 [existing] Avalonia acrylic colour math with tests (`acrylic.rs`).
 - R-core-6 [existing] Codicon glyph constants; the app supplies the icon font (`icon.rs`).
 - R-core-7 [existing] Tab-outline loop geometry (`chrome.rs`).
+- R-core-8 [new] The `Ui` frame context: widget ids from app keys under a parent scope, transient
+  and persistent retained state with keep-alive and exit retention, layered hit testing with modal
+  capture, `Response`, `Repaint`, the string table and the semantic tree (`core.ui`, `core.focus`,
+  D46).
+- R-core-9 [new] Image drawing: a painter primitive that draws an app-supplied bitmap (`core.image`).
+- R-core-10 [new] Painter primitives beyond today's fill, ring, stroke, acrylic, text, clip and
+  transform: the set each catalogue spec lists, aggregated in `core.painter`.
 
 ### Text
 
@@ -43,10 +52,12 @@ planner".
 - R-text-2 [existing] Shaped-text cache keyed by content, with a scale setting (`text.rs`).
 - R-text-3 [new] Multi-line text view and editor with syntax highlighting, for code, diffs and
   Markdown (Lunegit uses AvaloniaEdit + TextMate and Markdig).
-- R-text-4 [open] IME composition input. Not covered by today's `lune-ui` (no module for it in the
-  inventory); Luneterm M9 lists IME among its scope items.
-- R-text-5 [open] Text selection, caret movement and clipboard in text fields. The existing `field`
-  draws a placeholder and a caret when focused; selection behaviour is unverified.
+- R-text-4 [new] IME composition input: preedit text, its cursor range and the candidate-window
+  area, routed into text fields and editors. Not in today's `lune-ui`; Luneterm M9 lists IME among
+  its scope items. Resolved: `text.ime` (M5) and the input events in `core.input` (D35).
+- R-text-5 [new] Text selection, caret movement, undo and redo, and clipboard in text fields. The
+  existing `field` draws a placeholder and a caret when focused and has no selection. Resolved:
+  `text.text-edit` (M5), with the clipboard through `platform.clipboard` (M10).
 
 ### Render
 
@@ -69,22 +80,33 @@ planner".
   app falls back to an opaque theme (`material/other.rs`).
 - R-platform-4 [existing] Glass window attributes, edge resize hit test, double-click detection and
   caption button geometry for a custom caption (`window.rs`).
-- R-platform-5 [open] OS clipboard, cursor icons, file dialogs and drag-and-drop between windows.
-  None is in the inventory; whether the toolkit owns them or the app does is undecided.
-- R-platform-6 [new] System tray / menu-bar status item with a status dot, its click flyout and menu,
-  close-to-tray, single instance, autostart at sign-in and OS notifications (Wane).
+- R-platform-5 [new] Narrowed by D43. In the toolkit: the OS clipboard (`platform.clipboard`, M10),
+  cursor icons (`core.input`, `platform.input`; the cursor output exists) and inbound OS file-drop
+  events (`core.input`, `platform.input`, M10). App-side or out of v1: native file dialogs, outbound
+  OS drag and drag between windows (Lunegit has no use). In-window drag and drop is R-infra-5.
+- R-platform-6 [new] Narrowed by D43 and D48. In the toolkit: the system tray or menu-bar status item
+  with a status dot (`platform.tray-icon`), and its glass flyout (`overlay.flyout`) and glass menu
+  (`overlay.menu`) in tray-anchored popover windows. App-side, documented: the close-to-tray policy,
+  single instance, autostart at sign-in and OS notifications (Wane lists them,
+  `docs/ui/components.md:702-717`).
 
 ### Widgets
 
 - R-widget-1 [existing] Label, toggle, combo, stepper, text field, button and checkbox, drawn through
   the painter and generic over the app's hit type (`widgets/mod.rs`).
-- R-widget-2 [new] The controls Lunegit uses that the toolkit lacks: scrollbar, tooltip, star rating,
-  tab control, slider and others found by the planner (Lunegit styles several kinds; which exist as
-  controls was not verified).
-- R-widget-3 [open] Keyboard focus order and key handling inside widgets. Not in the inventory.
+- R-widget-2 [new] The controls Lunegit uses that the toolkit lacks: scrollbar (`widget.scrollbar`),
+  tooltip (`overlay.tooltip`), star rating (`widget.star-rating`), tab control (`widget.tab-strip`),
+  and the other Lunegit controls in the catalogue (`widget.filter-bar`, `widget.search-picker`,
+  `widget.list-row-badge`, `widget.banner-empty-state`, `widget.toolbar`). Resolved by the M3
+  specs; D42 maps the app-shaped ones.
+- R-widget-3 [new] Keyboard focus order, focus-visible and key handling inside widgets: Tab order
+  follows call order within a focus scope, overlays push and pop scopes. Not in today's `lune-ui`.
+  Resolved: `core.focus` (M4) and the focus rules in `core.ui`.
 - R-widget-4 [new] The controls Wane uses that the toolkit lacks: radio group, status dot, navigation
   item, badge, form field (label, control, hint), setting and item rows, callout, wizard steps,
   verdict row.
+- R-widget-5 [new] Controls with no Lunegit look: slider (`widget.slider`) and spinner
+  (`widget.spinner`), their looks derived from sibling tokens (D51).
 
 ### Overlays
 
@@ -92,6 +114,9 @@ planner".
   bottom) and glass context menu (`widgets/`).
 - R-overlay-2 [new] Toasts, with a history list (Lunegit has both).
 - R-overlay-3 [new] Tooltips and flyouts.
+- R-overlay-4 [new] Anchored popover placement and dismiss: an anchor rect placed with flip and shift
+  inside the window, dismissed on outside click, Escape and focus loss, opening and closing with
+  motion tokens (`overlay.popover`).
 
 ### Layout and data views
 
@@ -101,17 +126,24 @@ planner".
 - R-layout-3 [new] Virtualized lists and tree views with tree guide lines, for long lists (Lunegit
   uses virtualizing panels in several views).
 - R-data-1 [new] Domain views Lunegit draws itself: commit graph rows, diff views (unified and
-  split) with hunk actions and conflict strips, pie chart, kanban board with drag-and-drop. Whether
-  these are toolkit components or app code is for the planner.
+  split) with hunk actions and conflict strips, pie chart, kanban board with drag-and-drop.
+  Resolved by D42: toolkit components `data.lane-graph`, `text.diff-view`, `data.pie-chart` and
+  `data.kanban-board`; the conflict strip is external to the toolkit (its line bands and synced
+  scroll fold into `text.code-editor-view`).
 - R-data-2 [new] Dashboard data views Wane uses: data table, stat cell strip, key-value list, progress
-  bar and stacked bar chart. Whether the chart is a toolkit component or app drawing is for the planner.
+  bar and stacked bar chart. Resolved: all five are toolkit components (`data.table`, `data.stat`,
+  `data.kv-list`, `data.progress`, `data.bar-chart`).
 
 ### Motion
 
 - R-motion-1 [existing] Cubic-bezier easing and menu open and close motion; the app passes the time
   in (`widgets/menu.rs`).
 - R-motion-2 [new] General transitions and animation tiers, including a reduced-motion tier (Lunegit
-  has `Animations.axaml` and `AnimationsReduced.axaml`).
+  has `Animations.axaml` and `AnimationsReduced.axaml`): `motion.transitions` and
+  `motion.animation-tiers`, with the vocabulary in `docs/motion.md`.
+- R-motion-3 [new] The motion system and the 60 fps contract: closed-form values of the app's time, a
+  60 Hz conformance harness for every transition, a bench budget at milestone acceptance and Idle
+  when settled (D41).
 
 ### Infrastructure
 
@@ -121,10 +153,13 @@ planner".
   not located.
 - R-infra-3 [new] Theme values loadable from JSON and re-appliable at run time (Lunegit's
   `ThemeApplicator` and sample themes).
-- R-infra-4 [open] Accessibility (screen readers, focus indication, contrast). Not covered by
-  today's `lune-ui`.
+- R-infra-4 [new] Accessibility (screen readers, focus indication, contrast). Not covered by
+  today's `lune-ui`. Resolved by D46: a semantic tree every frame from M4 (`infra.accessibility`,
+  with focus indication in `core.focus`) and an AccessKit bridge behind a cargo feature in M10.
 - R-infra-5 [new] In-window drag and drop (pointer capture and drag state) for tab reorder, kanban
   cards and the split diff in Lunegit. OS-level drag and drop is R-platform-5.
+- R-infra-6 [new] A small bounded JSON reader in core (input size, depth and string-length limits,
+  fail-closed errors, no panics) behind theme and locale loading (`infra.json`, D44).
 
 ## Non-functional
 
@@ -138,13 +173,16 @@ planner".
 - R-nfr-3 [existing] `unsafe` only in platform modules, each block with a `// SAFETY:` comment
   (boundary rule 6, `CLAUDE.md` hard rule 3). Luneterm's three blocks are in `material/macos.rs`.
 - R-nfr-4 [existing] Size: the release profile is LTO, one codegen unit, abort on panic, stripped;
-  adding a dependency means measuring the release binary and noting the change. No numeric budget:
-  TBD by planner.
-- R-nfr-5 [open] Performance targets. The only number Luneterm states that touches this layer is
-  the running-outline CPU budget of at most 3 percentage points (Luneterm `docs/lunegit-bug-ledger.md`
-  row 16, roadmap M11); it is unmeasured. Frame-time and memory targets: TBD by planner.
-- R-nfr-6 [open] HiDPI: the text cache has a scale setting and Luneterm's dump scenes carry a scale;
-  the full scale contract (fractional scales, per-monitor change) is TBD by planner.
+  adding a dependency means measuring the release binary and noting the change. No numeric budget
+  in v1: each dependency commit carries a size note (hard rule 5), and M11 reports the release size.
+- R-nfr-5 [new] Performance targets, decided by D41: every transition passes the 60 Hz conformance
+  harness, a bench budget (p99 frame time at most 16.6 ms, no frame over 33 ms after warm-up) holds on
+  every gallery page at milestone acceptance, and a settled page reports Idle. No memory target in
+  v1. The running-outline CPU budget of at most 3 percentage points (Luneterm
+  `docs/lunegit-bug-ledger.md` row 16, roadmap M11) stays Luneterm's.
+- R-nfr-6 [new] HiDPI: scale is a per-window, per-frame input and any positive scale works (the text
+  cache already takes the scale per call, D27). Proven at scale 1 and 2 by M2's two-target test;
+  fractional scales get a 1.5x gallery scene in M11 coverage.
 - R-nfr-7 [existing] Platforms: macOS and Windows get glass, Linux gets an opaque fallback
   (Luneterm decision 3). CI on all three OSes is not set up here yet (STATE.md).
 - R-nfr-8 [new] Testability: each seam (text shaping, GPU, glass, windowing) gets a contract test
@@ -156,9 +194,10 @@ planner".
   seams follow as separate gated steps.
 - R-ext-2 [new] Pixel gate: the 18 scripted scenes of Luneterm's `glass-ui` spike, dumped before and
   after, compare at zero delta with its `dump_compare` tool, until a change is deliberate and
-  re-baselined with its reason. The baseline form is undecided (STATE.md).
+  re-baselined with its reason. The baseline form is decided: dumps are regenerated from
+  `git archive <base>`, not committed (D11).
 - R-ext-3 [new] Luneterm switches from its in-tree `lune-ui` to this repo's. How it depends on it
-  before a remote exists is undecided and blocks Luneterm M9.
+  before a remote exists is a vendored snapshot (D13); a git dependency follows once a remote exists.
 - R-ext-4 [new] Every bundled asset or code has its licence text in `licenses/` and a row in
   `THIRD_PARTY_NOTICES.md`: the Avalonia noise texture and colour formulas, any font the toolkit
   ships, any shader taken from elsewhere. The repo has neither file yet.
@@ -170,3 +209,7 @@ planner".
 - The terminal grid and its renderer (`lune-termview`), the VT engine, PTY handling: Luneterm.
 - Git logic, repository state, AI-session features: Lunegit.
 - A web or CSS engine: styles are Rust tokens.
+- App-side, documented for apps (D43): native file dialogs, OS notifications, single instance,
+  autostart, the close-to-tray policy, opening URLs (a link widget emits an event), and RTL
+  mirroring.
+- Outbound OS drag and drag between windows: Lunegit has no use for them (D43).

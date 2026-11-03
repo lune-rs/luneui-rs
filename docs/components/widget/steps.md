@@ -6,28 +6,92 @@ status: planned
 consumers: wane
 source: —
 owner: —
-summary: Numbered step list with done, current and upcoming states (first run)
+summary: Wizard steps: four 32 px rows in the sidebar slot with upcoming, current and done states; not clickable
 ---
 
 ## What it is
 
-Numbered step list with done, current and upcoming states (first run). Named by Wane's UI mocks (2026-11-04); the look is Lunegit's dark glass. Behaviour: Not clickable: Back and Continue move through the steps. Lives in the sidebar slot.
+`steps`: wizard step list in the sidebar slot, on the same rows as the nav list. Upcoming, current and done states. Not clickable: Back and Continue move through the steps [W docs/ui/components.md:505-507].
 
 ## Needs
 
-- Wane — Variants: none; four steps in the mocks (R-widget-4)
-- Wane — States: upcoming (tertiary, ring number); current (`--surface-selected`, bright, 500); done (accent circle with a 12 px check, secondary text). (R-widget-4)
-- Wane — Sizes: Rows 32, radius 6, 2 apart, padding 0 8, gap 8; number circle 20 (1 px `--border`, 11 Medium); label 13 in a 148 px column that never wraps (a long label is shortened). (R-widget-4)
-- Wane — Behaviour: Not clickable: Back and Continue move through the steps. Lives in the sidebar slot. (R-widget-4)
+- Wane controls the toolkit lacks (R-widget-4).
 
 ## Existing code
 
-None in luneui-rs or Luneterm's `lune-ui` (Wane: missing). Design source (not code to move): Wane `docs/ui/mocks/css/components.css` (widget.steps), the same row language as `widget.nav-item`.
+None in luneui-rs or Luneterm's `lune-ui` [W docs/ui/components.md:510]. Wane is the only source for this entry.
+
+## Spec
+
+### Evidence
+
+Pinned: Lunegit 33a1dd41, Wane 69931d6, this repo fa2958b. Read: `docs/ui/components.md:501-513,695`; `docs/ui/mocks/css/tokens.css:14,16,23,27,40,43`.
+No conflict: one source. The row language is `widget.nav-item` [W docs/ui/components.md:509].
+
+### Anatomy
+
+- Rows 32 high, radius 6, 2 apart; padding 0 8; gap 8 [W docs/ui/components.md:506].
+- Number circle 20 px with a 1 px `--border` ring; number 11 Medium [W docs/ui/components.md:506], [W docs/ui/mocks/css/tokens.css:27].
+- Label 13 in a 148 px column that never wraps; a long label is shortened [W docs/ui/components.md:506,695].
+- Lead line 13/20 tertiary, 12 px below the first row [W docs/ui/components.md:695].
+
+### States
+
+| state | look | cite |
+|---|---|---|
+| upcoming | tertiary label; ring number | [W docs/ui/components.md:505], [W docs/ui/mocks/css/tokens.css:14] |
+| current | fill `surface_selected`; `fg_bright` label ([D58]), weight 500 | [W docs/ui/components.md:505], [W docs/ui/mocks/css/tokens.css:16,23] |
+| done | accent circle with a 12 px check in `on_accent`; secondary label | [W docs/ui/components.md:505], [W docs/ui/mocks/css/tokens.css:40,43] |
+
+Not interactive, so no hover, press, focus or disabled look [W docs/ui/components.md:507].
+
+### Transitions
+
+n/a — Wane specifies no motion for the step rows [W docs/ui/components.md:505-507]; state changes come from the owner's Back and Continue.
+
+### Input and focus
+
+n/a — not clickable [W docs/ui/components.md:507]. Back and Continue are the owner's buttons (`widget.button`).
+
+### Retained state
+
+- Transient: none.
+- Persistent: none.
+- App-owned: the current step index and each step's label (passed every frame) [W docs/ui/components.md:507].
+- Exit retention: no.
+
+### Accessibility
+
+- Role `navigation` (Wane's steps list is a labelled navigation landmark [W docs/ui/mocks/js/shell.js:117], [D55]) wrapping a `list` of `list-item`s; the current row is state `selected` and `current`; name = the step label; `done` has no state in the vocabulary, see Open questions [infra.accessibility].
+
+### Strings
+
+None: step labels are app data.
+
+### Gallery scenes
+
+- `steps-states`: four rows, one each upcoming, current and done, settled.
+
+### Painter primitives
+
+- Existing: fill, ring, icon, text
+- New: none
+
+### Acceptance
+
+- Pixel probes at scale 2: row 64 px high; number circle 40 px; label column 296 px and never wraps.
+- Conformance: n/a — no transition.
+- Semantic node: role navigation over a list; the current item is selected and current; a long label is shortened, not wrapped.
+
+### Build
+
+- Milestone: M6
+- Depends on: widget.nav-item, core.painter, text.shaping
 
 ## Open questions
 
-- Whether this is a toolkit component or app code composed from the painter: the planner decides (Wane needs it either way).
+- `role-gap`: the done state needs a semantic state (for example `checked`) that the vocabulary lacks; M6 picks a state from the list or extends the list.
 
 ## Notes for the planner
 
-Wane priority P2 (P0 = needed by Overview, Requests or Settings). Full spec: Wane `docs/ui/components.md`, section `widget.steps`; mock: Wane `docs/ui/mocks/components.html`. Screens using it: components, first-run.
+Wane P2 in the mocks. Lives in the sidebar slot, so the sidebar owner places it.
