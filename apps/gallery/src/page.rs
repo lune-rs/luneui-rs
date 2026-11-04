@@ -16,6 +16,7 @@ use lune_ui::input::{
 use lune_ui::lunegit_dark::THEME;
 use lune_ui::motion::MotionTier;
 use lune_ui::scene::Scene;
+use lune_ui::shortcuts::Shortcuts;
 use lune_ui::strings::{DisplayFormat, StringTable};
 use lune_ui::testing::ScriptedInput;
 use lune_ui::text::TextSystem;
@@ -156,6 +157,7 @@ pub(crate) struct Player {
     theme: Theme,
     /// The modifiers `Ev::Mods` holds.
     held: Modifiers,
+    shortcuts: Shortcuts,
 }
 
 impl std::fmt::Debug for Player {
@@ -188,6 +190,7 @@ impl Player {
             tier,
             theme: THEME,
             held: Modifiers::default(),
+            shortcuts: Shortcuts::default(),
         }
     }
 
@@ -325,6 +328,7 @@ impl Player {
             arg_format: &DisplayFormat,
             // Scripted scenes run the same on every host.
             keymap: Keymap::MAC,
+            shortcuts: &self.shortcuts,
         };
         let mut ui = Ui::begin(&mut self.store, &raw, config, text);
         let page = self.page;

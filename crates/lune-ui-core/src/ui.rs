@@ -39,6 +39,7 @@ use crate::input::{
 use crate::motion::{MotionTier, Time};
 use crate::paint::{Painter, Rect, Xform};
 use crate::scene::Scene;
+use crate::shortcuts::{CommandId, Scope, Shortcuts};
 use crate::strings::{ArgFormat, StringTable};
 use crate::text::TextSystem;
 use crate::theme::Theme;
@@ -60,6 +61,8 @@ pub struct FrameConfig<'a> {
     pub arg_format: &'a dyn ArgFormat,
     /// The platform's keyboard conventions (the app reads the OS, not the toolkit).
     pub keymap: Keymap,
+    /// The shortcut table, read at begin (preempt) and at finish (bubble).
+    pub shortcuts: &'a Shortcuts,
 }
 
 impl std::fmt::Debug for FrameConfig<'_> {
@@ -69,6 +72,7 @@ impl std::fmt::Debug for FrameConfig<'_> {
             .field("tier", &self.tier)
             .field("strings", &self.strings)
             .field("keymap", &self.keymap)
+            .field("shortcuts", &self.shortcuts)
             .finish_non_exhaustive()
     }
 }
@@ -124,6 +128,13 @@ pub struct Ui<'a> {
     clipboard_read: bool,
     cursor: CursorIcon,
     ime_area: Option<Rect>,
+    /// Shortcut commands fired so far, in order.
+    fired: Vec<CommandId>,
+    /// The top overlay that takes input at begin: the preempt phase's overlay scope.
+    preempt_overlay: Option<WidgetId>,
+    /// Where `Scope::Within` paths start: the id scopes open when the current overlay's content
+    /// began (0 on the page).
+    scope_floor: usize,
     /// Dismiss requests found at begin, handed out by `overlay`.
     dismissed: BTreeMap<WidgetId, Dismissal>,
     /// Overlays pushed or reopened this frame.
@@ -241,6 +252,10 @@ impl<'a> Ui<'a> {
         let mut acted = false;
         // The modifiers of the key press that came immediately before the current event.
         let mut last_key: Option<Modifiers> = None;
+        let mut fired: Vec<CommandId> = Vec::new();
+        // The previous event was a key press a preempt shortcut took: its text is dropped too.
+        let mut fired_press = false;
+        let top_input = active.iter().rev().find(|o| o.takes_input).map(|o| o.id);
 
         if let Some(id) = store.focus.pending.take() {
             store.focus.focused = Some(id);
@@ -258,6 +273,7 @@ impl<'a> Ui<'a> {
             };
             for ev in &input.events {
                 let after_key = last_key.take();
+                let after_fired = std::mem::take(&mut fired_press);
                 match ev {
                     Event::PointerMoved { pos } => store.pointer.moved(*pos, &cx, &mut pointer),
                     Event::PointerLeft => store.pointer.left(),
@@ -326,6 +342,33 @@ impl<'a> Ui<'a> {
                         // While the focused widget composes, Escape and Tab belong to the IME.
                         let composing = store.focus.composing.is_some()
                             && store.focus.composing == store.focus.focused;
+                        // Preempt: the top overlay's and the global bindings see it first.
+                        if !composing {
+                            let hit = [
+                                Scope::Overlay(top_input.unwrap_or(WidgetId::ROOT)),
+                                Scope::Global,
+                            ]
+                            .into_iter()
+                            .enumerate()
+                            .find_map(|(i, scope)| {
+                                if i == 0 && top_input.is_none() {
+                                    return None;
+                                }
+                                config.shortcuts.find(
+                                    key,
+                                    *modifiers,
+                                    *repeat,
+                                    &config.keymap,
+                                    |b| b.preempt && b.scope == scope,
+                                )
+                            });
+                            if let Some(b) = hit {
+                                fired.push(b.command.clone());
+                                acted = true;
+                                fired_press = true;
+                                continue;
+                            }
+                        }
                         match key {
                             Key::Named(NamedKey::Escape)
                                 if !composing
@@ -367,7 +410,8 @@ impl<'a> Ui<'a> {
                     // A Command or Control chord (not AltGr, which reports Control and Alt) types
                     // nothing: platforms attach the character to the press.
                     Event::Text(t)
-                        if !after_key.is_some_and(|m| m.logo || (m.control && !m.alt)) =>
+                        if !after_fired
+                            && !after_key.is_some_and(|m| m.logo || (m.control && !m.alt)) =>
                     {
                         keys.push(KeyPress::real(FocusEvent::Text(t.clone())));
                     }
@@ -448,6 +492,9 @@ impl<'a> Ui<'a> {
             clipboard_read: false,
             cursor: CursorIcon::Default,
             ime_area: None,
+            fired,
+            preempt_overlay: top_input,
+            scope_floor: 0,
             dismissed,
             opened: Vec::new(),
             keys,
@@ -478,6 +525,9 @@ impl<'a> Ui<'a> {
             clipboard_read,
             cursor,
             ime_area,
+            mut fired,
+            preempt_overlay,
+            mut keys,
             mut tree,
             node_meta,
             pointer,
@@ -499,6 +549,38 @@ impl<'a> Ui<'a> {
             &config.theme.motion,
             config.tier,
         );
+        let mut input_acted = input_acted;
+        {
+            // The bubble phase: presses nobody took go through the registry.
+            let overlays: Vec<(WidgetId, u32, bool)> = store
+                .overlays
+                .iter()
+                .filter(|o| o.active())
+                .map(|o| (o.id, o.tag, o.opts.modal))
+                .collect();
+            let composing =
+                store.focus.composing.is_some() && store.focus.composing == store.focus.focused;
+            let focused = store
+                .focus
+                .focused
+                .and_then(|f| ids.get(&f).map(|t| (f, *t)));
+            let before = fired.len();
+            if !composing {
+                keys::bubble(
+                    &mut keys,
+                    &keys::BubbleScope {
+                        shortcuts: config.shortcuts,
+                        keymap: &config.keymap,
+                        overlays: &overlays,
+                        focused,
+                        path: &store.focus.scope_path,
+                        preempt_overlay,
+                    },
+                    &mut fired,
+                );
+            }
+            input_acted |= fired.len() > before;
+        }
 
         let mut senses: Vec<Option<(Sense, bool)>> = vec![None; painter.hits.len()];
         for r in &registered {
@@ -607,6 +689,7 @@ impl<'a> Ui<'a> {
             focused: out_focused,
             cursor,
             ime_area,
+            fired,
             ..FrameOutput::default()
         };
         (painter.scene, output)
@@ -645,6 +728,11 @@ impl<'a> Ui<'a> {
 
     pub fn tier(&self) -> MotionTier {
         self.config.tier
+    }
+
+    /// The id scope the current call runs under: what `Scope::Within` names.
+    pub fn scope_id(&self) -> WidgetId {
+        self.parent()
     }
 
     /// The platform's keyboard conventions for this frame.
@@ -755,8 +843,14 @@ impl<'a> Ui<'a> {
             return Response::inert(id, rect, false);
         }
         let focus = &mut self.store.focus;
-        if focus.focused == Some(id) && focus.chain.as_slice() != self.alive.as_slice() {
-            focus.chain = self.alive.clone();
+        if focus.focused == Some(id) {
+            if focus.chain.as_slice() != self.alive.as_slice() {
+                focus.chain = self.alive.clone();
+            }
+            let path = &self.scopes[self.scope_floor.min(self.scopes.len())..];
+            if focus.scope_path.as_slice() != path {
+                focus.scope_path = path.to_vec();
+            }
         }
         let p = &self.pointer;
         let mut r = Response::inert(id, rect, true);

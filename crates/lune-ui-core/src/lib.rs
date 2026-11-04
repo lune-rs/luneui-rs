@@ -19,6 +19,7 @@
 //!   dropdowns, dialogs), `chrome` (tab outline geometry);
 //! - `input` (the input seam: `RawInput` in, `FrameOutput` out, plain data), `layout` (pure stack,
 //!   row, column and grid helpers);
+//! - `shortcuts` (the scoped key-chord registry the frame resolves in two phases);
 //! - `ui` (the per-window frame: ids, retained state, layered hits, overlays, focus, semantic
 //!   nodes, `Response`, `FrameOutput`), `access` (the semantic tree and accessibility actions),
 //!   `motion` (the closed-form motion system and the time type), `strings` (the string table);
@@ -44,6 +45,7 @@ pub mod layout;
 pub mod motion;
 pub mod paint;
 pub mod scene;
+pub mod shortcuts;
 pub mod strings;
 pub mod testing;
 pub mod text;

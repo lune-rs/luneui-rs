@@ -1,20 +1,22 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-04 (M5 step 1: frame plumbing; M4 merged at d9fe71f)
+Last updated: 2026-11-04 (M5 steps 1 to 3: frame plumbing, layout helpers, shortcut registry; M4 merged at d9fe71f)
 
 ## Now
 
 M4 (interaction and motion) is merged to main at d9fe71f, on top of M3 (catalogue specs) and M2
 (seams and crate split). M5 (foundations: layout, scroll, list, popover, text editing, drag and drop,
-shortcuts, painter primitives) is in progress on branch `orch/toolkit-v1`; steps 1 to 3 are the frame
-plumbing, the layout helpers and the shortcut registry.
+shortcuts, painter primitives) is in progress on branch `orch/toolkit-v1`; steps 1 to 3 (the frame
+plumbing, the layout helpers and the shortcut registry) are done.
 `lune-ui-core` holds the per-window `Ui` frame (stable ids, retained state with keep-alive scopes,
 layered hits with modal and pointer capture, `Response`, overlays with exit retention, focus scopes,
 the semantic tree with actions, the string table, `FrameOutput` with `Repaint`) and the closed-form
 motion system. M5 step 1 opened the frame to ordered focus input (`Ui::focus_events`, keys with
 modifiers, text, IME and clipboard answers), the `Keymap`, press details on `Response`, cursor and
-IME-area output, `Xform::translate` and `Painter::push_clip`/`pop_clip`.
+IME-area output, `Xform::translate` and `Painter::push_clip`/`pop_clip`. `layout` holds the pure
+stack, row, column and grid helpers; `shortcuts` the scoped chord registry (preempt at begin, bubble at
+finish, `FrameOutput.fired`).
 `docs/architecture.md` holds the module map, "The `Ui` frame" and "API changes since M1"; DECISIONS
 D59 to D85 record the M4 choices.
 The gallery has a page registry (two legacy pages, 15 Ui pages), `--dump`, `--list` (62 scene names)
@@ -23,8 +25,7 @@ The pixel gate shows the 15 legacy scenes identical against the M1 base.
 
 ## Next
 
-1. M5 steps 2 to 16 per `m05-foundations/plan.md`: layout helpers, shortcut registry, painter
-   primitives, images, scroll area, virtualized list, popover and tooltip, text queries, `TextEdit`,
+1. M5 steps 4 to 16 per `m05-foundations/plan.md`: painter primitives, images, scroll area, virtualized list, popover and tooltip, text queries, `TextEdit`,
    the text field upgrade, drag and drop, gallery pages, docs and the acceptance bench.
 2. CI (fmt, clippy `-D warnings`, tests on macOS, Windows and Linux) now that there is code to run.
 3. An export script for Luneterm's vendored snapshot, before Luneterm M9. The migration

@@ -20,6 +20,7 @@ use lune_ui::input::{ClipboardRequest, Keymap, OutputState, Repaint, Translator,
 use lune_ui::lunegit_dark::THEME;
 use lune_ui::material::{self, Material};
 use lune_ui::motion::MotionTier;
+use lune_ui::shortcuts::Shortcuts;
 use lune_ui::strings::{DisplayFormat, StringTable};
 use lune_ui::surface::{Acquired, WindowSurface};
 use lune_ui::ui::{FrameConfig, Ui, UiStore};
@@ -73,6 +74,8 @@ struct App {
     store: UiStore,
     state: Option<Box<dyn PageState>>,
     strings: StringTable,
+    /// The shortcut table; the gallery's own keys are handled before the frame.
+    shortcuts: Shortcuts,
     mods: ModifiersState,
     /// The in-process clipboard standing in for the OS's until the platform layer has one.
     clipboard: Option<String>,
@@ -98,6 +101,7 @@ pub(crate) fn run() -> ExitCode {
         store: UiStore::default(),
         state: None,
         strings: StringTable::default(),
+        shortcuts: Shortcuts::default(),
         mods: ModifiersState::empty(),
         clipboard: None,
         start: Instant::now(),
@@ -218,6 +222,7 @@ impl App {
                     } else {
                         Keymap::PC
                     },
+                    shortcuts: &self.shortcuts,
                 };
                 let mut ui = Ui::begin(&mut self.store, &input, config, &mut r.text);
                 ui.scope(page.id, |ui| state.draw(ui));

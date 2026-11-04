@@ -11,6 +11,7 @@ use std::time::Duration;
 use crate::access::{AccessAction, SemanticTree};
 use crate::motion::Time;
 use crate::paint::Rect;
+use crate::shortcuts::CommandId;
 use crate::ui::WidgetId;
 use crate::window::ResizeEdge;
 
@@ -285,6 +286,8 @@ pub struct FrameOutput {
     pub tree: SemanticTree,
     /// The widget that has keyboard focus, if any.
     pub focused: Option<WidgetId>,
+    /// The shortcut commands that fired this frame, in order.
+    pub fired: Vec<CommandId>,
 }
 
 /// A window operation the app performs.

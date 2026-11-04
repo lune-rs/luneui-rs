@@ -19,6 +19,9 @@ pub(crate) struct FocusState {
     pub(crate) pending: Option<WidgetId>,
     /// The keep-alive scopes open when the focused id last registered.
     pub(crate) chain: Vec<WidgetId>,
+    /// The id scopes open around the focused widget when it last registered, outermost first,
+    /// counted from its overlay's content (the whole stack on the page).
+    pub(crate) scope_path: Vec<WidgetId>,
     /// The widget whose IME composition is open (`Ui::set_composing`); only counts while it is
     /// the focused widget.
     pub(crate) composing: Option<WidgetId>,
