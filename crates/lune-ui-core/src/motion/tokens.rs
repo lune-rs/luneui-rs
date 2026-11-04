@@ -8,6 +8,9 @@ use super::Easing;
 /// A duration token; components name one, never milliseconds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Token {
+    /// No time at all: the change snaps. Not part of the scale ([`Token::ALL`] omits it); a row
+    /// that names it never runs, in any tier, so an overlay with no motion reports `Idle` at once.
+    Zero,
     Instant,
     Fast,
     Base,
@@ -150,6 +153,7 @@ impl ReducedMap {
     /// The Reduced token for a Full `token` of `kind`.
     pub fn map(&self, token: Token, kind: Kind) -> Token {
         match token {
+            Token::Zero => Token::Zero,
             Token::Instant => self.instant,
             Token::Fast if kind == Kind::Selection => self.fast_selection,
             Token::Fast => self.fast,
@@ -202,6 +206,7 @@ impl MotionTokens {
     /// The duration of `token`.
     pub fn duration(&self, token: Token) -> Duration {
         match token {
+            Token::Zero => Duration::ZERO,
             Token::Instant => self.instant,
             Token::Fast => self.fast,
             Token::Base => self.base,

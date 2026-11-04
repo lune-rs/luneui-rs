@@ -494,11 +494,13 @@ fn d12(token: Token, kind: Kind) -> Token {
         (Token::Instant, _) | (Token::Fast, _) => Token::Instant,
         (Token::Base, _) | (Token::Moderate, _) => Token::Fast,
         (Token::Slow, _) => Token::Base,
+        (Token::Zero, _) => Token::Zero,
     }
 }
 
 fn token_ms(t: Token) -> u64 {
     match t {
+        Token::Zero => 0,
         Token::Instant => 120,
         Token::Fast => 180,
         Token::Base => 250,

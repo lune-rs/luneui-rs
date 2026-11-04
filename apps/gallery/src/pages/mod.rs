@@ -7,13 +7,14 @@ use lune_ui::paint::Rect;
 use lune_ui::text::{Spec, Style};
 use lune_ui::ui::Ui;
 
-use crate::page::{Page, PageState};
+use crate::page::Page;
 use crate::scenes::background;
 
 mod a11y;
 mod button;
 mod checkbox;
 mod combo;
+mod controls_ui;
 mod dialog;
 mod dropdown;
 pub(crate) mod effects;
@@ -64,16 +65,4 @@ pub(crate) fn heading(ui: &mut Ui<'_>, text: &str, x: f32, y: f32) {
 pub(crate) fn caption(ui: &mut Ui<'_>, text: &str, x: f32, y: f32) {
     let spec = Spec::plain(text, Style::ui(THEME.font_s, THEME.fg_secondary));
     ui.painter().text(&spec, x, y);
-}
-
-/// A page that is not built yet: its card and a heading.
-#[derive(Debug)]
-pub(crate) struct Stub(pub(crate) &'static str);
-
-impl PageState for Stub {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, self.0);
-        let spec = Spec::plain(self.0, Style::ui(THEME.font_m, THEME.fg_secondary).medium());
-        ui.painter().text(&spec, card.x + 24.0, card.y + 24.0);
-    }
 }

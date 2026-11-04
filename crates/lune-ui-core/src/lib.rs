@@ -18,8 +18,9 @@
 //!   contract), `text` (specs and the `TextSystem` seam), `icon`, `widgets` (controls, menus,
 //!   dropdowns, dialogs), `chrome` (tab outline geometry);
 //! - `input` (the input seam: `RawInput` in, `FrameOutput` out, plain data);
-//! - `ui` (widget ids and, as they land, the per-window frame), `access` (the semantic tree and
-//!   accessibility actions), `motion` (the time type), `strings` (the string table);
+//! - `ui` (the per-window frame: ids, retained state, layered hits, overlays, focus, semantic
+//!   nodes, `Response`, `FrameOutput`), `access` (the semantic tree and accessibility actions),
+//!   `motion` (the closed-form motion system and the time type), `strings` (the string table);
 //! - `backdrop` (the material seam: `GlassLayer`, `BackdropKind`, `Material` and the `Backdrop`
 //!   capability);
 //! - `window` (edge resize, double click, caption buttons);

@@ -89,11 +89,11 @@ pub fn dropdown<H: Copy + PartialEq, S: AsRef<str>>(
     }
 }
 
-/// Open and close are drawn at once (the list has no motion); this row only gives the overlay a
-/// phase to run, which draws nothing different.
+/// Open and close are drawn at once (the list has no motion): a zero-duration row, so the overlay
+/// never reports itself moving.
 const SNAP: Motion = Motion {
     kind: Kind::Dismiss,
-    token: Token::Instant,
+    token: Token::Zero,
     easing: Easing::Linear,
     reduced: Reduce::Snap,
     reduced_token: None,

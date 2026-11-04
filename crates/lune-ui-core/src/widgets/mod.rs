@@ -1,5 +1,5 @@
 //! Controls, styled after the house look's overrides of the Fluent theme (`DarkTheme.axaml`). Every
-//! widget is generic over the app's hit type and reads its tokens from the painter's [`Theme`].
+//! widget is generic over the app's hit type and reads its tokens from the painter's [`Theme`](crate::theme::Theme).
 
 pub mod button;
 pub mod checkbox;
@@ -24,5 +24,3 @@ pub use label::label;
 pub use popup_panel::popup_panel;
 pub use stepper::stepper;
 pub use toggle::toggle;
-
-pub(crate) use input_box::input_box;

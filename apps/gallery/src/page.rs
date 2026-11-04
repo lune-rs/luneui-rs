@@ -53,6 +53,12 @@ pub(crate) struct UiPage {
 /// What a Ui page draws each frame. The runner calls `draw` under `ui.scope(page.id)`.
 pub(crate) trait PageState {
     fn draw(&mut self, ui: &mut Ui<'_>);
+
+    /// The string table the page's window runs with (a test locale); the default is empty, so
+    /// every lookup falls back to the toolkit's English.
+    fn strings(&self) -> StringTable {
+        StringTable::default()
+    }
 }
 
 /// Whether a scene's capture frame still moves.
@@ -150,12 +156,13 @@ impl Player {
     ) -> Self {
         let mut input = ScriptedInput::new(size, scale);
         input.focus(true);
+        let strings = state.strings();
         Self {
             page,
             store: UiStore::default(),
             state,
             input,
-            strings: StringTable::default(),
+            strings,
             tier,
             theme: THEME,
         }

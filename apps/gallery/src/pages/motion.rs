@@ -54,6 +54,7 @@ fn kind_name(k: Kind) -> &'static str {
 
 fn token_name(t: Token) -> &'static str {
     match t {
+        Token::Zero => "zero",
         Token::Instant => "instant",
         Token::Fast => "fast",
         Token::Base => "base",

@@ -31,13 +31,3 @@ pub(crate) fn paint<H: Copy + PartialEq>(p: &mut Painter<'_, H>, r: Rect, look: 
     p.fill(r, radius, look.fill);
     p.ring(r, radius, 1.0, look.border, false);
 }
-
-pub(crate) fn input_box<H: Copy + PartialEq>(
-    p: &mut Painter<'_, H>,
-    r: Rect,
-    hovered: bool,
-    focused: bool,
-) {
-    let look = InputBoxLook::of(&p.theme, hovered, focused);
-    paint(p, r, &look);
-}
