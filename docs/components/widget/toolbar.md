@@ -81,11 +81,11 @@ Reduced keeps the background tween and drops the press scale [L src/Lunegit.Desk
 
 ### Strings
 
-- `luneui.toolbar.fetch`, `luneui.toolbar.pull`, `luneui.toolbar.push`, `luneui.toolbar.branch`: the tooltips are Lunegit keys `toolbar.fetch`, `toolbar.pull`, `toolbar.push`, `toolbar.branch` [L src/Lunegit.Desktop/Views/ToolbarView.axaml:52,61,70,80]; English defaults not read in this tree (Lunegit.Infrastructure).
+None. The tooltips and labels are the app's commands: `Ui::toolbar_action` and `Ui::toolbar_label` take them as arguments, so the entry's `luneui.toolbar.*` keys are not added ([D128]).
 
 ### Gallery scenes
 
-- `toolbar-actions`: four action buttons with icons, rest and hover on the second, settled.
+- `toolbar-actions`: three action buttons and the branch label button, rest and hover on the second, its tooltip shown; settled.
 - `toolbar-inactive`: the window inactive, fallback background shown; settled.
 - `toolbar-action-mid`: press on the first action, t = 90 ms (half of `fast`).
 - `toolbar-hover-mid`: second action rest → hover, t = 60 ms (half of `instant`).
@@ -109,8 +109,7 @@ Reduced keeps the background tween and drops the press scale [L src/Lunegit.Desk
 
 ## Open questions
 
-- `read-gap`: the centre and right groups of `ToolbarView.axaml` (lines 82-220) are not read; the spec covers the left group and the resources only.
-- `inactive-fallback`: the inactive fallback colour is `WindowFallbackBackground` [L src/Lunegit.Desktop/Views/ToolbarView.axaml:37]; its value is not read here.
+None. Closed by [D128]: `read-gap` (the centre and right groups are the caller's: `Ui::toolbar` hands over the `*, Auto, *` columns and the branch button's shape is `Ui::toolbar_label`; the middle column is zero wide, a centred group is placed around its x), and `inactive-fallback` (`Theme.window_fallback` is #333333FF, Lunegit `DarkTheme.axaml:245`). Focus-visible stays the button's ring.
 
 ## Notes for the planner
 

@@ -64,6 +64,9 @@ pub struct ScrollOptions {
     /// The content's extent when the app knows it before drawing: the clamp then runs before the
     /// content (D7); otherwise the content returns it and the clamp runs after.
     pub extent: Option<(f64, f64)>,
+    /// A vertical wheel or pixel delta scrolls the horizontal axis, so a plain wheel works on a
+    /// strip that only scrolls sideways. The larger of a gesture's two components wins.
+    pub wheel_x: bool,
 }
 
 impl Default for ScrollOptions {
@@ -73,6 +76,7 @@ impl Default for ScrollOptions {
             identity: None,
             follow_tail: false,
             extent: None,
+            wheel_x: false,
         }
     }
 }
@@ -457,12 +461,15 @@ impl Ui<'_> {
         // Input: wanted offsets are clamped here, against the extent last known (a wheel step at
         // the end must not leave `wanted` past it).
         if resp.enabled {
+            let gesture = |d: (f32, f32)| if opts.wheel_x { sideways(d) } else { d };
+            let (scroll_lines, scroll_pixels) =
+                (gesture(resp.scroll_lines), gesture(resp.scroll_pixels));
             for ax in 0..2 {
                 if !live[ax] {
                     continue;
                 }
-                let lines = [resp.scroll_lines.0, resp.scroll_lines.1][ax];
-                let pixels = [resp.scroll_pixels.0, resp.scroll_pixels.1][ax];
+                let lines = [scroll_lines.0, scroll_lines.1][ax];
+                let pixels = [scroll_pixels.0, scroll_pixels.1][ax];
                 let a = &mut st.a[ax];
                 let mut cur = clamp_offset(a.wanted, ext_pre[ax], vp[ax]);
                 if lines.is_finite() && lines != 0.0 {
@@ -689,6 +696,12 @@ impl Ui<'_> {
             viewport: rect,
         }
     }
+}
+
+/// A gesture `d` turned onto the horizontal axis: its larger component, so a plain wheel scrolls
+/// sideways and a trackpad's small vertical drift does not fight a horizontal swipe.
+fn sideways(d: (f32, f32)) -> (f32, f32) {
+    (if d.1.abs() > d.0.abs() { d.1 } else { d.0 }, 0.0)
 }
 
 /// The axis keys and the node's actions scroll: the vertical one unless only the horizontal one

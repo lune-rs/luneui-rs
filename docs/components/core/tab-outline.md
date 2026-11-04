@@ -43,12 +43,12 @@ Conflicts: none. The radii are the repo's (`CARD_RADIUS` 8, `SEAM_RADIUS` 8, `FL
 | state | look | cite |
 |---|---|---|
 | idle | the 1 px outline | [R crates/lune-ui-core/src/chrome.rs:9] |
-| running, sweep | conic alpha sweep around the loop | [R crates/lune-ui-wgpu/src/shader.wgsl:151-155] |
-| running, comet | a comet head with a tail | [R crates/lune-ui-wgpu/src/shader.wgsl:156-157] |
+| running, sweep | conic alpha sweep around the loop (`Painter::stroke_sweep`) | [R crates/lune-ui-wgpu/src/shader.wgsl:151-155] |
+| running, comet | a dash along the contour, travelling against the points' order (`Painter::stroke_comet`) | [R crates/lune-ui-wgpu/src/shader.wgsl:156-157] |
 
 ### Transitions
 
-n/a — the running sweep and comet are driven by the app's time (the shader's offset `style.z`, [R crates/lune-ui-wgpu/src/shader.wgsl:155]); the period has no source and is an Open question. Its kind would be `spin`; reduced snaps.
+n/a — the running sweep and comet are driven by the app's time (the shader's offset `style.z`, [R crates/lune-ui-wgpu/src/shader.wgsl:155]). The period is 2400 ms, the breath's 1800 ms, as `widget.tab-strip` runs them; Reduced forces the breath and Off is static.
 
 Runs only while a command executes (Lunegit's terminal card, [L .claude/docs/animation-rules.md:147]). Never animated: the terminal itself.
 
@@ -74,7 +74,7 @@ n/a — no text.
 ### Gallery scenes
 
 - `chrome` (existing): the card with a tab outline, settled. [R apps/gallery/src/scenes.rs:173-178]
-- New scenes for the running state are open (see Open questions).
+- The running states: `tab-strip-busy-sweep`, `tab-strip-busy-comet`, `tab-strip-busy-breath` (`widget.tab-strip`).
 
 ### Painter primitives
 
@@ -84,7 +84,8 @@ n/a — no text.
 ### Acceptance
 
 - Existing tests (by path, `crates/lune-ui-core/src/chrome.rs`): `notched_loop_reaches_card_top_only_at_the_tab` (:186 region), `flush_left_tab_uses_card_corner` (:206 region), `no_tab_loop_stays_below_seam` (:221 region).
-- Done standard still needs: a sweep-table probe (the four breakpoints) and a comet probe at scale 2, and the running-state conformance against the period the app passes.
+- The comet's share and travel and the sweep's phase around a translated centre are probed at scale 2 (`crates/lune-ui-wgpu/tests/primitives.rs`).
+- Done standard still needs: a sweep-table probe (the four breakpoints).
 
 ### Build
 
@@ -92,8 +93,6 @@ n/a — no text.
 - Depends on: core.painter, core.theme, widget.tab-strip.
 
 ## Open questions
-
-- Running period of the sweep and comet: no source for the duration; open.
 
 - The name `chrome` and its tab-bar assumption read as app-shaped; whether it is generic is for the planner.
 

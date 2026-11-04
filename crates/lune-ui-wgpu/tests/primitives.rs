@@ -261,3 +261,90 @@ fn a_radius_of_zero_takes_the_old_path() {
     let img = render(&mut gpu, &mut text, &zero);
     assert_eq!(px(&img, 20, 20), WHITE);
 }
+
+/// How far `a` in a list of `(x, y)` samples is lit, as a share of them.
+fn lit_share(img: &[u8], samples: &[(usize, usize)]) -> f32 {
+    let lit = samples
+        .iter()
+        .filter(|(x, y)| px(img, *x, *y)[0] > 128)
+        .count();
+    lit as f32 / samples.len() as f32
+}
+
+/// A square loop, logical px, and a sample on each device px along its centre line.
+const LOOP: [[f32; 2]; 4] = [[20.0, 10.0], [100.0, 10.0], [100.0, 70.0], [20.0, 70.0]];
+
+fn loop_samples() -> Vec<(usize, usize)> {
+    let (l, t, r, b) = (40, 20, 200, 140);
+    let top = (l..r).map(|x| (x, t));
+    let right = (t..b).map(|y| (r, y));
+    let bottom = (l + 1..=r).rev().map(|x| (x, b));
+    let left = (t + 1..=b).rev().map(|y| (l, y));
+    top.chain(right).chain(bottom).chain(left).collect()
+}
+
+#[test]
+fn a_comet_lights_its_fraction_of_the_loop_at_scale_2() {
+    let Some(mut gpu) = headless_gpu() else {
+        return;
+    };
+    let mut text = text_cache();
+    let scene = paint(&mut text, |p| {
+        p.stroke_comet(&LOOP, WHITE, 2.0, 0.14, 0.3);
+    });
+    let img = render(&mut gpu, &mut text, &scene);
+    let share = lit_share(&img, &loop_samples());
+    assert!((share - 0.14).abs() < 0.01, "lit {share}");
+}
+
+#[test]
+fn a_comet_travels_with_its_phase() {
+    let Some(mut gpu) = headless_gpu() else {
+        return;
+    };
+    let mut text = text_cache();
+    let samples = loop_samples();
+    let first_lit = |gpu: &mut Gpu, text: &mut TextCache, phase: f32| {
+        let scene = paint(text, |p| p.stroke_comet(&LOOP, WHITE, 2.0, 0.14, phase));
+        let img = render(gpu, text, &scene);
+        (0..samples.len())
+            .find(|i| {
+                let (x, y) = samples[*i];
+                let prev = samples[(i + samples.len() - 1) % samples.len()];
+                px(&img, x, y)[0] > 128 && px(&img, prev.0, prev.1)[0] <= 128
+            })
+            .expect("a dash")
+    };
+    let a = first_lit(&mut gpu, &mut text, 0.25);
+    let b = first_lit(&mut gpu, &mut text, 0.5);
+    let moved = (a + samples.len() - b) % samples.len();
+    let share = moved as f32 / samples.len() as f32;
+    assert!((share - 0.25).abs() < 0.01, "moved {share} of the loop");
+}
+
+#[test]
+fn a_sweep_is_brightest_at_its_phase_around_a_translated_centre() {
+    let Some(mut gpu) = headless_gpu() else {
+        return;
+    };
+    let mut text = text_cache();
+    // The loop drawn 10 px left of where it lands: the centre must move with it.
+    let shifted: Vec<[f32; 2]> = LOOP.iter().map(|q| [q[0] - 10.0, q[1]]).collect();
+    let centre = [50.0, 40.0];
+    let at = |gpu: &mut Gpu, text: &mut TextCache, phase: f32| {
+        let scene = paint(text, |p| {
+            p.push_translate(10.0, 0.0);
+            p.stroke_sweep(&shifted, WHITE, 2.0, phase, centre);
+            p.pop_translate();
+        });
+        let img = render(gpu, text, &scene);
+        // Device px: the top, right, bottom and left mid-points of the loop.
+        [(120, 20), (200, 80), (120, 140), (40, 80)].map(|(x, y)| px(&img, x, y)[0])
+    };
+    let up = at(&mut gpu, &mut text, 0.0);
+    assert!(up[0] > 200 && up[2] < 10, "{up:?}");
+    let right = at(&mut gpu, &mut text, 0.25);
+    assert!(right[1] > 200 && right[3] < 10, "{right:?}");
+    let down = at(&mut gpu, &mut text, 0.5);
+    assert!(down[2] > 200 && down[0] < 10, "{down:?}");
+}

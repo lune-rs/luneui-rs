@@ -597,3 +597,91 @@ fn every_primitive_is_recorded_and_replays_to_the_same_scene() {
     assert_eq!(sa, sb);
     assert!(!sa.layers[0].geometry.fills.is_empty());
 }
+
+const SQUARE: [[f32; 2]; 4] = [[10.0, 10.0], [60.0, 10.0], [60.0, 60.0], [10.0, 60.0]];
+
+#[test]
+fn a_sweep_holds_its_phase_and_its_centre_in_device_px() {
+    let mut text = FakeText;
+    let mut p = painter(&mut text, 2.0);
+    p.stroke_sweep(&SQUARE, WHITE, 1.0, 0.25, [35.0, 35.0]);
+    let v = p.scene.layers[0].geometry.strokes[0];
+    assert_eq!(v.style[0], 1.0);
+    assert_eq!(v.style[2], 0.25);
+    assert_eq!(v.extra[..2], [70.0, 70.0]);
+}
+
+#[test]
+fn a_sweep_centre_goes_through_the_transform_stack() {
+    let mut text = FakeText;
+    let mut p = painter(&mut text, 2.0);
+    p.push_translate(100.0, 7.0);
+    p.stroke_sweep(&SQUARE, WHITE, 1.0, 0.0, [35.0, 35.0]);
+    let v = p.scene.layers[0].geometry.strokes[0];
+    assert_eq!(v.extra[..2], [270.0, 84.0]);
+}
+
+#[test]
+fn a_comet_is_a_fraction_of_the_contour_at_any_scale() {
+    for s in [1.0, 2.0] {
+        let mut text = FakeText;
+        let mut p = painter(&mut text, s);
+        p.stroke_comet(&SQUARE, WHITE, 1.0, 0.14, 0.5);
+        let g = &p.scene.layers[0].geometry;
+        let v = g.strokes[0];
+        assert_eq!(v.style[0], 2.0);
+        assert!((v.extra[2] - 200.0).abs() < 1e-3);
+        assert!((v.style[2] - 28.0).abs() < 1e-3);
+        assert!((v.style[3] - 100.0).abs() < 1e-3);
+        // The last vertex's distance along the loop reaches the contour: the same units.
+        let along = g.strokes.iter().fold(0.0_f32, |m, v| m.max(v.aa[1]));
+        assert!((along - v.extra[2]).abs() < 1e-3, "scale {s}");
+    }
+}
+
+#[test]
+fn a_comet_under_a_scale_keeps_its_share_of_the_loop() {
+    let mut text = FakeText;
+    let mut p = painter(&mut text, 2.0);
+    p.push_xform(xf(0.5, 1.0));
+    p.stroke_comet(&SQUARE, WHITE, 1.0, 0.14, 0.0);
+    let g = &p.scene.layers[0].geometry;
+    let v = g.strokes[0];
+    let along = g.strokes.iter().fold(0.0_f32, |m, v| m.max(v.aa[1]));
+    assert!((along - v.extra[2]).abs() < 1e-3);
+    assert!((v.style[2] / v.extra[2] - 0.14).abs() < 1e-5);
+}
+
+#[test]
+fn a_phase_wraps_and_one_not_finite_is_zero() {
+    let phase = |ph: f32| {
+        let mut text = FakeText;
+        let mut p = painter(&mut text, 1.0);
+        p.stroke_sweep(&SQUARE, WHITE, 1.0, ph, [0.0, 0.0]);
+        p.scene.layers[0].geometry.strokes[0].style[2]
+    };
+    assert!((phase(1.25) - 0.25).abs() < 1e-6);
+    assert!((phase(-0.25) - 0.75).abs() < 1e-6);
+    assert_eq!(phase(f32::NAN), 0.0);
+    assert_eq!(phase(f32::INFINITY), 0.0);
+}
+
+#[test]
+fn a_recorded_sweep_and_comet_replay_in_the_replaying_painters_space() {
+    let mut text = FakeText;
+    let mut p = painter(&mut text, 1.0);
+    p.start_recording();
+    p.push_translate(0.0, 0.0);
+    p.pop_translate();
+    p.stroke_sweep(&SQUARE, WHITE, 1.0, 0.5, [35.0, 35.0]);
+    p.stroke_comet(&SQUARE, WHITE, 1.0, 0.14, 0.5);
+    let ops = p.take_recording();
+    let mut text = FakeText;
+    let mut q = painter(&mut text, 2.0);
+    q.push_translate(10.0, 0.0);
+    q.replay(&ops);
+    let s = &q.scene.layers[0].geometry.strokes;
+    assert_eq!(s[0].extra[..2], [90.0, 70.0]);
+    let last = s[s.len() - 1];
+    assert!((last.style[2] - 28.0).abs() < 1e-3);
+}

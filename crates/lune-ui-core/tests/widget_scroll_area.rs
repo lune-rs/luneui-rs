@@ -1018,3 +1018,45 @@ fn scroll_to_from_the_areas_own_content_is_served_in_that_frame() {
     let mut ms = 200;
     assert_eq!(until_idle(&mut h, &mut ms, false), 410.0);
 }
+
+#[test]
+fn wheel_x_turns_a_vertical_gesture_sideways() {
+    let wide = ScrollOptions {
+        bars: (Bars::Hidden, Bars::Disabled),
+        wheel_x: true,
+        ..ScrollOptions::default()
+    };
+    let ext = (2000.0, 100.0);
+    let mut h = UiHarness::new(WIN);
+    h.at_ms(0);
+    h.input.pointer_to(100.0, 100.0);
+    run(&mut h, &wide, ext);
+    run(&mut h, &wide, ext);
+    h.input.scroll_pixels(0.0, -30.0);
+    assert_eq!(run(&mut h, &wide, ext).r.offset, (30.0, 0.0));
+    // The larger component wins, in either direction.
+    h.input.scroll_pixels(-20.0, 5.0);
+    assert_eq!(run(&mut h, &wide, ext).r.offset, (50.0, 0.0));
+    h.input.scroll_lines(0.0, -1.0);
+    h.at_ms(10);
+    run(&mut h, &wide, ext);
+    h.at_ms(1000);
+    assert_eq!(run(&mut h, &wide, ext).r.offset, (50.0 + LINE, 0.0));
+}
+
+#[test]
+fn without_wheel_x_a_vertical_gesture_stays_vertical() {
+    let o = ScrollOptions {
+        bars: (Bars::Hidden, Bars::Hidden),
+        ..ScrollOptions::default()
+    };
+    assert!(!ScrollOptions::default().wheel_x);
+    let ext = (2000.0, 2000.0);
+    let mut h = UiHarness::new(WIN);
+    h.at_ms(0);
+    h.input.pointer_to(100.0, 100.0);
+    run(&mut h, &o, ext);
+    run(&mut h, &o, ext);
+    h.input.scroll_pixels(0.0, -30.0);
+    assert_eq!(run(&mut h, &o, ext).r.offset, (0.0, 30.0));
+}
