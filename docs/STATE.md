@@ -1,14 +1,14 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-04 (M5 steps 1 to 3: frame plumbing, layout helpers, shortcut registry; M4 merged at d9fe71f)
+Last updated: 2026-11-04 (M5 steps 1 to 5 done, paused by the user; step 6 is next; M4 merged at d9fe71f)
 
 ## Now
 
 M4 (interaction and motion) is merged to main at d9fe71f, on top of M3 (catalogue specs) and M2
 (seams and crate split). M5 (foundations: layout, scroll, list, popover, text editing, drag and drop,
-shortcuts, painter primitives) is in progress on branch `orch/toolkit-v1`; steps 1 to 3 (the frame
-plumbing, the layout helpers and the shortcut registry) are done.
+shortcuts, painter primitives) is in progress on branch `orch/toolkit-v1`; steps 1 to 5 (the frame
+plumbing, layout helpers, shortcut registry, vector primitives, image and rotate) are done; step 6 is next.
 `lune-ui-core` holds the per-window `Ui` frame (stable ids, retained state with keep-alive scopes,
 layered hits with modal and pointer capture, `Response`, overlays with exit retention, focus scopes,
 the semantic tree with actions, the string table, `FrameOutput` with `Repaint`) and the closed-form
