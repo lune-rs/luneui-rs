@@ -12,6 +12,7 @@ use lune_ui::widgets::checkbox::{CheckboxLook, CheckboxState};
 use lune_ui::widgets::combo::{ComboLook, ComboState};
 use lune_ui::widgets::dialog::{Cancel, Dialog};
 use lune_ui::widgets::field::{FieldLook, FieldState};
+use lune_ui::widgets::radio_group::{self, RadioLook, RadioState};
 use lune_ui::widgets::stepper::{StepperLook, StepperState};
 use lune_ui::widgets::toggle::{ToggleLook, ToggleState};
 use lune_ui::widgets::{button, checkbox, combo, field, stepper, toggle};
@@ -68,7 +69,7 @@ impl PageState for Focus {
 }
 
 /// Each kind of ring at full opacity, painted from the widgets' public looks (which draw it
-/// through `focus_ring::paint`). The radio joins in M6.
+/// through `focus_ring::paint`).
 struct Kinds;
 
 impl PageState for Kinds {
@@ -133,6 +134,15 @@ impl PageState for Kinds {
                 ..ComboState::default()
             };
             combo::paint(ui.painter(), r, "RznSans", &ComboLook::of(&theme, state));
+        });
+        row(ui, 7, "Radio", &|ui, r| {
+            let state = RadioState {
+                selected: true,
+                focus_visible: true,
+                ..RadioState::default()
+            };
+            let r = Rect::new(r.x, r.y + 2.0, 160.0, 28.0);
+            radio_group::paint(ui.painter(), r, "Radio", &RadioLook::of(&theme, state));
         });
     }
 }
