@@ -387,6 +387,14 @@ fn repaint_at_the_earliest_future_request() {
         Repaint::Idle,
         "a request not after now is due already"
     );
+    // A due request never hides a later one (review F2).
+    let (_, out) = h.at_ms(1000).frame(|ui| {
+        let now = ui.time();
+        ui.request_repaint_at(now + Duration::from_secs(5));
+        ui.request_repaint_at(now);
+        ui.request_repaint_at(now - Duration::from_millis(10));
+    });
+    assert_eq!(out.repaint, Repaint::At(Duration::from_secs(6)));
 }
 
 #[test]

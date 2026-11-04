@@ -80,8 +80,21 @@ struct Registration {
 struct Active {
     id: WidgetId,
     tag: u32,
-    layer: usize,
     opts: OverlayOptions,
+    /// Modal, or registered a focusable region in the previous frame. A passive overlay (a toast
+    /// with no control) is the top for Escape or an outside press only when it asks for that
+    /// dismissal (D82); otherwise they go to the overlay below it.
+    takes_input: bool,
+}
+
+/// The `(tag, layer)` of the topmost active modal overlay, which gates eligibility.
+fn modal_gate<'o>(
+    overlays: impl DoubleEndedIterator<Item = &'o overlay::OverlayRec>,
+) -> Option<(u32, usize)> {
+    overlays
+        .rev()
+        .find(|o| o.active() && o.opts.modal)
+        .map(|o| (o.tag, o.opts.layer as usize))
 }
 
 /// One window's frame. Built by [`Ui::begin`], consumed by [`Ui::finish`].
@@ -116,6 +129,11 @@ pub struct Ui<'a> {
     /// Indices in `tree` of the open containers.
     containers: Vec<usize>,
     node_meta: BTreeMap<WidgetId, (usize, u32)>,
+    /// This frame's input changed state the frame drew before reacting to (a click, a consumed
+    /// key, an access action, a dismissal, a scroll or drag): the next frame is needed (D81).
+    input_acted: bool,
+    /// `(focused, visible)` once begin applied the frame's input.
+    focus_at_begin: (Option<WidgetId>, bool),
 }
 
 impl std::fmt::Debug for Ui<'_> {
@@ -175,16 +193,24 @@ impl<'a> Ui<'a> {
             .map(|o| Active {
                 id: o.id,
                 tag: o.tag,
-                layer: o.opts.layer as usize,
                 opts: o.opts,
+                takes_input: o.opts.modal
+                    || store
+                        .prev_hits
+                        .iter()
+                        .any(|h| h.tag == o.tag && h.sense.focusable),
             })
             .collect();
-        let top = active.last().copied();
-        let modal = active
-            .iter()
-            .rev()
-            .find(|o| o.opts.modal)
-            .map(|o| (o.tag, o.layer));
+        let top_for = |asks: fn(&OverlayOptions) -> bool| {
+            active
+                .iter()
+                .rev()
+                .find(|o| o.takes_input || asks(&o.opts))
+                .copied()
+        };
+        let top_escape = top_for(|o| o.dismiss_on_escape);
+        let top_press = top_for(|o| o.dismiss_on_outside_press);
+        let modal = modal_gate(store.overlays.iter());
         let eligible = move |h: &HitRecord| modal.is_none_or(|(t, l)| h.tag >= t || h.layer > l);
         let eligible_at =
             move |(layer, tag): (usize, u32)| modal.is_none_or(|(t, l)| tag >= t || layer > l);
@@ -194,6 +220,7 @@ impl<'a> Ui<'a> {
         let mut dismissed = BTreeMap::new();
         let mut routed = Routed::default();
         let mut keys = Vec::new();
+        let mut acted = false;
 
         if let Some(id) = store.focus.pending.take() {
             store.focus.focused = Some(id);
@@ -222,7 +249,7 @@ impl<'a> Ui<'a> {
                         let target = topmost(&hits, *pos, &eligible);
                         store.focus.visible = false;
                         store.focus.keyboard = false;
-                        if let Some(t) = top
+                        if let Some(t) = top_press
                             && t.opts.dismiss_on_outside_press
                             && target.is_none_or(|h| h.tag < t.tag)
                         {
@@ -258,9 +285,9 @@ impl<'a> Ui<'a> {
                         store.focus.keyboard = true;
                         match key {
                             Key::Named(NamedKey::Escape)
-                                if top.is_some_and(|t| t.opts.dismiss_on_escape) =>
+                                if top_escape.is_some_and(|t| t.opts.dismiss_on_escape) =>
                             {
-                                if let Some(t) = top {
+                                if let Some(t) = top_escape {
                                     dismissed.entry(t.id).or_insert(D::Escape);
                                 }
                             }
@@ -294,6 +321,7 @@ impl<'a> Ui<'a> {
                     Event::Focus(false) => {
                         focus_loss(&active, &hits, None, &mut dismissed);
                     }
+                    Event::ClipboardText(_) | Event::ClipboardUnavailable => acted = true,
                     Event::Access(a) => {
                         let Some(node) = store.prev_tree.get(a.target) else {
                             continue;
@@ -302,7 +330,8 @@ impl<'a> Ui<'a> {
                         if !meta.is_some_and(eligible_at) {
                             continue;
                         }
-                        let top_escape = top.map(|t| (t.id, t.opts.dismiss_on_escape));
+                        acted = true;
+                        let top_escape = top_escape.map(|t| (t.id, t.opts.dismiss_on_escape));
                         let focus_to = access::route(
                             a,
                             node,
@@ -322,6 +351,7 @@ impl<'a> Ui<'a> {
             }
             store.pointer.settle(&cx, &mut pointer);
         }
+        acted |= !dismissed.is_empty() || pointer.acted();
         keys.extend(routed.keys);
         let key_focus = store.focus.focused.filter(|id| {
             let mut own = hits.iter().filter(|h| h.id == *id).peekable();
@@ -333,6 +363,7 @@ impl<'a> Ui<'a> {
         });
         store.prev_hits = hits;
 
+        let focus_at_begin = (store.focus.focused, store.focus.visible);
         let window = Rect::new(0.0, 0.0, input.size.0, input.size.1);
         let painter = Painter::new(input.scale, window, text, pointer.hovered, config.theme);
         Ui {
@@ -359,6 +390,8 @@ impl<'a> Ui<'a> {
             tree: SemanticTree::default(),
             containers: Vec::new(),
             node_meta: BTreeMap::new(),
+            input_acted: acted,
+            focus_at_begin,
         }
     }
 
@@ -378,6 +411,9 @@ impl<'a> Ui<'a> {
             clipboard_read,
             mut tree,
             node_meta,
+            pointer,
+            input_acted,
+            focus_at_begin,
             ..
         } = self;
         let now = input.time;
@@ -434,6 +470,28 @@ impl<'a> Ui<'a> {
         {
             store.focus.focused = None;
         }
+        // D81: a frame that acted on input, or whose focus changed after its widgets drew, or
+        // whose hover at the still pointer differs against its own new regions, drew a picture
+        // the next frame corrects: ask for it. The hover catch-up never repeats on a frame with
+        // no events, so a region that moves with its own hover cannot loop.
+        let stale_hover = {
+            let gate = modal_gate(store.overlays.iter());
+            let eligible = move |h: &HitRecord| gate.is_none_or(|(t, l)| h.tag >= t || h.layer > l);
+            let cx = Ctx {
+                hits: &hits,
+                eligible: &eligible,
+                time: now,
+            };
+            let mut next = PointerFrame::default();
+            store.pointer.settle(&cx, &mut next);
+            next.hovered != pointer.hovered && !(store.hover_catch_up && input.events.is_empty())
+        };
+        store.hover_catch_up = stale_hover;
+        let catch_up = input_acted
+            || stale_hover
+            || store.focus.pending.is_some()
+            || (store.focus.focused, store.focus.visible) != focus_at_begin;
+
         let focused = store.focus.focused;
         access::mark_focus(&mut tree, focused);
         let out_focused = focused.filter(|id| tree.get(*id).is_some());
@@ -446,7 +504,7 @@ impl<'a> Ui<'a> {
         store.frame += 1;
         store.last_tier = Some(config.tier);
 
-        let repaint = if in_flight || moving {
+        let repaint = if in_flight || moving || catch_up {
             Repaint::Now
         } else if let Some(t) = repaint_at.filter(|t| *t > now) {
             Repaint::At(t)
@@ -610,8 +668,12 @@ impl<'a> Ui<'a> {
         UiStore::entry(&mut self.store.persistent, id, frame, &self.alive)
     }
 
-    /// Asks for a frame at app time `t`; the earliest request later than now wins.
+    /// Asks for a frame at app time `t`; the earliest request later than now wins. A request at
+    /// or before the frame's time is due already and is ignored (it never hides a later one).
     pub fn request_repaint_at(&mut self, t: Time) {
+        if t <= self.input.time {
+            return;
+        }
         self.repaint_at = Some(self.repaint_at.map_or(t, |r| r.min(t)));
     }
 

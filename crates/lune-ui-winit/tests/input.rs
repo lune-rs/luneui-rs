@@ -273,4 +273,9 @@ fn control_flow_maps_each_repaint_without_reading_the_clock() {
         control_flow(Repaint::At(Duration::ZERO), origin),
         (ControlFlow::WaitUntil(origin), false)
     );
+    // A deadline past what `Instant` can hold waits for input instead of panicking.
+    assert_eq!(
+        control_flow(Repaint::At(Duration::MAX), origin),
+        (ControlFlow::Wait, false)
+    );
 }

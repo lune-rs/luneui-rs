@@ -137,8 +137,8 @@ impl Ui<'_> {
         if r.enabled {
             node.states.insert(State::Focusable);
             node.actions.insert(Action::Default);
+            // No collapse: the combo never closes itself; the open list's dismiss closes it.
             node.actions.insert(Action::Expand);
-            node.actions.insert(Action::Collapse);
         } else {
             node.states.insert(State::Disabled);
         }

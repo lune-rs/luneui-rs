@@ -167,7 +167,10 @@ fn exit_retention_is_120_ms_full_120_reduced_and_none_off() {
         (MotionTier::Off, 0),
     ] {
         let (idle_after, alphas) = close_run(tier);
-        assert_eq!(idle_after, ms, "{tier:?}");
+        // Off removes it at once; its close frame still asks for one more frame because focus
+        // returned after the page drew (D81), so the first idle frame is the next one.
+        let first_idle = if ms == 0 { 10 } else { ms };
+        assert_eq!(idle_after, first_idle, "{tier:?}");
         assert_eq!(alphas.len() as u64, ms / 10, "{tier:?}: a frame per 10 ms");
         assert!(
             alphas.windows(2).all(|w| w[1] <= w[0]),

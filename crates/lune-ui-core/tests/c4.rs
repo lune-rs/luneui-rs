@@ -256,7 +256,7 @@ fn a_scripted_frame_of_every_widget_yields_the_expected_nodes() {
             "Font",
             false,
             true,
-            &[Action::Default, Action::Expand, Action::Collapse],
+            &[Action::Default, Action::Expand],
         ),
     ];
     for (k, role, name, checked, focusable, actions) in table {
@@ -497,7 +497,8 @@ fn the_dialogs_exit_retention_per_tier_then_idle() {
         let (scene, out) = at(&mut h, &mut app, t0);
         if close_ms == 0 {
             assert!(modal_is_empty(&scene), "{tier:?} snaps");
-            assert_eq!(out.repaint, Repaint::Idle, "{tier:?}");
+            // Focus returned at the end of the frame, after the page drew (D81).
+            assert_eq!(out.repaint, Repaint::Now, "{tier:?}");
         } else {
             assert!(
                 !modal_is_empty(&scene),
@@ -564,19 +565,39 @@ fn a_settled_dropdown_reports_idle_the_frame_after_the_change() {
         h.tier = tier;
         dropdown_frame(&mut h, &mut app, 0);
         dropdown_frame(&mut h, &mut app, 1000);
-        // Open: the first frame of the list is already still.
+        // Open: the list is still from its first frame; that frame asks for one more only
+        // because focus moved into the list after it drew (D81).
         app.combo_open = true;
         let (_, out) = dropdown_frame(&mut h, &mut app, 2000);
-        assert_eq!(out.repaint, Repaint::Idle, "{tier:?} open frame");
+        assert_eq!(
+            out.repaint,
+            Repaint::Now,
+            "{tier:?} open frame (focus moved)"
+        );
         let (_, out) = dropdown_frame(&mut h, &mut app, 2016);
         assert_eq!(out.repaint, Repaint::Idle, "{tier:?} frame after open");
-        // Close by Escape.
+        // Close by Escape: the dismissal frame still drew the list, so it asks for the next
+        // frame (D81); that frame drops the list and moves focus back, asking once more; then
+        // nothing moves.
         key(&mut h, NamedKey::Escape);
         let (_, out) = dropdown_frame(&mut h, &mut app, 3000);
         assert!(!app.combo_open, "Escape dismissed the list");
         assert_eq!(app.dropdown_dismissed, 1);
-        assert_eq!(out.repaint, Repaint::Idle, "{tier:?} close frame");
-        let (_, out) = dropdown_frame(&mut h, &mut app, 3016);
+        assert_eq!(out.repaint, Repaint::Now, "{tier:?} dismissal frame");
+        let (scene, out) = dropdown_frame(&mut h, &mut app, 3016);
+        assert!(
+            scene.layers[LayerId::Popup as usize]
+                .geometry
+                .under
+                .is_empty(),
+            "{tier:?} the list is gone at once (D80)"
+        );
+        assert_eq!(
+            out.repaint,
+            Repaint::Now,
+            "{tier:?} close frame (focus moved)"
+        );
+        let (_, out) = dropdown_frame(&mut h, &mut app, 3032);
         assert_eq!(out.repaint, Repaint::Idle, "{tier:?} frame after close");
     }
 }
@@ -662,9 +683,15 @@ fn the_script_is_deterministic() {
 
 #[test]
 fn nothing_reports_now_while_nothing_moves() {
-    // Off: nothing ever animates, so every frame of the script is idle.
+    // Off: nothing ever animates. A step's frame may ask for one more frame when its input acted
+    // or focus moved after the widgets drew (D81); every other frame is idle, except the frame
+    // after Escape (step 10), where the dismissed list stops and focus returns to the combo.
     for (i, (_, out)) in run_script(MotionTier::Off).iter().enumerate() {
-        assert_eq!(out.repaint, Repaint::Idle, "Off: frame {i}");
+        let step_frame = i % 3 == 1;
+        let after_escape = i == 3 * 10 + 2;
+        if !step_frame && !after_escape {
+            assert_eq!(out.repaint, Repaint::Idle, "Off: frame {i}");
+        }
     }
     // Full and Reduced: every settle frame (1.5 s after a step) is idle.
     for tier in [MotionTier::Full, MotionTier::Reduced] {
@@ -673,5 +700,96 @@ fn nothing_reports_now_while_nothing_moves() {
                 assert_eq!(out.repaint, Repaint::Idle, "{tier:?}: settle frame {i}");
             }
         }
+    }
+}
+
+fn has_focused_state(out: &FrameOutput, k: &str) -> bool {
+    node(out, id(k)).states.contains(State::Focused)
+}
+
+#[test]
+fn a_menu_pick_that_opens_the_dialog_keeps_focus_in_the_dialog_then_restores_the_page() {
+    // Review F1, D83: the menu stops under the dialog it opened.
+    let mut app = App::new();
+    let mut h = settled(&mut app);
+    key(&mut h, NamedKey::Tab);
+    let (_, out) = at(&mut h, &mut app, 1100);
+    assert_eq!(out.focused, Some(id("page-button")));
+    app.menu_open = true;
+    at(&mut h, &mut app, 1200);
+    let (_, out) = at(&mut h, &mut app, 1300);
+    assert!(
+        out.focused.is_some() && out.focused != Some(id("page-button")),
+        "focus moved into the menu"
+    );
+    // The pick: the app opens the dialog in the menu's frame, then stops calling the menu.
+    app.dialog_open = true;
+    at(&mut h, &mut app, 1400);
+    app.menu_open = false;
+    let confirm = WidgetId::ROOT.with((id("dialog"), "confirm"));
+    for ms in [1500, 1600, 3000] {
+        let (_, out) = at(&mut h, &mut app, ms);
+        assert_eq!(out.focused, Some(confirm), "{ms}: Confirm is focused");
+        assert!(!has_focused_state(&out, "page-button"), "{ms}");
+    }
+    // Enter still confirms (D20).
+    key(&mut h, NamedKey::Enter);
+    at(&mut h, &mut app, 3100);
+    assert_eq!(app.confirmed, 1);
+    app.dialog_open = false;
+    at(&mut h, &mut app, 3200);
+    let (_, out) = at(&mut h, &mut app, 3300);
+    assert_eq!(
+        out.focused,
+        Some(id("page-button")),
+        "focus back on the page button"
+    );
+}
+
+#[test]
+fn a_dropdown_pick_frame_asks_for_the_frame_that_drops_the_list() {
+    // Review F3 (b), D81: the pick frame still drew the open list.
+    for tier in [MotionTier::Full, MotionTier::Off] {
+        let mut app = App::new();
+        let mut h = settled(&mut app);
+        h.tier = tier;
+        let (x, y) = centre(COMBO);
+        h.input.pointer_to(x, y).click(P);
+        at(&mut h, &mut app, 1100);
+        assert!(app.combo_open);
+        at(&mut h, &mut app, 2000);
+        // Row 1 sits under the combo's panel; press and release on it.
+        let row = h
+            .store
+            .last_rect(id("dropdown").with("list").with("1".to_string()))
+            .or_else(|| {
+                let p = h.store.last_rect(id("dropdown").with("list"))?;
+                Some(Rect::new(p.x, p.y + p.h / 2.0 - 4.0, p.w, 8.0))
+            })
+            .expect("the list registered");
+        h.input
+            .pointer_to(row.x + 8.0, row.y + row.h / 2.0)
+            .click(P);
+        let (scene, out) = at(&mut h, &mut app, 2100);
+        assert!(!app.combo_open, "{tier:?}: picked");
+        assert!(
+            !scene.layers[LayerId::Popup as usize]
+                .geometry
+                .under
+                .is_empty(),
+            "{tier:?}: the pick frame still drew the list"
+        );
+        assert_eq!(out.repaint, Repaint::Now, "{tier:?}: pick frame");
+        let (scene, _) = at(&mut h, &mut app, 2116);
+        assert!(
+            scene.layers[LayerId::Popup as usize]
+                .geometry
+                .under
+                .is_empty(),
+            "{tier:?}: the list is gone"
+        );
+        // Then it settles (Full: once the combo's closed look has faded in).
+        let (_, out) = at(&mut h, &mut app, 3500);
+        assert_eq!(out.repaint, Repaint::Idle, "{tier:?}: settles");
     }
 }

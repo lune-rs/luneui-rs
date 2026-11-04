@@ -32,6 +32,7 @@ impl Ui<'_> {
             return false;
         };
         k.consumed = true;
+        self.input_acted = true;
         if k.target.is_none() {
             self.store.focus.visible = true;
         }

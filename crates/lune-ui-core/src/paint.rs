@@ -234,6 +234,22 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         }
     }
 
+    /// Starts an inner recording, returning the outer one (if any) to hand to
+    /// [`Self::unnest_recording`].
+    pub(crate) fn nest_recording(&mut self) -> Option<Ops> {
+        self.recording.replace(Vec::new()).map(|ops| Ops { ops })
+    }
+
+    /// Ends an inner recording: returns it, and resumes `outer` with the inner calls appended.
+    pub(crate) fn unnest_recording(&mut self, outer: Option<Ops>) -> Ops {
+        let inner = self.take_recording();
+        if let Some(Ops { mut ops }) = outer {
+            ops.extend(inner.ops.iter().cloned());
+            self.recording = Some(ops);
+        }
+        inner
+    }
+
     /// Replays `ops` through this painter's own methods, so the result depends on its current
     /// state (theme, scale, text system) as if the calls were made here.
     pub fn replay(&mut self, ops: &Ops) {

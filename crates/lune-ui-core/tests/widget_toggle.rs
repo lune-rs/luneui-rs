@@ -184,9 +184,13 @@ fn reduced_snaps_the_knob_and_off_snaps_everything() {
     h.input.key_down(Key::Named(NamedKey::Space), None);
     h.at_ms(500);
     let (first, _, repaint) = frame(&mut h, &mut on);
+    // A consumed key asks for one catch-up frame (D81), which is already still.
+    assert_eq!(repaint, Repaint::Now);
+    h.at_ms(516);
+    let (_, _, repaint) = frame(&mut h, &mut on);
+    assert_eq!(repaint, Repaint::Idle);
     h.at_ms(2000);
     let (last, _, _) = frame(&mut h, &mut on);
-    assert_eq!(repaint, Repaint::Idle);
     assert_eq!(first, last);
 }
 

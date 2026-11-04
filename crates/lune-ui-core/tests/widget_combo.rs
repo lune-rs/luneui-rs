@@ -279,5 +279,7 @@ fn the_node_is_a_combo_box_whose_expanded_state_follows_open() {
         assert!(node.states.contains(State::Focusable));
         assert!(node.actions.contains(Action::Default));
         assert!(node.actions.contains(Action::Expand));
+        // It never closes itself, so it advertises no collapse (review F5).
+        assert!(!node.actions.contains(Action::Collapse));
     }
 }

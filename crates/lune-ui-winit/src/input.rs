@@ -279,12 +279,18 @@ pub fn cursor_icon(icon: CursorIcon) -> WCursor {
 
 /// The event loop's control flow for a frame's [`Repaint`], and whether to request a redraw now:
 /// `Idle` waits for input, `Now` waits and asks for a redraw, `At(t)` waits until `origin + t`,
-/// where `origin` is the instant the app's time `0` was taken. Reads no clock.
+/// where `origin` is the instant the app's time `0` was taken (a `t` too far to represent waits
+/// for input). Reads no clock.
 pub fn control_flow(repaint: Repaint, origin: Instant) -> (ControlFlow, bool) {
     match repaint {
         Repaint::Idle => (ControlFlow::Wait, false),
         Repaint::Now => (ControlFlow::Wait, true),
-        Repaint::At(t) => (ControlFlow::WaitUntil(origin + t), false),
+        Repaint::At(t) => (
+            origin
+                .checked_add(t)
+                .map_or(ControlFlow::Wait, ControlFlow::WaitUntil),
+            false,
+        ),
     }
 }
 

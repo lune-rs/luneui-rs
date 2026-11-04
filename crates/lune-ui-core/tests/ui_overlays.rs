@@ -252,6 +252,12 @@ fn off_tier_opens_at_once() {
     let mut phase = None;
     let (_, out) = h.frame(|ui| phase = Some(dialog(ui, "d", &modal()).0.phase));
     assert_eq!(phase, Some(OverlayPhase::Open));
+    // Focus moved into it after the page drew: one more frame (D81), then still.
+    assert_eq!(out.repaint, Repaint::Now);
+    let (_, out) = h
+        .at_ms(16)
+        .frame(|ui| phase = Some(dialog(ui, "d", &modal()).0.phase));
+    assert_eq!(phase, Some(OverlayPhase::Open));
     assert_eq!(out.repaint, Repaint::Idle);
 }
 
@@ -445,4 +451,53 @@ fn exit_painter_hits_are_suppressed_and_closing_overlays_are_inert() {
     h.input.pointer_to(20.0, 20.0).click(P);
     let b = run(&mut h, 1010, false);
     assert!(b.hovered && b.clicked, "a closing modal captures nothing");
+}
+
+#[test]
+fn a_modal_opening_under_a_still_pointer_asks_for_the_frame_with_the_right_hover() {
+    // Review F3 (a), D81: Off tier, nothing animates; the open frame resolved hover against the
+    // page's regions, so it asks for one more frame, which hovers the dialog's OK.
+    let mut h = harness();
+    h.tier = MotionTier::Off;
+    let run = |h: &mut UiHarness, open: bool| {
+        let (mut page, mut ok) = (false, false);
+        let (_, out) = h.frame(|ui| {
+            let id = ui.id("under");
+            page = ui
+                .interact(id, Rect::new(150.0, 170.0, 100.0, 50.0), Sense::CLICK)
+                .hovered;
+            if open {
+                ok = dialog(ui, "d", &modal()).1.hovered;
+            }
+        });
+        (page, ok, out.repaint)
+    };
+    run(&mut h, false);
+    h.input.pointer_to(170.0, 190.0);
+    assert_eq!(run(h.at_ms(10), false), (true, false, Repaint::Idle));
+    let (page, ok, repaint) = run(h.at_ms(20), true);
+    assert!(page && !ok, "the open frame's hover is the page's");
+    assert_eq!(repaint, Repaint::Now);
+    assert_eq!(run(h.at_ms(30), true), (false, true, Repaint::Idle));
+}
+
+#[test]
+fn a_nested_record_keeps_the_outer_recording_whole() {
+    // Review F7: the inner calls land in both recordings.
+    let mut h = harness();
+    h.frame(|ui| {
+        let ((_, inner), outer) = ui.record(|ui| {
+            ui.painter()
+                .fill(Rect::new(0.0, 0.0, 10.0, 10.0), 0.0, [255, 0, 0, 255]);
+            let r = ui.record(|ui| {
+                ui.painter()
+                    .fill(Rect::new(0.0, 0.0, 5.0, 5.0), 0.0, [0, 255, 0, 255]);
+            });
+            ui.painter()
+                .fill(Rect::new(0.0, 0.0, 2.0, 2.0), 0.0, [0, 0, 255, 255]);
+            r
+        });
+        assert_eq!(inner.len(), 1);
+        assert_eq!(outer.len(), 3);
+    });
 }

@@ -267,21 +267,26 @@ impl<'a> Ui<'a> {
         let r = content(self, &frame);
         self.painter.restore_state(saved);
         if self.opened.contains(&id) {
-            self.initial_focus(tag, first_hit, options.initial_focus);
+            self.initial_focus(tag, first_hit, options.initial_focus, options.modal);
         }
         (frame, r)
     }
 
     /// Runs `f` and returns what it drew as owned painter calls, for an exit painter to replay.
+    /// Nests: inside another `record` the outer recording also gets what `f` drew.
     pub fn record<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> (R, crate::paint::Ops) {
-        self.painter.start_recording();
+        let outer = self.painter.nest_recording();
         let r = f(self);
-        (r, self.painter.take_recording())
+        (r, self.painter.unnest_recording(outer))
     }
 
     /// At finish: starts closing every active overlay the app did not call (restoring focus),
     /// draws every closing overlay's exit frame and drops finished ones. Returns whether any
     /// overlay is still moving.
+    ///
+    /// Focus follows the scope stack: a closing overlay hands focus back only when focus is in it
+    /// (or gone), and a later overlay whose saved focus was inside the closing one inherits the
+    /// closing one's saved focus, so its own close restores to a widget that still exists.
     pub(crate) fn settle_overlays(
         store: &mut super::UiStore,
         painter: &mut Painter<'_, WidgetId>,
@@ -290,13 +295,35 @@ impl<'a> Ui<'a> {
         tokens: &MotionTokens,
         tier: MotionTier,
     ) -> bool {
+        let live: Vec<(u32, bool)> = store
+            .overlays
+            .iter()
+            .filter(|o| o.active() && o.called)
+            .map(|o| (o.tag, o.opts.modal))
+            .collect();
         let mut i = 0;
         while i < store.overlays.len() {
             let rec = &mut store.overlays[i];
             if rec.active() && !rec.called {
                 let (tag, saved, anchor) = (rec.tag, rec.saved_focus, rec.opts.anchor);
                 let keep = rec.start_closing(now, tokens, tier);
-                super::focus::restore_on_close(store, registered, tag, saved, anchor);
+                super::focus::restore_on_close(store, registered, &live, tag, saved, anchor);
+                let in_closing = |id: WidgetId| {
+                    !registered.contains_key(&id)
+                        && store
+                            .prev_hits
+                            .iter()
+                            .filter(|h| h.id == id)
+                            .map(|h| h.tag)
+                            .max()
+                            == Some(tag)
+                };
+                let heirs: Vec<usize> = (i + 1..store.overlays.len())
+                    .filter(|&j| store.overlays[j].saved_focus.is_some_and(in_closing))
+                    .collect();
+                for j in heirs {
+                    store.overlays[j].saved_focus = saved;
+                }
                 if !keep {
                     store.overlays.remove(i);
                     continue;

@@ -81,7 +81,7 @@ The dropdown's open and close motion belongs to `overlay.dropdown`, not to this 
 
 ### Accessibility
 
-- Role `combo-box`; name = the label the app passes; value = the current value text; states focusable, focused, expanded (while open), disabled; actions `expand` and `collapse`, `default` opens [infra.accessibility], [W docs/ui/components.md:381].
+- Role `combo-box`; name = the label the app passes; value = the current value text; states focusable, focused, expanded (while open), disabled; actions `expand`, `default` opens [infra.accessibility], [W docs/ui/components.md:381]. No `collapse`: the combo never closes itself; the open list's own `dismiss` closes it (D84).
 
 ### Strings
 

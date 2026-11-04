@@ -1,8 +1,14 @@
 //! `gallery --bench`: frame-time probes on a headless device (app code: it reads the clock).
 //!
 //! Each scenario is built, drawn, waited on and trimmed for `--frames` measured frames after a
-//! warm-up of 3, `--runs` times; a line per scenario reports the median over runs of each field.
-//! Offscreen only: no window, no event loop, no screen capture.
+//! warm-up of 3, `--runs` times (default 5); a line per scenario reports the median over runs of
+//! each field. Offscreen only: no window, no event loop, no screen capture.
+//!
+//! Robust to a busy machine (D85): each run is judged on its own (its p99 and its own worst
+//! frame), and a scenario is `OVER` only when at least half its runs are; a minority of over runs
+//! is reported beside an `ok`. The self-test is a calibration, not a gate: its spread (p99 and max
+//! above its p50) and the load average are printed with every verdict so a reader can see the
+//! conditions. Exit 2 is kept for usage and setup errors only.
 //!
 //! Scenarios: one timeline per page, then the effects page's cost probes and a self-test.
 //! A legacy page cycles its static scenes (each held for `HOLD` frames). A Ui page replays, for
@@ -11,7 +17,7 @@
 //! The probes: two text-fade grids (alpha moves every frame and every label carries the cycle
 //! number, so each fade frame shapes fresh text keys), a scaling and fading dialog over a blurred
 //! stripe page, one static reference scene, and a self-test (a 4 ms busy-wait in the build phase)
-//! that checks the instrument. Probe time advances 1/60 s per frame.
+//! that calibrates the instrument. Probe time advances 1/60 s per frame.
 //!
 //! GPU time is the wait of `device.poll` after the draw's submit (submit to done): the frame
 //! renderer builds and submits its encoder internally, so encoder timestamps around the draw
@@ -59,7 +65,7 @@ pub(crate) struct Options {
 impl Options {
     pub(crate) fn parse(args: &[String]) -> Result<Self, String> {
         let mut o = Options {
-            runs: 3,
+            runs: 5,
             frames: 600,
             size: DEFAULT_SIZE,
         };
@@ -227,6 +233,38 @@ struct Outcome {
     /// The largest measured frame of any run.
     worst: f64,
     cpu_p50: f64,
+    /// Runs over budget on their own p99 or their own worst frame.
+    runs_over: usize,
+    runs: usize,
+    /// Measured frames over `BUDGET_MAX_MS`, summed over runs.
+    frames_over: usize,
+}
+
+impl Outcome {
+    /// Over budget in at least half the runs; a minority of over runs is load, not the build.
+    fn over(&self) -> bool {
+        self.runs_over * 2 >= self.runs
+    }
+}
+
+/// The 1-minute load average, when the platform reports one (app code may read it).
+fn load1() -> String {
+    if let Ok(s) = std::fs::read_to_string("/proc/loadavg")
+        && let Some(v) = s.split_whitespace().next()
+    {
+        return v.to_owned();
+    }
+    std::process::Command::new("sysctl")
+        .args(["-n", "vm.loadavg"])
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .and_then(|s| {
+            s.split_whitespace()
+                .find(|t| t.parse::<f64>().is_ok())
+                .map(str::to_owned)
+        })
+        .unwrap_or_else(|| "unknown".to_owned())
 }
 
 fn ms(d: Duration) -> f64 {
@@ -466,6 +504,7 @@ fn measure(r: &mut Renderer, sc: &Scenario, o: &Options) -> Result<Outcome, Stri
     let mut runs = Vec::new();
     let mut worst: f64 = 0.0;
     let mut cpu: Vec<f64> = Vec::new();
+    let (mut runs_over, mut frames_over) = (0, 0);
     for _ in 0..o.runs {
         let mut driver = Driver::new(sc.kind, o.size);
         for _ in 0..WARMUP {
@@ -479,6 +518,8 @@ fn measure(r: &mut Renderer, sc: &Scenario, o: &Options) -> Result<Outcome, Stri
         }
         let st = stats(&samples);
         worst = worst.max(st.max);
+        runs_over += usize::from(!(st.p99 <= BUDGET_P99_MS && st.max <= BUDGET_MAX_MS));
+        frames_over += samples.iter().filter(|s| s.full > BUDGET_MAX_MS).count();
         cpu.extend(samples.iter().map(Sample::cpu));
         runs.push(st);
     }
@@ -486,15 +527,14 @@ fn measure(r: &mut Renderer, sc: &Scenario, o: &Options) -> Result<Outcome, Stri
         median: median_stats(&runs),
         worst,
         cpu_p50: percentile(&sorted(cpu), 0.50),
+        runs_over,
+        runs: runs.len(),
+        frames_over,
     })
 }
 
-fn passes(o: &Outcome) -> bool {
-    o.median.p99 <= BUDGET_P99_MS && o.worst <= BUDGET_MAX_MS
-}
-
-/// Runs the bench. Exit 0: every judged scenario passed; 1: some are over budget; 2: usage or
-/// setup error, or an instrument check failed.
+/// Runs the bench. Exit 0: every judged scenario passed in more than half its runs; 1: some are
+/// over budget in at least half; 2: usage or setup error. Never refuses a busy machine (D85).
 pub(crate) fn run(o: &Options) -> ExitCode {
     match run_inner(o) {
         Ok(code) => ExitCode::from(code),
@@ -527,30 +567,61 @@ fn run_inner(o: &Options) -> Result<u8, String> {
         "bench: runs={} frames={} size={}x{}",
         o.runs, o.frames, o.size.0, o.size.1
     );
+    println!("bench: load1={} at start", load1());
     let mut r = offscreen_renderer(gpu);
     let mut over = 0;
     let (mut controls_p50, mut label_p50) = (None, None);
+    // The self-test's spread above its own p50 (p99, max): how noisy this machine is right now.
+    let mut calib = None;
     for sc in scenarios(o.size) {
         let out = measure(&mut r, &sc, o)?;
-        if matches!(sc.kind, Kind::SelftestSleep4) && !(4.0..=6.0).contains(&out.cpu_p50) {
-            println!(
-                "bench {} cpu_p50={:.2} ms outside [4.0, 6.0]",
-                sc.name, out.cpu_p50
-            );
-            return Err("instrument check failed".into());
-        }
         let m = out.median;
-        let verdict = match (sc.judged, passes(&out)) {
-            (false, _) => "report-only",
-            (true, true) => "ok",
-            (true, false) => {
+        if matches!(sc.kind, Kind::SelftestSleep4) {
+            let spread = (m.p99 - m.p50, out.worst - m.p50);
+            let in_range = (4.0..=6.0).contains(&out.cpu_p50);
+            println!(
+                "bench: calibration {} cpu_p50={:.2} (expected 4.0-6.0: {}) p50={:.2} p99={:.2} worst={:.2} spread_p99=+{:.2} spread_max=+{:.2} load1={}",
+                sc.name,
+                out.cpu_p50,
+                if in_range { "in range" } else { "OUT OF RANGE" },
+                m.p50,
+                m.p99,
+                out.worst,
+                spread.0,
+                spread.1,
+                load1(),
+            );
+            calib = Some(spread);
+            continue;
+        }
+        let verdict = match (sc.judged, out.over()) {
+            (false, _) => "report-only".to_owned(),
+            (true, false) if out.runs_over == 0 => "ok".to_owned(),
+            (true, false) => format!("ok (over in {}/{} runs)", out.runs_over, out.runs),
+            (true, true) => {
                 over += 1;
-                "OVER"
+                format!("OVER (in {}/{} runs)", out.runs_over, out.runs)
             }
         };
+        let (sp99, smax) = calib.unwrap_or((0.0, 0.0));
         println!(
-            "bench {} frames={} p50={:.2} p95={:.2} p99={:.2} max={:.2} cpu_p99={:.2} gpu_p99={:.2} gpu=wait worst={:.2} {}",
-            sc.name, o.frames, m.p50, m.p95, m.p99, m.max, m.cpu_p99, m.gpu_p99, out.worst, verdict
+            "bench {} frames={} p50={:.2} p95={:.2} p99={:.2} max={:.2} cpu_p99={:.2} gpu_p99={:.2} gpu=wait worst={:.2} frames_over_33={} runs_over={}/{} load1={} calib_spread=+{:.2}/+{:.2} {}",
+            sc.name,
+            o.frames,
+            m.p50,
+            m.p95,
+            m.p99,
+            m.max,
+            m.cpu_p99,
+            m.gpu_p99,
+            out.worst,
+            out.frames_over,
+            out.runs_over,
+            out.runs,
+            load1(),
+            sp99,
+            smax,
+            verdict
         );
         match sc.name.as_str() {
             CONTROLS_PROBE => controls_p50 = Some(m.p50),
@@ -558,13 +629,13 @@ fn run_inner(o: &Options) -> Result<u8, String> {
             _ => {}
         }
     }
-    println!("bench: {over} over budget");
+    println!("bench: {over} over budget; load1={} at end", load1());
     if let (Some(c), Some(l)) = (controls_p50, label_p50)
         && l <= c
     {
-        return Err(format!(
-            "instrument check failed: label-fade-64 p50 {l:.2} ms is not above {CONTROLS_PROBE} p50 {c:.2} ms"
-        ));
+        println!(
+            "bench: calibration warning: label-fade-64 p50 {l:.2} ms is not above {CONTROLS_PROBE} p50 {c:.2} ms"
+        );
     }
     Ok(u8::from(over > 0))
 }

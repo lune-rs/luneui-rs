@@ -380,3 +380,194 @@ fn focus_moving_outside_or_window_blur_dismisses_a_focus_loss_overlay() {
     h.input.focus(false);
     assert_eq!(run(&mut h, None), Some(Dismissal::FocusLoss));
 }
+
+// Focus across the overlay stack (review F1, F4; D82, D83): opening or closing an overlay never
+// moves focus out of a still-open overlay above it, never lands it under an open modal, and
+// closing restores along the stack.
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Ov {
+    /// A light-dismiss popup with one focusable item.
+    Menu,
+    /// A second popup (a submenu) with one focusable item.
+    Sub,
+    /// A modal with one focusable OK.
+    Dialog,
+    /// A Toast-layer overlay with only a hover region and no dismissal: passive.
+    Toast,
+}
+
+fn ov_opts(o: Ov) -> OverlayOptions {
+    let popup = OverlayOptions {
+        layer: LayerId::Popup,
+        modal: false,
+        dismiss_on_outside_press: true,
+        ..modal()
+    };
+    match o {
+        Ov::Menu | Ov::Sub => popup,
+        Ov::Dialog => modal(),
+        Ov::Toast => OverlayOptions {
+            layer: LayerId::Toast,
+            dismiss_on_escape: false,
+            dismiss_on_outside_press: false,
+            ..popup
+        },
+    }
+}
+
+/// The page button and the overlays `ovs` in call order. Returns the focused key and the
+/// dismissals reported.
+fn stack(h: &mut UiHarness, ovs: &[Ov]) -> (Option<&'static str>, Vec<(Ov, Dismissal)>) {
+    let mut focused = None;
+    let mut dismissed = Vec::new();
+    h.frame(|ui| {
+        ui.painter().on(LayerId::Page);
+        if stop(ui, "page", 0).focused {
+            focused = Some("page");
+        }
+        for &o in ovs {
+            let key = format!("{o:?}");
+            let (f, _) = ui.overlay(
+                key.as_str(),
+                &ov_opts(o),
+                |_, _, _| {},
+                |ui, _| {
+                    let (k, i, sense) = match o {
+                        Ov::Menu => ("item", 1, Sense::CLICK_FOCUS),
+                        Ov::Sub => ("sub-item", 3, Sense::CLICK_FOCUS),
+                        Ov::Dialog => ("ok", 2, Sense::CLICK_FOCUS),
+                        Ov::Toast => ("toast", 5, Sense::HOVER),
+                    };
+                    let id = ui.id(k);
+                    if ui.interact(id, rect(i), sense).focused {
+                        assert!(focused.is_none(), "one focused widget");
+                        focused = Some(k);
+                    }
+                },
+            );
+            if let Some(d) = f.dismissed {
+                dismissed.push((o, d));
+            }
+        }
+    });
+    (focused, dismissed)
+}
+
+/// Focuses the page button with Tab.
+fn page_focused() -> UiHarness {
+    let mut h = harness();
+    stack(&mut h, &[]);
+    tab(&mut h);
+    assert_eq!(stack(&mut h, &[]).0, Some("page"));
+    h
+}
+
+#[test]
+fn a_menu_that_stops_under_the_dialog_it_opened_leaves_focus_in_the_dialog() {
+    use Ov::{Dialog, Menu};
+    let mut h = page_focused();
+    stack(&mut h, &[Menu]);
+    assert_eq!(stack(&mut h, &[Menu]).0, Some("item"));
+    // The item is picked: the app opens the dialog while the menu is still called.
+    stack(&mut h, &[Menu, Dialog]);
+    assert_eq!(stack(&mut h, &[Menu, Dialog]).0, Some("ok"));
+    // The app stops calling the menu.
+    assert_eq!(stack(&mut h, &[Dialog]).0, Some("ok"));
+    assert_eq!(
+        stack(&mut h, &[Dialog]).0,
+        Some("ok"),
+        "focus stays in the modal"
+    );
+    // Tab stays trapped in the dialog.
+    tab(&mut h);
+    assert_eq!(stack(&mut h, &[Dialog]).0, Some("ok"));
+    // The dialog closes after the menu already closed: focus returns to the page button the
+    // menu had saved (the dialog inherited it).
+    stack(&mut h, &[]);
+    assert_eq!(stack(&mut h, &[]).0, Some("page"));
+}
+
+#[test]
+fn a_toast_opened_before_a_dialog_closes_without_moving_focus() {
+    use Ov::{Dialog, Toast};
+    let mut h = page_focused();
+    // A passive toast takes no focus when it opens (D82).
+    stack(&mut h, &[Toast]);
+    assert_eq!(stack(&mut h, &[Toast]).0, Some("page"));
+    stack(&mut h, &[Toast, Dialog]);
+    assert_eq!(stack(&mut h, &[Toast, Dialog]).0, Some("ok"));
+    // The toast expires under the open dialog.
+    stack(&mut h, &[Dialog]);
+    assert_eq!(stack(&mut h, &[Dialog]).0, Some("ok"));
+    // The dialog closes: back to the page button, which the toast had kept.
+    stack(&mut h, &[]);
+    assert_eq!(stack(&mut h, &[]).0, Some("page"));
+}
+
+#[test]
+fn a_toast_over_an_open_dialog_takes_neither_focus_nor_escape() {
+    use Ov::{Dialog, Toast};
+    let mut h = page_focused();
+    stack(&mut h, &[Dialog]);
+    assert_eq!(stack(&mut h, &[Dialog]).0, Some("ok"));
+    stack(&mut h, &[Dialog, Toast]);
+    assert_eq!(stack(&mut h, &[Dialog, Toast]).0, Some("ok"));
+    // Escape goes past the passive toast to the dialog.
+    h.input.key_down(Key::Named(NamedKey::Escape), None);
+    let (f, d) = stack(&mut h, &[Dialog, Toast]);
+    assert_eq!(f, Some("ok"));
+    assert_eq!(d, [(Dialog, Dismissal::Escape)]);
+    // The toast closes over the dialog: focus stays on OK.
+    stack(&mut h, &[Dialog]);
+    assert_eq!(stack(&mut h, &[Dialog]).0, Some("ok"));
+}
+
+#[test]
+fn a_toast_opening_keeps_a_click_focused_page_widget_focused() {
+    let mut h = harness();
+    stack(&mut h, &[]);
+    h.input.pointer_to(20.0, 20.0).click(P);
+    assert_eq!(stack(&mut h, &[]).0, Some("page"));
+    stack(&mut h, &[Ov::Toast]);
+    assert_eq!(stack(&mut h, &[Ov::Toast]).0, Some("page"));
+    // An outside press goes past the passive toast too: it is a plain press on the page.
+    h.input.pointer_to(20.0, 20.0).click(P);
+    let (f, d) = stack(&mut h, &[Ov::Toast]);
+    assert_eq!((f, d), (Some("page"), vec![]));
+}
+
+#[test]
+fn a_menu_and_its_submenu_closing_in_one_frame_restore_the_page() {
+    use Ov::{Menu, Sub};
+    let mut h = page_focused();
+    stack(&mut h, &[Menu]);
+    assert_eq!(stack(&mut h, &[Menu]).0, Some("item"));
+    stack(&mut h, &[Menu, Sub]);
+    assert_eq!(stack(&mut h, &[Menu, Sub]).0, Some("sub-item"));
+    stack(&mut h, &[]);
+    assert_eq!(stack(&mut h, &[]).0, Some("page"));
+}
+
+#[test]
+fn closing_never_restores_focus_under_an_open_modal() {
+    use Ov::{Dialog, Menu};
+    // The menu holds focus and a modal opens over it; a press on the menu item (now under the
+    // modal) cannot pull focus back out, and when the menu stops, its saved page button is
+    // under the modal, so focus never goes there.
+    let mut h = page_focused();
+    stack(&mut h, &[Menu]);
+    assert_eq!(stack(&mut h, &[Menu]).0, Some("item"));
+    stack(&mut h, &[Menu, Dialog]);
+    // Focus is moved back into the menu by the app, then the menu stops.
+    h.input.pointer_to(rect(1).x + 5.0, 20.0).click(P);
+    let (f, _) = stack(&mut h, &[Menu, Dialog]);
+    assert_ne!(f, Some("page"));
+    stack(&mut h, &[Dialog]);
+    let (f, _) = stack(&mut h, &[Dialog]);
+    assert_ne!(
+        f,
+        Some("page"),
+        "a page widget never takes focus under the modal"
+    );
+}

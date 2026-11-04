@@ -82,6 +82,21 @@ pub(crate) struct PointerFrame {
     pub(crate) scroll_pixels: BTreeMap<WidgetId, (f32, f32)>,
 }
 
+impl PointerFrame {
+    /// Whether the frame's pointer input resolved to something a widget reacts to after it drew:
+    /// a click of any kind, a drag start, movement or stop, or a scroll.
+    pub(crate) fn acted(&self) -> bool {
+        !(self.clicked.is_empty()
+            && self.double_clicked.is_empty()
+            && self.secondary_clicked.is_empty()
+            && self.drag_started.is_empty()
+            && self.drag_stopped.is_empty()
+            && self.drag_delta.is_empty()
+            && self.scroll_lines.is_empty()
+            && self.scroll_pixels.is_empty())
+    }
+}
+
 fn add(m: &mut BTreeMap<WidgetId, (f32, f32)>, id: WidgetId, d: (f32, f32)) {
     let e = m.entry(id).or_insert((0.0, 0.0));
     e.0 += d.0;

@@ -45,7 +45,8 @@ pub enum ConformanceError {
     /// The first sample at or after the end is not the target exactly or still reports in
     /// flight, or a settled sample is not the target.
     End { frame: u64, at: Time },
-    /// It was in flight again after settling, or still in flight past duration plus one frame.
+    /// It was in flight again after settling. (A sampler still in flight at the first frame at
+    /// or after the end fails with `End` first, so a late settle reports `End`.)
     Late { frame: u64, at: Time, limit: Time },
     /// A sample is NaN or infinite.
     NotFinite { frame: u64, at: Time },
@@ -71,7 +72,7 @@ impl fmt::Display for ConformanceError {
             }
             ConformanceError::Late { frame, at, limit } => write!(
                 f,
-                "Late: frame {frame} ({at:?}) in flight after settling or past {limit:?}"
+                "Late: frame {frame} ({at:?}) in flight again after settling (limit {limit:?})"
             ),
             ConformanceError::NotFinite { frame, at } => {
                 write!(f, "NotFinite: frame {frame} ({at:?})")
@@ -115,8 +116,8 @@ pub fn conformance<T: Lerp>(
 
 /// Checks any sampler `t -> (value, in_flight)` on the 60 Hz grid from time 0: no step between
 /// consecutive samples longer than `bound` (`Jump`), every sample finite (`NotFinite`), the first
-/// sample at or after `end` exactly `target` and settled (`End`), and no sample in flight after
-/// the first settled one or past `end` plus one frame (`Late`). Sampling stops two frames after
+/// sample at or after `end` exactly `target` and settled (`End`, which is also how a late
+/// settle reports), and no sample in flight again after the first settled one (`Late`). Sampling stops two frames after
 /// the first settled sample.
 pub fn conformance_of<T: Lerp>(
     mut sampler: impl FnMut(Time) -> (T, bool),

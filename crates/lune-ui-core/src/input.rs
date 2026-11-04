@@ -173,10 +173,12 @@ pub enum ClipboardRequest {
 /// When the app should draw its next frame.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Repaint {
-    /// Nothing is animating or changing; the app may wait for input.
+    /// Nothing is animating or changing, and the frame's input changed nothing it drew before
+    /// reacting to; the app may wait for input.
     #[default]
     Idle,
-    /// Draw again as soon as possible.
+    /// Draw again as soon as possible: something is in flight, or this frame's input changed
+    /// state after the widgets drew (one catch-up frame, D81).
     Now,
     /// Draw again at this app time (an animation's next frame).
     At(Time),

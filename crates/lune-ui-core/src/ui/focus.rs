@@ -53,27 +53,35 @@ pub(crate) fn step(stops: &[WidgetId], current: Option<WidgetId>, back: bool) ->
     Some(stops[i])
 }
 
-/// On an overlay's close: when focus is inside it (or gone with it), focus returns to the id
-/// saved at open if it registered this frame, else to the anchor if it did, else nowhere.
-/// `registered` maps this frame's ids to their highest hit tag.
+/// On an overlay's close: when focus is inside it (or gone), focus returns to the id saved at
+/// open if it registered this frame, else to the anchor if it did, else nowhere. Focus in a later
+/// overlay that is still called is not inside: popping a scope that is not the active one never
+/// moves focus. A later overlay that closes this frame too (a child) counts as inside.
+/// `registered` maps this frame's ids to their highest hit tag; `live` lists the `(tag, modal)` of
+/// the overlays called this frame. A restore target under a live modal is never taken.
 pub(crate) fn restore_on_close(
     store: &mut UiStore,
     registered: &BTreeMap<WidgetId, u32>,
+    live: &[(u32, bool)],
     tag: u32,
     saved: Option<WidgetId>,
     anchor: Option<WidgetId>,
 ) {
+    let called = |t: u32| live.iter().any(|(l, _)| *l == t);
     let inside = match store.focus.focused {
         None => true,
-        Some(f) => registered.get(&f).is_none_or(|t| *t >= tag),
+        Some(f) => registered
+            .get(&f)
+            .is_none_or(|t| *t == tag || (*t > tag && !called(*t))),
     };
     if !inside {
         return;
     }
+    let under_modal = |t: u32| live.iter().any(|(l, modal)| *modal && *l > t);
     store.focus.focused = [saved, anchor]
         .into_iter()
         .flatten()
-        .find(|id| registered.contains_key(id));
+        .find(|id| registered.get(id).is_some_and(|t| !under_modal(*t)));
 }
 
 impl Ui<'_> {
@@ -83,8 +91,16 @@ impl Ui<'_> {
     }
 
     /// After a newly opened overlay's content: focus its `initial` stop if it registered one,
-    /// else its first stop, else nothing. The ring follows the last input's origin.
-    pub(crate) fn initial_focus(&mut self, tag: u32, first_hit: usize, initial: Option<WidgetId>) {
+    /// else its first stop. With no stop, a modal overlay focuses nothing and a non-modal one
+    /// leaves focus where it is (D82: a passive overlay such as a toast takes no focus). The ring
+    /// follows the last input's origin.
+    pub(crate) fn initial_focus(
+        &mut self,
+        tag: u32,
+        first_hit: usize,
+        initial: Option<WidgetId>,
+        modal: bool,
+    ) {
         let meta = self.painter.hit_meta();
         let mut stops = Vec::new();
         for r in &self.registered {
@@ -95,6 +111,9 @@ impl Ui<'_> {
         let pick = initial
             .filter(|i| stops.contains(i))
             .or_else(|| stops.first().copied());
+        if pick.is_none() && !modal {
+            return;
+        }
         self.store.focus.focused = pick;
         self.store.focus.visible = self.store.focus.keyboard;
         if pick.is_some() {

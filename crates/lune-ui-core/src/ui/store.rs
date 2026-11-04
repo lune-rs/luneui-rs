@@ -55,6 +55,8 @@ pub struct UiStore {
     pub(crate) prev_tree: SemanticTree,
     /// `(layer, hit tag)` each node of the previous frame was emitted under.
     pub(crate) prev_node_meta: BTreeMap<WidgetId, (usize, u32)>,
+    /// The previous frame asked for a frame only because its hover was stale (D81).
+    pub(crate) hover_catch_up: bool,
 }
 
 impl std::fmt::Debug for UiStore {

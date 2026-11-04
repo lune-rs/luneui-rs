@@ -1,7 +1,7 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-04 (M4 steps 20 and 21: core pages, C4 contract suite, docs)
+Last updated: 2026-11-04 (M4 review fix round 1: focus stack across overlays, Repaint catch-up, passive overlays, bench on a busy machine; D81-D85)
 
 ## Now
 
@@ -14,15 +14,16 @@ closed-form motion system (easings, tween, spring, keyframes, velocity-preservin
 Full, Reduced and Off tiers, theme motion tokens, a 60 Hz conformance harness). Every moved widget
 and overlay has a `Look`, a `paint` function, its old Painter-API wrapper (same pixels) and a `Ui`
 method; rest identity is proven by exact `Scene` equality tests. `docs/architecture.md` holds the
-module map, "The `Ui` frame" and "API changes since M1"; DECISIONS D59 to D80 record the M4 choices.
+module map, "The `Ui` frame" and "API changes since M1"; DECISIONS D59 to D85 record the M4 choices
+(D81-D85 from review fix round 1).
 The gallery has a page registry (two legacy pages, 15 Ui pages), `--dump`, `--list` (62 scene names)
 and `--bench`. The cross-widget contract suite is `crates/lune-ui-core/tests/c4.rs`.
 The pixel gate shows the 15 legacy scenes identical against the M1 base.
 
 ## Next
 
-1. Run the acceptance bench alone (`cargo run --release -p gallery -- --bench`, plus `--size
-   3456x2234` report-only); a failure is reported with per-page numbers, never loosened. Then review
+1. Run the acceptance bench (`cargo run --release -p gallery -- --bench`, 5 runs, runnable on a
+   busy machine per D85, plus `--size 3456x2234` report-only); a failure is reported with per-page numbers, never loosened. Then review
    and merge M4.
 2. M5 onward per the roadmap: text input (typing, search clear, IME composition) and the clipboard
    fake, then the remaining controls (button variants, the radio) and the layout and data

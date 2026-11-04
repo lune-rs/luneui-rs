@@ -231,9 +231,12 @@ drive the same state through a `Player` (a scripted input, the retained store an
 
 `gallery --bench [--runs N] [--frames N] [--size WxH]` times offscreen frames: a timeline per page,
 cost probes (text fades, a scaling and fading dialog over a blurred stripe page) and a 4 ms-sleep
-self-test that checks the instrument. Warm-up 3 frames, median over runs of each page's p99, at
-2080 x 1320 (1040 x 660 at 2x); a page passes at a median p99 of at most 16.6 ms and no frame over
-33 ms. It is the milestone acceptance run, alone on the machine, not part of the per-commit gate.
+self-test that calibrates the instrument. Warm-up 3 frames, 5 runs by default, at 2080 x 1320
+(1040 x 660 at 2x). Each run is judged on its own: p99 at most 16.6 ms and no frame over 33 ms; a
+page is `OVER` only when at least half its runs are, and a minority of over runs is printed beside
+its `ok`. The self-test's spread (p99 and worst above its p50) and the load average are printed with
+every verdict; nothing refuses a busy machine (D85). It is the milestone acceptance run, not part of
+the per-commit gate.
 
 ## Boundary rules
 

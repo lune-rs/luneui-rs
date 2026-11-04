@@ -503,7 +503,9 @@ fn reduced_open_is_a_fade_without_scale_at_the_fast_length() {
 #[test]
 fn off_opens_at_once() {
     let (opacity, scale) = sample(MotionTier::Off, true);
-    assert!(opacity.iter().all(|s| s.1 == 1.0 && !s.2));
+    assert!(opacity.iter().all(|s| s.1 == 1.0));
+    // Only the open frame asks for one more frame, because focus moved in after it drew (D81).
+    assert!(opacity[0].2 && opacity.iter().skip(1).all(|s| !s.2));
     assert!(scale.iter().all(|s| s.1 == 1.0));
 }
 
@@ -516,8 +518,15 @@ fn close_hides_at_180_120_and_0_ms() {
     ] {
         let (opacity, scale) = sample(tier, false);
         let end = Time::from_millis(ms);
-        conformance_of(replay(&opacity), end, 0.0, 0.35)
-            .unwrap_or_else(|e| panic!("{tier:?}: {e}"));
+        if ms == 0 {
+            // Off: gone at once; only the close frame asks for one more frame, because focus
+            // returned after the page drew (D81).
+            assert!(opacity.iter().all(|s| s.1 == 0.0), "{tier:?}");
+            assert!(opacity[0].2 && opacity.iter().skip(1).all(|s| !s.2));
+        } else {
+            conformance_of(replay(&opacity), end, 0.0, 0.35)
+                .unwrap_or_else(|e| panic!("{tier:?}: {e}"));
+        }
         // Scale: 1 at the start; shrinks to 0.96 only when transforms apply (Full).
         if tier == MotionTier::Full {
             assert_eq!(scale[0].1, 1.0);
@@ -530,11 +539,12 @@ fn close_hides_at_180_120_and_0_ms() {
         } else {
             assert!(scale.iter().filter(|s| s.1 != 0.96).all(|s| s.1 == 1.0));
         }
-        // After the end nothing is drawn and nothing moves.
+        // After the end nothing is drawn and nothing moves (Off's close frame is the D81
+        // catch-up checked above).
         assert!(
             opacity
                 .iter()
-                .filter(|s| s.0 >= end)
+                .filter(|s| s.0 >= end && (ms > 0 || s.0 > end))
                 .all(|s| s.1 == 0.0 && !s.2),
             "{tier:?}"
         );
