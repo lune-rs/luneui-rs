@@ -10,9 +10,9 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | status | count |
 | --- | --- |
 | in-luneterm | 0 |
-| planned | 55 |
+| planned | 44 |
 | stub | 0 |
-| in-progress | 38 |
+| in-progress | 49 |
 | done | 0 |
 | external | 4 |
 | **total** | **97** |
@@ -25,7 +25,7 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | [core.color](core/color.md) | Colour helpers | in-progress | luneterm | Straight-alpha RGBA values with premultiply, blend-over and alpha helpers |
 | [core.focus](core/focus.md) | Keyboard focus | in-progress | any | Tab order by call order within focus scopes, focus-visible, scope push, trap and restore, roving focus in composites |
 | [core.icon](core/icon.md) | Codicon glyph constants | in-progress | luneterm, wane | Codicon glyph constants and a glyph helper; the app supplies the icon font |
-| [core.image](core/image.md) | Image drawing | planned | lunegit, wane | Image primitive: app-decoded RGBA drawn into a rect with a fit mode, alpha and optional corner radius; explicit resource lifetime |
+| [core.image](core/image.md) | Image drawing | in-progress | lunegit, wane | Image primitive: app-decoded RGBA drawn into a rect with a fit mode, alpha and optional corner radius; explicit resource lifetime |
 | [core.input](core/input.md) | Input model | in-progress | any | Plain-data RawInput in, FrameOutput out; the windowing adapter translates both |
 | [core.painter](core/painter.md) | Immediate-mode painter | in-progress | luneterm | Painter: ordered layers, fills, rings, strokes, acrylic, text, clip, transform and hit regions, building a plain-data Scene; holds the aggregate table of new primitives |
 | [core.scene](core/scene.md) | Display list | in-progress | any | Plain-data Scene the painter builds and a renderer consumes; the draw-order contract |
@@ -72,7 +72,7 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | [widget.nav-item](widget/nav-item.md) | Navigation item | planned | wane | Navigation item: 32 px row, secondary text at rest, surface-selected fill and bright text when active, no accent bar |
 | [widget.radio-group](widget/radio-group.md) | Radio group | planned | wane | Radio group: vertical 16 px rings, accent ring and 6 px dot when selected; arrow keys move the selection inside the group |
 | [widget.row](widget/row.md) | Row (setting row, list item row) | planned | wane | Row: setting row (title, description, control at right, min 56 high) or compact item row (32 high, four columns); hover tints the row; rows are not clickable |
-| [widget.scrollbar](widget/scrollbar.md) | Scrollbars | planned | lunegit, wane | Overlay scrollbar: 9 px transparent track, 6 px accent thumb, auto-hide while the pointer is away, thumb drag |
+| [widget.scrollbar](widget/scrollbar.md) | Scrollbars | in-progress | lunegit, wane | Overlay scrollbar: 9 px transparent track, 6 px accent thumb, auto-hide while the pointer is away, thumb drag |
 | [widget.search-picker](widget/search-picker.md) | Search picker | planned | lunegit | Search picker: a field-style or link-style trigger that opens a searchable list; Escape closes, Enter picks the first match |
 | [widget.slider](widget/slider.md) | Slider | planned | any | Slider: 4 px track with accent fill and a 12 px knob (14 hovered); look derived from the toggle knob and the progress track; arrow keys step |
 | [widget.spinner](widget/spinner.md) | Spinner | planned | any | Spinner: a 14 px glyph that turns a full revolution every 1.2 s while busy; static under Reduced and Off |
@@ -95,10 +95,10 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | [overlay.dropdown](overlay/dropdown.md) | Drop-down list | in-progress | luneterm, wane | Combo drop-down option list that flips above its anchor near the window bottom |
 | [overlay.flyout](overlay/flyout.md) | Tray flyout | planned | wane | Windows tray left-click surface: header, stats, route list, action rows |
 | [overlay.menu](overlay/menu.md) | Glass context menu | in-progress | luneterm, wane | Glass context menu with open and close motion |
-| [overlay.popover](overlay/popover.md) | Anchored popover | planned | any | Anchored overlay placement and lifecycle: flip and shift inside the window, dismiss on outside click, Escape and focus loss, Popup layer, focus scope |
+| [overlay.popover](overlay/popover.md) | Anchored popover | in-progress | any | Anchored overlay placement and lifecycle: flip and shift inside the window, dismiss on outside click, Escape and focus loss, Popup layer, focus scope |
 | [overlay.popup-panel](overlay/popup-panel.md) | Popup panel surface | in-progress | luneterm | Shared popup surface: radius-8 fill and 1 px ring, colours passed by the caller (used by the drop-down list) |
 | [overlay.toast-notifications](overlay/toast-notifications.md) | Toasts and notification history | planned | lunegit | Bottom-right toast stack (max 3, timed dismissal, loading and prompt toasts) and a 50-item notification history |
-| [overlay.tooltip](overlay/tooltip.md) | Tooltips | planned | lunegit, wane | Hover tooltip: glass shell radius 8, padding 10 by 8, one 800 ms show delay, text or small rich content, also on disabled controls |
+| [overlay.tooltip](overlay/tooltip.md) | Tooltips | in-progress | lunegit, wane | Hover tooltip: glass shell radius 8, padding 10 by 8, one 800 ms show delay, text or small rich content, also on disabled controls |
 
 ## layout
 
@@ -107,14 +107,14 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | [layout.icon-rail](layout/icon-rail.md) | Icon rail | planned | lunegit | Narrow icon column of 40 px toolbar buttons that switch the side panels and toggle the terminal, with a notification badge |
 | [layout.page](layout/page.md) | Page card (header, scroll body, footer) | planned | wane | The card that holds a screen: header with title and actions, scrolling body, optional pinned footer |
 | [layout.panel](layout/panel.md) | Panel (group box) | planned | wane | Outline-only group box with title, meta, body and action footer |
-| [layout.scroll-area](layout/scroll-area.md) | Scroll area | planned | any | Scrolling region: per-id offset, wheel and trackpad scrolling, scroll-into-view, follow-tail, offset kept across content replacement |
+| [layout.scroll-area](layout/scroll-area.md) | Scroll area | in-progress | any | Scrolling region: per-id offset, wheel and trackpad scrolling, scroll-into-view, follow-tail, offset kept across content replacement |
 | [layout.settings-page](layout/settings-page.md) | Settings page layout | planned | luneterm | Settings page shell: a 20 px content host for the current section, a restart banner that reveals on demand, and the rows and sections built from toolkit widgets |
 | [layout.side-panel](layout/side-panel.md) | Side panel host and panels | planned | lunegit | Side panel host that shows one of nine panels by key, with a fade and 6 px slide on show |
 | [layout.sidebar](layout/sidebar.md) | Sidebar | planned | wane | 208 px column on the window glass: nav list (or wizard steps) and a status footer |
 | [layout.split-panes](layout/split-panes.md) | Resizable split panes | planned | lunegit | Resizable columns and rows between panels and content, with a 4 px splitter that snaps columns shown or hidden |
-| [layout.stack](layout/stack.md) | Stack, row, column and grid layout | planned | any | Pure layout helpers: stack, row, column and grid with gaps, alignment, insets and fixed, fill and hug sizing |
+| [layout.stack](layout/stack.md) | Stack, row, column and grid layout | in-progress | any | Pure layout helpers: stack, row, column and grid with gaps, alignment, insets and fixed, fill and hug sizing |
 | [layout.tree-view](layout/tree-view.md) | Tree view and tree guides | planned | lunegit, wane | Tree rows with guide lines (trunk and rounded elbow) per depth; expansion is a set of node keys, animated on the container |
-| [layout.virtualized-list](layout/virtualized-list.md) | Virtualized list | planned | lunegit, wane | Builds only the visible rows; selection as a set of row keys (single, multi, range); keyboard navigation; no row animation while scrolling |
+| [layout.virtualized-list](layout/virtualized-list.md) | Virtualized list | in-progress | lunegit, wane | Builds only the visible rows; selection as a set of row keys (single, multi, range); keyboard navigation; no row animation while scrolling |
 
 ## data
 
@@ -136,10 +136,10 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | [text.code-block](text/code-block.md) | Code block | planned | lunegit, wane | Read-only mono block with optional app-supplied highlight spans, horizontal scroll, selectable text and a copy button with feedback |
 | [text.code-editor-view](text/code-editor-view.md) | Code viewer and editor with syntax highlighting | planned | lunegit, wane | Multi-line code view and editor over an app-supplied document: gutter, app-supplied highlight spans, line bands, synced scrolling, overlay anchors |
 | [text.diff-view](text/diff-view.md) | Diff view (unified, split, hunk actions) | planned | lunegit, wane | Unified and split diff over an app-supplied line model: line numbers, add and remove tints, hunk header rows with actions, row selection, intra-line marks |
-| [text.ime](text/ime.md) | IME composition input | planned | luneterm, lunegit, wane | IME composition in text widgets: preedit drawn inline at the caret, commit, candidate-window area, byte offsets from the platform |
+| [text.ime](text/ime.md) | IME composition input | in-progress | luneterm, lunegit, wane | IME composition in text widgets: preedit drawn inline at the caret, commit, candidate-window area, byte offsets from the platform |
 | [text.markdown-preview](text/markdown-preview.md) | Markdown preview | planned | lunegit | Renders an app-supplied Markdown block model: headings, paragraphs with inline marks, lists with task boxes, quotes, tables, code, images; links raise an event |
 | [text.shaping](text/shaping.md) | Shaped-text cache | in-progress | luneterm | TextSystem seam in core; glyphon TextCache behind it, keyed by content and scale; the app registers its fonts |
-| [text.text-edit](text/text-edit.md) | Text editing engine | planned | any | Caret, selection, word and line navigation, undo and redo, clipboard through FrameOutput and preedit for single- and multi-line text |
+| [text.text-edit](text/text-edit.md) | Text editing engine | in-progress | any | Caret, selection, word and line navigation, undo and redo, clipboard through FrameOutput and preedit for single- and multi-line text |
 
 ## motion
 
@@ -154,10 +154,10 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
 | [infra.accessibility](infra/accessibility.md) | Semantic tree and accessibility | in-progress | any | One semantic node per interactive widget per frame (role, name, value, states, actions), AccessAction routing, AccessKit bridge in M10 |
-| [infra.drag-and-drop](infra/drag-and-drop.md) | In-window drag and drop | planned | lunegit | In-window drag state machine (press, threshold, drag, release or cancel), nearest-slot target, edge auto-scroll; no OS drag |
+| [infra.drag-and-drop](infra/drag-and-drop.md) | In-window drag and drop | in-progress | lunegit | In-window drag state machine (press, threshold, drag, release or cancel), nearest-slot target, edge auto-scroll; no OS drag |
 | [infra.json](infra/json.md) | Bounded JSON reader | planned | any | Small JSON reader in core with input, depth and string limits, fail-closed errors and no panics; backs theme and locale loading |
 | [infra.localization](infra/localization.md) | Localization | in-progress | any | One string table of flat dotted keys in core, luneui. keys with English defaults, positional formatting; locale JSON loaded in M10 |
-| [infra.shortcut-routing](infra/shortcut-routing.md) | Keyboard shortcut routing | planned | any | A scoped chord registry resolved in three phases (preempt, focused widget, bubble); Lunegit has no central one |
+| [infra.shortcut-routing](infra/shortcut-routing.md) | Keyboard shortcut routing | in-progress | any | A scoped chord registry resolved in three phases (preempt, focused widget, bubble); Lunegit has no central one |
 | [infra.theme-hot-reload](infra/theme-hot-reload.md) | Theme JSON loading and hot reload | planned | lunegit | Theme files as JSON mapped onto the Theme value, partial overrides over a baseline, acrylic level, swapped at a frame boundary by the app |
 
 ## lunegit

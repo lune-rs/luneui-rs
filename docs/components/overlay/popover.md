@@ -2,10 +2,10 @@
 id: overlay.popover
 title: Anchored popover
 area: overlay
-status: planned
+status: in-progress
 consumers: any
-source: —
-owner: —
+source: crates/lune-ui-core/src/widgets/popover.rs
+owner: orch/toolkit-v1
 summary: Anchored overlay placement and lifecycle: flip and shift inside the window, dismiss on outside click, Escape and focus loss, Popup layer, focus scope
 ---
 
@@ -26,7 +26,7 @@ pickers are built on it or share its rules; today each repeats the flip by hand
 
 ## Existing code
 
-None as a component. The placement rule exists twice inline: `crates/lune-ui-core/src/widgets/dropdown.rs:19-23` (flip) and `crates/lune-ui-core/src/widgets/menu.rs:95-100` (flip and shift);
+Built in M5 (D101): `crates/lune-ui-core/src/widgets/popover.rs` (`place`, `Ui::popover`); the dropdown and the menu now call `place`. The placement rule had existed twice inline: `crates/lune-ui-core/src/widgets/dropdown.rs:19-23` (flip) and `crates/lune-ui-core/src/widgets/menu.rs:95-100` (flip and shift);
 the plain shell is `popup_panel` at `crates/lune-ui-core/src/widgets/mod.rs:200-203`; the layer order is `LayerId` at `crates/lune-ui-core/src/scene.rs:17-22`.
 
 ## Spec
@@ -128,14 +128,14 @@ None: the popover has no text of its own.
 
 ### Build
 
-- Milestone: M5
+- Milestone: M5. Built in M5 (steps 9 and 10; the page is `popover`). Carried: an overlay above a modal is unsupported, so a popover inside a dialog draws under it (flagged to M7). Open for `done` (D47): M11 re-checks the whole bar on every entry; the Windows and Linux run time is unverified (the Linux and Windows lint is `scripts/check-targets.sh`).
 - Depends on: core.ui, core.focus, infra.accessibility, motion.transitions, core.input
 
 ## Open questions
 
-- Does the dismissing press also reach the widget under it? Lunegit's pickers set `IsLightDismissEnabled` and no pass-through option in the files read [L src/Lunegit.Desktop/Controls/LinkSearchPicker.axaml:41]; the modal rule of C4 sends it to the dismiss rule only. M5 decides (default: consumed).
-- A popover larger than the window on both sides: clamp and scroll its content, or truncate; no source states it.
-- Side placement (left and right of the anchor) for sub-menus: none of the Lunegit placements read is a side placement; M5 adds it with menus.
+- Answered (D101, consumed): does the dismissing press also reach the widget under it? Lunegit's pickers set `IsLightDismissEnabled` and no pass-through option in the files read [L src/Lunegit.Desktop/Controls/LinkSearchPicker.axaml:41]; the modal rule of C4 sends it to the dismiss rule only. M5 decides (default: consumed).
+- Answered (D101, clamp and scroll its content): a popover larger than the window on both sides: clamp and scroll its content, or truncate; no source states it.
+- Answered (D101): side placement (left and right of the anchor) for sub-menus: none of the Lunegit placements read is a side placement; M5 adds it with menus.
 
 ## Notes for the planner
 

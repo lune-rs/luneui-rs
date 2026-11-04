@@ -132,12 +132,12 @@ The placeholder and the label are app text.
 
 ### Build
 
-- Milestone: M4 (retrofit: focus, semantic node, transitions) and M5 (the editing engine, variants, IME); done by M11. Deferred to M5 [D74]: variants, typing, search clear and IME composition, with the scenes `text-field-variants`, `text-field-search-clear` and `text-field-composing`.
+- Milestone: M4 (retrofit: focus, semantic node, transitions) and M5 (the editing engine, variants, IME); done by M11. Deferred to M5 [D74]: variants, typing, search clear and IME composition, with the scenes `text-field-variants`, `text-field-search-clear` and `text-field-composing`. M5 built the engine wiring, the variants, search clear and IME composition (`text_field_with`, `text_area`; D88); the deferred scenes `text-field-variants`, `text-field-search-clear` and `text-field-composing` exist. Open for `done` (D47): M11 re-checks the whole bar on every entry; real typing with an input method (R1) and bidi caret placement are unverified here, and so is the Windows and Linux run time.
 - Depends on: core.ui, core.focus, infra.accessibility, motion.transitions, text.text-edit, text.ime, platform.clipboard
 
 ## Open questions
 
-- None beyond the engine's (selection colour, Esc, undo depth: see `text.text-edit`); the date variant has no picker in either source.
+- Answered (D103, D88): none beyond the engine's (selection colour, Esc, undo depth: see `text.text-edit`); the date variant has no picker in either source.
 
 ## Notes for the planner
 

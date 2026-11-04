@@ -2,10 +2,10 @@
 id: infra.shortcut-routing
 title: Keyboard shortcut routing
 area: infra
-status: planned
+status: in-progress
 consumers: any
-source: Lunegit: src/Lunegit.Desktop/MainWindow.axaml
-owner: —
+source: crates/lune-ui-core/src/shortcuts.rs
+owner: orch/toolkit-v1
 summary: A scoped chord registry resolved in three phases (preempt, focused widget, bubble); Lunegit has no central one
 ---
 
@@ -26,7 +26,7 @@ screen is app-side.
 
 ## Existing code
 
-None in this repo. The moved menu draws a shortcut hint as app text (`crates/lune-ui-core/src/widgets/menu.rs:10-16`; the
+Built in M5 (D92, D93): `crates/lune-ui-core/src/shortcuts.rs` (`Shortcuts`, `Binding`, `Chord`, `Scope`, `CommandId`; `FrameConfig.shortcuts`, `FrameOutput.fired`). Before it, the moved menu drew a shortcut hint as app text (`crates/lune-ui-core/src/widgets/menu.rs:10-16`; the
 gallery menu shows "Cmd+N", "Cmd+C", "Cmd+," at `apps/gallery/src/scenes.rs:379-383`). Lunegit
 (`/Users/ijat/Projects/AvaloniaApps/Project Lunegit`, 33a1dd41), relative to its root:
 - `src/Lunegit.Desktop/MainWindow.axaml.cs:30,91-113` (window tunnel handler: Escape, Ctrl or Cmd+K)
@@ -116,13 +116,13 @@ None: chords are formatted with fixed ASCII names (Cmd, Ctrl, Alt, Shift, then t
 
 ### Build
 
-- Milestone: M5 (the registry is core, no platform code; `overlay.command-palette` of M7 binds through it; `core.ui`'s key phase and `core.focus` of M4 have an empty registry until then).
+- Milestone: M5 (the registry is core, no platform code; `overlay.command-palette` of M7 binds through it; `core.ui`'s key phase and `core.focus` of M4 have an empty registry until then). M5 built the registry (steps 3 and 6; the page is `shortcuts`, the `shortcut-hints` scene). `overlay.command-palette` of M7 binds through it. Open for `done` (D47): M11 re-checks the whole bar on every entry; the Windows and Linux run time is unverified (the Linux and Windows lint is `scripts/check-targets.sh`).
 - Depends on: core.input, core.focus, core.ui.
 
 ## Open questions
 
-- Whether the registry reports `Fired` through `FrameOutput` or through the `Response` of a `ui.shortcut(command)` call: both are cheap; the choice affects how an app reads it and is M5's to make with the gallery's shortcut page.
-- Whether a user-visible remap needs a persisted form (a JSON chord string): Lunegit has none, so no source gives a format; it would use `infra.json` if an app asks.
+- Answered (D93, `FrameOutput.fired`): whether the registry reports `Fired` through `FrameOutput` or through the `Response` of a `ui.shortcut(command)` call: both are cheap; the choice affects how an app reads it and is M5's to make with the gallery's shortcut page.
+- Still open (no consumer): whether a user-visible remap needs a persisted form (a JSON chord string): Lunegit has none, so no source gives a format; it would use `infra.json` if an app asks.
 
 ## Notes for the planner
 

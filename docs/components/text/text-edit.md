@@ -2,10 +2,10 @@
 id: text.text-edit
 title: Text editing engine
 area: text
-status: planned
+status: in-progress
 consumers: any
-source: —
-owner: —
+source: crates/lune-ui-core/src/text_edit.rs
+owner: orch/toolkit-v1
 summary: Caret, selection, word and line navigation, undo and redo, clipboard through FrameOutput and preedit for single- and multi-line text
 ---
 
@@ -27,7 +27,7 @@ selection or clipboard. Lunegit gets all of it from Avalonia's `TextBox`; the to
 
 ## Existing code
 
-None as an engine. The only editing code is `field` (`crates/lune-ui-core/src/widgets/mod.rs:120-144`): placeholder, text, a 1.5 px caret after the text. Input events exist
+Built in M5 (D87, D88, D92, D94, D95, D103): `crates/lune-ui-core/src/text_edit.rs` (`TextEdit`, `EditCommand`, `SpecLayout`) drives `field` and `text_area` (`widgets/field.rs`, `widgets/text_area.rs`). Before it, the only editing code was `field` (`crates/lune-ui-core/src/widgets/mod.rs:120-144`): placeholder, text, a 1.5 px caret after the text. Input events exist
 (`crates/lune-ui-core/src/input.rs:32-67`), including `Text`, `Key`, `Ime`; `TextSystem` has `prepare` and `measure` only (`crates/lune-ui-core/src/text.rs:110-118`).
 
 ## Spec
@@ -138,16 +138,16 @@ None: the engine has no text of its own. A cut, copy and paste context menu, if 
 
 ### Build
 
-- Milestone: M5
+- Milestone: M5. Built in M5 (steps 11 to 13 and 15; the page is `text-edit`, 10 new scenes). Not verified here: the clipboard adapter (the gallery answers from an in-process string until M10, D107). Open for `done` (D47): M11 re-checks the whole bar on every entry; real typing with an input method (R1) and bidi caret placement are unverified here, and so is the Windows and Linux run time.
 - Depends on: core.ui, core.focus, core.input, text.shaping, platform.clipboard, text.ime, infra.accessibility, motion.transitions
 
 ## Open questions
 
-- Selection fill colour and caret blink: no source states them (Lunegit leaves both to Avalonia, Wane does not mock them); M5 chooses a `Theme` value for the selection and decides on blink under the motion rules.
-- Esc in a field: Wane lists it [W docs/ui/components.md:353] but not what it does (blur, revert or clear); M5 decides.
-- Undo depth and the coalescing pause: no source; M5 decides.
-- A cut, copy and paste context menu on right press: Lunegit's text boxes use Avalonia's default, not read; M5 decides with `overlay.menu`.
-- Whether the word-motion flavour (end of word on macOS, start of the next word on Windows) is a flag the app passes or derived from the shortcut modifier flavour.
+- Answered (D103: `text_selection`, no blink): selection fill colour and caret blink: no source states them (Lunegit leaves both to Avalonia, Wane does not mock them); M5 chooses a `Theme` value for the selection and decides on blink under the motion rules.
+- Answered (D103, not consumed): Esc in a field: Wane lists it [W docs/ui/components.md:353] but not what it does (blur, revert or clear); M5 decides.
+- Answered (D103, 200 and 500 ms): undo depth and the coalescing pause: no source; M5 decides.
+- Answered (D103, none until M7's menu upgrades): a cut, copy and paste context menu on right press: Lunegit's text boxes use Avalonia's default, not read; M5 decides with `overlay.menu`.
+- Answered (D92, a `Keymap` value): whether the word-motion flavour (end of word on macOS, start of the next word on Windows) is a flag the app passes or derived from the shortcut modifier flavour.
 
 ## Notes for the planner
 

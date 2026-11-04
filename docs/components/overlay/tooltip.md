@@ -2,10 +2,10 @@
 id: overlay.tooltip
 title: Tooltips
 area: overlay
-status: planned
+status: in-progress
 consumers: lunegit, wane
-source: Lunegit: src/Lunegit.Desktop/App.axaml
-owner: —
+source: crates/lune-ui-core/src/widgets/tooltip.rs
+owner: orch/toolkit-v1
 summary: Hover tooltip: glass shell radius 8, padding 10 by 8, one 800 ms show delay, text or small rich content, also on disabled controls
 ---
 
@@ -25,7 +25,7 @@ sites, one explicit delay.
 
 ## Existing code
 
-None in `lune-ui` today. Design source (not code to move): Lunegit `src/Lunegit.Desktop/App.axaml:700-717` (the style), `Views/TerminalPanelView.axaml:263-264` (the one explicit delay),
+Built in M5 (D102): `crates/lune-ui-core/src/widgets/tooltip.rs` (`Ui::tooltip`, `tooltip_with`, `hover_dwell`). Design source (not code to move): Lunegit `src/Lunegit.Desktop/App.axaml:700-717` (the style), `Views/TerminalPanelView.axaml:263-264` (the one explicit delay),
 `Controls/LazyHoverHost.cs` (a hover dwell that is not a tooltip), `Views/AiProjectDetailView.axaml:88-116` (disabled-control tooltips).
 
 ## Spec
@@ -117,14 +117,14 @@ None: the text is supplied by the app (Lunegit's are app strings such as `termin
 
 ### Build
 
-- Milestone: M5
+- Milestone: M5. Built in M5 (steps 9 and 10; the page is `tooltip`, 8 scenes). Open for `done` (D47): M11 re-checks the whole bar on every entry; the Windows and Linux run time is unverified (the Linux and Windows lint is `scripts/check-targets.sh`).
 - Depends on: overlay.popover, core.ui, core.focus, infra.accessibility, motion.transitions
 
 ## Open questions
 
-- Show on keyboard focus: no source states it. Wane's accessibility need (the tray tooltip is the second channel for colour vision [W docs/ui/components.md:756]) argues for it; M5 decides.
-- Text size and maximum width: Lunegit's style sets neither (the content presenter inherits the text defaults [L src/Lunegit.Desktop/App.axaml:710-713]); M5 picks from the theme's `font_s` and `font_base`.
-- Whether a second tooltip shown soon after the first skips the delay (Avalonia has a between-show delay): not in the files read.
+- Answered (D102, yes): show on keyboard focus: no source states it. Wane's accessibility need (the tray tooltip is the second channel for colour vision [W docs/ui/components.md:756]) argues for it; M5 decides.
+- Answered (D102, `font_s`, 320): text size and maximum width: Lunegit's style sets neither (the content presenter inherits the text defaults [L src/Lunegit.Desktop/App.axaml:710-713]); M5 picks from the theme's `font_s` and `font_base`.
+- Answered (D102, no skip-delay): whether a second tooltip shown soon after the first skips the delay (Avalonia has a between-show delay): not in the files read.
 
 ## Notes for the planner
 

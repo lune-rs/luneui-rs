@@ -2,10 +2,10 @@
 id: layout.scroll-area
 title: Scroll area
 area: layout
-status: planned
+status: in-progress
 consumers: any
-source: —
-owner: —
+source: crates/lune-ui-core/src/widgets/scroll_area.rs
+owner: orch/toolkit-v1
 summary: Scrolling region: per-id offset, wheel and trackpad scrolling, scroll-into-view, follow-tail, offset kept across content replacement
 ---
 
@@ -25,7 +25,7 @@ behaviours (`ScrollOffsetPreserver`, `AutoScrollBehavior`); the toolkit has to o
 
 ## Existing code
 
-None in `lune-ui` today. Design source (not code to move): Lunegit `src/Lunegit.Desktop/Controls/ScrollOffsetPreserver.cs`,
+Built in M5 (D96 to D99): `crates/lune-ui-core/src/widgets/scroll_area.rs` (`Ui::scroll_area`, `scroll_area_untranslated`, `scroll_to`). Design source (not code to move): Lunegit `src/Lunegit.Desktop/Controls/ScrollOffsetPreserver.cs`,
 `Controls/AutoScrollBehavior.cs`, `Views/RepositoryContentView.axaml.cs:101-152` (scroll-into-view).
 
 ## Spec
@@ -127,13 +127,13 @@ None: the area has no text of its own.
 
 ### Build
 
-- Milestone: M5
+- Milestone: M5. Built in M5 (steps 7 and 10; the page is `scroll-area`, 8 scenes). Open for `done` (D47): M11 re-checks the whole bar on every entry; the Windows and Linux run time is unverified (the Linux and Windows lint is `scripts/check-targets.sh`).
 - Depends on: core.ui, core.focus, infra.accessibility, motion.transitions, layout.stack, widget.scrollbar
 
 ## Open questions
 
-- Home and End, and arrow keys when the area itself has focus: no source read states them (Wane lists PageUp and PageDown only [W docs/ui/components.md:409]); M5 decides.
-- Horizontal wheel (Shift plus wheel) mapping is not specified by any source read.
+- Answered (D99): Home and End, and arrow keys when the area itself has focus: no source read states them (Wane lists PageUp and PageDown only [W docs/ui/components.md:409]); M5 decides.
+- Answered (D99): horizontal wheel (Shift plus wheel) mapping is not specified by any source read.
 
 ## Notes for the planner
 

@@ -66,6 +66,7 @@ None: the painter draws text it is given.
 ### Gallery scenes
 
 - Existing scenes exercise the existing primitives: `controls` (fill, fill-radii, ring, text, icon), `acrylic` (acrylic), `blur-contrast` and `menu` (backdrop), `chrome` (stroke, stroke-sweep, stroke-comet, clip-rect), `custom-draw` (custom), `menu-opening` (xform).
+- M5 built the seven new primitives and shows each on the gallery's `primitives` and `image` pages: `primitive-arc`, `primitive-sector`, `primitive-path-fill`, `primitive-dash`, `primitive-clip-rounded`, `primitive-rotate` and the seven `image-*` scenes (D105).
 - New primitives are exercised by the scenes of the entries that need them: image: `image-contain-wide` ([core.image]); rotate: `spinner-spinning` ([widget.spinner]); dash: `search-picker-link` ([widget.search-picker]); clip-rounded: `page-body-scroll` ([layout.page]) and `panel-card` ([layout.panel]); sector, path-fill and arc: `pie-chart-three` and `pie-chart-half` ([data.pie-chart]).
 
 ### Painter primitives
@@ -96,12 +97,12 @@ Not needed by any entry (no row): `linear-gradient` and `shadow`. No Lunegit or 
 
 ### Build
 
-- Milestone: M5 (the seven new primitives, R-core-10) and M11 (done standard; the existing code is moved).
+- Milestone: M5 (the seven new primitives, R-core-10) and M11 (done standard; the existing code is moved). M5 built the seven primitives (steps 4 and 5; the page is `primitives`); `core.painter` stays `in-progress` until M11's done standard.
 - Depends on: core.scene, core.theme, text.shaping, core.image.
 
 ## Open questions
 
-- None on the seam: the painter depends on core types only (M2 steps 2 and 5). It lives in `lune-ui-core`, which has no dependencies (boundary rules 7 and 8).
+- None on the seam: the painter depends on core types only (M2 steps 2 and 5). The seven M5 primitives are built (D105); `linear-gradient` and `shadow` are not, because no entry needs them. It lives in `lune-ui-core`, which has no dependencies (boundary rules 7 and 8).
 
 ## Notes for the planner
 

@@ -43,7 +43,8 @@ Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, r
 
 - Swap points: text shaping (glyphon), GPU renderer (wgpu), OS glass (`Material`), windowing (winit).
   Each sits behind a core type in the pure `lune-ui-core` (no dependencies; no wgpu, winit or glyphon
-  types in its signatures): `Scene` (display list), `TextSystem`, `RawInput`/`FrameOutput`, `Backdrop`.
+  types in its signatures): `Scene` (display list), `TextSystem`, `ImageStore` (pictures the renderer draws),
+  `RawInput`/`FrameOutput`, `Backdrop`.
   Crates: `lune-ui-core`; adapters `lune-ui-wgpu`, `lune-ui-winit`, `lune-ui-platform`; the facade
   `lune-ui` (D9). An adapter depends on the core and its own platform crates only, never on another
   adapter (boundary rules 7 to 9).
@@ -56,7 +57,8 @@ Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, r
   a catalogue file; new look = a `Theme` value. App-specific drawing goes through the `CustomDraw`
   hook, not into the toolkit (D8).
 - Each seam has a fake and a contract test in `lune_ui_core::testing` (`RecordingRenderer`, `FakeText`
-  with `text_system_contract`, `ScriptedInput`, `NullMaterial` with `backdrop_contract`); a new adapter
+  with `text_system_contract`, `FakeImages` with `image_store_contract`, `ScriptedInput`, `NullMaterial` with
+  `backdrop_contract`); a new adapter
   passes the same suite. `docs/architecture.md` holds the module map, the seam table, the multi-window
   model and the pixel gates.
 

@@ -2,10 +2,10 @@
 id: infra.drag-and-drop
 title: In-window drag and drop
 area: infra
-status: planned
+status: in-progress
 consumers: lunegit
-source: Lunegit: src/Lunegit.Desktop/Controls/Terminal/TerminalTabDragController.cs
-owner: —
+source: crates/lune-ui-core/src/drag.rs
+owner: orch/toolkit-v1
 summary: In-window drag state machine (press, threshold, drag, release or cancel), nearest-slot target, edge auto-scroll; no OS drag
 ---
 
@@ -26,7 +26,7 @@ v1 [D43]; OS file drop is an input event (`core.input`).
 
 ## Existing code
 
-None in `lune-ui` today. Design source (not code to move): Lunegit `src/Lunegit.Desktop/Controls/Terminal/TerminalTabDragController.cs` (458 lines, the pure state machine),
+Built in M5 (D89, D104): `crates/lune-ui-core/src/drag.rs` (`ReorderDrag`, `FreeDrag`, `Ui::drag_gesture`, `free_drag_gesture`, `drag_offset`, `drag_dim`, `paint_drop_line`). Design source (not code to move): Lunegit `src/Lunegit.Desktop/Controls/Terminal/TerminalTabDragController.cs` (458 lines, the pure state machine),
 `Views/TerminalPanelView.axaml.cs:262-480` (the event translator), `ViewModels/Scratchpad/ScratchpadBoardViewModel.cs:253-327` and
 `Views/Scratchpad/ScratchpadBoardView.axaml.cs:44-103` (kanban). `Views/SplitDiffView.axaml.cs` drags only to select rows (see `layout.virtualized-list`).
 
@@ -115,8 +115,8 @@ None: the gesture has no text.
 
 - `dnd-idle`: three tabs of widths 100, 200 and 100 with gap 5, settled.
 - `dnd-armed`: tab 1 pressed, pointer 3 px from the press point, settled.
-- `dnd-dragging`: tab 1 dragged to left edge 300, neighbours shifted, settled.
-- `dnd-autoscroll`: pointer 6 px from the right viewport edge with room to scroll, settled.
+- `dnd-dragging`: tab 1 (the first tab) dragged to left edge 300, neighbours shifted, settled.
+- `dnd-autoscroll`: pointer 6 px from the right viewport edge with room to scroll, settled. Built `Moving`: a parked pointer in the edge zone keeps scrolling, so a frame is always due.
 - `dnd-kanban-target`: a card dragged over column 2 below card 1: dimmed source, drop line, column hover, settled.
 - `dnd-kanban-no-target`: pointer between columns, no drop line, settled.
 - `dnd-cancelled`: after Escape, offsets cleared, settled.
@@ -142,13 +142,13 @@ None: the gesture has no text.
 
 ### Build
 
-- Milestone: M5
+- Milestone: M5. Built in M5 (steps 14 and 15; the page is `drag-and-drop`, 10 scenes). Known look limit: text draws above fills, so tab labels show through a sliding or settling tab during `dnd-slide` and `dnd-settle`. Open for `done` (D47): M11 re-checks the whole bar on every entry; the Windows and Linux run time is unverified (the Linux and Windows lint is `scripts/check-targets.sh`).
 - Depends on: core.ui, core.input, layout.scroll-area, motion.transitions
 
 ## Open questions
 
-- `role-gap: move/reorder action for list-item and tab` (see Accessibility); keyboard reordering is not in Lunegit and is left to M5 to decide.
-- Whether the kanban board (data.kanban-board) takes the free two-axis form of this machine or its own: the board's numbers are cited above; the component spec decides.
+- Still open (D104, no keyboard reorder in v1): `role-gap: move/reorder action for list-item and tab` (see Accessibility); keyboard reordering is not in Lunegit and is left to M5 to decide.
+- Answered (D104, the free two-axis form): whether the kanban board (data.kanban-board) takes the free two-axis form of this machine or its own: the board's numbers are cited above; the component spec decides.
 
 ## Notes for the planner
 

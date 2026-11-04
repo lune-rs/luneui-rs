@@ -1,19 +1,21 @@
 # Architecture
 
-State after M4 (interaction and motion): the toolkit is five crates. A pure core (`lune-ui-core`, no
+State after M5 (foundations): the toolkit is five crates. A pure core (`lune-ui-core`, no
 dependencies) holds the painter, the display list, the per-window `Ui` frame, the motion system,
 the string table, the semantic tree, widgets, the theme and the four seam types; three adapter
 crates implement the seams on wgpu/glyphon, winit and the OS glass; the facade `lune-ui` re-exports
 all of them under the module paths the toolkit has always had (D9, D24 to D38). The code moved from
 Luneterm 296cfdc's `crates/lune-ui` in M1 (D10), was cut along its seams in M2, and gained the `Ui`,
-motion, strings and accessibility data in M4 (D59 to D80).
+motion, strings and accessibility data in M4 (D59 to D80), and in M5 gained the shared pieces every later component
+reuses: layout helpers, the scroll area and virtualized list, popover and tooltip, the text editing engine with IME,
+in-window drag and drop, the shortcut registry, seven painter primitives and the `ImageStore` seam (D91 to D109).
 
 ## Workspace layout
 
 | Path | What |
 |---|---|
 | `crates/lune-ui-core` | Pure core: painter, `Scene`, `Ui` frame, motion, strings, semantic tree, widgets, theme, `TextSystem`, `RawInput`/`FrameOutput`, `Backdrop`, fakes. No dependencies |
-| `crates/lune-ui-wgpu` | wgpu renderer and glyphon text: one shared `Gpu`, per-target `FrameRenderer`, `WindowSurface`, dumps, `TextCache` |
+| `crates/lune-ui-wgpu` | wgpu renderer and glyphon text: one shared `Gpu` (which is also the `ImageStore`), per-target `FrameRenderer`, `WindowSurface`, dumps, `TextCache` |
 | `crates/lune-ui-winit` | winit adapter: input translation, output application, glass window attributes |
 | `crates/lune-ui-platform` | OS glass (`Material`) per platform; the only crate with `unsafe` |
 | `crates/lune-ui` | Facade: `lib.rs` only, re-exports the four crates at the old paths |
@@ -39,10 +41,15 @@ app passes time, sizes, fonts, theme, scale and hit values in), so frames are de
 | `color` (`color.rs`) | Straight-alpha colour and blend helpers | `Rgba = [u8; 4]`, `premul`, `over`, `with_alpha` |
 | `theme` (`theme.rs`) | Theme tokens widgets read; the dark preset with its glass layers | `Theme`, `DARK`, `lunegit_dark::{THEME, WINDOW, PANEL, CARD, ...}` |
 | `acrylic` (`acrylic.rs`) | Avalonia acrylic colour math and the noise opacity | `AcrylicColors`, `NOISE_OPACITY` |
-| `paint` (`paint.rs`) | Immediate-mode painter: five layers, clip, a transform stack (D66), hit regions generic over the app's hit type `H` and tagged with the overlay they belong to, an op recorder (`start_recording`, `take_recording`, replayed by exit painters), faded acrylic; builds a `Scene`; holds `&mut dyn TextSystem` | `Painter<H>`, `Rect`, `StrokeStyle`, `Xform`, `Ops` |
-| `scene` (`scene.rs`) | The display list: plain data plus the draw-order contract | `Scene`, `Layer`, `LayerGeometry`, `Shape`, `Acrylic` (a shape and its opacity, D61), `StrokeVertex`, `TextItem`, `CustomItem`, `BackdropRequest`, `LayerId` (Base, Page, Popup, Modal, Toast; D54), `LAYER_COUNT` (5), `SCENE_LAYERS`, `FrameParams` |
-| `text` (`text.rs`) | Text specs and the text seam | `TextSystem`, `TextKey`, `Spec`, `Style`, `Font` |
-| `input` (`input.rs`) | The input seam: what the app hands in, what the toolkit asks back | `RawInput`, `Event` (with `Access`, `ClipboardText`, `ClipboardUnavailable`), `Key`, `NamedKey`, `Modifiers`, `ImeEvent`, `FrameOutput` (with `repaint`, `clipboard`, `tree`, `focused`), `Repaint`, `ClipboardRequest`, `WindowCommand`, `CursorIcon` (with `ALL`), `printable` |
+| `paint` (`paint.rs`, `paint/path.rs`) | Immediate-mode painter: five layers, clip and rounded clip (`push_clip_rounded`), a transform stack (D66) and `push_translate`, the seven M5 primitives (image, rotate, dash, rounded clip, sector, path fill, arc; D105), hit regions generic over the app's hit type `H` and tagged with the overlay they belong to, an op recorder (`start_recording`, `take_recording`, replayed by exit painters), faded acrylic; builds a `Scene`; holds `&mut dyn TextSystem` | `Painter<H>`, `Rect`, `StrokeStyle`, `Xform`, `Ops` |
+| `scene` (`scene.rs`) | The display list: plain data plus the draw-order contract | `Scene`, `Layer`, `LayerGeometry`, `Shape`, `Acrylic` (a shape and its opacity, D61), `StrokeVertex`, `TextItem`, `CustomItem`, `BackdropRequest`, `ImageItem`, `RoundClip`, `LayerId` (Base, Page, Popup, Modal, Toast; D54), `LAYER_COUNT` (5), `SCENE_LAYERS`, `FrameParams` |
+| `text` (`text.rs`) | Text specs and the text seam, with the caret, hit, line and segment queries (D86, D94) | `TextSystem` (`prepare`, `measure`, `caret`, `hit`, `lines`, `segments`), `TextKey`, `Spec`, `Style`, `Font`, `CaretPos`, `LineSpan`, `Unit` |
+| `input` (`input.rs`) | The input seam: what the app hands in, what the toolkit asks back | `RawInput`, `Event` (with `Access`, `ClipboardText`, `ClipboardUnavailable`), `Key`, `NamedKey`, `Modifiers`, `ImeEvent`, `FocusEvent`, `Keymap` (`MAC`, `PC`; D92), `FrameOutput` (with `repaint`, `clipboard`, `tree`, `focused`, `cursor`, `ime_area`, `fired`), `Repaint`, `ClipboardRequest`, `WindowCommand`, `CursorIcon` (with `ALL`), `printable` |
+| `image` (`image.rs`) | The picture seam: the app decodes, registers by id, releases explicitly; fit geometry | `ImageStore`, `ImageData`, `ImageId`, `ImageError`, `Fit`, `ImageAlign`, `image_rect` |
+| `layout` (`layout.rs`) | Pure stack, row, column and grid helpers: rects out, nothing drawn or stored (D108) | `stack`, `row`, `column`, `grid`, `Size`, `Align`, `Insets`, `Track` |
+| `shortcuts` (`shortcuts.rs`) | The scoped chord registry, resolved by the frame (D93) | `Shortcuts`, `Binding`, `Chord`, `Scope`, `CommandId`, `Chord::hint` |
+| `text_edit` (`text_edit.rs`) | The pure text editing engine: caret, selection, undo, clipboard commands, preedit; offsets in chars (D95) | `TextEdit`, `EditCommand`, `EditOutcome`, `EditFlags`, `EditLayout`, `SpecLayout` |
+| `drag` (`drag.rs`) | The in-window drag machines and their `Ui` glue (D89, D104) | `ReorderDrag`, `FreeDrag`, `Metrics`, `Strip`, `Column`, `DropResult`, `FreeResult`, `paint_drop_line` |
 | `backdrop` (`backdrop.rs`) | The material seam | `Backdrop`, `Material`, `BackdropKind`, `GlassLayer` |
 | `window` (`window.rs`) | Edge resize, double click, caption buttons (no windowing type) | `ResizeEdge`, `edge_at`, `DoubleClick`, `caption_buttons` |
 | `icon` (`icon.rs`) | Codicon codepoints as Nerd Font glyphs; no font file bundled | `glyph`, `ADD`, `GEAR`, `CHECK`, ... |
@@ -50,10 +57,10 @@ app passes time, sizes, fonts, theme, scale and hit values in), so frames are de
 | `access` (`access.rs`) | The semantic tree and the actions that come back; plain data the `Ui` fills and routes | `Node`, `SemanticTree`, `Role` (36), `State` (15), `Action` (10), `Value`, `AccessAction` |
 | `motion` (`motion.rs`, `motion/{easing,tween,transition,tokens,conformance}.rs`) | Closed-form motion: every value is a function of the app's `Time` and stored parameters; the 60 Hz conformance harness | `Time`, `Easing`, `Tween`, `Spring`, `Keyframes`, `Transition`, `Token`, `Kind`, `Motion`, `MotionTier`, `MOTION`, `conformance` |
 | `strings` (`strings.rs`) | The string table: keys, `{n}` and `{n:spec}` placeholders, the toolkit's defaults | `StringTable`, `DEFAULTS`, `ArgFormat`, `DisplayFormat`, `format_template` |
-| `widgets` (`widgets/<name>.rs`, `widgets/mod.rs`) | One file per control, generic over `H` for the Painter API; each has a `Look`, a `paint` function, the old function as a wrapper and a `Ui` method (D60) | `button`, `toggle`, `checkbox`, `label`, `combo`, `stepper`, `field` (text field), `input_box` (shared look), `focus_ring`, `popup_panel` |
+| `widgets` (`widgets/<name>.rs`, `widgets/mod.rs`) | One file per control, generic over `H` for the Painter API; each has a `Look`, a `paint` function, the old function as a wrapper and a `Ui` method (D60) | `button`, `toggle`, `checkbox`, `label`, `combo`, `stepper`, `field` (text field with its variants), `text_area`, `input_box` (shared look), `focus_ring`, `popup_panel`, `scroll_area`, `scrollbar`, `virtual_list`, `popover`, `tooltip` |
 | `widgets::menu`, `dropdown`, `dialog` | The overlays: the old Painter functions and `Ui::menu`, `Ui::dropdown`, `Ui::dialog` on the overlay stack | `menu`, `MenuRow`, `menu_open_anim`; `dropdown`; `dialog`, `Dialog`, `DialogGlass`, `Cancel` |
 | `chrome` (`chrome.rs`) | Tab chrome outline geometry | `outline`, `TabSpan` |
-| `testing` (`testing/`) | Fakes and contract suites of the seams, public so apps can use them | `RecordingRenderer`, `FakeText`, `text_system_contract`, `ScriptedInput`, `NullMaterial`, `backdrop_contract`, `UiHarness` |
+| `testing` (`testing/`) | Fakes and contract suites of the seams, public so apps can use them | `RecordingRenderer`, `FakeText`, `text_system_contract`, `FakeImages`, `image_store_contract`, `ScriptedInput`, `NullMaterial`, `backdrop_contract`, `UiHarness` |
 
 `lib.rs` re-exports `Backdrop`, `BackdropKind`, `GlassLayer` and `theme::lunegit_dark`. Tests: unit
 tests in the modules and the files under `tests/` (`window`, `painter`, `motion`, `strings`, `ui_*`,
@@ -65,8 +72,9 @@ GPU or a window.
 A `Ui` is built per window and frame from the window's `UiStore` (the state that outlives a frame),
 the frame's `RawInput`, a `FrameConfig` (theme, motion tier, string table, `ArgFormat`) and a
 `TextSystem`. `Ui::finish` returns the `Scene` and a `FrameOutput` whose `repaint` says when to draw
-again (`Idle`, `Now`, or `At(time)`), with the cursor, clipboard requests, semantic tree and focused
-widget.
+again (`Idle`, `Now`, or `At(time)`), with the cursor, the input-method area, clipboard requests, semantic
+tree, focused widget and the shortcut commands that fired. `FrameConfig` also carries the `Keymap` and the
+`Shortcuts` table (D92, D93).
 
 - Ids: `WidgetId` from app keys under scopes (`ui.id`, `ui.scope`); the same key path is the same id
   from frame to frame.
@@ -90,12 +98,48 @@ widget.
 - Focus: scopes with a tab trap, initial focus, and restore on close (D72); keys are consumed by id
   (`consume_key`); a focused widget that is not registered for a frame loses focus unless a live
   keep-alive scope covers it.
+- Focus input (D91): the frame keeps the keys (named and character, with modifiers and repeat), typed text,
+  IME events and clipboard answers as one ordered list; `ui.focus_events(id)` hands the focused widget its
+  entries in arrival order and `ui.consume_focus_event(i)` takes one, so a widget sees Backspace then
+  "x" in the order they came, and what no widget took is left for the shortcuts. `consume_key` reads the
+  same entries; `consume_key_while_pressed` serves a drag's Escape. `Response` also reports the press
+  (`press_started`, `press_pos`, `press_count`, `press_modifiers`); `ui.set_cursor` and `ui.set_ime_area` fill the
+  frame's output.
+- Keymap (D92): `Keymap::MAC` and `Keymap::PC` say which modifier is primary, which moves by word and
+  which way a word motion lands; the app picks one (the gallery's scripted scenes use `MAC`).
+- Shortcut phases (D93): the preempt phase runs at begin over the top input-taking overlay's scope and
+  the global scope, before Escape and Tab take the key; the bubble phase runs at finish over the focused
+  widget's scope outwards, the overlays top-down down to the modal, then global, once every widget had its
+  chance. One binding fires per press, in table order; a fired command makes the frame `Repaint::Now`
+  and lands in `FrameOutput::fired`.
+- Scrolling and lists (D96 to D100): `Ui::scroll_area` keeps `f64` offsets per id, wheel and trackpad
+  motion, scroll-into-view (`Reveal::Center` or `Nearest`), follow-tail and the overlay scrollbar;
+  `Ui::virtual_list` builds only the rows in view on an untranslated area, with keyed selection.
+- Overlays above the page (D101, D102): the pure `place` computes a rect (side, alignment, gap, margin,
+  flip, shift, overflow) for the popover, the tooltip, the dropdown and the menu; `Ui::popover` is a
+  non-modal Popup overlay with light dismiss, `Ui::tooltip` shows after 800 ms of hover or on focus.
+- Text editing (D87, D88, D103): `text_field_with` and `text_area` sync a `TextEdit` kept in the store,
+  map the focus events to `EditCommand`s, and draw the selection, the preedit and the caret from the
+  engine's display string; `text_edit` holds no frame state of its own.
+- Drag and drop (D89, D104): `Ui::drag_gesture` and `free_drag_gesture` feed the machines from a `Response`;
+  `drag_offset` and `drag_dim` animate the items; the app applies a `Commit` or a `Drop`.
 - Accessibility: widgets emit `Node`s (`ui.node`, `ui.node_container`); the tree of the previous frame
   routes `AccessAction`s as pointer or key input (D71). `FrameOutput::tree` carries the tree out.
 - Strings: `ui.tr(key)` and `ui.tr_fmt(key, args)` read the table, then the toolkit default, then the
   key (D70).
 
 Frames stay deterministic: time, input, theme, tier and strings all come from the caller.
+
+### Draw order
+
+Inside one layer, back to front (the contract in `scene.rs`): the acrylic shapes, the under shapes, the
+path fills (their own list, `LayerGeometry::fills`, drawn with the stroke pipeline so the order is
+explicit, D105), the custom items in record order, the images in record order (`Layer::images`), the
+text, the over shapes and the strokes. Layers run back to front; those below `SCENE_LAYERS` render into
+the offscreen scene a backdrop blurs. Consequences a widget author meets: text draws above every fill
+of its layer (a label shows through a fill drawn "over" it on the same layer), and a rounded clip
+(`push_clip_rounded`) cuts shapes, strokes, fills and images but gives text and custom items only its
+bounding rect.
 
 ### Motion
 
@@ -112,15 +156,17 @@ monotone steps, the exact end and that it finishes within its duration plus one 
 |---|---|---|
 | `gpu` (`gpu.rs`, `shader.wgsl`) | The GPU every target shares: device, queue, noise texture, per colour format the pipelines and the glyph atlas; headless-capable | `Gpu`, `instance`, `Uploaded`, `Globals` |
 | `frame` (`frame.rs`) | One target's renderer: the scene, blur, target pass sequence over a core `Scene` | `FrameRenderer`, `FrameParams` |
+| `images` (`images.rs`, `image.wgsl`) | The image pipeline and the picture store: premultiply on upload, nearest at an integer ratio without rotation, else linear; rotated text is a raster of the shaped text drawn through it (D105, D106) | `Gpu::register`, `Gpu::release` (the `ImageStore` impl) |
 | `blur` (`blur.rs`, `blur.wgsl`) | Backdrop blur | `Blur` |
 | `surface` (`surface.rs`) | A window's swapchain; no winit dependency | `WindowSurface`, `Acquired` |
 | `dump` (`dump.rs`) | Offscreen targets and GPU readback to PNG; no screen capture | `target`, `read_rgba`, `write_png` |
 | `custom` (`custom.rs`) | App-owned GPU drawing inside a painted layer (the hook for app-specific drawing, D8) | `CustomDraw`, `CustomFrame`, `CustomItem` |
-| `text_cache` (`text_cache.rs`) | glyphon shaping behind the core's `TextSystem` | `TextCache` |
+| `text_cache` (`text_cache.rs`) | glyphon shaping behind the core's `TextSystem`, including the caret, hit, line and segment queries (`unicode-segmentation`, D86) | `TextCache` |
 | `platform` (private; `platform/{windows,other}.rs`) | The Windows DX12 backend choice | `configure` |
 
 Asset: `assets/acrylic-noise.png` (Avalonia's texture). Tests: `tests/text.rs` (text contract),
-`tests/targets.rs` (two targets on one `Gpu`).
+`tests/targets.rs` (two targets on one `Gpu`), `tests/images.rs` (the image contract on the `Gpu`),
+`tests/primitives.rs` and `tests/text_field.rs` (pixel probes on real fonts).
 
 ### `lune-ui-winit` (`crates/lune-ui-winit/src/`)
 
@@ -153,7 +199,8 @@ and a contract test the real adapter passes too (R-nfr-8).
 | Seam | Core model | Adapter | Fake | Contract test |
 |---|---|---|---|---|
 | Display list (renderer) | `scene::Scene` data and its draw-order contract; no renderer trait (D25) | `lune-ui-wgpu`: `Gpu::upload`, `FrameRenderer::draw` | `RecordingRenderer` | `records_the_documented_draw_order` (`testing/recording.rs`); two-target pixel equality in `lune-ui-wgpu/tests/targets.rs` |
-| Text shaping | `text::TextSystem` (`prepare(spec, scale)`, `measure`) | `lune-ui-wgpu`: `TextCache` over glyphon | `FakeText` | `text_system_contract`, run in `lune-ui-wgpu/tests/text.rs` and on the fake |
+| Text shaping | `text::TextSystem` (`prepare(spec, scale)`, `measure`, `caret`, `hit`, `lines`, `segments`) | `lune-ui-wgpu`: `TextCache` over glyphon | `FakeText` | `text_system_contract`, run in `lune-ui-wgpu/tests/text.rs` and on the fake |
+| Pictures | `image::ImageStore` (`register`, `release`); the app decodes | `lune-ui-wgpu`: `Gpu` | `FakeImages` | `image_store_contract` (`testing/images.rs`), run on the fake and in `lune-ui-wgpu/tests/images.rs` |
 | Input and output | `input::{RawInput, FrameOutput}` | `lune-ui-winit`: `Translator`, `OutputState` | `ScriptedInput` | `lune-ui-winit/tests/input.rs` (translator and scripted input agree) |
 | OS glass | `backdrop::Backdrop` (`best_supported`, `apply`) | `lune-ui-platform`: `WindowBackdrop` over `apply` | `NullMaterial` | `backdrop_contract`, run on `NullMaterial`; OS glass is not run headless |
 | Windowing | the core's window helpers and `FrameOutput::commands`; the app owns the event loop | `lune-ui-winit` | `ScriptedInput` | as input |
@@ -225,9 +272,16 @@ capture frame, with the `Repaint` it must report: `Settled` or `Moving`) and opt
 `-states` scenes are specimen sheets painted through the widgets' public `Look` and `paint`
 functions; mid-transition and interaction scenes are live scripted `Ui` frames. Pages: `button`,
 `toggle`, `checkbox`, `label`, `stepper`, `combo`, `text_field`, `dialog`, `dropdown`, `menu`, `motion`,
-`ui`, `focus`, `a11y`, `locale`; `apps/gallery/src/pages/controls_ui.rs` is the shared composition of every M4 widget that the
+`ui`, `focus`, `a11y`, `locale`, and from M5 `stack`, `image`, `shortcuts`, `primitives`, `scroll_area`,
+`scrollbar`, `virtual_list`, `popover`, `tooltip`, `text_edit`, `ime` and `drag_drop` (every page of the
+same pattern: a live state, scripted scenes, a bench timeline); `apps/gallery/src/pages/controls_ui.rs` is the shared composition of every M4 widget that the
 core pages draw. Window mode builds a `Ui` per frame over the page's live state; dump and bench
-drive the same state through a `Player` (a scripted input, the retained store and the page state).
+drive the same state through a `Player` (a scripted input, the retained store and the page state). A scene's `Expect` is `Settled` (`Idle`),
+`Moving` (`Now`) or, for a pending tooltip, `Waiting` (`At`). `Ev` scripts pointer, scroll, typed text, keys
+with modifiers, IME preedit and commit, and the clipboard's answer; the window answers a clipboard
+request from an in-process string until M10 (D107). The bundled fonts have no CJK glyph, so the IME scenes'
+"かな" draws as boxes (D90). A shown overlay fades from the first frame that draws it, so a scene that wants
+it visible needs a frame at the due time. Window mode and the bench draw the list page with 1,000,000 rows.
 
 `gallery --bench [--runs N] [--frames N] [--size WxH]` times offscreen frames: a timeline per page,
 cost probes (text fades, a scaling and fading dialog over a blurred stripe page) and a 4 ms-sleep
@@ -268,7 +322,11 @@ seam, in `platform/` or `material/` files, so the Windows DX12 choice is in
 
 The two M1 deviations are resolved: the inline `cfg(target_os)` in `gpu.rs` and `window.rs` moved
 into `platform/` files (step 8), and `Gpu::new` takes an optional compatible surface, so a headless
-device needs no window (steps 3 and 4). New: none.
+device needs no window (steps 3 and 4). Carried limits at the end of M5, none of them fixed here: an
+overlay above a modal is unsupported, so a popover or tooltip inside a dialog draws under it; the
+menu's node name; text cannot be cut by a rounded clip (it gets the bounding rect); text draws above
+fills, so overlapping labels show through during a drag; and nothing here verifies real typing with an
+input method, bidi caret placement or the Windows and Linux run time.
 
 ## API changes since M1
 
@@ -289,6 +347,23 @@ facade keeps those paths):
 - `theme::DARK`, a neutral alias of `lunegit_dark::THEME`;
 - new: `RawInput`, `FrameOutput`, `Translator`, `OutputState`, `Backdrop::apply`, `WindowBackdrop`,
   the `testing` module.
+
+Since M5 (D91 to D109):
+
+- `Event`, `FrameConfig` and `FrameOutput` grow: `FocusEvent` and the ordered focus queue, `Keymap` and
+  `Shortcuts` in `FrameConfig`, `cursor`, `ime_area` and `fired` in `FrameOutput`; `Response` gains the
+  press details; `Xform` gains `dx` and `dy` (a translate);
+- `Painter` gains `push_clip`/`pop_clip` (clips nest), `push_clip_rounded`, `push_translate`, `image`,
+  `image_rotated`, `text_rotated`, `dash`, `arc`, `sector`, `fill_path`, and the text queries
+  `caret`, `text_hit`, `text_lines`, `segments`; `Scene` layers gain `fills` and `images`;
+- `TextSystem` gains `caret`, `hit`, `lines` and `segments` (a fake and contract cases come with them);
+- `ImageStore`, `FakeImages` and `image_store_contract` are new, and `Gpu` implements the store;
+- `Theme` gains `text_selection` and the scrollbar thumb fills; `MotionTokens` gains `tooltip_delay`;
+- new core modules `layout`, `shortcuts`, `text_edit`, `drag` and the widgets `scroll_area`, `scrollbar`,
+  `virtual_list`, `popover`, `tooltip`, `text_area`; `lune-ui-wgpu` takes `unicode-segmentation` as a
+  direct dependency (already in the lock through cosmic-text; the core still has none);
+- `Ui::text_field` keeps its signature; `Ui::text_field_with` and `Ui::text_area` are the full forms;
+  `dropdown::panel_rect` and `menu_layout` call `place`.
 
 Since M4:
 

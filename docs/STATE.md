@@ -1,55 +1,51 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-04 (M5 steps 1 to 15 done; step 16 is next; M4 merged at d9fe71f)
+Last updated: 2026-11-04 (M5 steps 1 to 16 done, ready for review; M4 merged at d9fe71f)
 
 ## Now
 
 M4 (interaction and motion) is merged to main at d9fe71f, on top of M3 (catalogue specs) and M2
-(seams and crate split). M5 (foundations: layout, scroll, list, popover, text editing, drag and drop,
-shortcuts, painter primitives) is in progress on branch `orch/toolkit-v1`; steps 1 to 15 (the frame
-plumbing, layout helpers, shortcut registry, vector primitives, image and rotate, their gallery pages, the
-scroll area and scrollbar, the virtualized list, popover and tooltip, and the gallery pages of those four, and the text queries on `TextSystem`: caret, hit, lines,
-segments, D86, the `TextEdit` engine, D87, and the text field upgrade, D88, and drag and drop, D89, and their gallery pages: text edit, IME, text field and drag and drop) are done; step 16 (docs, catalogue, bench) is next.
-`lune-ui-core` holds the per-window `Ui` frame (stable ids, retained state with keep-alive scopes,
-layered hits with modal and pointer capture, `Response`, overlays with exit retention, focus scopes,
-the semantic tree with actions, the string table, `FrameOutput` with `Repaint`) and the closed-form
-motion system. M5 step 1 opened the frame to ordered focus input (`Ui::focus_events`, keys with
-modifiers, text, IME and clipboard answers), the `Keymap`, press details on `Response`, cursor and
-IME-area output, `Xform::translate` and `Painter::push_clip`/`pop_clip`. `layout` holds the pure
-stack, row, column and grid helpers; `shortcuts` the scoped chord registry (preempt at begin, bubble at
-finish, `FrameOutput.fired`). `Ui::scroll_area` (f64 offsets, wheel and trackpad, reveals, follow-tail,
-identity-keyed preservation, the overlay thumb) is in `widgets/scroll_area.rs` and `scrollbar.rs`;
-`Painter::push_translate` moves content and keeps clips put on screen. `Ui::virtual_list`
-(`widgets/virtual_list.rs`) builds only the rows in view on an untranslated scroll area: fixed rows or
-measured ones in a Fenwick tree, keyed selection in a persistent `ListState`, no row tween while the
-content moves. `widgets/popover.rs` holds the pure `place` (side, alignment, gap, margin, flip, shift;
-the dropdown and menu call it) and `Ui::popover` (popup layer, light dismiss, the menu's curves);
-`widgets/tooltip.rs` holds `Ui::tooltip`/`tooltip_with` and `Ui::hover_dwell` (800 ms
-`MotionTokens::tooltip_delay`, `LAZY_HOVER_DWELL` 150 ms). `text_edit` holds the pure `TextEdit`
-(caret, selection, undo, clipboard commands, preedit; `SpecLayout` over a `TextSystem`); `widgets/field.rs`
-(`Ui::text_field_with`: variants, `FieldResponse`, IME drawing) and `widgets/text_area.rs` (`Ui::text_area` on a
-scroll area) run it. Real IME typing stays unverified (roadmap R1). `drag` holds the pure `ReorderDrag` and
-`FreeDrag` machines and the `Ui::drag_gesture`, `drag_offset`, `drag_dim` and `free_drag_gesture` glue.
-`docs/architecture.md` holds the module map, "The `Ui` frame" and "API changes since M1"; DECISIONS
-D59 to D85 record the M4 choices.
-The gallery has a page registry (two legacy pages, 24 Ui pages), `--dump`, `--list` (123 scene names)
-and `--bench`. The cross-widget contract suite is `crates/lune-ui-core/tests/c4.rs`.
-The pixel gate shows the 15 legacy scenes identical against the M1 base.
+(seams and crate split). M5 (foundations) is built on branch `orch/toolkit-v1` and awaits review and the
+merge: layout helpers, the shortcut registry, the seven painter primitives and the `ImageStore` seam, the scroll
+area and scrollbar, the virtualized list, popover and tooltip, text queries on `TextSystem`, the `TextEdit`
+engine, the text field and text area upgrade with IME, drag and drop, and 12 new gallery pages with
+their scenes (152 scene names in `--list`). DECISIONS D91 to D109 record the M5 plan decisions (D90 the
+IME scenes' tofu boxes); the catalogue entries of those components are `in-progress` with their open
+questions answered or marked, and `docs/architecture.md` has the module map, the focus queue, `Keymap`, the
+shortcut phases, the per-layer draw order, the `ImageStore` seam and "API changes since M1".
+`lune-ui-core` holds the per-window `Ui` frame, the closed-form motion system and, since M5, `layout`,
+`shortcuts`, `text_edit`, `drag`, `image` and the widgets `scroll_area`, `scrollbar`, `virtual_list`,
+`popover`, `tooltip` and `text_area`; `lune-ui-wgpu` takes `unicode-segmentation` (the core still has no
+dependency). The gallery has a page registry (two legacy pages, 27 Ui pages), `--dump`, `--list` and
+`--bench` (M5 acceptance run: 0 pages over budget, worst page p99 11.9 ms at 2080 x 1320; details in the task notes). The cross-widget contract suite is
+`crates/lune-ui-core/tests/c4.rs`. The pixel gate shows the 15 legacy scenes identical against the M1 base.
+
+## Carried limits (M5 did not fix them)
+
+- An overlay above a modal is unsupported: a popover or tooltip inside a dialog draws under it, and so does
+  a combo inside one (flagged to M7, with the menu's node name).
+- Text cannot be cut by a rounded clip (it gets the clip's bounding rect): M7's page and panel keep text out of the
+  corners. Text draws above every fill of its layer, so labels show through a sliding tab during `dnd-slide`
+  and `dnd-settle`.
+- The gallery bundles no CJK font: the IME scenes' "かな" draws as boxes (D90).
+
+## Unverified here
+
+- Real typing with an input method (roadmap R1) and bidi caret placement.
+- Windows and Linux run time (the lint runs through `scripts/check-targets.sh`, Linux only with Docker).
+- A text field's clipboard: the gallery answers from an in-process string until M10 (D107).
 
 ## Next
 
-1. M5 steps 15 and 16 per `m05-foundations/plan.md`: the gallery pages
-   (text edit, text field, IME, drag and drop), docs and the acceptance bench.
+1. Review and merge M5; then M6 per `docs/` roadmap (data.stat, kv-list and progress moved there by Q3).
 2. CI (fmt, clippy `-D warnings`, tests on macOS, Windows and Linux) now that there is code to run.
 3. An export script for Luneterm's vendored snapshot, before Luneterm M9. The migration
    map for M11 is "API changes since M1" in `docs/architecture.md`.
 
 ## Blockers / open questions
 
-- None. Deferred by decision (D74): button variants and the radio, text-field variants, typing and
-  composition. Nested popups above a modal (a combo inside a dialog) are not supported: an overlay
-  draws on the layer it names, and a later overlay's text on the same layer would draw under earlier
-  fills; revisit with the dialog form variants.
+- None. Deferred by decision (D74): button variants and the radio (the text-field variants, typing and
+  composition are built, M5). Nested popups above a modal are listed under the carried limits.
 - Wane's OS behaviours (close-to-tray, single instance, autostart, notifications) are assumed
   app-side and documented (answer 2026-11-03, reversible).

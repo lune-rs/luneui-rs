@@ -80,12 +80,12 @@ n/a — the strings belong to the caller's `Spec`.
 
 ### Build
 
-- Milestone: M11 (done standard; code exists).
+- Milestone: M11 (done standard; code exists). M5 added the queries (step 11); the done standard stays with M11.
 - Depends on: core.painter, core.theme.
 
 ## Open questions
 
-- None on the seam (M2 step 5): the trait has no glyphon type in its signature. `R-text-5` (selection, caret) and a shaping feature such as `tnum` are not covered yet.
+- None on the seam (M2 step 5): the trait has no glyphon type in its signature. `R-text-5` (selection, caret) is covered since M5 by the caret, hit, lines and segments queries (D86, D94); a shaping feature such as `tnum` is not covered yet.
 
 ## Notes for the planner
 
