@@ -165,6 +165,74 @@ fn a_point_below_the_text_keeps_its_column_and_the_open_line_is_the_end() {
     assert_eq!(text.hit(&open, 2.0, (x, bottom + 30.0)), 6);
 }
 
+fn rows(text: &mut TextCache, spec: &lune_ui_core::text::Spec, scale: f32) -> Vec<(usize, usize)> {
+    use lune_ui_core::text::TextSystem;
+    let lines = text.lines(spec, scale);
+    lines.iter().map(|l| (l.start, l.end)).collect()
+}
+
+/// The row of a line whose first space was dropped owns that space's offset, in `lines` as in
+/// `caret`, and `hit` at its left edge shows the same caret.
+#[test]
+fn a_dropped_leading_space_belongs_to_its_lines_row() {
+    use lune_ui_core::text::{Spec, Style, TextSystem};
+    let mut text = with_fonts();
+    let style = Style::ui(13.0, [255; 4]);
+    let word = "w".repeat(20);
+    let spec = Spec::plain(format!("ww\n {word}\nnext"), style).wrapped(200.0);
+    assert_eq!(rows(&mut text, &spec, 2.0), [(0, 2), (3, 24), (25, 29)]);
+    let (space, glyph) = (text.caret(&spec, 2.0, 3), text.caret(&spec, 2.0, 4));
+    assert_eq!((space.line, space.x), (1, 0.0));
+    assert_eq!((glyph.line, glyph.x), (1, 0.0));
+    let mid = space.y + space.height / 2.0;
+    let at = text.hit(&spec, 2.0, (0.0, mid));
+    let left = text.caret(&spec, 2.0, at);
+    assert_eq!((left.line, left.x), (1, 0.0));
+    let first = Spec::plain(format!(" {word}"), style).wrapped(200.0);
+    assert_eq!(rows(&mut text, &first, 2.0), [(0, 21)]);
+}
+
+/// `run.glyphs` is not in visual order on a right-to-left row: the row's left edge is a min.
+#[test]
+fn a_dropped_space_on_a_right_to_left_row_is_at_the_rows_left_edge() {
+    use lune_ui_core::text::{Spec, Style, TextSystem};
+    let mut text = with_fonts();
+    let style = Style::ui(13.0, [255; 4]);
+    let spec = Spec::plain(
+        "\u{5d0}\u{5d1}\u{5d2} \u{5d3}\u{5d4}\u{5d5}      \u{5d0}\u{5d1}",
+        style,
+    )
+    .wrapped(40.0);
+    assert_eq!(rows(&mut text, &spec, 2.0)[1], (7, 17));
+    let edge = text.caret(&spec, 2.0, 17);
+    let dropped = text.caret(&spec, 2.0, 18);
+    assert_eq!((dropped.line, dropped.x), (1, edge.x));
+    assert!(text.caret(&spec, 2.0, 14).x > edge.x);
+}
+
+/// A soft row with no glyphs in mixed text, and a cluster of two glyphs split over two rows, keep
+/// the rows in text order, which every query relies on.
+#[test]
+fn the_rows_stay_in_text_order() {
+    use lune_ui_core::text::{Spec, Style, TextSystem};
+    let mut text = with_fonts();
+    let style = Style::ui(13.0, [255; 4]);
+    let hebrew = "\u{5d3}\u{5d4}\u{5d5}\u{5d0}\u{5d1}\u{5d2}";
+    let mixed = format!("word \u{5d0}\u{5d1}\u{5d2} {hebrew}{hebrew}{hebrew} {hebrew}");
+    let cases = [
+        (Spec::plain(mixed, style).wrapped(25.0), 3.0),
+        (
+            Spec::plain("\u{1F44D}\u{1F3FD}w\nword", style).wrapped(9.0),
+            1.0,
+        ),
+    ];
+    for (spec, scale) in cases {
+        let got = rows(&mut text, &spec, scale);
+        assert!(got.windows(2).all(|w| w[0].1 <= w[1].0), "{got:?}");
+        assert_eq!(text.caret(&spec, scale, 0).line, 0, "{got:?}");
+    }
+}
+
 /// A seeded walk over the texts that trip shaping: wide and narrow chars, spaces, each break.
 fn generated(seed: u64, style: lune_ui_core::text::Style) -> lune_ui_core::text::Spec {
     use lune_ui_core::text::Spec;

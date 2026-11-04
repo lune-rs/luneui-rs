@@ -161,7 +161,7 @@ monotone steps, the exact end and that it finishes within its duration plus one 
 | `surface` (`surface.rs`) | A window's swapchain; no winit dependency | `WindowSurface`, `Acquired` |
 | `dump` (`dump.rs`) | Offscreen targets and GPU readback to PNG; no screen capture | `target`, `read_rgba`, `write_png` |
 | `custom` (`custom.rs`) | App-owned GPU drawing inside a painted layer (the hook for app-specific drawing, D8) | `CustomDraw`, `CustomFrame`, `CustomItem` |
-| `text_cache` (`text_cache.rs`) | glyphon shaping behind the core's `TextSystem`, including the caret, hit, line and segment queries (`unicode-segmentation`, D86) | `TextCache` |
+| `text_cache` (`text_cache.rs`) | glyphon shaping behind the core's `TextSystem`, including the caret, hit, line and segment queries, which read one row list per shaped text (`unicode-segmentation`, D86; D112) | `TextCache` |
 | `platform` (private; `platform/{windows,other}.rs`) | The Windows DX12 backend choice | `configure` |
 
 Asset: `assets/acrylic-noise.png` (Avalonia's texture). Tests: `tests/text.rs` (text contract),

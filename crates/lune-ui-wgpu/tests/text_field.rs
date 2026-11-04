@@ -564,3 +564,67 @@ fn the_caret_stays_on_its_row_through_spaces_at_a_wrap() {
         assert_eq!((c.line, c.x), (0, end.x), "offset {at}");
     }
 }
+
+/// The engine on a line whose first space was dropped at a wrap: rows (0, 2), (3, 24), (25, 29).
+#[test]
+fn home_and_end_stay_on_a_row_whose_first_space_was_dropped() {
+    let word = "w".repeat(20);
+    let text = format!("ww\n {word}\nnext");
+    let wrapped = |t: &str| Spec::plain(t, Style::ui(13.0, [255; 4])).wrapped(200.0);
+    let spec = wrapped(&text);
+    let mut system = text_cache();
+    let after = |motion: Option<Motion>, system: &mut TextCache| {
+        let mut owned = text.clone();
+        let mut edit = TextEdit::new();
+        edit.set_flags(EditFlags {
+            multiline: true,
+            ..Default::default()
+        });
+        let mut layout = SpecLayout::new(system, &spec, SCALE);
+        edit.sync(&owned, &mut layout);
+        edit.set_selection(2, 2);
+        for command in [Some(Motion::GraphemeRight), motion].into_iter().flatten() {
+            let cmd = moved(command);
+            edit.apply(cmd, &mut owned, &mut layout, Keymap::PC, Duration::ZERO);
+        }
+        edit.caret()
+    };
+    assert_eq!(after(None, &mut system), 3);
+    assert_eq!(after(Some(Motion::LineStart), &mut system), 3);
+    assert_eq!(after(Some(Motion::LineEnd), &mut system), 24);
+    assert_eq!(after(Some(Motion::LineUp), &mut system), 0);
+    assert_eq!(after(Some(Motion::LineDown), &mut system), 25);
+
+    let mut owned = format!(" {word}");
+    let first = wrapped(&owned);
+    let mut edit = TextEdit::new();
+    let mut layout = SpecLayout::new(&mut system, &first, SCALE);
+    edit.sync(&owned, &mut layout);
+    edit.set_selection(0, 0);
+    let home = moved(Motion::LineStart);
+    edit.apply(home, &mut owned, &mut layout, Keymap::PC, Duration::ZERO);
+    assert_eq!(edit.caret(), 0);
+    let line = EditCommand::SelectLineAt(0);
+    edit.apply(line, &mut owned, &mut layout, Keymap::PC, Duration::ZERO);
+    assert_eq!(edit.selection(), 0..21);
+}
+
+/// Right of a row cut inside a word, a click lands where End does and the caret stays on that row.
+#[test]
+fn a_click_right_of_a_wrapped_row_lands_where_end_does() {
+    let mut owned = "w".repeat(40);
+    let spec = Spec::plain(owned.as_str(), style()).wrapped(80.0);
+    let mut system = text_cache();
+    let rows = system.lines(&spec, SCALE);
+    assert!(rows.len() >= 2 && rows[0].end == rows[1].start, "{rows:?}");
+    let press = (1000.0, rows[0].y + rows[0].height / 2.0);
+    let hit = system.hit(&spec, SCALE, press);
+    assert_eq!(system.caret(&spec, SCALE, hit).line, 0);
+    let mut edit = TextEdit::new();
+    let mut layout = SpecLayout::new(&mut system, &spec, SCALE);
+    edit.sync(&owned, &mut layout);
+    edit.set_selection(0, 0);
+    let end = moved(Motion::LineEnd);
+    edit.apply(end, &mut owned, &mut layout, Keymap::PC, Duration::ZERO);
+    assert_eq!(edit.caret(), hit);
+}

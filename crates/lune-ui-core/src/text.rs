@@ -118,7 +118,9 @@ pub struct CaretPos {
 }
 
 /// One visual line of a shaped spec: the byte range of the runs' joined text it shows (a line
-/// ending is not part of it) and its place, in logical px.
+/// ending is not part of it) and its place, in logical px. An offset belongs to the last line whose
+/// `start` is at or before it, so the rows are in text order and a line's first row starts at the
+/// line's start, also when a leading space was dropped at a wrap and its first glyph comes later.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LineSpan {
     pub start: usize,
@@ -156,14 +158,17 @@ pub trait TextSystem {
         self.prepare(spec, scale).1
     }
 
-    /// Where the caret sits at `offset`. For one unwrapped line, the caret at the end of the
-    /// text has exactly the width `prepare` returns, and the caret at 0 has `x == 0`.
+    /// Where the caret sits at `offset`, on the line [`LineSpan`] gives it to. For one unwrapped
+    /// line, the caret at the end of the text has exactly the width `prepare` returns, and the
+    /// caret at 0 has `x == 0`.
     fn caret(&mut self, spec: &Spec, scale: f32, offset: usize) -> CaretPos;
 
     /// The offset nearest to `pos`, a point in logical px from the spec's top-left corner:
     /// the nearer side of the character under it, the first or last offset of the line when it is
-    /// left or right of the text, the first or last line when it is above or below. A `pos` that
-    /// is not finite gives 0.
+    /// left or right of the text, the first or last line when it is above or below. The answer's
+    /// caret is on the line under `pos`: where a soft-wrapped row runs into the next, the row's end
+    /// is the next row's, so the row's last offset is the grapheme before it. A `pos` that is not
+    /// finite gives 0.
     fn hit(&mut self, spec: &Spec, scale: f32, pos: (f32, f32)) -> usize;
 
     /// The visual lines, top to bottom; there is always at least one.

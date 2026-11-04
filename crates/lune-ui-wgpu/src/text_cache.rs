@@ -4,8 +4,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 
 use glyphon::{
-    Attrs, Buffer, Color, Cursor, Family, FontSystem, LayoutRun, Metrics, Shaping, SwashCache,
-    Weight, Wrap,
+    Attrs, Buffer, Color, Cursor, Family, FontSystem, Metrics, Shaping, SwashCache, Weight, Wrap,
 };
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -30,8 +29,38 @@ pub const RASTER_MARGIN: u32 = 2;
 #[derive(Debug)]
 struct Entry {
     buffer: Buffer,
+    rows: Vec<Row>,
     size: (f32, f32),
     last_used: u64,
+}
+
+/// One visual row of a shaped text, as every query sees it: `lines` lists these, `caret` and `hit`
+/// pick one from this list, so the three cannot name different rows. Offsets are bytes of the
+/// spec's joined text; `top`, `height`, `left` and `right` are device px.
+#[derive(Debug, Clone, Copy)]
+struct Row {
+    /// The index of the row's layout run. `None` for a row cosmic-text has no run for: the empty
+    /// line a final terminator opens, or the one row of a text with no layout.
+    run: Option<usize>,
+    /// Where the row's buffer line starts.
+    base: usize,
+    /// The first offset the row owns: its first glyph, or the line's start on a line's first row,
+    /// where the first glyph comes later when a space was dropped.
+    start: usize,
+    /// Where the row's first glyph starts.
+    glyphs_start: usize,
+    /// Where the row's glyphs end.
+    end: usize,
+    /// The last offset the caret shows on this row: `end`, or the grapheme before it where the row
+    /// runs straight into the next, whose first offset that is.
+    last: usize,
+    top: f32,
+    height: f32,
+    /// The left edge of the row's leftmost glyph. `run.glyphs` is not in visual order on a
+    /// right-to-left row, so this is a min over the row.
+    left: f32,
+    /// The right edge of the row's rightmost glyph.
+    right: f32,
 }
 
 /// The glyphon [`TextSystem`]: shaped buffers keyed by [`TextKey`], so the UI can be drawn
@@ -206,15 +235,74 @@ fn line_bases(buffer: &Buffer, joined: &str) -> (Vec<usize>, bool) {
     (bases, open)
 }
 
-/// The caret's x for a byte `local` of the row's line that is in none of the row's glyphs: at a
-/// wrap cosmic-text drops the whitespace that does not fit, so such bytes come after the row's
-/// glyphs, or before them for a leading space ahead of a word wider than the wrap. The answer is
-/// the row's edge on that side.
-fn off_the_glyphs(run: &LayoutRun<'_>, local: usize) -> f32 {
-    let left = run.glyphs.first().map_or(0.0, |g| g.x);
-    let right = run.glyphs.last().map_or(0.0, |g| g.x + g.w);
-    let before = local <= glyph_range(run.glyphs).0;
-    if before != run.rtl { left } else { right }
+/// The rows of a shaped `buffer`, never empty: one per layout run, then the open line, or one row
+/// of `height` device px holding all of `joined` when there is no layout.
+fn rows_of(buffer: &Buffer, joined: &str, height: f32) -> Vec<Row> {
+    let len = joined.len();
+    let (bases, open) = line_bases(buffer, joined);
+    let mut rows: Vec<Row> = Vec::new();
+    let mut line = None;
+    for (i, run) in buffer.layout_runs().enumerate() {
+        let base = bases.get(run.line_i).copied().unwrap_or(0);
+        let (first, last) = glyph_range(run.glyphs);
+        let opens_line = line.replace(run.line_i) != Some(run.line_i);
+        // Rows stay in text order: a soft row with no glyphs has no offsets to give, and a cluster
+        // of several glyphs split over two rows keeps its bytes on the first.
+        let floor = rows.last().map_or(0, |r| r.end);
+        let glyphs_start = (base + first).min(len).max(floor);
+        let end = (base + last).min(len).max(floor);
+        let edges = run.glyphs.iter().map(|g| (g.x, g.x + g.w));
+        let (left, right) = edges
+            .reduce(|a, b| (a.0.min(b.0), a.1.max(b.1)))
+            .unwrap_or((0.0, 0.0));
+        rows.push(Row {
+            run: Some(i),
+            base,
+            start: if opens_line {
+                base.min(len)
+            } else {
+                glyphs_start
+            },
+            glyphs_start,
+            end,
+            last: end,
+            top: run.line_top,
+            height: run.line_height,
+            left,
+            right,
+        });
+    }
+    let empty = |top, height| Row {
+        run: None,
+        base: len,
+        start: len,
+        glyphs_start: len,
+        end: len,
+        last: len,
+        top,
+        height,
+        left: 0.0,
+        right: 0.0,
+    };
+    match rows.last().copied() {
+        Some(last) if open => rows.push(empty(last.top + last.height, last.height)),
+        Some(_) => {}
+        None => rows.push(Row {
+            base: 0,
+            start: 0,
+            glyphs_start: 0,
+            ..empty(0.0, height)
+        }),
+    }
+    for i in 1..rows.len() {
+        let (row, next) = (rows[i - 1], rows[i].start);
+        if row.start < row.end && row.end == next {
+            let shown = joined.get(row.start..row.end).unwrap_or("");
+            let before = shown.grapheme_indices(true).next_back();
+            rows[i - 1].last = row.start + before.map_or(0, |(at, _)| at);
+        }
+    }
+    rows
 }
 
 /// The byte range of a layout run's glyphs in its buffer line (empty for an empty line).
@@ -224,16 +312,43 @@ fn glyph_range(glyphs: &[glyphon::LayoutGlyph]) -> (usize, usize) {
     (start, end)
 }
 
+impl Row {
+    /// The caret's x for `off`, an offset this row owns. At a wrap cosmic-text drops the whitespace
+    /// that does not fit, so an offset can be in none of the row's glyphs: after them, or before
+    /// them for a leading space ahead of a word that fills the row. The answer is the row's edge on
+    /// that side.
+    fn caret_x(&self, buffer: &Buffer, off: usize) -> f32 {
+        let Some(run) = self.run.and_then(|i| buffer.layout_runs().nth(i)) else {
+            return 0.0;
+        };
+        let local = (off - self.base).min(run.text.len());
+        let x = run
+            .cursor_position(&Cursor::new(run.line_i, local))
+            .unwrap_or(if (off <= self.glyphs_start) != run.rtl {
+                self.left
+            } else {
+                self.right
+            });
+        // Positions are sums of glyph advances; where the caret is at the end of the line, take
+        // the line's own width, so the two agree to the last bit.
+        if (x - run.line_w).abs() < 0.01 {
+            run.line_w
+        } else {
+            x
+        }
+    }
+}
+
 impl TextCache {
     /// The height an unshaped query answers with: the first run's line height.
     fn fallback_height(spec: &Spec) -> f32 {
         spec.runs.first().map_or(17.0, |(_, st)| st.line)
     }
 
-    /// The shaped buffer of `spec` at `scale`, after `prepare`.
-    fn buffer_of(&mut self, spec: &Spec, scale: f32) -> Option<&Buffer> {
+    /// The entry of `spec` at `scale`, after `prepare`.
+    fn entry_of(&mut self, spec: &Spec, scale: f32) -> Option<&Entry> {
         let (key, _) = self.prepare(spec, scale);
-        self.entries.get(&key).map(|e| &e.buffer)
+        self.entries.get(&key)
     }
 }
 
@@ -250,10 +365,16 @@ impl TextSystem for TextCache {
             // No font face was supplied: shaping would panic inside cosmic-text, so the text
             // is an empty, zero-sized layout and draws nothing.
             let buffer = Buffer::new_empty(Metrics::new(1.0, 1.0));
+            let rows = rows_of(
+                &buffer,
+                &joined_text(spec),
+                Self::fallback_height(spec) * scale,
+            );
             self.entries.insert(
                 key,
                 Entry {
                     buffer,
+                    rows,
                     size: (0.0, 0.0),
                     last_used: frame,
                 },
@@ -299,19 +420,14 @@ impl TextSystem for TextCache {
             None,
         );
         buffer.shape_until_scroll(&mut self.fonts, false);
-        let mut w: f32 = 0.0;
-        let mut lines = 0;
-        for run in buffer.layout_runs() {
-            w = w.max(run.line_w);
-            lines += 1;
-        }
-        // `caret` and `lines` count the empty line a final terminator opens, so the height does.
-        lines += usize::from(line_bases(&buffer, &joined_text(spec)).1);
-        let size = (w / s, lines.max(1) as f32 * first.line);
+        let w = buffer.layout_runs().fold(0.0_f32, |w, r| w.max(r.line_w));
+        let rows = rows_of(&buffer, &joined_text(spec), first.line * s);
+        let size = (w / s, rows.len() as f32 * first.line);
         self.entries.insert(
             key,
             Entry {
                 buffer,
+                rows,
                 size,
                 last_used: frame,
             },
@@ -328,52 +444,19 @@ impl TextSystem for TextCache {
             height: Self::fallback_height(spec),
             line: 0,
         };
-        let Some(buffer) = self.buffer_of(spec, scale) else {
+        let Some(entry) = self.entry_of(spec, scale) else {
             return fallback;
         };
-        let (bases, open) = line_bases(buffer, &joined);
-        let runs: Vec<_> = buffer.layout_runs().collect();
-        if open
-            && off == joined.len()
-            && let Some(last) = runs.last()
-        {
-            // After a final line terminator: the start of the empty line below the last row.
-            return CaretPos {
-                x: 0.0,
-                y: (last.line_top + last.line_height) / scale,
-                height: last.line_height / scale,
-                line: runs.len(),
-            };
-        }
-        // The visual line that shows `off`: the last run whose first glyph is at or before it, so
-        // the offset where a wrapped line breaks belongs to the later row. A buffer line's first
-        // run owns the line's start, even when a dropped space puts its first glyph later.
-        let mut chosen = None;
-        let mut line = None;
-        for (row, run) in runs.iter().enumerate() {
-            let base = bases.get(run.line_i).copied().unwrap_or(0);
-            let first = line.replace(run.line_i) != Some(run.line_i);
-            if base + if first { 0 } else { glyph_range(run.glyphs).0 } <= off {
-                chosen = Some((row, run, base));
-            }
-        }
-        let Some((row, run, base)) = chosen else {
+        // The last row that owns `off`, so the offset where a wrapped line breaks is the later row's.
+        let Some(line) = entry.rows.iter().rposition(|r| r.start <= off) else {
             return fallback;
         };
-        let local = (off - base).min(run.text.len());
-        let mut x = run
-            .cursor_position(&Cursor::new(run.line_i, local))
-            .unwrap_or_else(|| off_the_glyphs(run, local));
-        // Positions are sums of glyph advances; where the caret is at the end of the line, take
-        // the line's own width, so the two agree to the last bit.
-        if (x - run.line_w).abs() < 0.01 {
-            x = run.line_w;
-        }
+        let row = entry.rows[line];
         CaretPos {
-            x: x / scale,
-            y: run.line_top / scale,
-            height: run.line_height / scale,
-            line: row,
+            x: row.caret_x(&entry.buffer, off) / scale,
+            y: row.top / scale,
+            height: row.height / scale,
+            line,
         }
     }
 
@@ -382,72 +465,41 @@ impl TextSystem for TextCache {
             return 0;
         }
         let text = joined_text(spec);
-        let Some(buffer) = self.buffer_of(spec, scale) else {
+        let Some(entry) = self.entry_of(spec, scale) else {
             return 0;
         };
-        let (bases, open) = line_bases(buffer, &text);
         let (x, y) = (pos.0 * scale, pos.1 * scale);
-        let Some(top) = buffer.layout_runs().next().map(|r| r.line_top) else {
+        // The row under `y`, or the nearest one: `Buffer::hit` drops `x` outside the rows (offset 0
+        // above them, the end of the text below them), and the trait keeps the column on the first
+        // or last line. So it is asked at the row's own top, and its answer stays on that row.
+        let rows = &entry.rows;
+        let Some(row) = rows.iter().rfind(|r| r.top <= y).or(rows.first()) else {
             return 0;
         };
-        let (row_top, below) = buffer
-            .layout_runs()
-            .take_while(|r| r.line_top <= y)
-            .last()
-            .map_or((top, top), |r| (r.line_top, r.line_top + r.line_height));
-        if open && y >= below {
-            return text.len();
-        }
-        // The top of the row under `y`, or of the nearest one: `Buffer::hit` drops `x` outside the
-        // rows (offset 0 above them, the end of the text below them), and the trait keeps the
-        // column on the first or last line.
-        let y = row_top;
-        let Some(cursor) = buffer.hit(x, y) else {
-            return 0;
-        };
-        let base = bases.get(cursor.line).copied().unwrap_or(0);
-        clamp_to_boundary(&text, base + cursor.index)
+        let cursor = row.run.and_then(|_| entry.buffer.hit(x, row.top));
+        let at = cursor.map_or(row.start, |c| row.base + c.index);
+        clamp_to_boundary(&text, at.clamp(row.start, row.last))
     }
 
     fn lines(&mut self, spec: &Spec, scale: f32) -> Vec<LineSpan> {
-        let joined = joined_text(spec);
-        let len = joined.len();
-        let height = Self::fallback_height(spec);
-        let one = LineSpan {
-            start: 0,
-            end: len,
-            y: 0.0,
-            height,
+        let Some(entry) = self.entry_of(spec, scale) else {
+            return vec![LineSpan {
+                start: 0,
+                end: joined_text(spec).len(),
+                y: 0.0,
+                height: Self::fallback_height(spec),
+            }];
         };
-        let Some(buffer) = self.buffer_of(spec, scale) else {
-            return vec![one];
-        };
-        let (bases, open) = line_bases(buffer, &joined);
-        let mut lines: Vec<LineSpan> = buffer
-            .layout_runs()
-            .map(|run| {
-                let base = bases.get(run.line_i).copied().unwrap_or(0);
-                let (start, end) = glyph_range(run.glyphs);
-                LineSpan {
-                    start: (base + start).min(len),
-                    end: (base + end).min(len),
-                    y: run.line_top / scale,
-                    height: run.line_height / scale,
-                }
+        entry
+            .rows
+            .iter()
+            .map(|r| LineSpan {
+                start: r.start,
+                end: r.end,
+                y: r.top / scale,
+                height: r.height / scale,
             })
-            .collect();
-        if lines.is_empty() {
-            return vec![one];
-        }
-        if open && let Some(last) = lines.last().copied() {
-            lines.push(LineSpan {
-                start: len,
-                end: len,
-                y: last.y + last.height,
-                height: last.height,
-            });
-        }
-        lines
+            .collect()
     }
 
     fn segments(&self, text: &str, unit: Unit) -> Vec<usize> {
