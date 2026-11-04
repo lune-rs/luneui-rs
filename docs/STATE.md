@@ -1,7 +1,7 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-04 (M4 review fix rounds 1-2: focus stack across overlays, Repaint catch-up, passive overlays, bench on a busy machine, a repeated focus request settles, bench self-test below 4 ms exits 2; D81-D85)
+Last updated: 2026-11-04 (M4 review fix rounds 1-3: focus stack across overlays, Repaint catch-up, passive overlays, bench on a busy machine, a repeated focus request settles (inside a focus-loss overlay too), bench self-test below 4 ms exits 2; D81-D85)
 
 ## Now
 

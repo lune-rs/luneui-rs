@@ -2,7 +2,8 @@
 //! blur, modal trap, restore on close, the vanish rule and keep-alive, request_focus, initial
 //! focus, key consumption and focus-loss dismissal.
 
-use lune_ui_core::input::{Key, Modifiers, NamedKey, PointerButton};
+use lune_ui_core::input::{Key, Modifiers, NamedKey, PointerButton, Repaint};
+use lune_ui_core::motion::MotionTier;
 use lune_ui_core::motion::{Kind, Motion};
 use lune_ui_core::paint::{LayerId, Rect};
 use lune_ui_core::testing::UiHarness;
@@ -569,5 +570,111 @@ fn closing_never_restores_focus_under_an_open_modal() {
         f,
         Some("page"),
         "a page widget never takes focus under the modal"
+    );
+}
+
+/// A non-modal Popup flyout with `dismiss_on_focus_loss`, stop `x` inside, page stop `a`
+/// outside; the app stops calling the flyout once it reports a dismissal. `request_focus(req)`
+/// every frame. Returns per frame `(repaint, dismissed, x focused, a focused)`.
+fn focus_loss_flyout_requests(req: &str, frames: u64) -> Vec<(Repaint, bool, bool, bool)> {
+    let o = OverlayOptions {
+        layer: LayerId::Popup,
+        modal: false,
+        dismiss_on_focus_loss: true,
+        ..modal()
+    };
+    let mut h = harness();
+    h.tier = MotionTier::Off;
+    let mut open = true;
+    let mut seq = Vec::new();
+    for i in 0..frames {
+        let (mut dismissed, mut x, mut a) = (false, false, false);
+        let (_, out) = h.at_ms(i * 10).frame(|ui| {
+            a = stop(ui, "a", 0).focused;
+            if open {
+                let (f, xr) = ui.overlay("flyout", &o, |_, _, _| {}, |ui, _| stop(ui, "x", 2));
+                x = xr.focused;
+                dismissed = f.dismissed.is_some();
+            }
+            ui.request_focus(WidgetId::ROOT.with(req));
+        });
+        open &= !dismissed;
+        seq.push((out.repaint, dismissed, x, a));
+    }
+    seq
+}
+
+#[test]
+fn a_focus_request_held_inside_a_focus_loss_overlay_settles_to_idle() {
+    // Review F13: keeping a flyout's field focused every frame neither dismisses the flyout nor
+    // keeps the window redrawing; begin's own containment test decides.
+    let seq = focus_loss_flyout_requests("x", 8);
+    assert_eq!(
+        seq[0].0,
+        Repaint::Now,
+        "the first request applies next frame"
+    );
+    assert!(
+        seq[1..]
+            .iter()
+            .all(|&s| s == (Repaint::Idle, false, true, false)),
+        "{seq:?}"
+    );
+}
+
+#[test]
+fn a_focus_request_outside_a_focus_loss_overlay_dismisses_it_then_settles() {
+    // Review F13, the other side: page stop `a` is requested every frame and already focused when
+    // a passive focus-loss overlay (a hover region, no stop) opens on frame 2. Nothing else acts
+    // that frame, so only the containment test can ask for the frame whose begin dismisses it.
+    let o = OverlayOptions {
+        layer: LayerId::Popup,
+        modal: false,
+        dismiss_on_focus_loss: true,
+        ..modal()
+    };
+    let mut h = harness();
+    h.tier = MotionTier::Off;
+    let mut open = false;
+    let mut seq = Vec::new();
+    for i in 0..8u64 {
+        let (mut dismissed, mut a) = (false, false);
+        let (_, out) = h.at_ms(i * 10).frame(|ui| {
+            a = stop(ui, "a", 0).focused;
+            if open {
+                let (f, _) = ui.overlay(
+                    "flyout",
+                    &o,
+                    |_, _, _| {},
+                    |ui, _| {
+                        let id = ui.id("tip");
+                        ui.interact(id, rect(2), Sense::HOVER);
+                    },
+                );
+                dismissed = f.dismissed.is_some();
+            }
+            ui.request_focus(WidgetId::ROOT.with("a"));
+        });
+        seq.push((out.repaint, dismissed, a));
+        open = (i == 1 || open) && !dismissed;
+    }
+    assert_eq!(
+        seq[1],
+        (Repaint::Idle, false, true),
+        "settled before: {seq:?}"
+    );
+    assert_eq!(
+        seq[2],
+        (Repaint::Now, false, true),
+        "begin would dismiss: {seq:?}"
+    );
+    // Frame 3 still calls the overlay (the app learns of the dismissal there), so the next
+    // begin dismisses it again: frame 3 asks for it, and frame 4 reports that begin's dismissal
+    // as acted input (D81) while the app no longer calls the overlay. Idle from frame 5.
+    assert_eq!(seq[3], (Repaint::Now, true, true), "dismissed: {seq:?}");
+    assert_eq!(seq[4], (Repaint::Now, false, true), "{seq:?}");
+    assert!(
+        seq[5..].iter().all(|&s| s == (Repaint::Idle, false, true)),
+        "{seq:?}"
     );
 }

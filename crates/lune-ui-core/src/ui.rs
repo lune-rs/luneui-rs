@@ -147,6 +147,15 @@ impl std::fmt::Debug for Ui<'_> {
     }
 }
 
+/// Whether focus moving to `to` is focus loss for the active overlay tagged `tag`: it asks for
+/// that dismissal and `to` has no region in `hits` inside it or in an overlay opened above it.
+/// The one containment test, shared by begin (which dismisses) and finish's catch-up (which asks
+/// for the frame where begin would), so the two cannot drift.
+fn loses_focus(opts: &OverlayOptions, tag: u32, hits: &[HitRecord], to: Option<WidgetId>) -> bool {
+    opts.dismiss_on_focus_loss
+        && !to.is_some_and(|id| hits.iter().any(|h| h.id == id && h.tag >= tag))
+}
+
 /// Dismisses, for focus loss, every active overlay that asks for it and does not hold `to`.
 fn focus_loss(
     active: &[Active],
@@ -154,11 +163,11 @@ fn focus_loss(
     to: Option<WidgetId>,
     dismissed: &mut BTreeMap<WidgetId, Dismissal>,
 ) {
-    for o in active.iter().filter(|o| o.opts.dismiss_on_focus_loss) {
-        let inside = to.is_some_and(|id| hits.iter().any(|h| h.id == id && h.tag >= o.tag));
-        if !inside {
-            dismissed.entry(o.id).or_insert(D::FocusLoss);
-        }
+    for o in active
+        .iter()
+        .filter(|o| loses_focus(&o.opts, o.tag, hits, to))
+    {
+        dismissed.entry(o.id).or_insert(D::FocusLoss);
     }
 }
 
@@ -487,15 +496,18 @@ impl<'a> Ui<'a> {
             next.hovered != pointer.hovered && !(store.hover_catch_up && input.events.is_empty())
         };
         store.hover_catch_up = stale_hover;
-        // A pending focus request counts only when applying it at the next begin changes
-        // something: another widget, a ring to hide, or a focus-loss overlay to dismiss.
+        // A pending focus request counts iff applying it at the next begin changes something:
+        // another widget, a ring to hide, or a focus-loss overlay to dismiss. The last is begin's
+        // own test over the same active set and the regions it will see (`hits` becomes its
+        // `prev_hits`).
         let request_acts = store.focus.pending.is_some_and(|p| {
             store.focus.focused != Some(p)
                 || store.focus.visible
                 || store
                     .overlays
                     .iter()
-                    .any(|o| o.active() && o.opts.dismiss_on_focus_loss)
+                    .filter(|o| o.active())
+                    .any(|o| loses_focus(&o.opts, o.tag, &hits, Some(p)))
         });
         let catch_up = input_acted
             || stale_hover
