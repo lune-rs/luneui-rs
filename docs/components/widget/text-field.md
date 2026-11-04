@@ -4,7 +4,7 @@ title: Text field
 area: widget
 status: in-progress
 consumers: luneterm, wane
-source: crates/lune-ui-core/src/widgets/mod.rs
+source: crates/lune-ui-core/src/widgets/field.rs
 owner: orch/toolkit-v1
 summary: Single-line text box: 32 px, radius 6, placeholder, caret when focused; variants fill, small, mono, password, search and date; editing engine from text.text-edit
 ---
@@ -39,14 +39,14 @@ Pinned: Lunegit 33a1dd41, Wane 69931d6, this repo fa2958b. Read: this repo crate
 Lunegit src/Lunegit.Desktop/Controls/FilterBar.axaml:8-44, Views/Settings/GitSettingsView.axaml:56-84, App.axaml:478-484 (disabled opacity 0.4), .claude/docs/animation-rules.md:98-110; Wane docs/ui/components.md:345-360,445-458.
 Lunegit styles no `TextBox` globally (`grep -n TextBox src/Lunegit.Desktop/App.axaml Themes/*.axaml` finds nothing): each view wraps a transparent `TextBox` in its own `Border` [L src/Lunegit.Desktop/Controls/FilterBar.axaml:8-44].
 Conflicts: (1) radius: Lunegit's filter box 4 [L src/Lunegit.Desktop/Controls/FilterBar.axaml:8], the moved box and Wane 6 [R crates/lune-ui-core/src/theme.rs:85], [W docs/ui/components.md:352]; the moved code wins (pixel-gated).
-(2) text inset: Wane's padding 0 9 [W docs/ui/components.md:352] against the moved box's 10 [R crates/lune-ui-core/src/widgets/mod.rs:132,135]; the moved code wins. (3) width: Wane 240 [W docs/ui/components.md:352], the gallery draws 210 and a dialog's inner width [R apps/gallery/src/scenes.rs:291-298,513]; the width is the caller's, 240 is the Wane default.
+(2) text inset: Wane's padding 0 9 [W docs/ui/components.md:352] against the moved box's 10 [R crates/lune-ui-core/src/widgets/field.rs:60-116]; the moved code wins. (3) width: Wane 240 [W docs/ui/components.md:352], the gallery draws 210 and a dialog's inner width [R apps/gallery/src/scenes.rs:291-298,513]; the width is the caller's, 240 is the Wane default.
 (4) caret colour: see `text.text-edit` (the moved `fg_primary` wins).
 
 ### Anatomy
 
-- Box: height 32 (the caller's rect), radius `item_radius` 6, fill `surface_input` at rest and `surface_hover` when hovered and not focused, 1 px ring `border`, `accent` when focused [R crates/lune-ui-core/src/widgets/mod.rs:50-69], [R crates/lune-ui-core/src/theme.rs:85]; Wane: 1 px `--border`, fill `--surface-input`, focus border `--accent` [W docs/ui/components.md:351-352].
-- Text: drawn 10 px from the left edge, clipped to the box inset 6 px; placeholder in `fg_tertiary` while empty [R crates/lune-ui-core/src/widgets/mod.rs:130-136]; text size 13 (`font_base`) [W docs/ui/components.md:352], [R crates/lune-ui-core/src/theme.rs:83].
-- Caret: `text.text-edit` Anatomy (1.5 px, `fg_primary`) [R crates/lune-ui-core/src/widgets/mod.rs:137-141].
+- Box: height 32 (the caller's rect), radius `item_radius` 6, fill `surface_input` at rest and `surface_hover` when hovered and not focused, 1 px ring `border`, `accent` when focused [R crates/lune-ui-core/src/widgets/input_box.rs:29-34] [R crates/lune-ui-core/src/widgets/stepper.rs:80] [R crates/lune-ui-core/src/widgets/combo.rs:53], [R crates/lune-ui-core/src/theme.rs:85]; Wane: 1 px `--border`, fill `--surface-input`, focus border `--accent` [W docs/ui/components.md:351-352].
+- Text: drawn 10 px from the left edge, clipped to the box inset 6 px; placeholder in `fg_tertiary` while empty [R crates/lune-ui-core/src/widgets/field.rs:60-116]; text size 13 (`font_base`) [W docs/ui/components.md:352], [R crates/lune-ui-core/src/theme.rs:83].
+- Caret: `text.text-edit` Anatomy (1.5 px, `fg_primary`) [R crates/lune-ui-core/src/widgets/field.rs:60-116].
 - Variant `fill`: width 100 percent of the parent; `sm`: 24 high; default width 240 [W docs/ui/components.md:350,352].
 - Variant `mono`: the mono face for ids, URLs and paths [W docs/ui/components.md:350].
 - Variant `password`: a fixed mask of 16 dots, never the real length; not copyable [W docs/ui/components.md:350,353].
@@ -59,13 +59,13 @@ Conflicts: (1) radius: Lunegit's filter box 4 [L src/Lunegit.Desktop/Controls/Fi
 
 | state | look | cite |
 |---|---|---|
-| rest | fill `surface_input`, ring `border`, text `fg_primary`, placeholder `fg_tertiary` | [R crates/lune-ui-core/src/widgets/mod.rs:50-69,131-136] |
-| hover | fill `surface_hover` (not while focused) | [R crates/lune-ui-core/src/widgets/mod.rs:129,50-60] |
+| rest | fill `surface_input`, ring `border`, text `fg_primary`, placeholder `fg_tertiary` | [R crates/lune-ui-core/src/widgets/field.rs:60-116] [R crates/lune-ui-core/src/widgets/input_box.rs:29-34] [R crates/lune-ui-core/src/widgets/stepper.rs:80] [R crates/lune-ui-core/src/widgets/combo.rs:53] |
+| hover | fill `surface_hover` (not while focused) | [R crates/lune-ui-core/src/widgets/field.rs:60-116] [R crates/lune-ui-core/src/widgets/input_box.rs:29-34] [R crates/lune-ui-core/src/widgets/stepper.rs:80] [R crates/lune-ui-core/src/widgets/combo.rs:53] |
 | pressed | as hover until the press places the caret and focuses it | [derived: the press focuses the field; Lunegit and Wane draw no separate pressed look] |
-| focus-visible | ring `accent`, caret shown | [R crates/lune-ui-core/src/widgets/mod.rs:61-69,137-141], [W docs/ui/components.md:351] |
+| focus-visible | ring `accent`, caret shown | [R crates/lune-ui-core/src/widgets/field.rs:60-116] [R crates/lune-ui-core/src/widgets/input_box.rs:29-34], [W docs/ui/components.md:351] |
 | disabled | opacity 0.4, inert | [W docs/ui/components.md:351], [L src/Lunegit.Desktop/App.axaml:482] |
 | error | ring in the error colour | [W docs/ui/components.md:351] |
-| empty | placeholder in `fg_tertiary` | [R crates/lune-ui-core/src/widgets/mod.rs:131-133] |
+| empty | placeholder in `fg_tertiary` | [R crates/lune-ui-core/src/widgets/field.rs:60-116] |
 | password | fixed 16-dot mask | [W docs/ui/components.md:350] |
 | composing | preedit with an underline | [text.ime] |
 
@@ -132,7 +132,7 @@ The placeholder and the label are app text.
 
 ### Build
 
-- Milestone: M4 (retrofit: focus, semantic node, transitions) and M5 (the editing engine, variants, IME); done by M11.
+- Milestone: M4 (retrofit: focus, semantic node, transitions) and M5 (the editing engine, variants, IME); done by M11. Deferred to M5 [D74]: variants, typing, search clear and IME composition, with the scenes `text-field-variants`, `text-field-search-clear` and `text-field-composing`.
 - Depends on: core.ui, core.focus, infra.accessibility, motion.transitions, text.text-edit, text.ime, platform.clipboard
 
 ## Open questions

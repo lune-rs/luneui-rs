@@ -37,9 +37,10 @@
 #   11 crates/lune-ui/src holds only lib.rs, with no item definitions (fn, struct, enum, trait,
 #      impl, const, static, type, macro_rules)
 #   12 compiled code comes only from the scanned files: each member crate's build targets are its
-#      src/lib.rs and files under its tests/ (no [lib] path, bin, example, bench or build script),
-#      and no crates/*/src file has a `path = "..."` attribute or an include!( (include_str! and
-#      include_bytes! are allowed)
+#      src/lib.rs and the modules it reaches (no [lib] path, bin, example, bench or build script;
+#      tests/ files are not library code and are not scanned), and no crates/*/src file has a
+#      `path = "..."` attribute or an include!( (include_str! and include_bytes! are allowed); a
+#      comment line or a `let path =` binding is not an attribute
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -116,22 +117,25 @@ EOF2
 fi
 # Every crate but the platform crate forbids unsafe code at the crate root. The forbid line must
 # be in effect: everything above it is a blank line, a `//` comment or a single-line inner
-# attribute, so it is not inside a block comment or a string. Exit 0 found, 1 missing, 3 something
-# else comes first (printed as `<line>: <text>`).
+# attribute, so it is not inside a block comment or a string. Exit 0 found, 1 missing (no forbid
+# line anywhere), 3 something else comes first (printed as `<line>: <text>`, the first such line).
 read -r -d '' AWK_FORBID <<'AWKEOF' || true
-BEGIN { st = 1 }
-st != 1 { next }
-/^#!\[forbid\(unsafe_code\)\]$/ { st = 0; next }
+BEGIN { found = 0; bad = "" }
+/^#!\[forbid\(unsafe_code\)\]$/ { found = 1; exit }
 {
+  if (bad != "") next
   t = $0
   sub(/^[ \t]+/, "", t)
   sub(/[ \t]+$/, "", t)
   if (t == "" || t ~ /^\/\//) next
   if (t ~ /^#!\[[A-Za-z_]+(\([A-Za-z0-9_, ]*\))?\]$/) next
-  print FNR ": " $0
-  st = 3
+  bad = FNR ": " $0
 }
-END { exit st }
+END {
+  if (!found) exit 1
+  if (bad != "") { print bad; exit 3 }
+  exit 0
+}
 AWKEOF
 for dir in crates/*/; do
   name="$(basename "$dir")"
@@ -634,10 +638,26 @@ fi
 
 # Rule 12 (sources): a `path = "..."` attribute (also inside cfg_attr) or include!( would compile a
 # file the rules above never scan. The target half of rule 12 runs with rule 9 above.
-check 12 no -rn -E \
+# A comment line (`//`, doc comments included) and a `let path =` binding are not attributes, so
+# their hits are dropped; any other hit, or a grep error (exit 2), is reported as before.
+rc12=0
+out12="$(grep -rn -E \
   -e '(^|[^[:alnum:]_])path[[:space:]]*=[[:space:]]*b?r?#*"' \
   -e '(^|[^[:alnum:]_])include[[:space:]]*!' \
-  crates/*/src
+  crates/*/src 2>&1)" || rc12=$?
+if [ "$rc12" -gt 1 ]; then
+  echo "check-boundaries: grep failed (exit $rc12) in rule 12: $out12" >&2
+  exit 2
+fi
+if [ "$rc12" -eq 0 ]; then
+  out12="$(printf '%s\n' "$out12" | grep -v -E \
+    -e '^[^:]*:[0-9]+:[[:space:]]*//' \
+    -e '(^|[^[:alnum:]_])let[[:space:]]+(mut[[:space:]]+)?path[[:space:]]*=' || true)"
+  if [ -n "$out12" ]; then
+    printf '%s\n' "$out12" | sed "s/^/rule 12: /"
+    fail=1
+  fi
+fi
 
 if [ "$fail" -ne 0 ]; then
   echo "check-boundaries: FAILED" >&2

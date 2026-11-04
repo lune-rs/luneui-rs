@@ -2,10 +2,10 @@
 id: infra.localization
 title: Localization
 area: infra
-status: planned
+status: in-progress
 consumers: any
-source: Lunegit: src/Lunegit.Infrastructure/Localization/en.json
-owner: —
+source: crates/lune-ui-core/src/strings.rs
+owner: orch/toolkit-v1
 summary: One string table of flat dotted keys in core, luneui. keys with English defaults, positional formatting; locale JSON loaded in M10
 ---
 
@@ -119,7 +119,7 @@ n/a — no drawing.
 
 ## Open questions
 
-- An app key that starts with `luneui.` or a catalog that defines one: C4 reserves the prefix but does not say whether the table rejects it or ignores it. M4 decides; rejecting with an error at load is the fail-closed choice.
+- None. Resolved: a table may hold exactly the toolkit's default `luneui.` keys; an unknown `luneui.` key or an empty key is rejected at insert [D70].
 
 ## Notes for the planner
 

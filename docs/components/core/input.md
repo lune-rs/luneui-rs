@@ -84,7 +84,7 @@ None: no user-visible text.
 
 ### Gallery scenes
 
-No scene exercises `RawInput` today: the gallery passes hover directly to each scene [R apps/gallery/src/scenes.rs:90-94]. From M4 the gallery pages are driven by a scripted `RawInput`, so every existing scene (`controls`, `menu`, `dropdown`, `dialog-confirm`) exercises it; no new scene id is needed.
+The 15 legacy scenes stay on the Painter API and pass hover directly to each scene [R apps/gallery/src/scenes.rs:90-94] [D59]. The Ui pages (`button`, `dialog`, `menu`, `ui`, `focus` and the rest) are driven by a scripted `RawInput` through `ScriptedInput`, so they exercise it; no new scene id is needed.
 
 ### Painter primitives
 

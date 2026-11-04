@@ -167,8 +167,10 @@ D41, in three parts [D41]:
 2. **Bench budget.** `gallery --bench` on every page with its animations running, at 1040x660 at
    2x offscreen on this Mac: p99 full frame time (CPU build, encode and GPU wait) at or below
    16.6 ms and no frame over 33 ms after 3 warm-up frames. One extra run at the full panel size
-   (3456x2234) is report-only. The budget is enforced at milestone acceptance only: run alone, in the
-   release profile, three runs, judged on the median p99; never in the per-commit gate. There is no
+   (3456x2234) is report-only. The budget is enforced at milestone acceptance only, in the release profile, never
+   in the per-commit gate; each of five runs is judged on its own and a page fails only when at
+   least half its runs do, with the machine's load and the self-test's spread printed beside the
+   verdict (D85). There is no
    memory target in v1.
 3. **Idle when settled.** A settled page reports `Repaint::Idle`: zero idle frames. A running
    transition reports `Now` (or `At(t)`) until it settles [core.ui].

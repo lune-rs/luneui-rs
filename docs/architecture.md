@@ -1,21 +1,23 @@
 # Architecture
 
-State after M2 (seams): the toolkit is five crates. A pure core (`lune-ui-core`, no dependencies)
-holds the painter, the display list, widgets, the theme and the four seam types; three adapter
+State after M4 (interaction and motion): the toolkit is five crates. A pure core (`lune-ui-core`, no
+dependencies) holds the painter, the display list, the per-window `Ui` frame, the motion system,
+the string table, the semantic tree, widgets, the theme and the four seam types; three adapter
 crates implement the seams on wgpu/glyphon, winit and the OS glass; the facade `lune-ui` re-exports
 all of them under the module paths the toolkit has always had (D9, D24 to D38). The code moved from
-Luneterm 296cfdc's `crates/lune-ui` in M1 (D10) and was cut along its seams in M2.
+Luneterm 296cfdc's `crates/lune-ui` in M1 (D10), was cut along its seams in M2, and gained the `Ui`,
+motion, strings and accessibility data in M4 (D59 to D80).
 
 ## Workspace layout
 
 | Path | What |
 |---|---|
-| `crates/lune-ui-core` | Pure core: painter, `Scene`, widgets, theme, `TextSystem`, `RawInput`/`FrameOutput`, `Backdrop`, fakes. No dependencies |
+| `crates/lune-ui-core` | Pure core: painter, `Scene`, `Ui` frame, motion, strings, semantic tree, widgets, theme, `TextSystem`, `RawInput`/`FrameOutput`, `Backdrop`, fakes. No dependencies |
 | `crates/lune-ui-wgpu` | wgpu renderer and glyphon text: one shared `Gpu`, per-target `FrameRenderer`, `WindowSurface`, dumps, `TextCache` |
 | `crates/lune-ui-winit` | winit adapter: input translation, output application, glass window attributes |
 | `crates/lune-ui-platform` | OS glass (`Material`) per platform; the only crate with `unsafe` |
 | `crates/lune-ui` | Facade: `lib.rs` only, re-exports the four crates at the old paths |
-| `apps/gallery` | Reference scenes: a glass window, `--dump <dir>` (offscreen PNG frames on a headless device, no window), `--list`. App code, outside `crates/` (D12): it bundles fonts |
+| `apps/gallery` | A page registry (legacy Painter-API pages and `Ui` pages), a glass window, `--dump <dir>` (offscreen PNG frames on a headless device, no window), `--list`, `--bench` (frame-time probes). App code, outside `crates/` (D12): it bundles fonts |
 | `tools/dump-compare` | Compares two dirs of PNG frame dumps pixel by pixel (the pixel gate's compare tool) |
 | `scripts/` | Gates and generators, see "Boundary rules" and "Pixel gates" |
 | `docs/components/` | Catalogue, one file per component; `docs/components/INDEX.md` is generated |
@@ -37,20 +39,72 @@ app passes time, sizes, fonts, theme, scale and hit values in), so frames are de
 | `color` (`color.rs`) | Straight-alpha colour and blend helpers | `Rgba = [u8; 4]`, `premul`, `over`, `with_alpha` |
 | `theme` (`theme.rs`) | Theme tokens widgets read; the dark preset with its glass layers | `Theme`, `DARK`, `lunegit_dark::{THEME, WINDOW, PANEL, CARD, ...}` |
 | `acrylic` (`acrylic.rs`) | Avalonia acrylic colour math and the noise opacity | `AcrylicColors`, `NOISE_OPACITY` |
-| `paint` (`paint.rs`) | Immediate-mode painter: four layers, clip, transform, hit regions generic over the app's hit type `H`; builds a `Scene`; holds `&mut dyn TextSystem` | `Painter<H>`, `Rect`, `StrokeStyle`, `Xform` |
-| `scene` (`scene.rs`) | The display list: plain data plus the draw-order contract | `Scene`, `Layer`, `LayerGeometry`, `Shape`, `StrokeVertex`, `TextItem`, `CustomItem`, `BackdropRequest`, `LayerId`, `LAYER_COUNT`, `SCENE_LAYERS`, `FrameParams` |
+| `paint` (`paint.rs`) | Immediate-mode painter: five layers, clip, a transform stack (D66), hit regions generic over the app's hit type `H` and tagged with the overlay they belong to, an op recorder (`start_recording`, `take_recording`, replayed by exit painters), faded acrylic; builds a `Scene`; holds `&mut dyn TextSystem` | `Painter<H>`, `Rect`, `StrokeStyle`, `Xform`, `Ops` |
+| `scene` (`scene.rs`) | The display list: plain data plus the draw-order contract | `Scene`, `Layer`, `LayerGeometry`, `Shape`, `Acrylic` (a shape and its opacity, D61), `StrokeVertex`, `TextItem`, `CustomItem`, `BackdropRequest`, `LayerId` (Base, Page, Popup, Modal, Toast; D54), `LAYER_COUNT` (5), `SCENE_LAYERS`, `FrameParams` |
 | `text` (`text.rs`) | Text specs and the text seam | `TextSystem`, `TextKey`, `Spec`, `Style`, `Font` |
-| `input` (`input.rs`) | The input seam: what the app hands in, what the toolkit asks back | `RawInput`, `Event`, `Key`, `NamedKey`, `Modifiers`, `ImeEvent`, `FrameOutput`, `WindowCommand`, `CursorIcon`, `printable` |
+| `input` (`input.rs`) | The input seam: what the app hands in, what the toolkit asks back | `RawInput`, `Event` (with `Access`, `ClipboardText`, `ClipboardUnavailable`), `Key`, `NamedKey`, `Modifiers`, `ImeEvent`, `FrameOutput` (with `repaint`, `clipboard`, `tree`, `focused`), `Repaint`, `ClipboardRequest`, `WindowCommand`, `CursorIcon` (with `ALL`), `printable` |
 | `backdrop` (`backdrop.rs`) | The material seam | `Backdrop`, `Material`, `BackdropKind`, `GlassLayer` |
 | `window` (`window.rs`) | Edge resize, double click, caption buttons (no windowing type) | `ResizeEdge`, `edge_at`, `DoubleClick`, `caption_buttons` |
 | `icon` (`icon.rs`) | Codicon codepoints as Nerd Font glyphs; no font file bundled | `glyph`, `ADD`, `GEAR`, `CHECK`, ... |
-| `widgets` (`widgets/mod.rs`) | Controls generic over `H` | `button`, `toggle`, `checkbox`, `combo`, `stepper`, `field`, `popup_panel` |
-| `widgets::menu`, `dropdown`, `dialog` | The overlays | `menu`, `MenuEntry`, `menu_open_anim`; `dropdown`; `dialog`, `DialogSpec` |
+| `ui` (`ui.rs`, `ui/{access,animate,focus,id,keys,overlay,pointer,response,store}.rs`) | The per-window frame (see "The `Ui` frame" below) | `Ui`, `UiStore`, `FrameConfig`, `WidgetId`, `Response`, `Sense`, `OverlayOptions`, `OverlayFrame`, `OverlayPhase`, `Dismissal` |
+| `access` (`access.rs`) | The semantic tree and the actions that come back; plain data the `Ui` fills and routes | `Node`, `SemanticTree`, `Role` (36), `State` (15), `Action` (10), `Value`, `AccessAction` |
+| `motion` (`motion.rs`, `motion/{easing,tween,transition,tokens,conformance}.rs`) | Closed-form motion: every value is a function of the app's `Time` and stored parameters; the 60 Hz conformance harness | `Time`, `Easing`, `Tween`, `Spring`, `Keyframes`, `Transition`, `Token`, `Kind`, `Motion`, `MotionTier`, `MOTION`, `conformance` |
+| `strings` (`strings.rs`) | The string table: keys, `{n}` and `{n:spec}` placeholders, the toolkit's defaults | `StringTable`, `DEFAULTS`, `ArgFormat`, `DisplayFormat`, `format_template` |
+| `widgets` (`widgets/<name>.rs`, `widgets/mod.rs`) | One file per control, generic over `H` for the Painter API; each has a `Look`, a `paint` function, the old function as a wrapper and a `Ui` method (D60) | `button`, `toggle`, `checkbox`, `label`, `combo`, `stepper`, `field` (text field), `input_box` (shared look), `focus_ring`, `popup_panel` |
+| `widgets::menu`, `dropdown`, `dialog` | The overlays: the old Painter functions and `Ui::menu`, `Ui::dropdown`, `Ui::dialog` on the overlay stack | `menu`, `MenuRow`, `menu_open_anim`; `dropdown`; `dialog`, `Dialog`, `DialogGlass`, `Cancel` |
 | `chrome` (`chrome.rs`) | Tab chrome outline geometry | `outline`, `TabSpan` |
-| `testing` (`testing/`) | Fakes and contract suites of the seams, public so apps can use them | `RecordingRenderer`, `FakeText`, `text_system_contract`, `ScriptedInput`, `NullMaterial`, `backdrop_contract` |
+| `testing` (`testing/`) | Fakes and contract suites of the seams, public so apps can use them | `RecordingRenderer`, `FakeText`, `text_system_contract`, `ScriptedInput`, `NullMaterial`, `backdrop_contract`, `UiHarness` |
 
 `lib.rs` re-exports `Backdrop`, `BackdropKind`, `GlassLayer` and `theme::lunegit_dark`. Tests: unit
-tests in the modules and `tests/window.rs`; none needs a GPU or a window.
+tests in the modules and the files under `tests/` (`window`, `painter`, `motion`, `strings`, `ui_*`,
+one `widget_*` file per retrofitted control, and `c4`, the cross-widget contract suite); none needs a
+GPU or a window.
+
+### The `Ui` frame
+
+A `Ui` is built per window and frame from the window's `UiStore` (the state that outlives a frame),
+the frame's `RawInput`, a `FrameConfig` (theme, motion tier, string table, `ArgFormat`) and a
+`TextSystem`. `Ui::finish` returns the `Scene` and a `FrameOutput` whose `repaint` says when to draw
+again (`Idle`, `Now`, or `At(time)`), with the cursor, clipboard requests, semantic tree and focused
+widget.
+
+- Ids: `WidgetId` from app keys under scopes (`ui.id`, `ui.scope`); the same key path is the same id
+  from frame to frame.
+- Hits resolve against the previous frame's regions (the Painter's rule), with this frame's events in order.
+  Regions from `ui.interact` and from raw `Painter::hit` calls share one layered list, so widgets of
+  both APIs mix in a frame; `painter.hover` is the hovered id (D61). A press captures the pointer
+  until release.
+- State: `UiStore` keeps typed entries per `(WidgetId, TypeId)` in ordered maps (no random hasher,
+  D62). Transient state lives while the widget is drawn; persistent state lives while the widget is
+  drawn or a keep-alive scope on its chain is live (`keep_alive`, `mark_alive`, `end_keep_alive`,
+  D63). Animated values (`animate_f32`, `animate_color`) are a retargetable `Transition` per id,
+  resolved through the theme's motion tokens and the frame's tier.
+- Overlays (`Ui::overlay`, used by `menu`, `dropdown`, `dialog`): a stack in open order, each on the
+  layer it names, with its own focus scope and a phase (Opening, Open, Closing) whose progress is
+  linear and mapped to the look by the overlay (D64). A modal overlay captures hover, press, scroll,
+  keys and actions for everything below; Escape and an outside press dismiss only the top overlay
+  that allows it, and a light-dismiss press is consumed (D77). The Ui never closes an overlay: the app
+  stops calling it. Each called frame an overlay hands the Ui an exit painter built from owned inputs
+  (with the app's content recorded as painter ops), and the Ui keeps drawing it through the close
+  motion (D65).
+- Focus: scopes with a tab trap, initial focus, and restore on close (D72); keys are consumed by id
+  (`consume_key`); a focused widget that is not registered for a frame loses focus unless a live
+  keep-alive scope covers it.
+- Accessibility: widgets emit `Node`s (`ui.node`, `ui.node_container`); the tree of the previous frame
+  routes `AccessAction`s as pointer or key input (D71). `FrameOutput::tree` carries the tree out.
+- Strings: `ui.tr(key)` and `ui.tr_fmt(key, args)` read the table, then the toolkit default, then the
+  key (D70).
+
+Frames stay deterministic: time, input, theme, tier and strings all come from the caller.
+
+### Motion
+
+`docs/motion.md` holds the vocabulary: five duration tokens, seven easings, 15 kinds. A widget row
+names a `Motion` (kind, token, easing, Reduced rule); `MotionTokens::resolve` turns it into a
+duration under the frame's tier (`Full` runs it, `Reduced` maps the token or fades without
+transform, `Off` snaps, D69). `Token::Zero` is a row that never runs, in any tier. A retarget while
+in flight keeps position and velocity (D68). `conformance` samples a motion at 60 Hz and checks
+monotone steps, the exact end and that it finishes within its duration plus one frame.
 
 ### `lune-ui-wgpu` (`crates/lune-ui-wgpu/src/`)
 
@@ -153,10 +207,36 @@ window.
 | Another renderer | Consume `Scene` in the documented draw order; test the painter side with `RecordingRenderer` |
 | Another text shaper | Implement `TextSystem`; pass `text_system_contract` |
 | Another windowing library | Translate its events into `RawInput`, apply `FrameOutput`; script it with `ScriptedInput` |
-| Overlay or widget | A new module (under `crates/lune-ui-core/src/widgets/` for controls) plus a catalogue file |
+| Widget | A file under `crates/lune-ui-core/src/widgets/`: a public `Look` with `of(theme, state)`, a `paint` function, the Painter-API function as a wrapper, a `Ui` method that interacts, animates through `Motion` rows and emits its node; a catalogue file; a gallery page; a `tests/widget_<name>.rs` with the rest-identity test (settled `Scene` equals the Painter function's) |
+| Overlay | `Ui::overlay` with `OverlayOptions` (layer, modal, dismissal, anchor, initial focus, open and close `Motion`) and an exit painter; `Ui::menu` and `Ui::dialog` are the worked examples |
+| Gallery page | A file under `apps/gallery/src/pages/` implementing `PageState`, its `UiScene`s (timed scripted input, then a capture frame, with the `Repaint` it must report) and one line in `apps/gallery/src/pages/mod.rs` |
+| Test locale | A `StringTable` returned by `PageState::strings` (the gallery's `locale` page wraps every default in brackets) |
 | Look | A `Theme` value handed to the `Painter`; `theme::DARK` and `lunegit_dark` are one |
 | App-specific drawing | `CustomDraw`, one implementation per slot passed to `FrameRenderer::draw_with`; the gallery's `apps/gallery/src/custom.rs` is the worked example. The terminal-grid renderer built on it stays in Luneterm (D8) |
-| Fonts | The app passes font bytes and family names to `TextCache::new`; the library bundles none (D5, D12) |
+| Fonts | The app passes font bytes and family names to `TextCache::new` (or `with_locale`); the library bundles none and loads no system font (D5, D12, D78) |
+
+## Gallery pages and bench
+
+`apps/gallery` is app code (it reads the clock for the bench and bundles fonts). Every screen is a
+`Page` in `apps/gallery/src/pages/mod.rs`: the legacy pages (`reference`, `effects`) hold the 15 fixed Painter-API
+scenes the pixel gate compares and keep their drawing code; every other page draws through the `Ui`
+(D73). A Ui page has a live state (window mode, the bench), scripted `UiScene`s (timed input, then a
+capture frame, with the `Repaint` it must report: `Settled` or `Moving`) and optional bench steps.
+`-states` scenes are specimen sheets painted through the widgets' public `Look` and `paint`
+functions; mid-transition and interaction scenes are live scripted `Ui` frames. Pages: `button`,
+`toggle`, `checkbox`, `label`, `stepper`, `combo`, `text_field`, `dialog`, `dropdown`, `menu`, `motion`,
+`ui`, `focus`, `a11y`, `locale`; `apps/gallery/src/pages/controls_ui.rs` is the shared composition of every M4 widget that the
+core pages draw. Window mode builds a `Ui` per frame over the page's live state; dump and bench
+drive the same state through a `Player` (a scripted input, the retained store and the page state).
+
+`gallery --bench [--runs N] [--frames N] [--size WxH]` times offscreen frames: a timeline per page,
+cost probes (text fades, a scaling and fading dialog over a blurred stripe page) and a 4 ms-sleep
+self-test that calibrates the instrument. Warm-up 3 frames, 5 runs by default, at 2080 x 1320
+(1040 x 660 at 2x). Each run is judged on its own: p99 at most 16.6 ms and no frame over 33 ms; a
+page is `OVER` only when at least half its runs are, and a minority of over runs is printed beside
+its `ok`. The self-test's spread (p99 and worst above its p50) and the load average are printed with
+every verdict; nothing refuses a busy machine (D85). It is the milestone acceptance run, not part of
+the per-commit gate.
 
 ## Boundary rules
 
@@ -175,7 +255,7 @@ offender, 2 when a scanned path or a tool is missing):
 | 9 | Every crate dir is registered with its allowed dependency names and is the workspace member of that name; every dependency cargo reports is within its lists; an unregistered dir, a rename, a path dependency outside `crates/<name>`, or a root `package =`, `[patch]` or `[replace]` fails; adapters name no `lune-ui-*` crate but the core | crate rule (adapters depend on the core only) |
 | 10 | No OS predicate in `cfg` outside `platform/` or `material/` dirs, except `#[cfg]` on `mod x;` or `use`; a wrapped statement is joined (strings and comments skipped), one open after 40 lines fails | hard rule 3 |
 | 11 | `crates/lune-ui/src` holds only `lib.rs`, with no item definitions | crate rule (facade only) |
-| 12 | Compiled code comes only from the scanned files: build targets are `src/lib.rs` and `tests/` files; no `path = "..."` attribute or `include!` in `crates/*/src` | rules 6, 10, 11 (what they scan is what is built) |
+| 12 | Compiled code comes only from the scanned files: build targets are `src/lib.rs` and its modules (`tests/` files are not library code and are not scanned); no `path = "..."` attribute or `include!` in `crates/*/src` (comment lines and `let path =` bindings are not attributes) | rules 6, 10, 11 (what they scan is what is built) |
 
 The script does not cover hard rules 4 (a new dependency needs a DECISIONS row; rule 9 forces a
 script edit but does not check the row), 5, 6 (licence rows), 8, 9 or 10 (`gen-component-index.sh
@@ -210,6 +290,27 @@ facade keeps those paths):
 - new: `RawInput`, `FrameOutput`, `Translator`, `OutputState`, `Backdrop::apply`, `WindowBackdrop`,
   the `testing` module.
 
+Since M4:
+
+- `Painter` gains a transform stack (`push_xform`, `pop_xform`; `set_xform` replaces it with zero or
+  one entry; one entry is bit-identical to the old single transform, D66), hit tags, an op recorder
+  and faded acrylic: `scene::Acrylic { shape, opacity }` replaces the bare acrylic shape in
+  `LayerGeometry::acrylic` (opacity 1 is the old replace blend, D67);
+- `LayerId::Toast` is a fifth layer above `Modal` (`LAYER_COUNT` 5, `SCENE_LAYERS` unchanged, D54);
+- `Event` gains `Access`, `ClipboardText`, `ClipboardUnavailable` (it is `non_exhaustive`);
+  `FrameOutput` gains `repaint`, `clipboard`, `tree`, `focused`; `CursorIcon::ALL` lists the 36 icons;
+- `Theme` gains the D58 colour fields and `font_title`, `line_title`, and the theme carries the
+  motion tokens (`Theme::motion`);
+- `TextCache::new` loads only the fonts it is given and no system font; `TextCache::with_locale`
+  takes the shaping locale; with no font every text is an empty layout of zero size (D78, D79);
+- `Gpu::upload` and `Uploaded` are crate-private (the app draws through `FrameRenderer`);
+  `Gpu::new_with_features` asks for optional device features and reports what the adapter granted;
+- the old Painter-API widget functions keep their paths, signatures and pixels; each widget file now
+  also has a `Look`, `paint` and a `Ui` method (D60);
+- new modules `ui`, `access`, `motion`, `strings` (see above), re-exported by the facade;
+- `Token::Zero` (outside `Token::ALL`) is a zero-duration row; the dropdown's snap
+  open and close use it so an overlay with no motion reports `Idle` at once (D80).
+
 ## Provenance of reworded comments
 
 On the move, 12 comment lines that named the source app's look were reworded so library source
@@ -240,11 +341,11 @@ only under `target/`, except that `scripts/pixel-gate.sh` extracts its base sour
 | Gate | Proves | Compare | Exit codes |
 |---|---|---|---|
 | `scripts/pixel-gate-luneterm.sh` | M1 only: this repo's `lune-ui` drew the same pixels as Luneterm's. Phases: lock parity (every registry package in this repo's `Cargo.lock` is in Luneterm's lock at the rev; `--parity-only` stops here and still applies), run A (Luneterm's own crate), run B (the scratch clone's `lune-ui` repointed at this repo's crate), compare with Luneterm's `dump_compare`. Since M2 step 2 run B cannot build against the new API, so a full run exits 2 by design (roadmap D4) | `18 files, 18 identical, 0 differ, max delta 0` | 0 pass; 1 parity mismatch or pixel difference; 2 usage or setup error |
-| `scripts/pixel-gate.sh [--base <rev>] [--allow <id>...]` | A change since `<rev>` (default `HEAD`) leaves the gallery's reference scenes unchanged. Dumps `git archive <rev>` and the working tree, compares with `dump-compare --allow-new`. `--allow <id>` names a scene whose frames may differ (reported only); an id not in `gallery --list` is an error | `15 files, 15 identical` | 0 pass; 1 delta or scene missing from the candidate; 2 usage or setup error (a base without `apps/gallery` included: nothing to compare is not a pass) |
+| `scripts/pixel-gate.sh [--base <rev>] [--allow <id>...]` | A change since `<rev>` (default `HEAD`) leaves the gallery's reference scenes unchanged (the 15 legacy scenes stay on the Painter API, so the gate keeps proving the moved drawing code is untouched; scenes a later change adds are reported as new, D59). Dumps `git archive <rev>` and the working tree, compares with `dump-compare --allow-new`. `--allow <id>` names a scene whose frames may differ (reported only); an id not in `gallery --list` is an error | `15 files, 15 identical` | 0 pass; 1 delta or scene missing from the candidate; 2 usage or setup error (a base without `apps/gallery` included: nothing to compare is not a pass) |
 | `scripts/check-targets.sh [--skip-linux]` | The workspace lints and builds beyond the host: Windows `clippy` (needs the `x86_64-pc-windows-msvc` target) and Linux fmt, clippy and tests in a `rust:1.92` container. Not a pixel gate; it covers the code the host `cfg` hides | `windows: passed`, `linux: passed` or `skipped (<reason>)` | 0 every half that ran passed; 1 a check failed; 2 usage |
 
 Dump file names: the gallery writes `<id>@<scale>x.png` (logical 1040x660; `gallery --list` prints
-the 15 names); Luneterm's spike writes `NN-<name>@<scale>x.png` (18 scenes). `tools/dump-compare`
+the 15 legacy names first, then the Ui pages' scenes: 62 names after M4); Luneterm's spike writes `NN-<name>@<scale>x.png` (18 scenes). `tools/dump-compare`
 (`cargo run -p dump-compare -- <baseline> <candidate> [--max-delta N] [--allow-new]`) compares per
 pixel, max channel delta including alpha; a file missing from the candidate, a file only in the
 candidate (unless `--allow-new`), a size or colour-type mismatch or a delta above `N` (default 0)

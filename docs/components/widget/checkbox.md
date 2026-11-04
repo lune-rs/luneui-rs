@@ -4,7 +4,7 @@ title: Checkbox
 area: widget
 status: in-progress
 consumers: luneterm, wane
-source: crates/lune-ui-core/src/widgets/mod.rs
+source: crates/lune-ui-core/src/widgets/checkbox.rs
 owner: orch/toolkit-v1
 summary: Checkbox: 16 px box, accent fill and check when checked, label beside it
 ---
@@ -32,23 +32,23 @@ Pinned: Lunegit 33a1dd41, Wane 69931d6, this repo fa2958b. Read: `crates/lune-ui
 `crates/lune-ui-core/src/theme.rs:62,67,83`; `apps/gallery/src/scenes.rs:262-275`; Wane `docs/ui/components.md:319-331`;
 Lunegit `src/Lunegit.Desktop/Themes/DarkTheme.axaml:174-181`, `src/Lunegit.Desktop/Views/Dialogs/StashDialogView.axaml:97-100` (use site), `.claude/docs/animation-rules.md:102,104,110`.
 Lunegit has no `CheckBox` style or template override (rg over `src/Lunegit.Desktop` at 33a1dd41: only the `CheckBox*` colour keys).
-Conflicts: (1) Wane gives a hover fill `--surface-hover` and a focus outline [W docs/ui/components.md:323]; the moved code draws neither, so Wane supplies them. (2) Wane's min height 24 [W docs/ui/components.md:324] is a layout rule the moved code does not set; the caller's rect decides. (3) Lunegit's checked fill and border are the accent in every pointer state [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:174-179] and the moved code agrees [R crates/lune-ui-core/src/widgets/mod.rs:186].
+Conflicts: (1) Wane gives a hover fill `--surface-hover` and a focus outline [W docs/ui/components.md:323]; the moved code draws neither, so Wane supplies them. (2) Wane's min height 24 [W docs/ui/components.md:324] is a layout rule the moved code does not set; the caller's rect decides. (3) Lunegit's checked fill and border are the accent in every pointer state [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:174-179] and the moved code agrees [R crates/lune-ui-core/src/widgets/checkbox.rs:87-132].
 
 ### Anatomy
 
-- Box 16 x 16, vertically centred in the rect, at the rect's left edge; corner radius 3 [R crates/lune-ui-core/src/widgets/mod.rs:184,186,189]; Wane 16 x 16 radius 3 (`--radius-check`) [W docs/ui/components.md:324].
-- Unchecked: 1 px ring `fg_secondary` [R crates/lune-ui-core/src/widgets/mod.rs:189].
-- Checked: fill `accent` [R crates/lune-ui-core/src/widgets/mod.rs:186] with a 12 px check glyph in `on_accent` [R crates/lune-ui-core/src/widgets/mod.rs:187]; Wane checked: 12 px check [W docs/ui/components.md:323].
-- Label: 13 px secondary UI text (`fg_secondary`), starts 8 px after the box [R crates/lune-ui-core/src/widgets/mod.rs:192-195]; Wane label 13 secondary, gap 8 [W docs/ui/components.md:324].
-- Hit area: 24 px plus the label width, full rect height [R crates/lune-ui-core/src/widgets/mod.rs:196].
+- Box 16 x 16, vertically centred in the rect, at the rect's left edge; corner radius 3 [R crates/lune-ui-core/src/widgets/checkbox.rs:87-132]; Wane 16 x 16 radius 3 (`--radius-check`) [W docs/ui/components.md:324].
+- Unchecked: 1 px ring `fg_secondary` [R crates/lune-ui-core/src/widgets/checkbox.rs:87-132].
+- Checked: fill `accent` [R crates/lune-ui-core/src/widgets/checkbox.rs:87-132] with a 12 px check glyph in `on_accent` [R crates/lune-ui-core/src/widgets/checkbox.rs:87-132]; Wane checked: 12 px check [W docs/ui/components.md:323].
+- Label: 13 px secondary UI text (`fg_secondary`), starts 8 px after the box [R crates/lune-ui-core/src/widgets/checkbox.rs:87-132]; Wane label 13 secondary, gap 8 [W docs/ui/components.md:324].
+- Hit area: 24 px plus the label width, full rect height [R crates/lune-ui-core/src/widgets/checkbox.rs:87-132].
 - Min height 24 [W docs/ui/components.md:324] (rect height is set by the caller).
 
 ### States
 
 | state | look | cite |
 |---|---|---|
-| unchecked | 1 px ring `fg_secondary`, no fill | [R crates/lune-ui-core/src/widgets/mod.rs:189] |
-| checked | fill `accent`, check glyph `on_accent` | [R crates/lune-ui-core/src/widgets/mod.rs:186-187] |
+| unchecked | 1 px ring `fg_secondary`, no fill | [R crates/lune-ui-core/src/widgets/checkbox.rs:87-132] |
+| checked | fill `accent`, check glyph `on_accent` | [R crates/lune-ui-core/src/widgets/checkbox.rs:87-132] |
 | hover (unchecked) | fill `surface_hover` behind the box | [W docs/ui/components.md:323]; not drawn by the moved code |
 | hover (checked) | accent fill unchanged | [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:175,178] |
 | focus-visible | 1 px outline, offset 2 | [W docs/ui/components.md:323]; not drawn by the moved code |
@@ -66,7 +66,7 @@ Lunegit has no `CheckBox` motion selector (`Themes/Animations.axaml`), so every 
 
 ### Input and focus
 
-- Pointer: click toggles; hover over the hit area [R crates/lune-ui-core/src/widgets/mod.rs:196]; pointer capture while pressed [core.input].
+- Pointer: click toggles; hover over the hit area [R crates/lune-ui-core/src/widgets/checkbox.rs:87-132]; pointer capture while pressed [core.input].
 - Keyboard: Space toggles [W docs/ui/components.md:325]; Tab stop yes; focus-visible after keyboard navigation [core.focus].
 - Layer: whatever layer the app draws it on; no overlay, no focus scope.
 - Disabled: no hit, no toggle [W docs/ui/components.md:323].
@@ -75,7 +75,7 @@ Lunegit has no `CheckBox` motion selector (`Themes/Animations.axaml`), so every 
 
 - Transient: hover, focus-ring opacity, fill transitions [core.ui].
 - Persistent: none.
-- App-owned: `checked` (passed every frame), the label text [R crates/lune-ui-core/src/widgets/mod.rs:176-182].
+- App-owned: `checked` (passed every frame), the label text [R crates/lune-ui-core/src/widgets/checkbox.rs:117-122].
 - Exit retention: no.
 
 ### Accessibility

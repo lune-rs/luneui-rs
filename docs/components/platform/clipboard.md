@@ -2,10 +2,10 @@
 id: platform.clipboard
 title: Clipboard
 area: platform
-status: planned
+status: in-progress
 consumers: any
-source: —
-owner: —
+source: crates/lune-ui-core/src/input.rs
+owner: orch/toolkit-v1
 summary: Text clipboard through FrameOutput requests and input events; types in M4, fake in M5, platform adapter in M10
 ---
 

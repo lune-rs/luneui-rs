@@ -2,6 +2,7 @@
 
 use std::time::Duration;
 
+use crate::access::AccessAction;
 use crate::input::{
     Event, ImeEvent, Key, Modifiers, PointerButton, RawInput, ScrollDelta, printable,
 };
@@ -150,6 +151,24 @@ impl ScriptedInput {
         self
     }
 
+    /// Pushes an assistive technology's action request.
+    pub fn access(&mut self, action: AccessAction) -> &mut Self {
+        self.events.push(Event::Access(action));
+        self
+    }
+
+    /// Pushes the clipboard's text, answering a read.
+    pub fn clipboard_text(&mut self, text: &str) -> &mut Self {
+        self.events.push(Event::ClipboardText(text.to_owned()));
+        self
+    }
+
+    /// Pushes the clipboard-unavailable answer to a read.
+    pub fn clipboard_unavailable(&mut self) -> &mut Self {
+        self.events.push(Event::ClipboardUnavailable);
+        self
+    }
+
     /// The window gains or loses focus.
     pub fn focus(&mut self, focused: bool) -> &mut Self {
         self.focused = focused;
@@ -166,5 +185,41 @@ impl ScriptedInput {
             focused: self.focused,
             events: std::mem::take(&mut self.events),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ScriptedInput;
+    use crate::access::{AccessAction, AccessValue, Action};
+    use crate::input::Event;
+    use crate::ui::WidgetId;
+
+    #[test]
+    fn the_accessibility_and_clipboard_builders_append_their_events() {
+        let target = WidgetId::ROOT.with("field");
+        let mut input = ScriptedInput::new((100.0, 50.0), 1.0);
+        input
+            .access(AccessAction {
+                target,
+                action: Action::SetValue,
+                value: Some(AccessValue::Number(2.5)),
+            })
+            .clipboard_text("pasted")
+            .clipboard_unavailable();
+        let frame = input.end_frame();
+        assert_eq!(
+            frame.events,
+            vec![
+                Event::Access(AccessAction {
+                    target,
+                    action: Action::SetValue,
+                    value: Some(AccessValue::Number(2.5)),
+                }),
+                Event::ClipboardText("pasted".to_owned()),
+                Event::ClipboardUnavailable,
+            ]
+        );
+        assert!(input.end_frame().events.is_empty());
     }
 }

@@ -2,10 +2,10 @@
 id: motion.animation-tiers
 title: Animation tiers and reduced motion
 area: motion
-status: planned
+status: in-progress
 consumers: any
-source: Lunegit: src/Lunegit.Desktop/Themes/Animations.axaml
-owner: —
+source: crates/lune-ui-core/src/motion/tokens.rs
+owner: orch/toolkit-v1
 summary: Full, Reduced and Off motion tiers passed in by the app, with the per-token Reduced duration map
 ---
 
@@ -120,7 +120,7 @@ None: the tier names and the setting row are app text (Lunegit keeps them as `se
 
 ## Open questions
 
-- A tier change while a transition is in flight: Lunegit swaps style files [L src/Lunegit.Desktop/Theming/AnimationApplicator.cs:39-56] and the repo does not say how Avalonia treats the running one. Proposal for M4: the running transition snaps to its end on the next frame. Not verified against any source.
+- None. Resolved: a tier change snaps everything in flight on the next frame [D69].
 
 ## Notes for the planner
 

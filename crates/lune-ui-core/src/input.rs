@@ -8,7 +8,10 @@
 
 use std::time::Duration;
 
+use crate::access::{AccessAction, SemanticTree};
+use crate::motion::Time;
 use crate::paint::Rect;
+use crate::ui::WidgetId;
 use crate::window::ResizeEdge;
 
 /// Everything the app knows about one window at the start of a frame.
@@ -62,6 +65,12 @@ pub enum Event {
     Focus(bool),
     /// The modifier keys changed.
     ModifiersChanged(Modifiers),
+    /// An assistive technology requested an action on a node.
+    Access(AccessAction),
+    /// The text the clipboard held, answering a [`ClipboardRequest::Read`].
+    ClipboardText(String),
+    /// The clipboard holds no text or cannot be read, answering a [`ClipboardRequest::Read`].
+    ClipboardUnavailable,
 }
 
 /// A pointer button.
@@ -151,6 +160,30 @@ pub enum ImeEvent {
     Disabled,
 }
 
+/// A clipboard operation the toolkit asks of the adapter. Requests are answered, if at all, by
+/// an `Event` on a later frame.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ClipboardRequest {
+    /// Put this text on the clipboard.
+    Write(String),
+    /// Read the clipboard text; answered once.
+    Read,
+}
+
+/// When the app should draw its next frame.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Repaint {
+    /// Nothing is animating or changing, and the frame's input changed nothing it drew before
+    /// reacting to; the app may wait for input.
+    #[default]
+    Idle,
+    /// Draw again as soon as possible: something is in flight, or this frame's input changed
+    /// state after the widgets drew (one catch-up frame, D81).
+    Now,
+    /// Draw again at this app time (an animation's next frame).
+    At(Time),
+}
+
 /// What the toolkit asks of the window after a frame.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct FrameOutput {
@@ -161,6 +194,14 @@ pub struct FrameOutput {
     pub ime_area: Option<Rect>,
     /// Window operations, in order.
     pub commands: Vec<WindowCommand>,
+    /// When the next frame is due.
+    pub repaint: Repaint,
+    /// Clipboard operations, in order; at most one write survives a frame.
+    pub clipboard: Vec<ClipboardRequest>,
+    /// The semantic tree of the frame, for assistive technology.
+    pub tree: SemanticTree,
+    /// The widget that has keyboard focus, if any.
+    pub focused: Option<WidgetId>,
 }
 
 /// A window operation the app performs.
@@ -222,9 +263,115 @@ pub enum CursorIcon {
     AllResize,
 }
 
+impl CursorIcon {
+    /// Every icon, in declaration order.
+    pub const ALL: [CursorIcon; 36] = [
+        CursorIcon::Default,
+        CursorIcon::ContextMenu,
+        CursorIcon::Help,
+        CursorIcon::Pointer,
+        CursorIcon::Progress,
+        CursorIcon::Wait,
+        CursorIcon::Cell,
+        CursorIcon::Crosshair,
+        CursorIcon::Text,
+        CursorIcon::VerticalText,
+        CursorIcon::Alias,
+        CursorIcon::Copy,
+        CursorIcon::Move,
+        CursorIcon::NoDrop,
+        CursorIcon::NotAllowed,
+        CursorIcon::Grab,
+        CursorIcon::Grabbing,
+        CursorIcon::EResize,
+        CursorIcon::NResize,
+        CursorIcon::NeResize,
+        CursorIcon::NwResize,
+        CursorIcon::SResize,
+        CursorIcon::SeResize,
+        CursorIcon::SwResize,
+        CursorIcon::WResize,
+        CursorIcon::EwResize,
+        CursorIcon::NsResize,
+        CursorIcon::NeswResize,
+        CursorIcon::NwseResize,
+        CursorIcon::ColResize,
+        CursorIcon::RowResize,
+        CursorIcon::AllScroll,
+        CursorIcon::ZoomIn,
+        CursorIcon::ZoomOut,
+        CursorIcon::DndAsk,
+        CursorIcon::AllResize,
+    ];
+}
+
 /// The text a key press types: `text` without control characters, or `None` when nothing is left.
 /// Adapters and fakes use this one rule to decide whether a press emits [`Event::Text`].
 pub fn printable(text: &str) -> Option<String> {
     let t: String = text.chars().filter(|c| !c.is_control()).collect();
     (!t.is_empty()).then_some(t)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{CursorIcon, CursorIcon as C, printable};
+
+    /// The declaration index of every icon. No wildcard: a variant added without an entry here
+    /// stops the build.
+    fn index(icon: CursorIcon) -> usize {
+        match icon {
+            C::Default => 0,
+            C::ContextMenu => 1,
+            C::Help => 2,
+            C::Pointer => 3,
+            C::Progress => 4,
+            C::Wait => 5,
+            C::Cell => 6,
+            C::Crosshair => 7,
+            C::Text => 8,
+            C::VerticalText => 9,
+            C::Alias => 10,
+            C::Copy => 11,
+            C::Move => 12,
+            C::NoDrop => 13,
+            C::NotAllowed => 14,
+            C::Grab => 15,
+            C::Grabbing => 16,
+            C::EResize => 17,
+            C::NResize => 18,
+            C::NeResize => 19,
+            C::NwResize => 20,
+            C::SResize => 21,
+            C::SeResize => 22,
+            C::SwResize => 23,
+            C::WResize => 24,
+            C::EwResize => 25,
+            C::NsResize => 26,
+            C::NeswResize => 27,
+            C::NwseResize => 28,
+            C::ColResize => 29,
+            C::RowResize => 30,
+            C::AllScroll => 31,
+            C::ZoomIn => 32,
+            C::ZoomOut => 33,
+            C::DndAsk => 34,
+            C::AllResize => 35,
+        }
+    }
+
+    #[test]
+    fn cursor_icon_all_lists_every_variant_in_declaration_order() {
+        assert_eq!(CursorIcon::ALL.len(), 36);
+        for (i, icon) in CursorIcon::ALL.iter().enumerate() {
+            assert_eq!(index(*icon), i, "{icon:?}");
+        }
+    }
+
+    #[test]
+    fn printable_drops_control_characters() {
+        assert_eq!(printable("\u{7}"), None);
+        assert_eq!(printable("a\tb"), Some("ab".to_owned()));
+        assert_eq!(printable(""), None);
+        assert_eq!(printable("é"), Some("é".to_owned()));
+    }
 }

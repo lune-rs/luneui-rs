@@ -2,10 +2,10 @@
 id: motion.transitions
 title: Motion system and transitions
 area: motion
-status: planned
+status: in-progress
 consumers: any
-source: —
-owner: —
+source: crates/lune-ui-core/src/motion/transition.rs
+owner: orch/toolkit-v1
 summary: Time, Easing, Tween, Spring, Keyframes and Transition evaluated in closed form, tier-aware, with a 60 Hz conformance harness
 ---
 

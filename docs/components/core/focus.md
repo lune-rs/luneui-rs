@@ -2,10 +2,10 @@
 id: core.focus
 title: Keyboard focus
 area: core
-status: planned
+status: in-progress
 consumers: any
-source: —
-owner: —
+source: crates/lune-ui-core/src/ui/focus.rs
+owner: orch/toolkit-v1
 summary: Tab order by call order within focus scopes, focus-visible, scope push, trap and restore, roving focus in composites
 ---
 
@@ -55,8 +55,8 @@ C4-only rule [core.ui].
 - Tab order: Tab moves to the next tab stop in call order within the current focus scope, Shift+Tab to the previous; the order wraps inside a scope [derived: C4 "Tab order follows call order within the current focus scope"; the wrap follows Lunegit's `Cycle` on the dialog card, `src/Lunegit.Desktop/MainWindow.axaml:249`].
 - Focus scopes: a stack. The base scope is the window; an overlay pushes a scope on open. A modal scope traps Tab: it cycles inside the overlay and never reaches a lower layer [derived: C4], [L src/Lunegit.Desktop/MainWindow.axaml:249], [W docs/ui/components.md:563].
 - Initial focus on open: the overlay names the widget to focus (a text field for a search or form dialog), else its first tab stop; Lunegit focuses the first text box when a dialog attaches [L src/Lunegit.Desktop/Views/Dialogs/GlobalSearchDialogView.axaml.cs:15-16], [L src/Lunegit.Desktop/Views/Dialogs/AddWorktreeDialogView.axaml.cs:19].
-- Restore on close: popping the scope returns focus to the widget focused before the overlay opened, or to the overlay's anchor widget when that is gone [core.ui].
-- Focus-visible: the ring shows after keyboard navigation (Tab, Shift+Tab, arrow keys, a key press on the widget) and hides after a pointer press; Wane styles the ring on `:focus-visible` [W docs/ui/mocks/css/components.css:125,174,197]. A text input shows its focus as an accent border at all times (focus-within) [W docs/ui/mocks/css/components.css:234,290], matching the moved field and combo [R crates/lune-ui-core/src/widgets/mod.rs:65].
+- Restore on close: popping the scope returns focus to the widget focused before the overlay opened, or to the overlay's anchor widget when that is gone [core.ui]. Scopes are a stack ([D83]): closing an overlay whose scope is not the active one (focus is in a later overlay still open) moves no focus, a later overlay whose saved focus was inside the closing one inherits the closing one's saved focus, and a restore never lands under an open modal. A passive overlay with no stop leaves focus where it is on open ([D82]).
+- Focus-visible: the ring shows after keyboard navigation (Tab, Shift+Tab, arrow keys, a key press on the widget) and hides after a pointer press; Wane styles the ring on `:focus-visible` [W docs/ui/mocks/css/components.css:125,174,197]. A text input shows its focus as an accent border at all times (focus-within) [W docs/ui/mocks/css/components.css:234,290], matching the moved field and combo [R crates/lune-ui-core/src/widgets/input_box.rs:29-34].
 - Ring look: button and ghost button: 1 px `fg_secondary` outline, offset -1 (inset); primary button: outline `on_accent_text`; toggle, checkbox and radio: 1 px `fg_secondary` outline at offset 2; fields, steppers and the open combo: border `accent` [W docs/ui/mocks/css/components.css:125,130,174,197-198,234,290,312], theme fields [R crates/lune-ui-core/src/theme.rs:13,20-25].
 - Pointer: a press on a focusable widget focuses it; a press on a non-focusable widget leaves focus alone; clicking a form label focuses its control [W docs/ui/components.md:451].
 - Keys: routed to the focused widget; keys it does not consume go to the shortcut registry; Tab and Shift+Tab are consumed here unless the focused widget keeps Tab as text (a code editor) [infra.shortcut-routing], [derived: no source says whether a text field keeps Tab; Wane lists Tab among its behaviours, docs/ui/components.md:353 is not a ruling].
@@ -140,12 +140,12 @@ None: no user-visible text.
 
 ### Build
 
-- Milestone: M4.
+- Milestone: M4. Deferred [D74]: the radio in `focus-ring-kinds` (the control arrives in M6).
 - Depends on: core.ui, core.input, motion.transitions, infra.accessibility.
 
 ## Open questions
 
-- A focused widget that stops being drawn: C4 gives no rule. Proposal: focus clears after one frame without use unless a keep-alive scope covers it, and the next Tab starts from the first stop of the current scope. No source says otherwise.
+- Resolved [D72]: a focused widget that is not registered for one frame loses focus unless a live keep-alive scope covers it.
 - Tab inside a code editor or terminal view: whether the widget keeps Tab as text or releases it is that widget's spec (`text.code-editor-view`); the registry here only reads the widget's answer.
 
 ## Notes for the planner

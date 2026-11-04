@@ -4,7 +4,7 @@ title: Toggle switch
 area: widget
 status: in-progress
 consumers: luneterm, wane
-source: crates/lune-ui-core/src/widgets/mod.rs
+source: crates/lune-ui-core/src/widgets/toggle.rs
 owner: orch/toolkit-v1
 summary: On/off switch: 40x20 track, accent fill when on, knob slides between ends
 ---
@@ -35,24 +35,24 @@ Pinned: Lunegit 33a1dd41, Wane 69931d6, this repo fa2958b. Read: `crates/lune-ui
 src/Lunegit.Desktop/Themes/Animations.axaml (no ToggleSwitch selector), .claude/docs/animation-rules.md:82-110,
 src/Lunegit.Desktop/Views/Settings/GeneralSettingsView.axaml:148-163; Wane docs/ui/components.md:305-317.
 Conflict: Wane puts the knob "at 3 px" [W docs/ui/components.md:310]; the moved code insets it 4 px
-[R crates/lune-ui-core/src/widgets/mod.rs:33,44], which the pixel gate pins. The code wins.
+[R crates/lune-ui-core/src/widgets/toggle.rs:103-147], which the pixel gate pins. The code wins.
 
 ### Anatomy
 
-- Track 40 x 20, radius 10, vertically centred in the given rect [R crates/lune-ui-core/src/widgets/mod.rs:28].
-- Knob: circle 12 (14 hovered), inset 4 from the track end [R crates/lune-ui-core/src/widgets/mod.rs:29,33,44].
-- Hit area: track grown 4 px left and right, 6 px up and down (48 x 32) [R crates/lune-ui-core/src/widgets/mod.rs:47].
-- Off: 1 px ring `fg_secondary`, knob `fg_primary` [R crates/lune-ui-core/src/widgets/mod.rs:43,45]. On: track `accent`, knob `on_accent` [R crates/lune-ui-core/src/widgets/mod.rs:31,38]; Lunegit's on fill and stroke are AccentPrimaryColor in every pointer state [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:203-208].
+- Track 40 x 20, radius 10, vertically centred in the given rect [R crates/lune-ui-core/src/widgets/toggle.rs:103-147].
+- Knob: circle 12 (14 hovered), inset 4 from the track end [R crates/lune-ui-core/src/widgets/toggle.rs:103-147].
+- Hit area: track grown 4 px left and right, 6 px up and down (48 x 32) [R crates/lune-ui-core/src/widgets/toggle.rs:103-147].
+- Off: 1 px ring `fg_secondary`, knob `fg_primary` [R crates/lune-ui-core/src/widgets/toggle.rs:103-147]. On: track `accent`, knob `on_accent` [R crates/lune-ui-core/src/widgets/toggle.rs:103-147]; Lunegit's on fill and stroke are AccentPrimaryColor in every pointer state [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:203-208].
 - Optional label: 13 px secondary text, gap 12, min height 24 [W docs/ui/components.md:310].
 
 ### States
 
 | state | look | cite |
 |---|---|---|
-| off | ring `fg_secondary`, knob left `fg_primary` | [R crates/lune-ui-core/src/widgets/mod.rs:40-45] |
-| on | fill `accent`, knob right `on_accent` | [R crates/lune-ui-core/src/widgets/mod.rs:30-38] |
-| hover (off) | track fill `surface_hover`, knob 14 | [R crates/lune-ui-core/src/widgets/mod.rs:29,40-42] |
-| hover (on) | knob 14, fill unchanged | [R crates/lune-ui-core/src/widgets/mod.rs:29], [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:204] |
+| off | ring `fg_secondary`, knob left `fg_primary` | [R crates/lune-ui-core/src/widgets/toggle.rs:103-147] |
+| on | fill `accent`, knob right `on_accent` | [R crates/lune-ui-core/src/widgets/toggle.rs:103-147] |
+| hover (off) | track fill `surface_hover`, knob 14 | [R crates/lune-ui-core/src/widgets/toggle.rs:103-147] |
+| hover (on) | knob 14, fill unchanged | [R crates/lune-ui-core/src/widgets/toggle.rs:103-147], [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:204] |
 | pressed | as hover (Lunegit's pressed fill equals rest) | [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:205,208] |
 | focus-visible | 1 px outline, offset 2 | [W docs/ui/components.md:309] |
 | disabled | opacity 0.4, inert | [W docs/ui/components.md:309], [L src/Lunegit.Desktop/App.axaml:481-483] (Lunegit's disabled toolbar action) |
@@ -71,7 +71,7 @@ knob slide is a D40 deviation. Never animated: nothing beyond the motion.md list
 
 ### Input and focus
 
-- Pointer: click toggles; hover over the hit area [R crates/lune-ui-core/src/widgets/mod.rs:47].
+- Pointer: click toggles; hover over the hit area [R crates/lune-ui-core/src/widgets/toggle.rs:103-147].
 - Keyboard: Space toggles; Tab stop in call order; focus-visible after keyboard navigation [W docs/ui/components.md:311], [core.focus].
 - Layer: whatever layer the app draws it on; no overlay, no focus scope.
 
