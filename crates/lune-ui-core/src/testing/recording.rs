@@ -16,6 +16,11 @@ pub enum DrawCall {
     },
     /// One shape below the layer's text.
     Under { layer: usize, shape: Shape },
+    /// The layer's path-fill vertices (one draw for the whole non-empty run), below the text.
+    Fills {
+        layer: usize,
+        vertices: Vec<StrokeVertex>,
+    },
     /// One app-owned draw.
     Custom { layer: usize, item: CustomItem },
     /// One text placement.
@@ -37,6 +42,7 @@ impl DrawCall {
         match self {
             Self::Acrylic { layer, .. }
             | Self::Under { layer, .. }
+            | Self::Fills { layer, .. }
             | Self::Custom { layer, .. }
             | Self::Text { layer, .. }
             | Self::Over { layer, .. }
@@ -55,7 +61,7 @@ pub struct RecordedFrame {
 
 /// Consumes scenes like a renderer does, in the draw order the [`scene`](crate::scene) module
 /// documents, and records one [`DrawCall`] per draw: one per acrylic, under and over shape, one
-/// per non-empty stroke run, one per text item, one per custom item, and the backdrop step when
+/// per non-empty stroke or path-fill run, one per text item, one per custom item, and the backdrop step when
 /// the scene requests one.
 #[derive(Debug, Default)]
 pub struct RecordingRenderer {
@@ -89,6 +95,12 @@ impl RecordingRenderer {
                 layer,
                 shape,
             }));
+            if !g.fills.is_empty() {
+                calls.push(DrawCall::Fills {
+                    layer: i,
+                    vertices: g.fills.clone(),
+                });
+            }
             calls.extend(layer.customs.iter().map(|item| DrawCall::Custom {
                 layer: i,
                 item: *item,
@@ -139,6 +151,7 @@ mod tests {
             DrawCall::Acrylic { .. } => "acrylic",
             DrawCall::Under { shape, .. } if shape.params[0] == 1.0 => "under ring",
             DrawCall::Under { .. } => "under fill",
+            DrawCall::Fills { .. } => "fills",
             DrawCall::Custom { item, .. } if item.slot == 0 => "custom 0",
             DrawCall::Custom { .. } => "custom",
             DrawCall::Text { .. } => "text",
@@ -171,6 +184,7 @@ mod tests {
             false,
             StrokeStyle::solid(THEME.fg_primary, 1.0),
         );
+        p.fill_path(&[[0.0, 0.0], [20.0, 0.0], [20.0, 20.0]], THEME.fg_primary);
         p.text(&spec, 12.0, 12.0);
         p.custom(0, r);
         p.on(LayerId::Popup);
@@ -196,6 +210,7 @@ mod tests {
                 ("acrylic", Some(0)),
                 ("under fill", Some(0)),
                 ("under ring", Some(0)),
+                ("fills", Some(0)),
                 ("custom 0", Some(0)),
                 ("text", Some(0)),
                 ("over ring", Some(0)),

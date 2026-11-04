@@ -30,6 +30,8 @@ struct ShapeIn {
     @location(3) under: vec4<f32>,  // acrylic: what this layer replaces (for AA edges)
     @location(4) params: vec4<f32>, // kind (0 fill, 1 ring), ring width, acrylic flag, noise flag
     @location(5) clip: vec4<f32>,
+    @location(6) round: vec4<f32>,    // rounded clip rect (x, y, w, h)
+    @location(7) round_r: f32,        // its corner radius; 0 = none
 };
 
 struct ShapeOut {
@@ -41,6 +43,8 @@ struct ShapeOut {
     @location(4) @interpolate(flat) under: vec4<f32>,
     @location(5) @interpolate(flat) params: vec4<f32>,
     @location(6) @interpolate(flat) clip: vec4<f32>,
+    @location(7) @interpolate(flat) round: vec4<f32>,
+    @location(8) @interpolate(flat) round_r: f32,
 };
 
 @vertex
@@ -56,6 +60,8 @@ fn vs_shape(@builtin(vertex_index) vi: u32, s: ShapeIn) -> ShapeOut {
     o.under = s.under;
     o.params = s.params;
     o.clip = s.clip;
+    o.round = s.round;
+    o.round_r = s.round_r;
     return o;
 }
 
@@ -66,6 +72,13 @@ fn sd_round_rect(p: vec2<f32>, half: vec2<f32>, r: vec4<f32>) -> f32 {
     if p.x < 0.0 && p.y >= 0.0 { rad = r.w; }
     let q = abs(p) - half + vec2<f32>(rad);
     return min(max(q.x, q.y), 0.0) + length(max(q, vec2<f32>(0.0))) - rad;
+}
+
+// Coverage of the rounded clip: 1 without one, else the antialiased inside of the rounded rect.
+fn round_clip(p: vec2<f32>, rc: vec4<f32>, r: f32) -> f32 {
+    if r <= 0.0 { return 1.0; }
+    let d = sd_round_rect(p - (rc.xy + rc.zw * 0.5), rc.zw * 0.5, vec4<f32>(r));
+    return clamp(0.5 - d, 0.0, 1.0);
 }
 
 // Straight-alpha noise OVER a premultiplied colour (Skia's compose with SrcOver).
@@ -86,6 +99,7 @@ fn fs_shape(i: ShapeOut) -> @location(0) vec4<f32> {
     } else {
         cov = clamp(0.5 - d, 0.0, 1.0);
     }
+    cov = cov * round_clip(i.p, i.round, i.round_r);
     if i.params.z > 0.5 {
         // Acrylic layer, drawn with REPLACE blending: Skia's `Src` + antialiasing is
         // lerp(dst, src, coverage), and dst here is the known layer underneath.
@@ -106,6 +120,8 @@ struct StrokeIn {
     @location(3) style: vec4<f32>,  // mode (0 solid, 1 conic sweep, 2 comet), half width (px), a, b
     @location(4) extra: vec4<f32>,  // sweep: centre x, y (px); comet: -, -, contour length
     @location(5) clip: vec4<f32>,
+    @location(6) round: vec4<f32>,
+    @location(7) round_r: f32,
 };
 
 struct StrokeOut {
@@ -116,6 +132,8 @@ struct StrokeOut {
     @location(3) @interpolate(flat) style: vec4<f32>,
     @location(4) @interpolate(flat) extra: vec4<f32>,
     @location(5) @interpolate(flat) clip: vec4<f32>,
+    @location(6) @interpolate(flat) round: vec4<f32>,
+    @location(7) @interpolate(flat) round_r: f32,
 };
 
 @vertex
@@ -128,6 +146,8 @@ fn vs_stroke(s: StrokeIn) -> StrokeOut {
     o.style = s.style;
     o.extra = s.extra;
     o.clip = s.clip;
+    o.round = s.round;
+    o.round_r = s.round_r;
     return o;
 }
 
@@ -145,7 +165,7 @@ fn sweep_alpha(t: f32) -> f32 {
 fn fs_stroke(i: StrokeOut) -> @location(0) vec4<f32> {
     if clipped(i.p, i.clip) { discard; }
     let half = i.style.y;
-    let cov = clamp(half + 0.5 - abs(i.aa.x), 0.0, 1.0);
+    let cov = clamp(half + 0.5 - abs(i.aa.x), 0.0, 1.0) * round_clip(i.p, i.round, i.round_r);
     var k = 1.0;
     let mode = i.style.x;
     if mode > 0.5 && mode < 1.5 {

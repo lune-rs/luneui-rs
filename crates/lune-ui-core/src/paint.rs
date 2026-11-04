@@ -8,6 +8,8 @@ use crate::scene::{
 use crate::text::{Spec, TextSystem};
 use crate::theme::Theme;
 
+mod path;
+
 pub use crate::scene::{LAYER_COUNT, LayerId};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
@@ -128,6 +130,7 @@ enum Op {
     On(LayerId),
     SetClip(Option<Rect>),
     PushClip(Rect),
+    PushClipRounded(Rect, f32),
     PopClip,
     SetXform(Option<Xform>),
     PushXform(Xform),
@@ -139,7 +142,18 @@ enum Op {
     Backdrop(Rect, f32),
     Text(Spec, f32, f32),
     Stroke(Vec<[f32; 2]>, bool, StrokeStyle),
+    Dash(Vec<[f32; 2]>, bool, f32, f32, f32, Rgba),
+    Arc([f32; 2], f32, f32, f32, StrokeStyle),
+    FillPath(Vec<[f32; 2]>, Rgba),
+    Sector([f32; 2], f32, f32, f32, Rgba),
     Custom(usize, Rect),
+}
+
+/// The clip a [`Painter::push_clip`] or [`Painter::push_clip_rounded`] replaced.
+#[derive(Debug, Clone, Copy)]
+struct ClipFrame {
+    clip: Option<Rect>,
+    round: Option<(Rect, f32)>,
 }
 
 /// Painter calls recorded by [`Painter::start_recording`], owned and `'static`, to replay later
@@ -166,7 +180,8 @@ impl Ops {
 pub(crate) struct PainterState {
     layer: usize,
     clip: Option<Rect>,
-    clips: Vec<Option<Rect>>,
+    round: Option<(Rect, f32)>,
+    clips: Vec<ClipFrame>,
     xforms: Vec<Xform>,
     hit_tag: u32,
 }
@@ -178,8 +193,10 @@ pub struct Painter<'a, H> {
     pub scene: Scene,
     layer: usize,
     clip: Option<Rect>,
-    /// The clips [`Self::push_clip`] replaced, innermost last.
-    clips: Vec<Option<Rect>>,
+    /// The innermost rounded clip: its rect (also folded into `clip`) and corner radius.
+    round: Option<(Rect, f32)>,
+    /// The clips [`Self::push_clip`] and [`Self::push_clip_rounded`] replaced, innermost last.
+    clips: Vec<ClipFrame>,
     pub hits: Vec<(Rect, H)>,
     pub text: &'a mut dyn TextSystem,
     pub hover: Option<H>,
@@ -223,6 +240,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
             scene: Scene::default(),
             layer: 0,
             clip: None,
+            round: None,
             clips: Vec::new(),
             hits: Vec::new(),
             text,
@@ -278,6 +296,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
                 Op::On(l) => self.on(*l),
                 Op::SetClip(c) => self.set_clip(*c),
                 Op::PushClip(r) => self.push_clip(*r),
+                Op::PushClipRounded(r, radius) => self.push_clip_rounded(*r, *radius),
                 Op::PopClip => self.pop_clip(),
                 Op::SetXform(x) => self.set_xform(*x),
                 Op::PushXform(x) => self.push_xform(*x),
@@ -293,6 +312,16 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
                     self.text(spec, *x, *y);
                 }
                 Op::Stroke(pts, closed, st) => self.stroke(pts, *closed, *st),
+                Op::Dash(pts, closed, width, on, off, c) => {
+                    self.dash(pts, *closed, *width, *on, *off, *c);
+                }
+                Op::Arc(center, radius, start, sweep, st) => {
+                    self.arc(*center, *radius, *start, *sweep, *st);
+                }
+                Op::FillPath(pts, c) => self.fill_path(pts, *c),
+                Op::Sector(center, radius, start, sweep, c) => {
+                    self.sector(*center, *radius, *start, *sweep, *c);
+                }
                 Op::Custom(slot, r) => self.custom(*slot, *r),
             }
         }
@@ -320,6 +349,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         PainterState {
             layer: self.layer,
             clip: self.clip,
+            round: self.round,
             clips: self.clips.clone(),
             xforms: self.xforms.clone(),
             hit_tag: self.hit_tag,
@@ -330,6 +360,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
     pub(crate) fn restore_state(&mut self, s: PainterState) {
         self.layer = s.layer;
         self.clip = s.clip;
+        self.round = s.round;
         self.clips = s.clips;
         self.xforms = s.xforms;
         self.hit_tag = s.hit_tag;
@@ -340,6 +371,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
     pub(crate) fn enter(&mut self, layer: LayerId, tag: u32) {
         self.layer = layer as usize;
         self.clip = None;
+        self.round = None;
         self.clips.clear();
         self.xforms.clear();
         self.hit_tag = tag;
@@ -349,6 +381,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         self.rec(|| Op::On(layer));
         self.layer = layer as usize;
         self.clip = None;
+        self.round = None;
         self.clips.clear();
     }
 
@@ -361,18 +394,57 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
     /// [`Self::pop_clip`]. The rect is in the space draws are made in now, like [`Self::set_clip`]'s.
     pub fn push_clip(&mut self, rect: Rect) {
         self.rec(|| Op::PushClip(rect));
-        self.clips.push(self.clip);
+        self.push_frame();
         self.clip = Some(match self.clip {
             Some(c) => c.intersect(&rect),
             None => rect,
         });
     }
 
-    /// Restores the clip that held before the last [`Self::push_clip`]; does nothing without one.
+    /// [`Self::push_clip`] with the corners of `rect` rounded by `radius` (logical px, limited to
+    /// half the shorter side): shapes, strokes, fills and images are cut along the rounded rect,
+    /// antialiased; text and custom draws take its bounding rect only. The innermost rounded clip
+    /// holds; a radius of 0 (or one that is negative or not finite) is a plain clip. A `rect` that
+    /// is not finite clips everything.
+    pub fn push_clip_rounded(&mut self, rect: Rect, radius: f32) {
+        self.rec(|| Op::PushClipRounded(rect, radius));
+        self.push_frame();
+        let finite = [rect.x, rect.y, rect.w, rect.h]
+            .iter()
+            .all(|v| v.is_finite());
+        if !finite {
+            self.clip = Some(Rect::default());
+            self.round = None;
+            return;
+        }
+        self.clip = Some(match self.clip {
+            Some(c) => c.intersect(&rect),
+            None => rect,
+        });
+        let radius = if radius.is_finite() && radius > 0.0 {
+            radius.min(rect.w.min(rect.h) / 2.0)
+        } else {
+            0.0
+        };
+        if radius > 0.0 {
+            self.round = Some((rect, radius));
+        }
+    }
+
+    fn push_frame(&mut self) {
+        self.clips.push(ClipFrame {
+            clip: self.clip,
+            round: self.round,
+        });
+    }
+
+    /// Restores the clip that held before the last [`Self::push_clip`] or
+    /// [`Self::push_clip_rounded`]; does nothing without one.
     pub fn pop_clip(&mut self) {
         self.rec(|| Op::PopClip);
-        if let Some(c) = self.clips.pop() {
-            self.clip = c;
+        if let Some(f) = self.clips.pop() {
+            self.clip = f.clip;
+            self.round = f.round;
         }
     }
 
@@ -434,8 +506,24 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         c.map(|v| v * a)
     }
 
+    /// The clip in physical px. A clip with no area clips everything (the shader reads a zero
+    /// width as "no clip", so it becomes a sliver of zero height).
     fn clip_phys(&self) -> [f32; 4] {
-        self.clip.map_or([0.0; 4], |c| self.tr(c).phys(self.s))
+        self.clip.map_or([0.0; 4], |c| {
+            let r = self.tr(c).phys(self.s);
+            if r[2] > 0.0 && r[3] > 0.0 {
+                r
+            } else {
+                [0.0, 0.0, f32::MIN_POSITIVE, 0.0]
+            }
+        })
+    }
+
+    /// The innermost rounded clip as a physical rect and radius; all zero when there is none.
+    fn round_phys(&self) -> ([f32; 4], f32) {
+        self.round.map_or(([0.0; 4], 0.0), |(r, radius)| {
+            (self.tr(r).phys(self.s), radius * self.scale_k() * self.s)
+        })
     }
 
     /// Ask for the blurred scene inside `r` (drawn under this layer).
@@ -455,6 +543,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
 
     fn shape(&self, r: Rect, radii: [f32; 4], color: [f32; 4]) -> Shape {
         let k = self.scale_k();
+        let (round, round_radius) = self.round_phys();
         Shape {
             rect: self.tr(r).phys(self.s),
             radii: radii.map(|v| v * self.s * k),
@@ -462,6 +551,8 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
             under: [0.0; 4],
             params: [0.0; 4],
             clip: self.clip_phys(),
+            round,
+            round_radius,
         }
     }
 
@@ -599,8 +690,14 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
     /// Tessellates a polyline (logical px) into antialiased triangles (physical px).
     pub fn stroke(&mut self, pts: &[[f32; 2]], closed: bool, st: StrokeStyle) {
         self.rec(|| Op::Stroke(pts.to_vec(), closed, st));
+        self.stroke_pts(pts, closed, st);
+    }
+
+    /// [`Self::stroke`] without recording, for the primitives built on it.
+    fn stroke_pts(&mut self, pts: &[[f32; 2]], closed: bool, st: StrokeStyle) {
         let s = self.s;
         let clip = self.clip_phys();
+        let (round, round_radius) = self.round_phys();
         let (pts, st) = if self.xforms.is_empty() {
             (pts.to_vec(), st)
         } else {
@@ -692,12 +789,188 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
                     style: [st.mode, half, st.a, st.b],
                     extra: st.extra,
                     clip,
+                    round,
+                    round_radius,
                 }
             };
             let (a0, a1) = (v(i, -1.0, along), v(i, 1.0, along));
             let (b0, b1) = (v(j, -1.0, along + len), v(j, 1.0, along + len));
             out.extend_from_slice(&[a0, a1, b0, a1, b1, b0]);
             along += len;
+        }
+    }
+
+    /// A dashed polyline: runs `on` long separated by gaps `off` long (logical px, along the path,
+    /// starting with a run at the first point), each stroked `width` wide in `color`. `closed`
+    /// also walks the segment from the last point back to the first. An `off` of 0 is a solid
+    /// stroke; an `on` or `width` that is not above zero, or any value not finite, draws nothing.
+    /// A pattern so fine that it would make over 100 000 runs is drawn solid.
+    pub fn dash(
+        &mut self,
+        pts: &[[f32; 2]],
+        closed: bool,
+        width: f32,
+        on: f32,
+        off: f32,
+        color: Rgba,
+    ) {
+        self.rec(|| Op::Dash(pts.to_vec(), closed, width, on, off, color));
+        let ok = pts.iter().flatten().all(|v| v.is_finite())
+            && [width, on, off].iter().all(|v| v.is_finite())
+            && width > 0.0
+            && on > 0.0
+            && off >= 0.0;
+        if !ok {
+            return;
+        }
+        let st = StrokeStyle::solid(color, width);
+        let runs = if off > 0.0 {
+            path::dash(pts, closed, on, off)
+        } else {
+            None
+        };
+        match runs {
+            Some(runs) => {
+                for run in runs {
+                    self.stroke_pts(&run, false, st);
+                }
+            }
+            None => self.stroke_pts(pts, closed, st),
+        }
+    }
+
+    /// The device radius of a circle of logical `radius` under the current transforms.
+    fn device_radius(&self, radius: f32) -> f32 {
+        radius * self.scale_k() * self.s
+    }
+
+    /// Strokes an arc of the circle of `radius` about `center` (logical px): from angle `start`
+    /// over `sweep` radians, where 0 points right and a positive sweep turns clockwise on the
+    /// screen. The polyline's chords stay within 0.25 device px of the circle. A `sweep` of 2π
+    /// or more (either way) is a closed circle. A `radius` or `sweep` that is zero, or any value
+    /// not finite, draws nothing.
+    pub fn arc(
+        &mut self,
+        center: [f32; 2],
+        radius: f32,
+        start: f32,
+        sweep: f32,
+        style: StrokeStyle,
+    ) {
+        self.rec(|| Op::Arc(center, radius, start, sweep, style));
+        let styled = style.width.is_finite() && style.color.iter().all(|v| v.is_finite());
+        let Some((pts, closed)) =
+            path::arc(center, radius, start, sweep, self.device_radius(radius))
+        else {
+            return;
+        };
+        if styled {
+            self.stroke_pts(&pts, closed, style);
+        }
+    }
+
+    /// Fills the simple polygon `pts` (logical px) with `color`, below this layer's text. Ear
+    /// clipping triangulates it; a one-pixel fringe antialiases the edge. Holes and
+    /// self-intersection are not supported: a polygon the clipper cannot finish (or one with over
+    /// 4096 points) draws the triangles found, never panics. Points that are not finite draw
+    /// nothing.
+    pub fn fill_path(&mut self, pts: &[[f32; 2]], color: Rgba) {
+        self.rec(|| Op::FillPath(pts.to_vec(), color));
+        if !pts.iter().flatten().all(|v| v.is_finite()) {
+            return;
+        }
+        let mut poly: Vec<[f32; 2]> = path::dedup_loop(&self.device_points(pts));
+        if poly.len() < 3 {
+            return;
+        }
+        if path::signed_area2(&poly) < 0.0 {
+            poly.reverse();
+        }
+        let tris = path::ear_clip(&poly);
+        let boundary: Vec<usize> = (0..poly.len()).collect();
+        self.emit_fill(&poly, &tris, &boundary, color);
+    }
+
+    /// Fills the circular sector of `radius` about `center` (logical px) from angle `start` over
+    /// `sweep`, with the angle convention of [`Self::arc`], as one fan below this layer's text:
+    /// one pass, so no seam shows at the centre. A `sweep` of 2π or more is the whole disc. A
+    /// `radius` or `sweep` that is zero, or any value not finite, draws nothing.
+    pub fn sector(&mut self, center: [f32; 2], radius: f32, start: f32, sweep: f32, color: Rgba) {
+        self.rec(|| Op::Sector(center, radius, start, sweep, color));
+        let Some((arc, full)) = path::arc(center, radius, start, sweep, self.device_radius(radius))
+        else {
+            return;
+        };
+        let mut verts = vec![center];
+        verts.extend(arc);
+        let verts = self.device_points(&verts);
+        let n = verts.len();
+        let (tris, boundary): (Vec<[usize; 3]>, Vec<usize>) = if full {
+            (
+                (1..n)
+                    .map(|k| [0, k, if k + 1 < n { k + 1 } else { 1 }])
+                    .collect(),
+                (1..n).collect(),
+            )
+        } else {
+            (
+                (1..n - 1).map(|k| [0, k, k + 1]).collect(),
+                (0..n).collect(),
+            )
+        };
+        self.emit_fill(&verts, &tris, &boundary, color);
+    }
+
+    /// `pts` through the transform stack, in physical px.
+    fn device_points(&self, pts: &[[f32; 2]]) -> Vec<[f32; 2]> {
+        pts.iter()
+            .map(|q| {
+                let (x, y) = self.point(q[0], q[1]);
+                [x * self.s, y * self.s]
+            })
+            .collect()
+    }
+
+    /// Records `tris` (indices into `verts`, physical px) as interior triangles and the fringe
+    /// of the `boundary` loop into this layer's `fills`.
+    fn emit_fill(
+        &mut self,
+        verts: &[[f32; 2]],
+        tris: &[[usize; 3]],
+        boundary: &[usize],
+        color: Rgba,
+    ) {
+        const HALF: f32 = 0.5;
+        const FRINGE: f32 = 1.0;
+        if verts.iter().flatten().any(|v| !v.is_finite()) {
+            return;
+        }
+        let color = self.fade(premul(color));
+        let (clip, (round, round_radius)) = (self.clip_phys(), self.round_phys());
+        let vertex = |pos: [f32; 2], aa: f32| StrokeVertex {
+            pos,
+            aa: [aa, 0.0],
+            color,
+            style: [0.0, HALF, 0.0, 0.0],
+            extra: [0.0; 4],
+            clip,
+            round,
+            round_radius,
+        };
+        let ring: Vec<[f32; 2]> = boundary.iter().map(|&i| verts[i]).collect();
+        let made: Vec<StrokeVertex> = tris
+            .iter()
+            .flatten()
+            .map(|&i| vertex(verts[i], 0.0))
+            .chain(
+                path::fringe(&ring, FRINGE)
+                    .into_iter()
+                    .map(|(pos, outer)| vertex(pos, if outer { HALF + FRINGE } else { 0.0 })),
+            )
+            .collect();
+        // Coordinates near the f32 limit overflow in the fringe's arithmetic: draw nothing.
+        if made.iter().all(|v| v.pos.iter().all(|c| c.is_finite())) {
+            self.scene.layers[self.layer].geometry.fills.extend(made);
         }
     }
 }

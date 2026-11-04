@@ -3,8 +3,8 @@
 //!
 //! Draw-order contract, which every renderer follows:
 //! - layers back to front, `layers[0]` first, five of them (see [`LayerId`]);
-//! - inside a layer: the acrylic shapes, the under shapes, the custom items (in record order),
-//!   the text, the over shapes, the strokes;
+//! - inside a layer: the acrylic shapes, the under shapes, the path fills, the custom items (in
+//!   record order), the text, the over shapes, the strokes;
 //! - layers below [`SCENE_LAYERS`] render into an offscreen scene, the one a backdrop blurs; that
 //!   scene is then copied to the target, the [`BackdropRequest`] (if any) is drawn over it, and
 //!   the remaining layers follow.
@@ -38,6 +38,11 @@ pub struct Shape {
     pub params: [f32; 4],
     /// Physical clip rect (x, y, w, h); zero width = no clip.
     pub clip: [f32; 4],
+    /// Physical rect (x, y, w, h) of the innermost rounded clip; used only when `round_radius`
+    /// is above zero. Cuts coverage along a rounded rect, on top of `clip`.
+    pub round: [f32; 4],
+    /// Corner radius in physical px of the rounded clip `round`; 0 means none.
+    pub round_radius: f32,
 }
 
 /// One vertex of a tessellated, antialiased stroke (triangle list).
@@ -49,6 +54,10 @@ pub struct StrokeVertex {
     pub style: [f32; 4],
     pub extra: [f32; 4],
     pub clip: [f32; 4],
+    /// As [`Shape::round`].
+    pub round: [f32; 4],
+    /// As [`Shape::round_radius`].
+    pub round_radius: f32,
 }
 
 /// One acrylic layer. `shape.color` is the unfaded colour; `opacity` (0 to 1) is how much of the
@@ -61,13 +70,16 @@ pub struct Acrylic {
 }
 
 /// One z-layer of the frame: acrylic (replace blend, or a constant blend when faded), shapes under
-/// text, text (drawn by the caller), then shapes and strokes over text.
+/// text, path fills, text (drawn by the caller), then shapes and strokes over text.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct LayerGeometry {
     pub acrylic: Vec<Acrylic>,
     pub under: Vec<Shape>,
     pub over: Vec<Shape>,
     pub strokes: Vec<StrokeVertex>,
+    /// Filled polygons as triangle lists with an antialiasing fringe (`aa.x` 0 inside, `half + 1`
+    /// at the fringe), drawn like strokes but below the text, after the under shapes.
+    pub fills: Vec<StrokeVertex>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

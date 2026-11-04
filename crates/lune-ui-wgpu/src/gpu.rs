@@ -29,6 +29,8 @@ struct GpuShape {
     params: [f32; 4],
     /// Physical clip rect (x, y, w, h); zero width = no clip.
     clip: [f32; 4],
+    round: [f32; 4],
+    round_radius: f32,
 }
 
 /// GPU copy of [`StrokeVertex`]: same fields, same order.
@@ -41,10 +43,12 @@ struct GpuStrokeVertex {
     style: [f32; 4],
     extra: [f32; 4],
     clip: [f32; 4],
+    round: [f32; 4],
+    round_radius: f32,
 }
 
-const _: () = assert!(size_of::<GpuShape>() == 96);
-const _: () = assert!(size_of::<GpuStrokeVertex>() == 80);
+const _: () = assert!(size_of::<GpuShape>() == 116);
+const _: () = assert!(size_of::<GpuStrokeVertex>() == 100);
 
 impl From<&Shape> for GpuShape {
     fn from(s: &Shape) -> Self {
@@ -55,6 +59,8 @@ impl From<&Shape> for GpuShape {
             under: s.under,
             params: s.params,
             clip: s.clip,
+            round: s.round,
+            round_radius: s.round_radius,
         }
     }
 }
@@ -68,6 +74,8 @@ impl From<&StrokeVertex> for GpuStrokeVertex {
             style: v.style,
             extra: v.extra,
             clip: v.clip,
+            round: v.round,
+            round_radius: v.round_radius,
         }
     }
 }
@@ -123,12 +131,23 @@ type Range = std::ops::Range<u32>;
 /// whole run, anything lower is a single shape through the constant-blend pipeline.
 type AcrylicRun = (Range, f32);
 
+/// Where one layer's records sit in the uploaded buffers.
+#[derive(Debug, Clone)]
+struct LayerRanges {
+    acrylic: Vec<AcrylicRun>,
+    under: Range,
+    over: Range,
+    /// Path-fill vertices, in the stroke buffer.
+    fills: Range,
+    strokes: Range,
+}
+
 #[derive(Debug)]
 pub(crate) struct Uploaded {
     shapes: wgpu::Buffer,
     strokes: Option<wgpu::Buffer>,
     /// Per layer: the acrylic runs, the under and over shape ranges and the stroke vertex range.
-    ranges: Vec<(Vec<AcrylicRun>, Range, Range, Range)>,
+    ranges: Vec<LayerRanges>,
 }
 
 /// The wgpu instance. `display` is the windowing system's display handle (an event loop's owned
@@ -250,7 +269,7 @@ impl Gpu {
         let device = &self.device;
         let shape_attrs = wgpu::vertex_attr_array![
             0 => Float32x4, 1 => Float32x4, 2 => Float32x4, 3 => Float32x4, 4 => Float32x4,
-            5 => Float32x4
+            5 => Float32x4, 6 => Float32x4, 7 => Float32
         ];
         let shape_layout = wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<GpuShape>() as u64,
@@ -259,7 +278,7 @@ impl Gpu {
         };
         let stroke_attrs = wgpu::vertex_attr_array![
             0 => Float32x2, 1 => Float32x2, 2 => Float32x4, 3 => Float32x4, 4 => Float32x4,
-            5 => Float32x4
+            5 => Float32x4, 6 => Float32x4, 7 => Float32
         ];
         let stroke_layout = wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<GpuStrokeVertex>() as u64,
@@ -396,8 +415,16 @@ impl Gpu {
             let under = push(&layer.under);
             let over = push(&layer.over);
             let start = strokes.len() as u32;
+            strokes.extend(layer.fills.iter().map(GpuStrokeVertex::from));
+            let mid = strokes.len() as u32;
             strokes.extend(layer.strokes.iter().map(GpuStrokeVertex::from));
-            ranges.push((acrylic, under, over, start..strokes.len() as u32));
+            ranges.push(LayerRanges {
+                acrylic,
+                under,
+                over,
+                fills: start..mid,
+                strokes: mid..strokes.len() as u32,
+            });
         }
         if shapes.is_empty() {
             shapes.push(GpuShape::zeroed());
@@ -434,7 +461,12 @@ impl FormatState {
         up: &Uploaded,
         layer: usize,
     ) {
-        let (acrylic, under, _, _) = up.ranges[layer].clone();
+        let LayerRanges {
+            acrylic,
+            under,
+            fills,
+            ..
+        } = up.ranges[layer].clone();
         for (range, opacity) in acrylic {
             if opacity >= 1.0 {
                 draw_shapes(pass, globals, up, &self.acrylic_pipeline, range);
@@ -449,6 +481,24 @@ impl FormatState {
             }
         }
         draw_shapes(pass, globals, up, &self.shape_pipeline, under);
+        self.draw_vertices(pass, globals, up, fills);
+    }
+
+    fn draw_vertices(
+        &self,
+        pass: &mut wgpu::RenderPass<'_>,
+        globals: &wgpu::BindGroup,
+        up: &Uploaded,
+        range: Range,
+    ) {
+        if let Some(strokes) = &up.strokes
+            && !range.is_empty()
+        {
+            pass.set_pipeline(&self.stroke_pipeline);
+            pass.set_bind_group(0, globals, &[]);
+            pass.set_vertex_buffer(0, strokes.slice(..));
+            pass.draw(range, 0..1);
+        }
     }
 
     /// Everything of `layer` that goes above its text; `globals` is the target's bind group.
@@ -459,16 +509,9 @@ impl FormatState {
         up: &Uploaded,
         layer: usize,
     ) {
-        let (_, _, over, stroke_range) = up.ranges[layer].clone();
+        let LayerRanges { over, strokes, .. } = up.ranges[layer].clone();
         draw_shapes(pass, globals, up, &self.shape_pipeline, over);
-        if let Some(strokes) = &up.strokes
-            && !stroke_range.is_empty()
-        {
-            pass.set_pipeline(&self.stroke_pipeline);
-            pass.set_bind_group(0, globals, &[]);
-            pass.set_vertex_buffer(0, strokes.slice(..));
-            pass.draw(stroke_range, 0..1);
-        }
+        self.draw_vertices(pass, globals, up, strokes);
     }
 }
 
@@ -568,9 +611,9 @@ mod tests {
 
     #[test]
     fn gpu_records_are_bit_exact() {
-        let v = values(24);
+        let v = values(29);
         let distinct: std::collections::HashSet<u32> = v.iter().map(|f| f.to_bits()).collect();
-        assert_eq!(distinct.len(), 24);
+        assert_eq!(distinct.len(), 29);
         let shape = Shape {
             rect: quad(&v[0..]),
             radii: quad(&v[4..]),
@@ -578,13 +621,15 @@ mod tests {
             under: quad(&v[12..]),
             params: quad(&v[16..]),
             clip: quad(&v[20..]),
+            round: quad(&v[24..]),
+            round_radius: v[28],
         };
         assert_eq!(
             bytemuck::bytes_of(&GpuShape::from(&shape)),
             bytes(&v).as_slice()
         );
 
-        let v = values(20);
+        let v = values(25);
         let vertex = StrokeVertex {
             pos: [v[0], v[1]],
             aa: [v[2], v[3]],
@@ -592,6 +637,8 @@ mod tests {
             style: quad(&v[8..]),
             extra: quad(&v[12..]),
             clip: quad(&v[16..]),
+            round: quad(&v[20..]),
+            round_radius: v[24],
         };
         assert_eq!(
             bytemuck::bytes_of(&GpuStrokeVertex::from(&vertex)),
