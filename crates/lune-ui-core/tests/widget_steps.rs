@@ -131,11 +131,22 @@ fn an_upcoming_step_is_tertiary_over_a_ring_number() {
         t.iter()
             .any(|i| i.key.0 == label_key("Storage", Style::ui(13.0, DARK.fg_tertiary)))
     );
-    let ring = under(&d.scene)
-        .into_iter()
-        .filter(|s| s.color == premul(DARK.border) && s.radii == [10.0; 4])
-        .count();
-    assert_eq!(ring, 4, "no step is done, so every row rings its number");
+    let rings = |c: [u8; 4]| {
+        under(&d.scene)
+            .into_iter()
+            .filter(|s| s.color == premul(c) && s.radii == [10.0; 4])
+            .count()
+    };
+    assert_eq!(
+        rings(DARK.border),
+        3,
+        "the three upcoming rows ring in `border`"
+    );
+    assert_eq!(
+        rings(DARK.fg_primary),
+        1,
+        "the current row rings in `fg_primary`"
+    );
 }
 
 #[test]

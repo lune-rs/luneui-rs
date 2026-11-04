@@ -31,7 +31,7 @@ No conflict: one source. The row language is `widget.nav-item` [W docs/ui/compon
 ### Anatomy
 
 - Rows 32 high, radius 6, 2 apart; padding 0 8; gap 8 [W docs/ui/components.md:506].
-- Number circle 20 px with a 1 px `--border` ring; number 11 Medium [W docs/ui/components.md:506], [W docs/ui/mocks/css/tokens.css:27].
+- Number circle 20 px with a 1 px `--border` ring, `fg_primary` on the current step (the mock's `.is-current .c-steps__num`; Wane's text names only `--border`, the mock is the reference; visual batch 3, C8); number 11 Medium [W docs/ui/components.md:506], [W docs/ui/mocks/css/tokens.css:27].
 - Label 13 in a 148 px column that never wraps; a long label is shortened [W docs/ui/components.md:506,695].
 - Lead line 13/20 tertiary, 12 px below the last row [W docs/ui/components.md:695] (`Ui::steps_with_lead`; the mock text says "first row", which cannot be a position under a list of rows), wrapping at the width.
 

@@ -148,7 +148,8 @@ fn draw_row(
         p.fill(circle, CIRCLE / 2.0, t.accent);
         p.text_centered(&icon::glyph(icon::CHECK, CHECK, t.on_accent), circle);
     } else {
-        p.ring(circle, CIRCLE / 2.0, 1.0, t.border, false);
+        let ring = if current { t.fg_primary } else { t.border };
+        p.ring(circle, CIRCLE / 2.0, 1.0, ring, false);
         let color = if current { t.fg_bright } else { t.fg_tertiary };
         let number = Spec::plain(
             (index + 1).to_string(),

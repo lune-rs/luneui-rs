@@ -1,6 +1,6 @@
 //! A progress track (`data.progress`): 4 px high, radius 4, `surface_overlay` track, a fill in a
-//! tone (neutral is `accent`), an optional head (name left, value right, 13 on a 20 px line, 4 px
-//! below). Determinate never animates (a progress value updates continuously, no tween).
+//! tone (neutral is `accent`; square at its leading edge, clipped by the track), an optional
+//! head (name left, value right, 13 on a 20 px line, 4 px below). Determinate never animates (a progress value updates continuously, no tween).
 //! Indeterminate (D118) is a 3 px track: a segment 30% of the track travelling left to right,
 //! linear, period 2400 ms, clipped by the track. Under Reduced the full-width fill breathes
 //! between 0.38 and 1.0 over 1800 ms (opacity only); under Off it holds at 0.38.
@@ -120,8 +120,11 @@ pub fn paint<H: Copy + PartialEq>(p: &mut Painter<'_, H>, track: Rect, fraction:
     p.fill(track, RADIUS, theme.surface_overlay);
     let f = clamp(fraction);
     if f > 0.0 {
+        // Square leading edge, clipped by the rounded track (a full bar keeps the track's ends).
         let fill = Rect::new(track.x, track.y, track.w * f, track.h);
-        p.fill(fill, RADIUS, fill_color(&theme, tone));
+        p.push_clip_rounded(track, RADIUS);
+        p.fill(fill, 0.0, fill_color(&theme, tone));
+        p.pop_clip();
     }
 }
 

@@ -43,7 +43,10 @@ fn the_fill_width_is_the_fraction_of_the_track_at_0_half_and_1() {
         assert_eq!(s.len(), 2, "{f}");
         assert_eq!(s[0].rect, [10.0, 20.0, 200.0, 4.0]);
         assert_eq!(s[1].rect, [10.0, 20.0, w, 4.0], "{f}");
-        assert_eq!(s[1].radii, [4.0; 4]);
+        assert_eq!(
+            s[1].radii, [0.0; 4],
+            "square leading edge, the track clips it"
+        );
     }
 }
 
