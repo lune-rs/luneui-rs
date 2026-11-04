@@ -4,11 +4,12 @@
 //! Draw-order contract, which every renderer follows:
 //! - layers back to front, `layers[0]` first, five of them (see [`LayerId`]);
 //! - inside a layer: the acrylic shapes, the under shapes, the path fills, the custom items (in
-//!   record order), the text, the over shapes, the strokes;
+//!   record order), the images (in record order), the text, the over shapes, the strokes;
 //! - layers below [`SCENE_LAYERS`] render into an offscreen scene, the one a backdrop blurs; that
 //!   scene is then copied to the target, the [`BackdropRequest`] (if any) is drawn over it, and
 //!   the remaining layers follow.
 
+use crate::image::{Fit, ImageAlign, ImageId};
 use crate::paint::Rect;
 use crate::text::TextKey;
 
@@ -101,12 +102,50 @@ pub struct CustomItem {
     pub clip: [u32; 4],
 }
 
+/// Where an [`ImageItem`]'s pixels come from.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ImageSource {
+    /// A picture the app registered with the renderer's [`ImageStore`](crate::image::ImageStore).
+    Id(ImageId),
+    /// A shaped text, rasterised once by the renderer and kept while the text is cached. The
+    /// number is the glyph scale relative to the shaped size, as [`TextItem::scale`]; the
+    /// picture is drawn at its raster size times that, centred on `dst`.
+    Text(TextKey, f32),
+}
+
+/// A rounded clip: the rect (physical px) and corner radius; radius 0 means none.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct RoundClip {
+    pub rect: [f32; 4],
+    pub radius: f32,
+}
+
+/// One recorded image draw. All rects are physical pixels.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ImageItem {
+    pub source: ImageSource,
+    /// The destination rect: for an [`ImageSource::Id`] the rect `fit` and `align` place the
+    /// picture in; for text the rect the shaped text would fill, whose centre is the draw's.
+    pub dst: Rect,
+    pub fit: Fit,
+    pub align: ImageAlign,
+    /// Opacity multiplier, 0 to 1 (the transform stack's alpha is folded in).
+    pub alpha: f32,
+    /// Radians, clockwise on screen, about the centre of the drawn picture; 0 for none.
+    pub rotation: f32,
+    /// Physical clip rect (x, y, w, h); zero width = no clip.
+    pub clip: [f32; 4],
+    pub round_clip: RoundClip,
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Layer {
     pub geometry: LayerGeometry,
     pub texts: Vec<TextItem>,
-    /// App-owned draws, in record order; drawn after the under shapes, before the text.
+    /// App-owned draws, in record order; drawn after the under shapes, before the images.
     pub customs: Vec<CustomItem>,
+    /// Image draws, in record order; drawn after the customs, before the text.
+    pub images: Vec<ImageItem>,
 }
 
 /// A blurred-backdrop region to draw, in physical pixels.

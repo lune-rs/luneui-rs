@@ -2,8 +2,10 @@
 //! text placements and hit regions. Clicks resolve against the previous frame's hit regions.
 
 use crate::color::{Rgba, premul};
+use crate::image::{Fit, ImageAlign, ImageId};
 use crate::scene::{
-    Acrylic, BackdropRequest, CustomItem, LayerGeometry, Scene, Shape, StrokeVertex, TextItem,
+    Acrylic, BackdropRequest, CustomItem, ImageItem, ImageSource, LayerGeometry, RoundClip, Scene,
+    Shape, StrokeVertex, TextItem,
 };
 use crate::text::{Spec, TextSystem};
 use crate::theme::Theme;
@@ -146,6 +148,8 @@ enum Op {
     Arc([f32; 2], f32, f32, f32, StrokeStyle),
     FillPath(Vec<[f32; 2]>, Rgba),
     Sector([f32; 2], f32, f32, f32, Rgba),
+    Image(Rect, ImageId, Fit, ImageAlign, f32, f32),
+    TextRotated(Spec, (f32, f32), f32),
     Custom(usize, Rect),
 }
 
@@ -321,6 +325,12 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
                 Op::FillPath(pts, c) => self.fill_path(pts, *c),
                 Op::Sector(center, radius, start, sweep, c) => {
                     self.sector(*center, *radius, *start, *sweep, *c);
+                }
+                Op::Image(dst, id, fit, align, alpha, rotation) => {
+                    self.image_rotated(*dst, *id, *fit, *align, *alpha, *rotation);
+                }
+                Op::TextRotated(spec, center, radians) => {
+                    self.text_rotated(spec, *center, *radians);
                 }
                 Op::Custom(slot, r) => self.custom(*slot, *r),
             }
@@ -655,6 +665,101 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
             scale,
         });
         size
+    }
+
+    /// Draws the picture registered as `id` into `dst`, placed by `fit` and `align`, at opacity
+    /// `alpha` (0 to 1) times the transform stack's, after this layer's custom draws and before
+    /// its text. An id the renderer does not hold draws nothing; so does a `dst` with no area,
+    /// or any number that is not finite.
+    pub fn image(&mut self, dst: Rect, id: ImageId, fit: Fit, align: ImageAlign, alpha: f32) {
+        self.image_rotated(dst, id, fit, align, alpha, 0.0);
+    }
+
+    /// [`Self::image`] turned by `radians` (clockwise on screen) about the centre of the fitted
+    /// picture. Clips and the rounded clip stay put; only the picture turns.
+    pub fn image_rotated(
+        &mut self,
+        dst: Rect,
+        id: ImageId,
+        fit: Fit,
+        align: ImageAlign,
+        alpha: f32,
+        radians: f32,
+    ) {
+        self.rec(|| Op::Image(dst, id, fit, align, alpha, radians));
+        self.push_image(ImageSource::Id(id), dst, fit, align, alpha, radians);
+    }
+
+    /// Draws `spec`, centred on `center`, turned by `radians` (clockwise on screen) about that
+    /// centre. The renderer rasterises the shaped text once and turns the raster, so unlike
+    /// [`Self::text`] the glyphs are resampled; the transform stack's alpha is applied when
+    /// drawing. Returns the text's logical size.
+    pub fn text_rotated(&mut self, spec: &Spec, center: (f32, f32), radians: f32) -> (f32, f32) {
+        self.rec(|| Op::TextRotated(spec.clone(), center, radians));
+        let (key, size) = self.text.prepare(spec, self.s);
+        let k = self.scale_k();
+        let (cx, cy) = self.point(center.0, center.1);
+        let (w, h) = (size.0 * k * self.s, size.1 * k * self.s);
+        let dst = Rect::new(cx * self.s - w / 2.0, cy * self.s - h / 2.0, w, h);
+        let src = ImageSource::Text(key, k);
+        self.push_image_phys(src, dst, Fit::Contain, ImageAlign::CENTER, 1.0, radians);
+        size
+    }
+
+    fn push_image(
+        &mut self,
+        source: ImageSource,
+        dst: Rect,
+        fit: Fit,
+        align: ImageAlign,
+        alpha: f32,
+        radians: f32,
+    ) {
+        if ![dst.x, dst.y, dst.w, dst.h].iter().all(|v| v.is_finite()) {
+            return;
+        }
+        let dst = self.tr(dst);
+        let dst = Rect::new(
+            dst.x * self.s,
+            dst.y * self.s,
+            dst.w * self.s,
+            dst.h * self.s,
+        );
+        self.push_image_phys(source, dst, fit, align, alpha, radians);
+    }
+
+    /// Records an image whose `dst` is already in physical px.
+    fn push_image_phys(
+        &mut self,
+        source: ImageSource,
+        dst: Rect,
+        fit: Fit,
+        align: ImageAlign,
+        alpha: f32,
+        radians: f32,
+    ) {
+        let alpha = alpha.clamp(0.0, 1.0) * self.alpha_k();
+        let ok = [dst.x, dst.y, dst.w, dst.h].iter().all(|v| v.is_finite())
+            && dst.w > 0.0
+            && dst.h > 0.0
+            && radians.is_finite()
+            && alpha.is_finite()
+            && alpha > 0.0;
+        if !ok {
+            return;
+        }
+        let (rect, radius) = self.round_phys();
+        let item = ImageItem {
+            source,
+            dst,
+            fit,
+            align,
+            alpha,
+            rotation: radians,
+            clip: self.clip_phys(),
+            round_clip: RoundClip { rect, radius },
+        };
+        self.scene.layers[self.layer].images.push(item);
     }
 
     /// Text vertically centred in `r` at its left edge (plus `pad`).

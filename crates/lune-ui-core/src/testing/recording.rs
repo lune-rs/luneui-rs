@@ -1,7 +1,8 @@
 //! The display-list seam's fake: a renderer that records draw calls instead of drawing.
 
 use crate::scene::{
-    BackdropRequest, CustomItem, FrameParams, SCENE_LAYERS, Scene, Shape, StrokeVertex, TextItem,
+    BackdropRequest, CustomItem, FrameParams, ImageItem, SCENE_LAYERS, Scene, Shape, StrokeVertex,
+    TextItem,
 };
 
 /// One draw call, in the order a renderer issues it. `layer` is the index into
@@ -23,6 +24,8 @@ pub enum DrawCall {
     },
     /// One app-owned draw.
     Custom { layer: usize, item: CustomItem },
+    /// One image draw, after the customs and before the text.
+    Image { layer: usize, item: ImageItem },
     /// One text placement.
     Text { layer: usize, item: TextItem },
     /// One shape above the layer's text.
@@ -44,6 +47,7 @@ impl DrawCall {
             | Self::Under { layer, .. }
             | Self::Fills { layer, .. }
             | Self::Custom { layer, .. }
+            | Self::Image { layer, .. }
             | Self::Text { layer, .. }
             | Self::Over { layer, .. }
             | Self::Strokes { layer, .. } => Some(*layer),
@@ -105,6 +109,10 @@ impl RecordingRenderer {
                 layer: i,
                 item: *item,
             }));
+            calls.extend(layer.images.iter().map(|item| DrawCall::Image {
+                layer: i,
+                item: *item,
+            }));
             calls.extend(layer.texts.iter().map(|item| DrawCall::Text {
                 layer: i,
                 item: *item,
@@ -140,6 +148,7 @@ impl RecordingRenderer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::image::{Fit, ImageAlign, ImageId};
     use crate::paint::{LayerId, Painter, Rect, StrokeStyle};
     use crate::testing::FakeText;
     use crate::text::{Spec, Style};
@@ -154,6 +163,7 @@ mod tests {
             DrawCall::Fills { .. } => "fills",
             DrawCall::Custom { item, .. } if item.slot == 0 => "custom 0",
             DrawCall::Custom { .. } => "custom",
+            DrawCall::Image { .. } => "image",
             DrawCall::Text { .. } => "text",
             DrawCall::Over { shape, .. } if shape.params[0] == 1.0 => "over ring",
             DrawCall::Over { .. } => "over fill",
@@ -187,6 +197,7 @@ mod tests {
         p.fill_path(&[[0.0, 0.0], [20.0, 0.0], [20.0, 20.0]], THEME.fg_primary);
         p.text(&spec, 12.0, 12.0);
         p.custom(0, r);
+        p.image(r, ImageId(1), Fit::Contain, ImageAlign::CENTER, 1.0);
         p.on(LayerId::Popup);
         p.backdrop(r, 4.0);
         p.fill(r, 4.0, THEME.fg_primary);
@@ -212,6 +223,7 @@ mod tests {
                 ("under ring", Some(0)),
                 ("fills", Some(0)),
                 ("custom 0", Some(0)),
+                ("image", Some(0)),
                 ("text", Some(0)),
                 ("over ring", Some(0)),
                 ("strokes", Some(0)),

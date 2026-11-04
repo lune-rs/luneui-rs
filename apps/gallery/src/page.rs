@@ -10,6 +10,7 @@
 //! caller lends, so dump, bench and the self-check tests all drive it the same way.
 
 use lune_ui::access::{AccessAction, Action};
+use lune_ui::image::{ImageData, ImageId, ImageStore};
 use lune_ui::input::{
     FrameOutput, ImeEvent, Key, Keymap, Modifiers, NamedKey, PointerButton, Repaint,
 };
@@ -62,6 +63,50 @@ pub(crate) trait PageState {
     fn strings(&self) -> StringTable {
         StringTable::default()
     }
+
+    /// The pictures the page draws, by id; the dump, the window and the bench register them with
+    /// the renderer when the page or scene starts and release them after. Ids are unique across
+    /// the gallery. The default is none.
+    fn images(&self) -> Vec<(ImageId, ImageData)> {
+        Vec::new()
+    }
+}
+
+/// Registers every picture of `images` with `store`; on a refusal releases the ones already
+/// registered and names the id. Returns the ids to hand to [`release_images`].
+pub(crate) fn register_images(
+    store: &mut impl ImageStore,
+    images: Vec<(ImageId, ImageData)>,
+) -> Result<Vec<ImageId>, String> {
+    let mut done = Vec::with_capacity(images.len());
+    for (id, data) in images {
+        if let Err(e) = store.register(id, data) {
+            release_images(store, &done);
+            return Err(format!("image {}: {e}", id.0));
+        }
+        done.push(id);
+    }
+    Ok(done)
+}
+
+/// Releases `ids`.
+pub(crate) fn release_images(store: &mut impl ImageStore, ids: &[ImageId]) {
+    for id in ids {
+        store.release(*id);
+    }
+}
+
+/// Every picture the states of `page` draw: its scenes' and its window state's. Empty for a
+/// legacy page.
+pub(crate) fn page_images(page: &Page) -> Vec<(ImageId, ImageData)> {
+    let PageKind::Ui(ui) = page.kind else {
+        return Vec::new();
+    };
+    let mut out = (ui.state)().images();
+    for scene in ui.scenes {
+        out.extend((scene.state)().images());
+    }
+    out
 }
 
 /// Whether a scene's capture frame still moves.
@@ -373,6 +418,49 @@ mod tests {
     use std::cell::Cell;
     use std::collections::BTreeSet;
     use std::rc::Rc;
+
+    fn pic(w: u32, h: u32) -> ImageData {
+        ImageData {
+            width: w,
+            height: h,
+            rgba: vec![0; 4 * (w * h) as usize],
+        }
+    }
+
+    #[test]
+    fn images_register_and_release_as_a_set() {
+        use lune_ui::testing::FakeImages;
+        let mut store = FakeImages::new();
+        let ids = register_images(
+            &mut store,
+            vec![(ImageId(1), pic(2, 2)), (ImageId(2), pic(1, 3))],
+        )
+        .expect("registers");
+        assert_eq!((ids.len(), store.len()), (2, 2));
+        release_images(&mut store, &ids);
+        assert!(store.is_empty());
+    }
+
+    #[test]
+    fn a_refused_picture_releases_the_ones_before_it() {
+        use lune_ui::testing::FakeImages;
+        let mut store = FakeImages::with_limit(4);
+        let err = register_images(
+            &mut store,
+            vec![(ImageId(1), pic(2, 2)), (ImageId(2), pic(9, 1))],
+        )
+        .expect_err("refused");
+        assert!(err.contains("image 2"), "{err}");
+        assert!(store.is_empty());
+    }
+
+    #[test]
+    fn a_page_without_pictures_has_no_images() {
+        for page in PAGES {
+            let n = page_images(page).len();
+            assert!(n < 64, "{}: {n}", page.id);
+        }
+    }
 
     /// Every Ui scene runs, every key path resolves, and the capture frame's `Repaint` matches
     /// `expect`.

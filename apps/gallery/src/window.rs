@@ -26,10 +26,11 @@ use lune_ui::surface::{Acquired, WindowSurface};
 use lune_ui::ui::{FrameConfig, Ui, UiStore};
 use lune_ui::window::glass_attributes;
 
-use crate::page::{Page, PageKind, PageState};
+use crate::page::{Page, PageKind, PageState, register_images, release_images};
 use crate::pages::PAGES;
 use crate::scenes::{H, W};
 use crate::{Renderer, custom, draw_scene, text_cache};
+use lune_ui::image::ImageId;
 
 /// Window mode: the window, its surface and the renderer drawing into it.
 struct Shown {
@@ -73,6 +74,8 @@ struct App {
     /// The Ui page's retained state; reset when the page changes.
     store: UiStore,
     state: Option<Box<dyn PageState>>,
+    /// The pictures the page's state registered with the renderer.
+    images: Vec<ImageId>,
     strings: StringTable,
     /// The shortcut table; the gallery's own keys are handled before the frame.
     shortcuts: Shortcuts,
@@ -100,6 +103,7 @@ pub(crate) fn run() -> ExitCode {
         scene: 0,
         store: UiStore::default(),
         state: None,
+        images: Vec::new(),
         strings: StringTable::default(),
         shortcuts: Shortcuts::default(),
         mods: ModifiersState::empty(),
@@ -172,6 +176,10 @@ impl App {
         self.scene = 0;
         self.store = UiStore::default();
         self.state = None;
+        if let Some(shown) = &mut self.shown {
+            release_images(&mut shown.r.gpu, &self.images);
+            self.images.clear();
+        }
         if let Some(shown) = &self.shown {
             shown
                 .window
@@ -211,7 +219,17 @@ impl App {
                 scenes[self.scene % scenes.len()].paint(&mut r.text, s, size)
             }
             PageKind::Ui(ui_page) => {
-                let state = self.state.get_or_insert_with(ui_page.state);
+                if self.state.is_none() {
+                    let fresh = (ui_page.state)();
+                    match register_images(&mut r.gpu, fresh.images()) {
+                        Ok(ids) => self.images = ids,
+                        Err(e) => eprintln!("images: {e}"),
+                    }
+                    self.state = Some(fresh);
+                }
+                let Some(state) = self.state.as_mut() else {
+                    return Ok(());
+                };
                 let config = FrameConfig {
                     theme: THEME,
                     tier: MotionTier::Full,

@@ -14,7 +14,8 @@
 //! Modules:
 //! - `color`, `theme` (the `Theme` tokens and the dark preset with its glass layers), `acrylic`
 //!   (Avalonia acrylic colour math);
-//! - `paint` (the `Painter`), `scene` (the display list it builds: plain data and the draw-order
+//! - `image` (the `ImageStore` seam and image fit geometry),
+//!   `paint` (the `Painter`), `scene` (the display list it builds: plain data and the draw-order
 //!   contract), `text` (specs and the `TextSystem` seam), `icon`, `widgets` (controls, menus,
 //!   dropdowns, dialogs), `chrome` (tab outline geometry);
 //! - `input` (the input seam: `RawInput` in, `FrameOutput` out, plain data), `layout` (pure stack,
@@ -40,6 +41,7 @@ pub mod backdrop;
 pub mod chrome;
 pub mod color;
 pub mod icon;
+pub mod image;
 pub mod input;
 pub mod layout;
 pub mod motion;
