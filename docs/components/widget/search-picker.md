@@ -15,10 +15,12 @@ summary: Search picker: a field-style or link-style trigger that opens a searcha
 
 ## Needs
 
-- Drawn through the painter and generic over the app's hit type (R-widget-2); popup (R-overlay-4 through `overlay.dropdown`).
+- Drawn through the painter and generic over the app's hit type (R-widget-2); popup (R-overlay-4 through `overlay.popover`).
 - Keyboard: Escape and Enter in the search box; Tab stop (R-widget-3); semantic node (R-infra-4).
 
 ## Existing code
+
+`crates/lune-ui-core/src/widgets/search_picker.rs` (`Ui::search_picker`, `PickerOptions`, `Trigger`, `matches`), on `Ui::popover`, `Ui::filter_bar` and the scroll area.
 
 `src/Lunegit.Desktop/Controls/SearchPickerBase.cs`, `src/Lunegit.Desktop/Controls/FieldSearchPicker.axaml`, `src/Lunegit.Desktop/Controls/LinkSearchPicker.axaml`.
 
@@ -35,7 +37,8 @@ Wane has no search-picker component; the Wane combo (`widget.combo`) is not sear
 - Link trigger: leading 14 px icon, spacing 6, text 13 px `ForegroundSecondary` with a 1 px underline stroked dashed `1,2` [L src/Lunegit.Desktop/Controls/LinkSearchPicker.axaml:16-31].
 - Popup: `BackdropDark` fill, `SurfaceBorder` 1 px, radius 8, padding 6, min width 220, max height 320 [L src/Lunegit.Desktop/Controls/LinkSearchPicker.axaml:42-48].
 - Search bar at the top of the popup: radius 4, `SurfaceInput`, padding 8 horizontal and 6 vertical, bottom margin 6 [L src/Lunegit.Desktop/Controls/LinkSearchPicker.axaml:52-56].
-- Popup width tracks the field trigger [L src/Lunegit.Desktop/Controls/FieldSearchPicker.axaml:53].
+- Popup width tracks the field trigger [L src/Lunegit.Desktop/Controls/FieldSearchPicker.axaml:53]. Its height follows the filtered count, from the frame's count before the popup is drawn, up to 320 and the window; a popup flipped above the trigger at open stays above it while the list narrows.
+- Rows: 32 high, radius 4, padding 8, `surface_selected` on the selected row, else `surface_hover` under the pointer; an overlong text ends in an ellipsis [L src/Lunegit.Desktop/Controls/LinkSearchPicker.axaml:99-112].
 - Placeholder: `SearchPlaceholder`, default empty [L src/Lunegit.Desktop/Controls/SearchPickerBase.cs:50].
 
 ### States
@@ -45,36 +48,44 @@ Wane has no search-picker component; the Wane combo (`widget.combo`) is not sear
 | field, rest | filter-bar surface, value text | [L src/Lunegit.Desktop/Controls/FieldSearchPicker.axaml:18-50] |
 | field, hover | no change: the trigger's pointerover clears its background | [L src/Lunegit.Desktop/Controls/FieldSearchPicker.axaml:26-29] |
 | link, rest | secondary text with dashed underline | [L src/Lunegit.Desktop/Controls/LinkSearchPicker.axaml:19-31] |
-| link, hover, pressed | not styled by Lunegit (Fluent default); open | [L src/Lunegit.Desktop/Controls/LinkSearchPicker.axaml:11-15] |
+| link, hover | text and underline `fg_primary` | [D124] |
+| link, pressed | as hover | [D124] |
 | open | popup shown; trigger state unchanged | [L src/Lunegit.Desktop/Controls/SearchPickerBase.cs:143], [L src/Lunegit.Desktop/Controls/LinkSearchPicker.axaml:38-41] |
-| focus-visible | not styled; open | [L src/Lunegit.Desktop/Controls/FieldSearchPicker.axaml:18-34] |
+| focus-visible | link: `RingKind::Button` [D124]; field: the same line at the trigger's radius, `RingKind::Edge`, so keyboard focus shows on both | [D124], [core.focus] |
 | disabled | opacity 0.4, inert | [widget.button], [L src/Lunegit.Desktop/App.axaml:481-483] |
 
 ### Transitions
 
-n/a — Lunegit styles no motion on either trigger; the popup's open and close motion belongs to `overlay.dropdown`.
+n/a — Lunegit styles no motion on either trigger; the popup's open and close motion belongs to `overlay.popover`.
 
 ### Input and focus
 
 - Pointer: a trigger click toggles the popup [L src/Lunegit.Desktop/Controls/SearchPickerBase.cs:143]; light dismiss on an outside click [L src/Lunegit.Desktop/Controls/LinkSearchPicker.axaml:41].
-- Keyboard in the search box: Escape closes; Enter selects the first filtered item and closes [L src/Lunegit.Desktop/Controls/SearchPickerBase.cs:302-318].
-- Tab stop: the trigger [core.focus].
-- Layer: trigger `Base`; popup `Popup` (`overlay.dropdown`).
-- Focus scope: the popup pushes a scope on open and closing restores focus to the trigger [overlay.dropdown].
-- Dismiss: Escape and outside click act on the open popup only [overlay.dropdown]. Closing the popup by any route syncs the open flag [L src/Lunegit.Desktop/Controls/SearchPickerBase.cs:160-163].
+- Keyboard on the trigger: Enter and Space toggle the popup.
+- Keyboard in the search box: Escape closes; Enter selects the first filtered item and closes [L src/Lunegit.Desktop/Controls/SearchPickerBase.cs:302-318]; with no match it does nothing and the popup stays. The arrows move the caret: there is no row highlight [D124].
+- Filter: trimmed, case-insensitive contains (Unicode `to_lowercase`); an empty or all-space search shows all [D124]. The filter runs each open frame over all items.
+- Tab stop: the trigger; in the popup the box, and its clear button while it shows; no row is one [core.focus].
+- Layer: trigger `Base`; popup `Popup` (`overlay.popover`).
+- Focus scope: the popup pushes a scope on open and closing restores focus to the trigger [overlay.popover].
+- Dismiss: Escape, outside click and focus loss act on the open popup only [overlay.popover]. Closing the popup by any route syncs the open flag [L src/Lunegit.Desktop/Controls/SearchPickerBase.cs:160-163].
+- Open flag: the popover is called exactly while `open` is true; a dismissal clears it on the frame that reports it, so that frame is the last that calls the popover. Paths: trigger click, Enter or Space on the trigger, accessibility default, expand and collapse, Escape, outside press, a press on the open trigger, focus loss, a row click, Enter in the box, disabling the picker (it does not reopen on enabling), a keep-alive gap (the Ui closed it; it does not come back). Items replaced while open keep it open.
+- A press on the open trigger is an outside press: the Ui consumes it, so it closes once and reaches nothing [D77].
+- Every open is a new overlay, so an open on the frame after a close starts clean: empty search, focus in the box.
+- Every close gives focus back to the trigger, also when an accessibility action opened the popup with focus elsewhere; the ring stays as it was. The exception is a close caused by focus moving to another widget (`request_focus`, an accessibility focus action): focus stays on that widget, by `core.focus`'s rule that a closing overlay hands focus back only when focus is in it or gone.
+- A `selected` out of range reads as none and is left as it is. A pick writes an index into `items`, not the filtered list; picking the selected row reports `picked` without `changed`.
 
 ### Retained state
 
-- Transient: hover, press, the open flag while the popup is up [core.ui].
-- Persistent: the search text is held by the picker (Open questions: whether it survives a close).
+- Transient: hover, press [core.ui].
+- Persistent: the open flag and the search text, held by the picker. The search is cleared on open, not on close, so the closing popup replays what it drew [D124].
 - App-owned: `ItemsSource`, `SelectedItem`, `DisplayMemberBinding`, `Icon`, `SearchPlaceholder` (Lunegit properties [L src/Lunegit.Desktop/Controls/SearchPickerBase.cs:35-53]).
 - Exit retention: no.
 
 ### Accessibility
 
 - Trigger: role `combo-box`; name = the owner's label; value = the selected item's display text; states expanded (while open), focusable, focused, disabled; actions `expand`, `collapse`, `default` [infra.accessibility].
-- Search box: role `text-input`; name = `SearchPlaceholder`.
-- List: role `list` of `list-item`s; the filtered items are the list [infra.accessibility].
+- Search box: role `text-input`; name = `SearchPlaceholder`, or the trigger's name without one.
+- List: role `list` of `list-item`s, named like the trigger; the visible rows of the filtered items are the list; a row's `default` action picks it [infra.accessibility].
 
 ### Strings
 
@@ -101,12 +112,12 @@ None: placeholder and item text are owner data (`SearchPlaceholder`, `DisplayMem
 ### Build
 
 - Milestone: M6
-- Depends on: overlay.dropdown, widget.filter-bar, text.text-edit, core.focus, infra.accessibility
+- Depends on: overlay.popover, widget.filter-bar, text.text-edit, core.focus, infra.accessibility
 
 ## Open questions
 
-- `behaviour`: whether the search text is cleared on close and whether the search box takes focus on open. Lunegit's code shows neither as explicit lines in the read range; M6 checks the rest of `SearchPickerBase.cs`.
-- `variant`: the link trigger's hover and focus looks are Fluent defaults; the spec needs a value or a decision before M6.
+- Resolved [D124] `behaviour`: open clears the search and focuses the box.
+- Resolved [D124] `variant`: link hover text `fg_primary`, ring `RingKind::Button`.
 
 ## Notes for the planner
 

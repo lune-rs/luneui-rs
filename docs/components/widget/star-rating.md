@@ -36,6 +36,7 @@ Instrument: Wane has no star component: `git grep -i star` over `docs/ui/compone
 - Spacing between stars: 2 [L src/Lunegit.Desktop/Controls/StarRatingControl.axaml:36].
 - Default count: `Max` = 5 [L src/Lunegit.Desktop/Controls/StarRatingControl.axaml.cs:21].
 - Filled star: `StatusWarning` [L src/Lunegit.Desktop/Controls/StarRatingControl.axaml:29]; empty star: `ForegroundTertiary` [L src/Lunegit.Desktop/Controls/StarRatingControl.axaml:32].
+- Glyphs: `STAR_FULL` for the stars within the value, `STAR_EMPTY` (the outlined star) for the rest, both 20 px [D120].
 - Hover: the hovered star button's background `SurfaceHover`, radius 4 [L src/Lunegit.Desktop/Controls/StarRatingControl.axaml:21-23].
 
 ### States
@@ -60,7 +61,7 @@ Lunegit animates no star button (no selector in `src/Lunegit.Desktop/Themes/Anim
 ### Input and focus
 
 - Pointer: click star N sets `Value` to N; clicking the current value sets 0 [L src/Lunegit.Desktop/Controls/StarRatingControl.axaml.cs:64-67].
-- Keyboard: each star is a button and takes Enter and Space as a button does; Tab stop per star [L src/Lunegit.Desktop/Controls/StarRatingControl.axaml.cs:59-62]; arrow-key selection is not in Lunegit (Open questions).
+- Keyboard: Lunegit's stars are buttons that take Enter and Space, one tab stop per star [L src/Lunegit.Desktop/Controls/StarRatingControl.axaml.cs:59-62]. The toolkit's row is one roving stop (a radio group has one) [D120]: Tab enters once, on the star of the value (the first when unrated); Left, Right, Home and End move focus only, not the value, and do not wrap; Enter and Space set the focused star, or clear it when it is the current value.
 - Layer: `Base`; no overlay, no focus scope.
 
 ### Retained state
@@ -102,8 +103,8 @@ None: the star names are numbers, and the control has no text keys [L src/Lunegi
 
 ## Open questions
 
-- `role-choice`: Lunegit's clear-on-reclick cannot be expressed by a radio. Choose: radio-group with a clear action, or `slider` with 0..Max. M6 decides.
-- `key-gap`: arrow-key selection is not in Lunegit's control; the toolkit decides whether to add it.
+- Resolved [D120] `role-choice`: role `radio-group` of `radio`s; setting the current value clears it to 0, by click, Enter, Space or the default action (no separate clear action).
+- Resolved [D120] `key-gap`: the arrows move focus only; they never set the value (a rating is a deliberate choice, and an arrow pass over the stars must not rate).
 
 ## Notes for the planner
 
