@@ -26,12 +26,16 @@ mod menu;
 mod motion;
 mod primitives;
 pub(crate) mod reference;
+mod scroll_area;
+mod scrollbar;
 mod shortcuts;
 mod stack;
 mod stepper;
 mod text_field;
 mod toggle;
+mod tooltip;
 mod ui;
+mod virtual_list;
 
 /// Every page, in listing and window order.
 pub(crate) static PAGES: &[&Page] = &[
@@ -56,6 +60,10 @@ pub(crate) static PAGES: &[&Page] = &[
     &image::PAGE,
     &shortcuts::PAGE,
     &primitives::PAGE,
+    &scroll_area::PAGE,
+    &scrollbar::PAGE,
+    &virtual_list::PAGE,
+    &tooltip::PAGE,
 ];
 
 /// The window background of a Ui page (glass, focused) and its card. Returns the card.
