@@ -2,10 +2,10 @@
 id: widget.search-picker
 title: Search picker
 area: widget
-status: planned
+status: in-progress
 consumers: lunegit
 source: Lunegit: src/Lunegit.Desktop/Controls/SearchPickerBase.cs
-owner: —
+owner: toolkit-v1 M6
 summary: Search picker: a field-style or link-style trigger that opens a searchable list; Escape closes, Enter picks the first match
 ---
 

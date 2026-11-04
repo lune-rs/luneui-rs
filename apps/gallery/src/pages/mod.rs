@@ -11,7 +11,10 @@ use crate::page::Page;
 use crate::scenes::background;
 
 mod a11y;
+mod badge;
+mod banner;
 mod button;
+mod callout;
 mod checkbox;
 mod combo;
 mod controls_ui;
@@ -19,26 +22,44 @@ mod dialog;
 mod drag_drop;
 mod dropdown;
 pub(crate) mod effects;
+mod filter_bar;
 mod focus;
+mod form_field;
 mod image;
 mod ime;
+mod kv_list;
 mod label;
+mod list_row;
 mod locale;
 mod menu;
 mod motion;
+mod nav_item;
 mod popover;
 mod primitives;
+mod progress;
+mod radio_group;
 pub(crate) mod reference;
+mod row;
 mod scroll_area;
 mod scrollbar;
+mod search_picker;
 mod shortcuts;
+mod slider;
+mod spinner;
 mod stack;
+mod star_rating;
+mod stat;
+mod status_dot;
 mod stepper;
+mod steps;
+mod tab_strip;
 mod text_edit;
 mod text_field;
 mod toggle;
+mod toolbar;
 mod tooltip;
 mod ui;
+mod verdict_row;
 mod virtual_list;
 
 /// Every page, in listing and window order.
@@ -72,6 +93,27 @@ pub(crate) static PAGES: &[&Page] = &[
     &text_edit::PAGE,
     &ime::PAGE,
     &drag_drop::PAGE,
+    &badge::PAGE,
+    &status_dot::PAGE,
+    &verdict_row::PAGE,
+    &progress::PAGE,
+    &spinner::PAGE,
+    &callout::PAGE,
+    &stat::PAGE,
+    &kv_list::PAGE,
+    &row::PAGE,
+    &list_row::PAGE,
+    &form_field::PAGE,
+    &steps::PAGE,
+    &nav_item::PAGE,
+    &radio_group::PAGE,
+    &star_rating::PAGE,
+    &slider::PAGE,
+    &filter_bar::PAGE,
+    &search_picker::PAGE,
+    &tab_strip::PAGE,
+    &toolbar::PAGE,
+    &banner::PAGE,
 ];
 
 /// The window background of a Ui page (glass, focused) and its card. Returns the card.

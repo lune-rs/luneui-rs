@@ -2,10 +2,10 @@
 id: widget.callout
 title: Callout
 area: widget
-status: planned
+status: in-progress
 consumers: wane
 source: —
-owner: —
+owner: toolkit-v1 M6
 summary: Callout: static notice with 1 px tone border, 14 px icon, optional figure and action button; not dismissible
 ---
 

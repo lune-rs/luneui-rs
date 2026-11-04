@@ -2,10 +2,10 @@
 id: data.stat
 title: Stat cell
 area: data
-status: planned
+status: in-progress
 consumers: wane
 source: —
-owner: —
+owner: toolkit-v1 M6
 summary: A labelled figure in a strip: label, mono value, sub-line, optional meter
 ---
 

@@ -2,10 +2,10 @@
 id: widget.radio-group
 title: Radio group
 area: widget
-status: planned
+status: in-progress
 consumers: wane
 source: —
-owner: —
+owner: toolkit-v1 M6
 summary: Radio group: vertical 16 px rings, accent ring and 6 px dot when selected; arrow keys move the selection inside the group
 ---
 

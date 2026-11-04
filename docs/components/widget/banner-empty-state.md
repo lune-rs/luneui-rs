@@ -2,10 +2,10 @@
 id: widget.banner-empty-state
 title: Banners, empty states and loading gates
 area: widget
-status: planned
+status: in-progress
 consumers: lunegit
 source: Lunegit: src/Lunegit.Desktop/Controls/IndexingBanner.axaml
-owner: —
+owner: toolkit-v1 M6
 summary: Indexing banner (warning tone, spinning sync icon) and the empty-repository view: centred icon, title, subtitle, action buttons
 ---
 

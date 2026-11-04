@@ -1,23 +1,46 @@
 //! Controls, styled after the house look's overrides of the Fluent theme (`DarkTheme.axaml`). Every
 //! widget is generic over the app's hit type and reads its tokens from the painter's [`Theme`](crate::theme::Theme).
 
+pub mod badge;
+pub mod banner;
 pub mod button;
+pub mod callout;
 pub mod checkbox;
 pub mod combo;
 pub mod dialog;
 pub mod dropdown;
 pub mod field;
+pub mod filter_bar;
 pub mod focus_ring;
+pub mod form_field;
+pub mod kv_list;
 pub mod label;
+pub mod list_row;
 pub mod menu;
+pub mod nav_item;
 pub mod popover;
 pub mod popup_panel;
+pub mod progress;
+pub mod radio_group;
+pub mod row;
 pub mod scroll_area;
 pub mod scrollbar;
+pub mod search_picker;
+pub mod selectable;
+pub mod slider;
+pub mod spinner;
+pub mod star_rating;
+pub mod stat;
+pub mod status_dot;
 pub mod stepper;
+pub mod steps;
+pub mod tab_strip;
 pub mod text_area;
 pub mod toggle;
+pub mod tone;
+pub mod toolbar;
 pub mod tooltip;
+pub mod verdict_row;
 pub mod virtual_list;
 
 mod input_box;

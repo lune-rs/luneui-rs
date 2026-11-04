@@ -2,10 +2,10 @@
 id: widget.spinner
 title: Spinner
 area: widget
-status: planned
+status: in-progress
 consumers: any
 source: —
-owner: orch/toolkit-v1
+owner: toolkit-v1 M6
 summary: Spinner: a 14 px glyph that turns a full revolution every 1.2 s while busy; static under Reduced and Off
 ---
 

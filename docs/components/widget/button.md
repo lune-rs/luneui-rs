@@ -114,7 +114,7 @@ None: the label is app text.
 
 ## Open questions
 
-- `token-gap` resolved by [D58]: the pressed fill `surface_active` has no field in `Theme` (`crates/lune-ui-core/src/theme.rs:12-41`); token to add (M4), #FFFFFF20 [W docs/ui/mocks/css/tokens.css:24], equal to Lunegit's `SurfaceActive` #20FFFFFF [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:29].
+- `token-gap` resolved by [D58] and built in M4: `Theme.surface_active` exists (`crates/lune-ui-core/src/theme.rs`), #FFFFFF20 [W docs/ui/mocks/css/tokens.css:24], equal to Lunegit's `SurfaceActive` #20FFFFFF [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:29]. Nothing open.
 
 ## Notes for the planner
 

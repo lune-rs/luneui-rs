@@ -2,10 +2,10 @@
 id: data.progress
 title: Progress bar
 area: data
-status: planned
+status: in-progress
 consumers: wane
 source: —
-owner: —
+owner: toolkit-v1 M6
 summary: 4 px track with an accent fill; warn and err only for meaning
 ---
 

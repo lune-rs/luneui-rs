@@ -2,10 +2,10 @@
 id: widget.list-row-badge
 title: List rows with status badges
 area: widget
-status: planned
+status: in-progress
 consumers: lunegit, wane
 source: Lunegit: src/Lunegit.Desktop/App.axaml
-owner: —
+owner: toolkit-v1 M6
 summary: Master list row: name, value and sub-line with a badge in the head; rest transparent, hover surface-hover, selected surface-selected
 ---
 

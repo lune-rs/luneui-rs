@@ -2,10 +2,10 @@
 id: widget.badge
 title: Badge
 area: widget
-status: planned
+status: in-progress
 consumers: wane
 source: —
-owner: —
+owner: toolkit-v1 M6
 summary: Badge: static 18 px tag with tone fill and border; neutral, ok, warn, err, data; Lunegit status-badge shape
 ---
 

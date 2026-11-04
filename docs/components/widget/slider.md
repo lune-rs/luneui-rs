@@ -2,10 +2,10 @@
 id: widget.slider
 title: Slider
 area: widget
-status: planned
+status: in-progress
 consumers: any
 source: —
-owner: orch/toolkit-v1
+owner: toolkit-v1 M6
 summary: Slider: 4 px track with accent fill and a 12 px knob (14 hovered); look derived from the toggle knob and the progress track; arrow keys step
 ---
 

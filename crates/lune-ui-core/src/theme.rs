@@ -66,6 +66,10 @@ pub struct Theme {
     pub gold: Rgba,
     /// The neutral status dot.
     pub paused: Rgba,
+    /// The window fill a toolbar shows when the window is inactive or no glass material is
+    /// available: Lunegit's `WindowFallbackBackground` #FF333333 (`DarkTheme.axaml:245`, D128).
+    /// Opaque, so the toolbar never reads as see-through without a backdrop.
+    pub window_fallback: Rgba,
     pub font_s: f32,
     pub font_base: f32,
     pub font_m: f32,
@@ -135,6 +139,8 @@ pub mod lunegit_dark {
         data_hi: [0x8F, 0xBB, 0xFF, 0xFF],
         gold: [0xE9, 0xC4, 0x6A, 0xFF],
         paused: [0x8A, 0x90, 0x99, 0xFF],
+        // Lunegit `Themes/DarkTheme.axaml:245`.
+        window_fallback: [0x33, 0x33, 0x33, 0xFF],
         font_s: 11.0,
         font_base: 13.0,
         font_m: 14.0,
@@ -202,8 +208,9 @@ mod tests {
             (THEME.data_hi, [0x8F, 0xBB, 0xFF, 0xFF]),
             (THEME.gold, [0xE9, 0xC4, 0x6A, 0xFF]),
             (THEME.paused, [0x8A, 0x90, 0x99, 0xFF]),
+            (THEME.window_fallback, [0x33, 0x33, 0x33, 0xFF]),
         ];
-        assert_eq!(expected.len(), 19);
+        assert_eq!(expected.len(), 20);
         for (got, want) in expected {
             assert_eq!(got, want);
         }

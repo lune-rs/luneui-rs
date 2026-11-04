@@ -2,10 +2,10 @@
 id: widget.status-dot
 title: Status dot
 area: widget
-status: planned
+status: in-progress
 consumers: wane
 source: —
-owner: —
+owner: toolkit-v1 M6
 summary: Status dot: static 8 px circle in ok, warn, err, data or paused tone; never alone, a word beside it carries the meaning
 ---
 

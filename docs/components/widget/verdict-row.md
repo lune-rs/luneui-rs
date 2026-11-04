@@ -2,10 +2,10 @@
 id: widget.verdict-row
 title: Verdict check row
 area: widget
-status: planned
+status: in-progress
 consumers: wane
 source: —
-owner: —
+owner: toolkit-v1 M6
 summary: Verdict row: mark OK, WARN or NO in its tone, then name and text; three-column or stacked; static
 ---
 

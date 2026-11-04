@@ -19,6 +19,16 @@ const NAMESPACE: &str = "luneui";
 pub const DEFAULTS: &[(&str, &str)] = &[
     ("luneui.dialog.cancel", "Cancel"),
     ("luneui.text-field.clear", "Clear"),
+    ("luneui.tab-strip.new", "New tab"),
+    ("luneui.tab-strip.close", "Close tab"),
+    ("luneui.tab-strip.menu.close", "Close"),
+    ("luneui.tab-strip.menu.close-others", "Close Others"),
+    ("luneui.tab-strip.menu.close-all", "Close All"),
+    ("luneui.tab-strip.menu.rename", "Rename\u{2026}"),
+    ("luneui.verdict-row.ok", "OK"),
+    ("luneui.verdict-row.warn", "WARN"),
+    ("luneui.verdict-row.no", "NO"),
+    ("luneui.stat.no-data", "No data"),
 ];
 
 /// The default text of a toolkit key, if it is one.

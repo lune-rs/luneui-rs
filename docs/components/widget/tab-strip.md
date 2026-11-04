@@ -2,10 +2,10 @@
 id: widget.tab-strip
 title: Tab strip
 area: widget
-status: planned
+status: in-progress
 consumers: luneterm, lunegit
 source: —
-owner: —
+owner: toolkit-v1 M6
 summary: Tab strip: tabs with close, new-tab button, overflow scrolling, drag reorder, and the connected tab outline with a running cue
 ---
 

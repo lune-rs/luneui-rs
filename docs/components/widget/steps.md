@@ -2,10 +2,10 @@
 id: widget.steps
 title: Wizard steps
 area: widget
-status: planned
+status: in-progress
 consumers: wane
 source: —
-owner: —
+owner: toolkit-v1 M6
 summary: Wizard steps: four 32 px rows in the sidebar slot with upcoming, current and done states; not clickable
 ---
 

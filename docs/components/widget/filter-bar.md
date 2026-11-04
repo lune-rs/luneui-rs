@@ -2,10 +2,10 @@
 id: widget.filter-bar
 title: Filter bar
 area: widget
-status: planned
+status: in-progress
 consumers: lunegit
 source: Lunegit: src/Lunegit.Desktop/Controls/FilterBar.axaml
-owner: —
+owner: toolkit-v1 M6
 summary: Filter bar: search field in an inset surface with a 14 px search icon, a clear button when text is present, and no focus ring
 ---
 

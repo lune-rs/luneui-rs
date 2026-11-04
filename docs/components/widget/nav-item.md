@@ -2,10 +2,10 @@
 id: widget.nav-item
 title: Navigation item
 area: widget
-status: planned
+status: in-progress
 consumers: wane
 source: —
-owner: —
+owner: toolkit-v1 M6
 summary: Navigation item: 32 px row, secondary text at rest, surface-selected fill and bright text when active, no accent bar
 ---
 

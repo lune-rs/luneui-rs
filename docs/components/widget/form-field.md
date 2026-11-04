@@ -2,10 +2,10 @@
 id: widget.form-field
 title: Form field (label, control, hint)
 area: widget
-status: planned
+status: in-progress
 consumers: wane
 source: —
-owner: —
+owner: toolkit-v1 M6
 summary: Form field: label above a control, hint below; error state rings the control and colours the hint in err
 ---
 

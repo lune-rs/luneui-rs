@@ -2,10 +2,10 @@
 id: widget.toolbar
 title: Main toolbar
 area: widget
-status: planned
+status: in-progress
 consumers: lunegit
 source: Lunegit: src/Lunegit.Desktop/Views/ToolbarView.axaml
-owner: —
+owner: toolkit-v1 M6
 summary: Toolbar: three-column command bar of 40 px toolbar-action buttons with 20 px icons on a glass material
 ---
 

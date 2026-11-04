@@ -2,10 +2,10 @@
 id: widget.star-rating
 title: Star rating
 area: widget
-status: planned
+status: in-progress
 consumers: lunegit
 source: Lunegit: src/Lunegit.Desktop/Controls/StarRatingControl.axaml
-owner: —
+owner: toolkit-v1 M6
 summary: Star rating: row of star buttons (default five) in the warning tone; click N sets N, click again clears
 ---
 

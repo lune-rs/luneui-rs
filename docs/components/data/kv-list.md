@@ -2,10 +2,10 @@
 id: data.kv-list
 title: Key-value list
 area: data
-status: planned
+status: in-progress
 consumers: wane
 source: —
-owner: —
+owner: toolkit-v1 M6
 summary: Aligned key and value pairs: facts, paths, ids, figures
 ---
 
