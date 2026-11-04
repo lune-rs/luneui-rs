@@ -82,13 +82,11 @@ The banner has no transition of its own; the spinner's rotation is in `widget.sp
 
 ### Strings
 
-- `luneui.banner-empty-state.indexing-banner`: English default not read in this tree; Lunegit key `indexing.banner` (`src/Lunegit.Desktop/Controls/IndexingBanner.axaml:21`).
-- `luneui.banner-empty-state.empty-title`: Lunegit key `emptyRepo.title` (`src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:24`); English default not read.
-- `luneui.banner-empty-state.empty-subtitle`: Lunegit key `emptyRepo.subtitle` (`src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:30`); English default not read.
+None. The banner text, the empty view's title and subtitle and the action labels are the app's: `Ui::banner` and `Ui::empty_state` take them as arguments, so the entry's `luneui.banner-empty-state.*` keys are not added ([D128]).
 
 ### Gallery scenes
 
-- `banner-shown`: banner with the spinner, settled.
+- `banner-shown`: banner with the spinner, 300 ms in (the spinner runs: moving).
 - `banner-empty-state`: empty-repository view with two actions, settled.
 - `banner-empty-state-action-mid`: action pressed, t = 90 ms (half of `fast`).
 - `banner-empty-state-hover-mid`: action rest → hover, t = 60 ms (half of `instant`).
@@ -113,8 +111,7 @@ The banner has no transition of its own; the spinner's rotation is in `widget.sp
 
 ## Open questions
 
-- `scope`: the startup loading view and the EULA and Git gate views are app code per the survey; their look is not read here. Confirm the split with the owner before M6.
-- `design-gap`: the banner's solid warning fill against Wane's callout tint; see `widget.callout`.
+None. Closed by [D128] and [D129]: `scope` (the startup loading view and the EULA and Git gate views stay app code), `design-gap` (the banner's solid fill and the callout's tint are two widgets with two looks, each per its source). The empty view has no field for the picture's name, so its `Image` node is always hidden.
 
 ## Notes for the planner
 
