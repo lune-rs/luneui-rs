@@ -64,6 +64,16 @@ impl Rect {
     }
 }
 
+/// [`StrokeStyle::mode`]: the shader's conic sweep (see [`Painter::stroke_sweep`]).
+const MODE_SWEEP: f32 = 1.0;
+/// [`StrokeStyle::mode`]: the shader's comet (see [`Painter::stroke_comet`]).
+const MODE_COMET: f32 = 2.0;
+
+/// How a stroke is drawn. Every length is in logical px of the drawing space, like the points;
+/// the painter turns them into the units the shader reads.
+///
+/// `mode` 0 is solid. Mode 1, the conic sweep: `a` is the phase in turns, `extra[0..2]` the centre.
+/// Mode 2, the comet: `a` the dash length, `b` the distance travelled, `extra[2]` the contour.
 #[derive(Debug, Clone, Copy)]
 pub struct StrokeStyle {
     pub color: [f32; 4],
@@ -858,9 +868,70 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         self.stroke_pts(pts, closed, st);
     }
 
+    /// A closed loop through `pts` lit by the conic sweep: alpha runs round `center` (logical px,
+    /// where the points are), brightest at `phase` turns clockwise from 12 o'clock. `phase` wraps;
+    /// one that is not finite is 0.
+    pub fn stroke_sweep(
+        &mut self,
+        pts: &[[f32; 2]],
+        color: Rgba,
+        width: f32,
+        phase: f32,
+        center: [f32; 2],
+    ) {
+        let style = StrokeStyle {
+            mode: MODE_SWEEP,
+            a: turns(phase),
+            extra: [center[0], center[1], 0.0, 0.0],
+            ..StrokeStyle::solid(color, width)
+        };
+        self.stroke(pts, true, style);
+    }
+
+    /// A closed loop through `pts`, lit only along a dash `fraction` of its contour long (clamped
+    /// to 0 to 1), which `phase` turns carry once round the loop, against the points' order.
+    /// `phase` wraps; one that is not finite is 0.
+    pub fn stroke_comet(
+        &mut self,
+        pts: &[[f32; 2]],
+        color: Rgba,
+        width: f32,
+        fraction: f32,
+        phase: f32,
+    ) {
+        let contour = polyline_length(pts);
+        let style = StrokeStyle {
+            mode: MODE_COMET,
+            a: fraction.clamp(0.0, 1.0) * contour,
+            b: turns(phase) * contour,
+            extra: [0.0, 0.0, contour, 0.0],
+            ..StrokeStyle::solid(color, width)
+        };
+        self.stroke(pts, true, style);
+    }
+
+    /// `st`'s mode parameters in the units the shader reads: the sweep's centre through the
+    /// transform stack, in physical px; the comet's lengths in the logical px of the transformed
+    /// points, which is what a vertex's `aa.y` measures.
+    fn shader_style(&self, st: StrokeStyle) -> StrokeStyle {
+        let mut st = st;
+        if st.mode == MODE_SWEEP {
+            let (x, y) = self.point(st.extra[0], st.extra[1]);
+            st.extra[0] = x * self.s;
+            st.extra[1] = y * self.s;
+        } else if st.mode == MODE_COMET {
+            let k = self.scale_k();
+            st.a *= k;
+            st.b *= k;
+            st.extra[2] *= k;
+        }
+        st
+    }
+
     /// [`Self::stroke`] without recording, for the primitives built on it.
     fn stroke_pts(&mut self, pts: &[[f32; 2]], closed: bool, st: StrokeStyle) {
         let s = self.s;
+        let st = self.shader_style(st);
         let clip = self.clip_phys();
         let (round, round_radius) = self.round_phys();
         let (pts, st) = if self.xforms.is_empty() {
@@ -1140,6 +1211,16 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
     }
 }
 
+/// `phase` wrapped into one turn; 0 when it is not finite.
+fn turns(phase: f32) -> f32 {
+    if phase.is_finite() {
+        phase.rem_euclid(1.0)
+    } else {
+        0.0
+    }
+}
+
+/// The length of the closed loop through `pts`, the closing segment included.
 pub fn polyline_length(pts: &[[f32; 2]]) -> f32 {
     let dist = |a: [f32; 2], b: [f32; 2]| ((b[0] - a[0]).powi(2) + (b[1] - a[1]).powi(2)).sqrt();
     pts.windows(2).map(|w| dist(w[0], w[1])).sum::<f32>()
