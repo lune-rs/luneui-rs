@@ -21,7 +21,7 @@ Aligned key and value pairs: facts, paths, ids, figures. Named by Wane's UI mock
 
 ## Existing code
 
-None in luneui-rs or Luneterm's `lune-ui` (Wane: missing). Design source (not code to move): Wane `docs/ui/mocks/css/components.css` (data.kv-list); no lune-ui source.
+`crates/lune-ui-core/src/widgets/kv_list.rs` (`KvOptions`, `Ui::kv_list`) and `crates/lune-ui-core/src/widgets/selectable.rs` (`Ui::selectable_text`), M6. Gallery page `apps/gallery/src/pages/kv_list.rs`; tests `crates/lune-ui-core/tests/widget_kv_list.rs`. Design source (not code moved): Wane `docs/ui/mocks/css/components.css` (data.kv-list); no lune-ui source.
 
 ## Spec
 
@@ -44,7 +44,7 @@ Conflicts: none. Lunegit has no kv-list source read; not used for values.
 | state | look | cite |
 |---|---|---|
 | rest (the only interaction state) | key and value as above | [W docs/ui/components.md:613-626] |
-| value selected for copy | the text selection look; not in the source | open question |
+| value selected for copy | `text_selection` fill under the text, while the value has focus [D125] | [D125] |
 
 ### Transitions
 
@@ -52,8 +52,8 @@ n/a — static (Wane: "Static"); a value change follows the app's data without m
 
 ### Input and focus
 
-- Pointer: values accept selection for copy [W docs/ui/components.md:613-626]; the rows take no click.
-- Keyboard: copy of the selected text (the platform's copy); no key handling in the source.
+- Pointer: values accept selection for copy [W docs/ui/components.md:613-626]; a press focuses the value and places the caret, a drag, a double press and Shift extend it. The rows, the keys and the space beside a value take no input: the hit region is the drawn text. An elided value selects as a whole: any press selects all of it and Copy writes all of the full text [D125].
+- Keyboard: the platform's copy and select-all on the focused value; the caret keys move the selection of a value shown in full; an elided value ignores them, so a partial selection of it cannot exist.
 - Tab stop: no; the values are not controls [derived: static text, W docs/ui/components.md:613-626].
 - Layer: whatever layer the owner draws it on [derived: a container].
 - Focus scope: none.
@@ -68,8 +68,8 @@ n/a — static (Wane: "Static"); a value change follows the app's data without m
 
 ### Accessibility
 
-- Role `group` for the list; each pair is a `group` with a `static-text` key and value [infra.accessibility].
-- Values are selectable text: name = key, value = the text [infra.accessibility].
+- Each pair is a `group` named by its key with a `static-text` key and a `static-text` value [infra.accessibility]; the list itself has no node of its own.
+- Values are selectable text: name = key, value = the full text, with the selection [infra.accessibility].
 - Live region: none.
 
 ### Strings
@@ -81,6 +81,7 @@ None: keys and values are app text.
 - `kv-list-default` (new): six pairs with the longest key sizing the column, settled.
 - `kv-list-stacked` (new): stacked two-column variant, settled.
 - `kv-list-wrap` (new): a wrapped value over two lines, settled.
+- `kv-list-selected` (new): the commit value selected whole (elided), focused by a press, settled.
 
 ### Painter primitives
 
@@ -89,7 +90,7 @@ None: keys and values are app text.
 
 ### Acceptance
 
-- Behaviour (scripted input, injected time): a value is selectable and copies its text; rows take no clicks. None exists.
+- Behaviour (scripted input, injected time): a value is selectable and copies its text; rows take no clicks. Tests `widget_kv_list.rs` (a drag then Copy writes the substring; a press on an elided value then Copy writes the whole; Tab skips every value; a press outside a value does nothing).
 - Pixel probes at scale 2: row 48 px; key-value gap 32 px; key text at 26 px font size; the key column equals the longest key's measured width.
 - Conformance: none (no motion).
 - Semantic node: `group` per pair; key and value `static-text`.
@@ -101,10 +102,7 @@ None: keys and values are app text.
 
 ## Open questions
 
-- Selection look for copy: not in any source; open.
-- Whether a copy button is part of the component: not in the mock text; open.
-- Whether this is a toolkit component or app code composed from the painter: the planner decides (Wane needs it either way).
-- Native rendering: column sizing needs a measure pass (`measure` on the painter) for the longest key.
+- None. The selection look (`text_selection`), no copy button and a toolkit component are settled by [D125]. Column sizing measures the longest key with `Painter::measure`.
 
 ## Notes for the planner
 
