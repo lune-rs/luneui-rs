@@ -300,6 +300,7 @@ struct ScrollState {
 #[derive(Debug, Default)]
 struct Requests {
     reveals: Vec<(Target, Reveal)>,
+    shift_x: f64,
     shift_y: f64,
 }
 
@@ -357,6 +358,13 @@ impl Ui<'_> {
         self.transient::<Requests>(id).shift_y += by;
     }
 
+    /// [`Self::scroll_shift`] on the horizontal axis: an edit moves its caret into view at once,
+    /// since typing and caret motion never animate.
+    pub(crate) fn scroll_shift_x(&mut self, key: impl Hash, by: f64) {
+        let id = self.id(key);
+        self.transient::<Requests>(id).shift_x += by;
+    }
+
     fn scroll_area_with<R>(
         &mut self,
         key: impl Hash,
@@ -381,6 +389,7 @@ impl Ui<'_> {
         let mut st = std::mem::take(self.persistent::<ScrollState>(id));
         let Requests {
             mut reveals,
+            shift_x,
             shift_y,
         } = std::mem::take(self.transient::<Requests>(id));
 
@@ -391,6 +400,7 @@ impl Ui<'_> {
         let preserve = should_restore(st.rendered, st.key, opts.identity);
         st.key = opts.identity;
         st.rendered = true;
+        st.a[0].shift(shift_x);
         st.a[1].shift(shift_y);
 
         let known = opts.extent.map(|(w, h)| [clean(w), clean(h)]);
@@ -534,8 +544,9 @@ impl Ui<'_> {
             }
         }
 
-        // Page keys and Home and End, when the focused child inside the area declined them.
-        if let Some((f, _)) = inside {
+        // Page keys and Home and End, when the focused child inside the area declined them;
+        // while it composes they are the input method's.
+        if let Some((f, _)) = inside.filter(|_| !self.composing()) {
             let pax = primary_axis(&live, &ext, &vp);
             if live[pax] && ext[pax] > vp[pax] {
                 for (index, ev) in self.focus_events(f) {

@@ -103,6 +103,13 @@ impl Ui<'_> {
         }
     }
 
+    /// Whether the focused widget is composing, so the keys left in the queue are the input
+    /// method's.
+    pub(crate) fn composing(&self) -> bool {
+        let focus = &self.store.focus;
+        focus.composing.is_some() && focus.composing == focus.focused
+    }
+
     /// Focuses `id` at the next frame's begin, without the ring.
     pub fn request_focus(&mut self, id: WidgetId) {
         self.store.focus.pending = Some(id);

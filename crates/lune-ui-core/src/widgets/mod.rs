@@ -15,6 +15,7 @@ pub mod popup_panel;
 pub mod scroll_area;
 pub mod scrollbar;
 pub mod stepper;
+pub mod text_area;
 pub mod toggle;
 pub mod tooltip;
 pub mod virtual_list;

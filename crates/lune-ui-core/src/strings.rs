@@ -16,7 +16,10 @@ const NAMESPACE: &str = "luneui";
 
 /// The toolkit's own strings, key and English text. A table may translate these and add its own
 /// keys outside the toolkit namespace.
-pub const DEFAULTS: &[(&str, &str)] = &[("luneui.dialog.cancel", "Cancel")];
+pub const DEFAULTS: &[(&str, &str)] = &[
+    ("luneui.dialog.cancel", "Cancel"),
+    ("luneui.text-field.clear", "Clear"),
+];
 
 /// The default text of a toolkit key, if it is one.
 pub fn default_text(key: &str) -> Option<&'static str> {
