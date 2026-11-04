@@ -91,6 +91,7 @@ None: the label is app text.
 
 - `controls` (existing, scale 2 and 1): primary and secondary at rest.
 - `button-states`: primary and secondary at rest, secondary hovered, pressed, focus-visible, disabled; settled.
+- `button-variants`: ghost, small, icon (28 and 24), icon with label, each at rest and hovered, and a fill-width button; settled.
 - `button-hover-mid`: secondary rest → hover, t = 60 ms (half of `instant`).
 - `button-press-mid`: pressed, t = 90 ms (half of `fast`).
 - `button-focus-mid`: focus-visible on, t = 90 ms (half of `fast`).
@@ -109,7 +110,7 @@ None: the label is app text.
 
 ### Build
 
-- Milestone: M4 (retrofit: transitions, focus, semantic node); done by M11. Deferred [D74]: the variants (small, icon, ghost), which no M4 scene needs.
+- Milestone: M4 (retrofit: transitions, focus, semantic node); done by M11. The variants (small, icon, ghost) were deferred by [D74] and are built in M6 step 3 ([D116]): `ButtonKind::Ghost`, `ButtonOptions { kind, small, icon }` with `Ui::button_with` and `button_width_with`, `IconButton` with `Ui::icon_button`; the small button is 24 high (the top of the caller's rect kept), radius 4, padding 0 12; a labelled icon is a 16 px glyph, an 8 gap; fill width needs no code (the caller's rect is the width). The ring follows the corner radius (`RingKind::Edge`).
 - Depends on: core.ui, core.focus, infra.accessibility, motion.transitions.
 
 ## Open questions
