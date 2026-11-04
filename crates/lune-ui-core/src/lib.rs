@@ -22,6 +22,7 @@
 //! - `input` (the input seam: `RawInput` in, `FrameOutput` out, plain data), `layout` (pure stack,
 //!   row, column and grid helpers);
 //! - `shortcuts` (the scoped key-chord registry the frame resolves in two phases);
+//! - `drag` (in-window drag and drop: the pure reorder and free machines and their `Ui` glue);
 //! - `ui` (the per-window frame: ids, retained state, layered hits, overlays, focus, semantic
 //!   nodes, `Response`, `FrameOutput`), `access` (the semantic tree and accessibility actions),
 //!   `motion` (the closed-form motion system and the time type), `strings` (the string table);
@@ -41,6 +42,7 @@ pub mod acrylic;
 pub mod backdrop;
 pub mod chrome;
 pub mod color;
+pub mod drag;
 pub mod icon;
 pub mod image;
 pub mod input;

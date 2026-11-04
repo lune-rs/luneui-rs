@@ -1,16 +1,16 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-04 (M5 steps 1 to 13 done; step 14 is next; M4 merged at d9fe71f)
+Last updated: 2026-11-04 (M5 steps 1 to 14 done; step 15 is next; M4 merged at d9fe71f)
 
 ## Now
 
 M4 (interaction and motion) is merged to main at d9fe71f, on top of M3 (catalogue specs) and M2
 (seams and crate split). M5 (foundations: layout, scroll, list, popover, text editing, drag and drop,
-shortcuts, painter primitives) is in progress on branch `orch/toolkit-v1`; steps 1 to 13 (the frame
+shortcuts, painter primitives) is in progress on branch `orch/toolkit-v1`; steps 1 to 14 (the frame
 plumbing, layout helpers, shortcut registry, vector primitives, image and rotate, their gallery pages, the
 scroll area and scrollbar, the virtualized list, popover and tooltip, and the gallery pages of those four, and the text queries on `TextSystem`: caret, hit, lines,
-segments, D86, the `TextEdit` engine, D87, and the text field upgrade, D88) are done; step 14 (drag and drop) is next.
+segments, D86, the `TextEdit` engine, D87, and the text field upgrade, D88, and drag and drop, D89) are done; step 15 (their gallery pages) is next.
 `lune-ui-core` holds the per-window `Ui` frame (stable ids, retained state with keep-alive scopes,
 layered hits with modal and pointer capture, `Response`, overlays with exit retention, focus scopes,
 the semantic tree with actions, the string table, `FrameOutput` with `Repaint`) and the closed-form
@@ -29,7 +29,8 @@ the dropdown and menu call it) and `Ui::popover` (popup layer, light dismiss, th
 `MotionTokens::tooltip_delay`, `LAZY_HOVER_DWELL` 150 ms). `text_edit` holds the pure `TextEdit`
 (caret, selection, undo, clipboard commands, preedit; `SpecLayout` over a `TextSystem`); `widgets/field.rs`
 (`Ui::text_field_with`: variants, `FieldResponse`, IME drawing) and `widgets/text_area.rs` (`Ui::text_area` on a
-scroll area) run it. Real IME typing stays unverified (roadmap R1).
+scroll area) run it. Real IME typing stays unverified (roadmap R1). `drag` holds the pure `ReorderDrag` and
+`FreeDrag` machines and the `Ui::drag_gesture`, `drag_offset`, `drag_dim` and `free_drag_gesture` glue.
 `docs/architecture.md` holds the module map, "The `Ui` frame" and "API changes since M1"; DECISIONS
 D59 to D85 record the M4 choices.
 The gallery has a page registry (two legacy pages, 24 Ui pages), `--dump`, `--list` (123 scene names)
@@ -38,8 +39,8 @@ The pixel gate shows the 15 legacy scenes identical against the M1 base.
 
 ## Next
 
-1. M5 steps 14 to 16 per `m05-foundations/plan.md`: drag and drop,
-   gallery pages, docs and the acceptance bench.
+1. M5 steps 15 and 16 per `m05-foundations/plan.md`: the gallery pages
+   (text edit, text field, IME, drag and drop), docs and the acceptance bench.
 2. CI (fmt, clippy `-D warnings`, tests on macOS, Windows and Linux) now that there is code to run.
 3. An export script for Luneterm's vendored snapshot, before Luneterm M9. The migration
    map for M11 is "API changes since M1" in `docs/architecture.md`.
