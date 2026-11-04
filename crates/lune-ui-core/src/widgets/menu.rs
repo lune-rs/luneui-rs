@@ -2,6 +2,7 @@
 
 use std::hash::Hash;
 
+use super::popover::{PlaceAlign, PlaceRequest, Side, place};
 use crate::access::{Action, Node, Role, State};
 use crate::icon;
 use crate::input::NamedKey;
@@ -119,13 +120,17 @@ pub fn menu_layout<H: Copy + PartialEq>(
             MenuRow::Separator => h += SEP,
         }
     }
-    let x = at.0.min(p.window.w - w - 8.0).max(8.0);
-    let y = if at.1 + h > p.window.h - 8.0 {
-        (at.1 - h).max(8.0)
-    } else {
-        at.1
-    };
-    let panel = Rect::new(x, y, w, h);
+    let panel = place(&PlaceRequest {
+        anchor: Rect::new(at.0, at.1, 0.0, 0.0),
+        size: (w, h),
+        side: Side::Bottom,
+        align: PlaceAlign::Start,
+        gap: 0.0,
+        margin: 8.0,
+        shift: true,
+        window: p.window,
+    })
+    .rect;
     let mut cy = panel.y + PAD;
     let rects = rows
         .iter()
@@ -310,7 +315,7 @@ impl OwnedRow {
 
 /// The transform of a menu at one moment: the moved curves, or opacity only when `transforms`
 /// is off (the Reduced fade).
-fn xform_of(anim: MenuAnim, origin: (f32, f32), transforms: bool) -> Xform {
+pub(crate) fn xform_of(anim: MenuAnim, origin: (f32, f32), transforms: bool) -> Xform {
     let (alpha, dy, scale) = anim;
     if transforms {
         Xform {

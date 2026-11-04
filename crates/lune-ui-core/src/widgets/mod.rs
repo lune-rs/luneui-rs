@@ -10,11 +10,13 @@ pub mod field;
 pub mod focus_ring;
 pub mod label;
 pub mod menu;
+pub mod popover;
 pub mod popup_panel;
 pub mod scroll_area;
 pub mod scrollbar;
 pub mod stepper;
 pub mod toggle;
+pub mod tooltip;
 pub mod virtual_list;
 
 mod input_box;

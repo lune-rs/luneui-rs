@@ -164,7 +164,7 @@ impl ReducedMap {
     }
 }
 
-/// The theme's motion tokens: the five durations and the Reduced map.
+/// The theme's motion tokens: the five durations, the tooltip delay and the Reduced map.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MotionTokens {
     pub instant: Duration,
@@ -172,6 +172,9 @@ pub struct MotionTokens {
     pub base: Duration,
     pub moderate: Duration,
     pub slow: Duration,
+    /// How long the pointer rests on an anchor before its tooltip shows (D57). Not a motion
+    /// duration: nothing animates over it.
+    pub tooltip_delay: Duration,
     pub reduced: ReducedMap,
 }
 
@@ -192,6 +195,7 @@ pub const MOTION: MotionTokens = MotionTokens {
     base: Duration::from_millis(250),
     moderate: Duration::from_millis(350),
     slow: Duration::from_millis(500),
+    tooltip_delay: Duration::from_millis(800),
     reduced: ReducedMap {
         instant: Token::Instant,
         fast: Token::Instant,

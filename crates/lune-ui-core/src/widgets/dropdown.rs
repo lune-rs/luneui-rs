@@ -3,6 +3,7 @@
 
 use std::hash::Hash;
 
+use super::popover::{PlaceAlign, PlaceRequest, Side, place};
 use super::{label, popup_panel};
 use crate::access::{Action, Node, Role, State};
 use crate::icon;
@@ -13,16 +14,20 @@ use crate::ui::{OverlayOptions, Sense, Ui, WidgetId};
 
 const ITEM_H: f32 = 32.0;
 
-/// The list's panel for `n` options under (or, near the window's bottom edge, over) `anchor`.
+/// The list's panel for `n` options under (or, near the window's bottom edge, over) `anchor`:
+/// the anchor's width, gap 4, margin 8, never shifted sideways.
 pub fn panel_rect<H: Copy + PartialEq>(p: &Painter<'_, H>, anchor: Rect, n: usize) -> Rect {
-    let h = n as f32 * ITEM_H + 8.0;
-    let below = anchor.bottom() + 4.0;
-    let y = if below + h > p.window.h - 8.0 {
-        (anchor.y - 4.0 - h).max(8.0)
-    } else {
-        below
-    };
-    Rect::new(anchor.x, y, anchor.w, h)
+    place(&PlaceRequest {
+        anchor,
+        size: (anchor.w, n as f32 * ITEM_H + 8.0),
+        side: Side::Bottom,
+        align: PlaceAlign::Start,
+        gap: 4.0,
+        margin: 8.0,
+        shift: false,
+        window: p.window,
+    })
+    .rect
 }
 
 /// Option `i`'s row inside `panel`.
