@@ -19,11 +19,15 @@ mod dialog;
 mod dropdown;
 pub(crate) mod effects;
 mod focus;
+mod image;
 mod label;
 mod locale;
 mod menu;
 mod motion;
+mod primitives;
 pub(crate) mod reference;
+mod shortcuts;
+mod stack;
 mod stepper;
 mod text_field;
 mod toggle;
@@ -48,6 +52,10 @@ pub(crate) static PAGES: &[&Page] = &[
     &focus::PAGE,
     &a11y::PAGE,
     &locale::PAGE,
+    &stack::PAGE,
+    &image::PAGE,
+    &shortcuts::PAGE,
+    &primitives::PAGE,
 ];
 
 /// The window background of a Ui page (glass, focused) and its card. Returns the card.

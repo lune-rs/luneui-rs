@@ -1,14 +1,14 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-04 (M5 steps 1 to 5 done, paused by the user; step 6 is next; M4 merged at d9fe71f)
+Last updated: 2026-11-04 (M5 steps 1 to 6 done; step 7 is next; M4 merged at d9fe71f)
 
 ## Now
 
 M4 (interaction and motion) is merged to main at d9fe71f, on top of M3 (catalogue specs) and M2
 (seams and crate split). M5 (foundations: layout, scroll, list, popover, text editing, drag and drop,
-shortcuts, painter primitives) is in progress on branch `orch/toolkit-v1`; steps 1 to 5 (the frame
-plumbing, layout helpers, shortcut registry, vector primitives, image and rotate) are done; step 6 is next.
+shortcuts, painter primitives) is in progress on branch `orch/toolkit-v1`; steps 1 to 6 (the frame
+plumbing, layout helpers, shortcut registry, vector primitives, image and rotate, their gallery pages) are done; step 7 is next.
 `lune-ui-core` holds the per-window `Ui` frame (stable ids, retained state with keep-alive scopes,
 layered hits with modal and pointer capture, `Response`, overlays with exit retention, focus scopes,
 the semantic tree with actions, the string table, `FrameOutput` with `Repaint`) and the closed-form
@@ -25,7 +25,7 @@ The pixel gate shows the 15 legacy scenes identical against the M1 base.
 
 ## Next
 
-1. M5 steps 4 to 16 per `m05-foundations/plan.md`: painter primitives, images, scroll area, virtualized list, popover and tooltip, text queries, `TextEdit`,
+1. M5 steps 7 to 16 per `m05-foundations/plan.md`: scroll area, virtualized list, popover and tooltip, text queries, `TextEdit`,
    the text field upgrade, drag and drop, gallery pages, docs and the acceptance bench.
 2. CI (fmt, clippy `-D warnings`, tests on macOS, Windows and Linux) now that there is code to run.
 3. An export script for Luneterm's vendored snapshot, before Luneterm M9. The migration
