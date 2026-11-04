@@ -1,16 +1,16 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-04 (M5 steps 1 to 10 done; step 11 is next; M4 merged at d9fe71f)
+Last updated: 2026-11-04 (M5 steps 1 to 11 done; step 12 is next; M4 merged at d9fe71f)
 
 ## Now
 
 M4 (interaction and motion) is merged to main at d9fe71f, on top of M3 (catalogue specs) and M2
 (seams and crate split). M5 (foundations: layout, scroll, list, popover, text editing, drag and drop,
-shortcuts, painter primitives) is in progress on branch `orch/toolkit-v1`; steps 1 to 10 (the frame
+shortcuts, painter primitives) is in progress on branch `orch/toolkit-v1`; steps 1 to 11 (the frame
 plumbing, layout helpers, shortcut registry, vector primitives, image and rotate, their gallery pages, the
-scroll area and scrollbar, the virtualized list, popover and tooltip, and the gallery pages of those four) are done; step 11
-(text queries on `TextSystem`) is next.
+scroll area and scrollbar, the virtualized list, popover and tooltip, and the gallery pages of those four, and the text queries on `TextSystem`: caret, hit, lines,
+segments, D86) are done; step 12 (`TextEdit`) is next.
 `lune-ui-core` holds the per-window `Ui` frame (stable ids, retained state with keep-alive scopes,
 layered hits with modal and pointer capture, `Response`, overlays with exit retention, focus scopes,
 the semantic tree with actions, the string table, `FrameOutput` with `Repaint`) and the closed-form
@@ -35,7 +35,7 @@ The pixel gate shows the 15 legacy scenes identical against the M1 base.
 
 ## Next
 
-1. M5 steps 11 to 16 per `m05-foundations/plan.md`: text queries, `TextEdit`, the text field
+1. M5 steps 12 to 16 per `m05-foundations/plan.md`: `TextEdit`, the text field
    upgrade, drag and drop, gallery pages, docs and the acceptance bench.
 2. CI (fmt, clippy `-D warnings`, tests on macOS, Windows and Linux) now that there is code to run.
 3. An export script for Luneterm's vendored snapshot, before Luneterm M9. The migration

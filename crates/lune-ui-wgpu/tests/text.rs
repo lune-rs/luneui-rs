@@ -28,3 +28,103 @@ fn text_cache_without_fonts_lays_out_nothing() {
     assert_eq!(text.prepare(&spec, 2.0).1, (0.0, 0.0));
     assert_eq!(text.measure(&spec, 2.0), (0.0, 0.0));
 }
+
+fn with_fonts() -> TextCache {
+    let fonts: [&[u8]; 3] = [
+        include_bytes!("../../../apps/gallery/assets/RobotoMonoNerdFontMono-Regular.ttf"),
+        include_bytes!("../../../apps/gallery/assets/RznSans-Regular.ttf"),
+        include_bytes!("../../../apps/gallery/assets/RznSans-Medium.ttf"),
+    ];
+    TextCache::new(&fonts, "RznSans", "RobotoMono Nerd Font Mono")
+}
+
+/// The contract's hand-worked segmentation table, against `unicode-segmentation` itself.
+#[test]
+fn the_segment_table_matches_unicode_segmentation() {
+    use lune_ui_core::testing::SEGMENT_TABLE;
+    use unicode_segmentation::UnicodeSegmentation;
+    for case in SEGMENT_TABLE {
+        let mut g: Vec<usize> = case.text.grapheme_indices(true).map(|(i, _)| i).collect();
+        g.push(case.text.len());
+        g.dedup();
+        let mut w: Vec<usize> = case
+            .text
+            .split_word_bound_indices()
+            .map(|(i, _)| i)
+            .collect();
+        w.push(case.text.len());
+        w.dedup();
+        assert_eq!(g, case.graphemes, "graphemes of {:?}", case.text);
+        assert_eq!(w, case.words, "words of {:?}", case.text);
+    }
+}
+
+#[test]
+fn the_caret_at_the_end_is_the_width_and_lines_follow_the_endings() {
+    use lune_ui_core::text::{Spec, Style, TextSystem};
+    let mut text = with_fonts();
+    let style = Style::ui(14.0, [255; 4]);
+    for scale in [1.0, 1.5, 2.0] {
+        for s in ["Hello world", "Wide WWWW iiii", "fi ffi \u{e9}"] {
+            let spec = Spec::plain(s, style);
+            let width = text.measure(&spec, scale).0;
+            assert!(width > 0.0);
+            assert_eq!(
+                text.caret(&spec, scale, s.len()).x,
+                width,
+                "{s:?} at {scale}"
+            );
+        }
+    }
+    // Three lines across \n and \r\n, split over two runs.
+    let spec = Spec {
+        runs: vec![
+            ("ab\ncd".to_owned(), style),
+            ("\r\nef".to_owned(), style.bold()),
+        ],
+        wrap: None,
+    };
+    let lines = text.lines(&spec, 2.0);
+    let ranges: Vec<_> = lines.iter().map(|l| (l.start, l.end)).collect();
+    assert_eq!(ranges, [(0, 2), (3, 5), (7, 9)]);
+    assert!(lines.windows(2).all(|w| w[0].y < w[1].y));
+    let c = text.caret(&spec, 2.0, 8);
+    assert_eq!(c.line, 2);
+    assert_eq!(c.y, lines[2].y);
+    assert!(c.x > 0.0);
+    // The click lands in the middle line, and the end of the text is the joined length.
+    let mid = lines[1].y + lines[1].height / 2.0;
+    assert_eq!(text.hit(&spec, 2.0, (0.0, mid)), 3);
+    assert_eq!(text.hit(&spec, 2.0, (1000.0, mid)), 5);
+    assert_eq!(text.hit(&spec, 2.0, (1000.0, 1000.0)), 9);
+}
+
+#[test]
+fn a_wrapped_line_breaks_into_rows_and_the_break_offset_starts_the_next() {
+    use lune_ui_core::text::{Spec, Style, TextSystem};
+    let mut text = with_fonts();
+    let spec = Spec::plain("aaaa bbbb cccc dddd", Style::ui(14.0, [255; 4])).wrapped(60.0);
+    let lines = text.lines(&spec, 1.0);
+    assert!(lines.len() >= 3, "{lines:?}");
+    assert_eq!(lines[0].start, 0);
+    let second = lines[1].start;
+    assert!(second > 0);
+    let at_break = text.caret(&spec, 1.0, second);
+    assert_eq!((at_break.line, at_break.x), (1, 0.0));
+    let before = text.caret(&spec, 1.0, second - 1);
+    assert_eq!(before.line, 0);
+    assert_eq!(lines.last().expect("lines").end, spec.runs[0].0.len());
+}
+
+#[test]
+fn right_to_left_and_mixed_text_answer_without_panicking() {
+    use lune_ui_core::text::{Spec, Style, TextSystem};
+    let mut text = with_fonts();
+    let spec = Spec::plain("abc \u{5d0}\u{5d1}\u{5d2} def", Style::ui(14.0, [255; 4]));
+    let len = spec.runs[0].0.len();
+    for b in 0..=len + 2 {
+        let c = text.caret(&spec, 1.0, b);
+        assert!(c.x.is_finite() && c.y.is_finite() && c.height > 0.0);
+    }
+    assert!(text.hit(&spec, 1.0, (30.0, 5.0)) <= len);
+}

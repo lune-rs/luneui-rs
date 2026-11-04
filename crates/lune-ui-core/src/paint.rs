@@ -7,7 +7,7 @@ use crate::scene::{
     Acrylic, BackdropRequest, CustomItem, ImageItem, ImageSource, LayerGeometry, RoundClip, Scene,
     Shape, StrokeVertex, TextItem,
 };
-use crate::text::{Spec, TextSystem};
+use crate::text::{CaretPos, LineSpan, Spec, TextSystem, Unit};
 use crate::theme::Theme;
 
 mod path;
@@ -805,6 +805,27 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
 
     pub fn measure(&mut self, spec: &Spec) -> (f32, f32) {
         self.text.measure(spec, self.s)
+    }
+
+    /// Where the caret sits at byte `offset` of `spec`'s joined text ([`TextSystem::caret`]).
+    pub fn caret(&mut self, spec: &Spec, offset: usize) -> CaretPos {
+        self.text.caret(spec, self.s, offset)
+    }
+
+    /// The byte offset nearest to `pos`, logical px from the text's top-left corner
+    /// ([`TextSystem::hit`]).
+    pub fn text_hit(&mut self, spec: &Spec, pos: (f32, f32)) -> usize {
+        self.text.hit(spec, self.s, pos)
+    }
+
+    /// The visual lines of `spec` ([`TextSystem::lines`]).
+    pub fn text_lines(&mut self, spec: &Spec) -> Vec<LineSpan> {
+        self.text.lines(spec, self.s)
+    }
+
+    /// The boundaries of `unit` in `text` ([`TextSystem::segments`]).
+    pub fn segments(&self, text: &str, unit: Unit) -> Vec<usize> {
+        self.text.segments(text, unit)
     }
 
     pub fn hit(&mut self, r: Rect, h: H) {

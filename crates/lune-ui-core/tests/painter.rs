@@ -289,3 +289,26 @@ fn push_translate_replays_to_the_same_scene() {
     assert_eq!(direct.scene, replayed.scene);
     assert_eq!(direct.scene, rec.scene);
 }
+
+#[test]
+fn text_queries_forward_to_the_text_system() {
+    use lune_ui_core::text::{CaretPos, Unit};
+    let mut t = FakeText;
+    let mut p = painter(&mut t);
+    let spec = Spec::plain("ab\ncd", Style::ui(10.0, THEME.fg_primary));
+    // The fake is in logical px, whatever the painter's scale (2).
+    assert_eq!(
+        p.caret(&spec, 4),
+        CaretPos {
+            x: 5.0,
+            y: 13.0,
+            height: 13.0,
+            line: 1
+        }
+    );
+    assert_eq!(p.text_hit(&spec, (8.0, 14.0)), 5);
+    let lines = p.text_lines(&spec);
+    assert_eq!(lines.len(), 2);
+    assert_eq!((lines[1].start, lines[1].end), (3, 5));
+    assert_eq!(p.segments("a\u{301}b", Unit::Grapheme), [0, 3, 4]);
+}

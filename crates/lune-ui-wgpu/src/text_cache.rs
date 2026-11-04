@@ -3,10 +3,14 @@
 use std::collections::HashMap;
 
 use glyphon::{
-    Attrs, Buffer, Color, Family, FontSystem, Metrics, Shaping, SwashCache, Weight, Wrap,
+    Attrs, Buffer, Color, Cursor, Family, FontSystem, Metrics, Shaping, SwashCache, Weight, Wrap,
 };
+use unicode_segmentation::UnicodeSegmentation;
 
-use lune_ui_core::text::{Font, Spec, Style, TextKey, TextSystem};
+use lune_ui_core::text::{
+    CaretPos, Font, LineSpan, Spec, Style, TextKey, TextSystem, Unit, clamp_to_boundary,
+    joined_text,
+};
 
 /// A shaped text drawn into pixels by [`TextCache::rasterize`]: straight-alpha RGBA, row by row
 /// from the top left, with a margin of [`RASTER_MARGIN`] px around the text's own box.
@@ -147,6 +151,51 @@ impl TextCache {
     }
 }
 
+/// Where each buffer line starts in the spec's joined text, and whether the text ends in a line
+/// terminator that opens one more, empty line (cosmic-text has no buffer line for it).
+///
+/// The buffer keeps each paragraph's text without its terminator and does not record which
+/// terminator it was (`set_rich_text` gives every line `LineEnding::Lf`), so the offsets are found
+/// by walking the joined text: a line's text, then one terminator (`\r\n` counts once).
+fn line_bases(buffer: &Buffer, joined: &str) -> (Vec<usize>, bool) {
+    let mut at = 0;
+    let mut bases = Vec::with_capacity(buffer.lines.len());
+    let mut open = false;
+    for line in &buffer.lines {
+        bases.push(at);
+        at = (at + line.text().len()).min(joined.len());
+        let rest = joined.get(at..).unwrap_or("");
+        let term = if rest.starts_with("\r\n") {
+            2
+        } else {
+            rest.chars().next().map_or(0, char::len_utf8)
+        };
+        at += term;
+        open = term > 0 && at == joined.len();
+    }
+    (bases, open)
+}
+
+/// The byte range of a layout run's glyphs in its buffer line (empty for an empty line).
+fn glyph_range(glyphs: &[glyphon::LayoutGlyph]) -> (usize, usize) {
+    let start = glyphs.iter().map(|g| g.start).min().unwrap_or(0);
+    let end = glyphs.iter().map(|g| g.end).max().unwrap_or(0);
+    (start, end)
+}
+
+impl TextCache {
+    /// The height an unshaped query answers with: the first run's line height.
+    fn fallback_height(spec: &Spec) -> f32 {
+        spec.runs.first().map_or(17.0, |(_, st)| st.line)
+    }
+
+    /// The shaped buffer of `spec` at `scale`, after `prepare`.
+    fn buffer_of(&mut self, spec: &Spec, scale: f32) -> Option<&Buffer> {
+        let (key, _) = self.prepare(spec, scale);
+        self.entries.get(&key).map(|e| &e.buffer)
+    }
+}
+
 impl TextSystem for TextCache {
     /// Shapes `spec` at `scale` if needed; returns its cache key and logical size.
     fn prepare(&mut self, spec: &Spec, scale: f32) -> (TextKey, (f32, f32)) {
@@ -221,5 +270,135 @@ impl TextSystem for TextCache {
             },
         );
         (key, size)
+    }
+
+    fn caret(&mut self, spec: &Spec, scale: f32, offset: usize) -> CaretPos {
+        let joined = joined_text(spec);
+        let off = clamp_to_boundary(&joined, offset);
+        let fallback = CaretPos {
+            x: 0.0,
+            y: 0.0,
+            height: Self::fallback_height(spec),
+            line: 0,
+        };
+        let Some(buffer) = self.buffer_of(spec, scale) else {
+            return fallback;
+        };
+        let (bases, open) = line_bases(buffer, &joined);
+        let runs: Vec<_> = buffer.layout_runs().collect();
+        if open
+            && off == joined.len()
+            && let Some(last) = runs.last()
+        {
+            // After a final line terminator: the start of the empty line below the last row.
+            return CaretPos {
+                x: 0.0,
+                y: (last.line_top + last.line_height) / scale,
+                height: last.line_height / scale,
+                line: runs.len(),
+            };
+        }
+        // The visual line that shows `off`: the last run whose first glyph is at or before it, so
+        // the offset where a wrapped line breaks belongs to the later row.
+        let mut chosen = None;
+        for (row, run) in runs.iter().enumerate() {
+            let base = bases.get(run.line_i).copied().unwrap_or(0);
+            if base + glyph_range(run.glyphs).0 <= off {
+                chosen = Some((row, run, base));
+            }
+        }
+        let Some((row, run, base)) = chosen else {
+            return fallback;
+        };
+        let local = (off - base).min(run.text.len());
+        let mut x = run
+            .cursor_position(&Cursor::new(run.line_i, local))
+            .unwrap_or(0.0);
+        // Positions are sums of glyph advances; where the caret is at the end of the line, take
+        // the line's own width, so the two agree to the last bit.
+        if (x - run.line_w).abs() < 0.01 {
+            x = run.line_w;
+        }
+        CaretPos {
+            x: x / scale,
+            y: run.line_top / scale,
+            height: run.line_height / scale,
+            line: row,
+        }
+    }
+
+    fn hit(&mut self, spec: &Spec, scale: f32, pos: (f32, f32)) -> usize {
+        if !(pos.0.is_finite() && pos.1.is_finite()) {
+            return 0;
+        }
+        let text = joined_text(spec);
+        let Some(buffer) = self.buffer_of(spec, scale) else {
+            return 0;
+        };
+        let (bases, open) = line_bases(buffer, &text);
+        let (x, y) = (pos.0 * scale, pos.1 * scale);
+        let below = buffer
+            .layout_runs()
+            .last()
+            .map_or(f32::INFINITY, |r| r.line_top + r.line_height);
+        if open && y >= below {
+            return text.len();
+        }
+        let Some(cursor) = buffer.hit(x, y) else {
+            return 0;
+        };
+        let base = bases.get(cursor.line).copied().unwrap_or(0);
+        clamp_to_boundary(&text, base + cursor.index)
+    }
+
+    fn lines(&mut self, spec: &Spec, scale: f32) -> Vec<LineSpan> {
+        let joined = joined_text(spec);
+        let len = joined.len();
+        let height = Self::fallback_height(spec);
+        let one = LineSpan {
+            start: 0,
+            end: len,
+            y: 0.0,
+            height,
+        };
+        let Some(buffer) = self.buffer_of(spec, scale) else {
+            return vec![one];
+        };
+        let (bases, open) = line_bases(buffer, &joined);
+        let mut lines: Vec<LineSpan> = buffer
+            .layout_runs()
+            .map(|run| {
+                let base = bases.get(run.line_i).copied().unwrap_or(0);
+                let (start, end) = glyph_range(run.glyphs);
+                LineSpan {
+                    start: (base + start).min(len),
+                    end: (base + end).min(len),
+                    y: run.line_top / scale,
+                    height: run.line_height / scale,
+                }
+            })
+            .collect();
+        if lines.is_empty() {
+            return vec![one];
+        }
+        if open && let Some(last) = lines.last().copied() {
+            lines.push(LineSpan {
+                start: len,
+                end: len,
+                y: last.y + last.height,
+                height: last.height,
+            });
+        }
+        lines
+    }
+
+    fn segments(&self, text: &str, unit: Unit) -> Vec<usize> {
+        let mut out: Vec<usize> = match unit {
+            Unit::Grapheme => text.grapheme_indices(true).map(|(i, _)| i).collect(),
+            Unit::Word => text.split_word_bound_indices().map(|(i, _)| i).collect(),
+        };
+        out.push(text.len());
+        out.dedup();
+        out
     }
 }
