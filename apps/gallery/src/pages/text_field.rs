@@ -5,7 +5,7 @@
 use lune_ui::motion::MotionTier;
 use lune_ui::paint::{Rect, Xform};
 use lune_ui::ui::Ui;
-use lune_ui::widgets::field::{FieldLook, FieldState, paint};
+use lune_ui::widgets::field::{FieldLook, FieldOptions, FieldState, Variant, paint};
 
 use super::{caption, card, heading};
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
@@ -89,6 +89,71 @@ impl PageState for Specimens {
     }
 }
 
+fn variants() -> Box<dyn PageState> {
+    Box::new(Variants {
+        texts: ["lune", "lune", "lune", "sample", "lune", "2026-11-04"].map(str::to_owned),
+    })
+}
+
+/// The six variants side by side through the real widget, each with its own text.
+struct Variants {
+    texts: [String; 6],
+}
+
+impl PageState for Variants {
+    fn draw(&mut self, ui: &mut Ui<'_>) {
+        let card = card(ui, "Text field variants");
+        let (x, y) = (card.x + 24.0, card.y + 24.0);
+        heading(ui, "TEXT FIELD VARIANTS", x, y);
+        let plain = FieldOptions::default();
+        let cases = [
+            ("Fill", plain),
+            (
+                "Small",
+                FieldOptions {
+                    small: true,
+                    ..plain
+                },
+            ),
+            (
+                "Mono",
+                FieldOptions {
+                    variant: Variant::Mono,
+                    ..plain
+                },
+            ),
+            (
+                "Password",
+                FieldOptions {
+                    variant: Variant::Password,
+                    ..plain
+                },
+            ),
+            (
+                "Search",
+                FieldOptions {
+                    variant: Variant::Search,
+                    placeholder: "Search",
+                    ..plain
+                },
+            ),
+            (
+                "Date",
+                FieldOptions {
+                    variant: Variant::Date,
+                    ..plain
+                },
+            ),
+        ];
+        for (i, ((name, opts), text)) in cases.into_iter().zip(&mut self.texts).enumerate() {
+            let (col, row) = ((i % 3) as f32, (i / 3) as f32);
+            let (fx, fy) = (x + col * 300.0, y + 28.0 + row * 80.0);
+            caption(ui, name, fx, fy);
+            ui.text_field_with(name, Rect::new(fx, fy + 20.0, 260.0, 32.0), text, &opts);
+        }
+    }
+}
+
 /// The live field, by its path.
 const FIELD: &[&str] = &["field"];
 
@@ -107,6 +172,16 @@ const SCENES: &[UiScene] = &[
         scale: 2,
         tier: MotionTier::Full,
         state: live,
+        script: &[],
+        capture_ms: 0,
+        expect: Expect::Settled,
+    },
+    // Settled: nothing is focused or hovered, so the page reports `Idle`.
+    UiScene {
+        id: "text-field-variants",
+        scale: 2,
+        tier: MotionTier::Full,
+        state: variants,
         script: &[],
         capture_ms: 0,
         expect: Expect::Settled,
