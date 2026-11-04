@@ -518,3 +518,49 @@ fn enter_at_the_bottom_of_a_full_text_area_keeps_the_whole_caret_in_view() {
     assert!(text.ends_with('\n'));
     assert_eq!(frame(&mut w, &mut text).expect("focused").h, line);
 }
+
+/// The text after a click at the left of row `row` of an area holding `text`, then typing X.
+fn click_row_and_type(text: &str, row: usize) -> String {
+    let rect = Rect::new(10.0, 10.0, 180.0, 100.0);
+    let mut text = text.to_owned();
+    let mut w = Window::sized((200.0, 140.0));
+    let frame = |w: &mut Window, text: &mut String| {
+        w.run(|ui| {
+            ui.text_area("a", rect, text, &AreaOptions::default());
+        });
+    };
+    frame(&mut w, &mut text);
+    // The frame of 1 and the padding of 9 and 6.
+    let y = 17.0 + (row as f32 + 0.5) * style().line;
+    w.input.pointer_to(20.5, y);
+    frame(&mut w, &mut text);
+    w.input.press(PointerButton::Primary);
+    frame(&mut w, &mut text);
+    w.input.release(PointerButton::Primary);
+    frame(&mut w, &mut text);
+    w.input.key_down(Key::Character("x".into()), Some("X"));
+    frame(&mut w, &mut text);
+    text
+}
+
+#[test]
+fn a_click_on_a_row_after_a_crlf_lands_on_that_row_in_any_text() {
+    assert_eq!(click_row_and_type("ab\r\ncd\r\nef", 2), "ab\r\ncd\r\nXef");
+    assert_eq!(
+        click_row_and_type("\u{e9}b\r\ncd\r\nef", 2),
+        "\u{e9}b\r\ncd\r\nXef"
+    );
+}
+
+#[test]
+fn the_caret_stays_on_its_row_through_spaces_at_a_wrap() {
+    let mut system = text_cache();
+    let spec = Spec::plain("hello world again      x", style()).wrapped(120.0);
+    let rows = system.lines(&spec, SCALE);
+    assert_eq!(rows.len(), 2);
+    let end = system.caret(&spec, SCALE, rows[0].end);
+    for at in rows[0].end..rows[1].start {
+        let c = system.caret(&spec, SCALE, at);
+        assert_eq!((c.line, c.x), (0, end.x), "offset {at}");
+    }
+}

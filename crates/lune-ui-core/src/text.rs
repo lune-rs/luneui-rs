@@ -144,7 +144,9 @@ pub enum Unit {
 /// The queries after `measure` read the layout `prepare` makes. Offsets are bytes of the spec's
 /// runs joined into one string; one that is past the end, or inside a character, clamps down to
 /// the end or to the character's start. Nothing panics, and a system with nothing to lay out
-/// (empty text, no fonts) answers with finite values.
+/// (empty text, no fonts) answers with finite values. A line break is `\n`, `\r\n` (even across
+/// two runs) or a lone `\r`, whatever else the text holds, and the offsets count it as the bytes
+/// it is in the spec.
 pub trait TextSystem {
     /// Shapes `spec` at `scale` if needed; returns its key and logical size (width, height).
     fn prepare(&mut self, spec: &Spec, scale: f32) -> (TextKey, (f32, f32));

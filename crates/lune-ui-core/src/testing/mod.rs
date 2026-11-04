@@ -24,5 +24,5 @@ pub use backdrop::{NullMaterial, backdrop_contract};
 pub use images::{FakeImages, image_store_contract};
 pub use input::ScriptedInput;
 pub use recording::{DrawCall, RecordedFrame, RecordingRenderer};
-pub use text::{FakeText, SEGMENT_TABLE, SegmentCase, text_system_contract};
+pub use text::{FakeText, SEGMENT_TABLE, SegmentCase, spec_line_contract, text_system_contract};
 pub use ui::UiHarness;

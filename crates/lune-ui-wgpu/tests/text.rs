@@ -164,3 +164,55 @@ fn a_point_below_the_text_keeps_its_column_and_the_open_line_is_the_end() {
     assert_eq!(text.hit(&open, 2.0, (x, bottom - 1.0)), 6);
     assert_eq!(text.hit(&open, 2.0, (x, bottom + 30.0)), 6);
 }
+
+/// A seeded walk over the texts that trip shaping: wide and narrow chars, spaces, each break.
+fn generated(seed: u64, style: lune_ui_core::text::Style) -> lune_ui_core::text::Spec {
+    use lune_ui_core::text::Spec;
+    const PIECES: &[&str] = &[
+        "a",
+        "w",
+        "\u{e9}",
+        " ",
+        "  ",
+        "     ",
+        "\n",
+        "\r\n",
+        "\r",
+        "word",
+        "wwwwwwwwwwwwwwwwwwww",
+    ];
+    let mut state = seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1;
+    let mut next = |n: u64| {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        (state % n) as usize
+    };
+    let text: String = (0..next(14))
+        .map(|_| PIECES[next(PIECES.len() as u64)])
+        .collect();
+    let spec = Spec::plain(text, style);
+    match next(3) {
+        0 => spec,
+        1 => spec.wrapped(120.0),
+        _ => spec.wrapped(200.0),
+    }
+}
+
+#[test]
+fn generated_text_meets_the_line_properties() {
+    use lune_ui_core::testing::spec_line_contract;
+    use lune_ui_core::text::Style;
+    let mut text = with_fonts();
+    let style = Style::ui(13.0, [255; 4]);
+    let mut failures = Vec::new();
+    for seed in 1..=6000 {
+        let spec = generated(seed, style);
+        if let Err(e) = spec_line_contract(&mut text, &spec) {
+            failures.push(e);
+        }
+    }
+    let n = failures.len();
+    failures.truncate(12);
+    assert_eq!(n, 0, "{failures:#?}");
+}

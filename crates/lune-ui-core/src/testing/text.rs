@@ -9,7 +9,7 @@ use crate::text::{
 /// - key: `TextKey(spec.cache_key(scale))`, so it matches any real system's identity rule;
 /// - width: the sum over runs of char count × size × 0.5 (logical px), so every char is half its
 ///   run's size wide;
-/// - lines break at `\n` and `\r\n` (the ending is not part of a line); with `wrap: Some(w)`,
+/// - lines break at `\n`, `\r\n` and a lone `\r` (the ending is not part of a line); with `wrap: Some(w)`,
 ///   `w > 0` and a widest line above `w`, each line above `w` shows as `ceil(line width / w)` rows
 ///   (at most one per char, the chars spread evenly over them) and the width is `w`; otherwise the
 ///   width is the widest line's;
@@ -92,6 +92,7 @@ impl FakeText {
             let ending = match g.ch {
                 '\n' => 1,
                 '\r' if chars.get(i + 1).is_some_and(|n| n.ch == '\n') => 2,
+                '\r' => 1,
                 _ => 0,
             };
             if ending == 0 {
@@ -300,7 +301,13 @@ fn finite_size(property: &str, size: (f32, f32)) -> Result<(), String> {
 /// - P15: the queries and `prepare` agree on the lines, for hard and soft breaks and a final
 ///   terminator: `measure`'s height is the last row's bottom, the rows stack with no gap, the caret
 ///   of each row's start is on that row, the caret at the end is on the last row, and `hit` at each
-///   row's left edge is its start.
+///   row's left edge is its start;
+/// - P16: a line break is one break, whatever the rest of the text holds: the rows of a table of
+///   ASCII and non-ASCII texts are the table's byte ranges, and around each break the caret at and
+///   inside it is at the row's end and the caret after it at the next row's start;
+/// - P17: along a row the caret never moves left as the offset grows, also through a run of spaces
+///   at a wrap;
+/// - P18: on any row, `hit` of the caret of a grapheme boundary is that boundary.
 pub fn text_system_contract(ts: &mut dyn TextSystem) -> Result<(), String> {
     let white = [255; 4];
     let samples = [
@@ -569,7 +576,6 @@ fn query_contract(ts: &mut dyn TextSystem) -> Result<(), String> {
             "P12 caret after a trailing terminator",
             || format!("{c:?}"),
         )?;
-        hit_contract(ts, style)?;
         line_contract(ts, style)?;
     } else {
         check(
@@ -584,7 +590,8 @@ fn query_contract(ts: &mut dyn TextSystem) -> Result<(), String> {
     Ok(())
 }
 
-/// The texts of P14 and P15: hard breaks of each kind, with and without a final terminator.
+/// The texts of P14 to P18: hard breaks of each kind, with and without a final terminator, each
+/// in ASCII and with a non-ASCII char.
 const LINE_TEXTS: &[&str] = &[
     "a",
     "a\nb",
@@ -596,93 +603,235 @@ const LINE_TEXTS: &[&str] = &[
     "a\r\n",
     "a\r\nb\r\n",
     "Hello world\nsecond",
+    "\u{e9}\r\nb",
+    "\u{e9}\r\nb\r\n",
+    "\u{e9}b\r\ncd\r\nef",
+    "\r\n\u{e9}\r\n\r\n",
+    "a\rb",
+    "\u{e9}\rb",
+    "a\r",
+    "a\r\r\nb",
+    "\u{e9}\n\rb",
 ];
 
-/// The specs of P14 and P15.
+/// The rows of a text as byte ranges, for P16.
+const BREAK_ROWS: &[(&str, &[(usize, usize)])] = &[
+    ("ab\r\ncd", &[(0, 2), (4, 6)]),
+    ("\u{e9}b\r\ncd", &[(0, 3), (5, 7)]),
+    ("\u{e9}b\r\ncd\r\nef", &[(0, 3), (5, 7), (9, 11)]),
+    ("\u{e9}\r\nb\r\n", &[(0, 2), (4, 5), (7, 7)]),
+    ("a\rb", &[(0, 1), (2, 3)]),
+    ("\u{e9}\rb", &[(0, 2), (3, 4)]),
+    ("a\r\r\nb", &[(0, 1), (2, 2), (4, 5)]),
+    ("\u{e9}\r\r\nb", &[(0, 2), (3, 3), (5, 6)]),
+];
+
+/// The specs of P14 to P18.
 fn line_specs(style: Style) -> Vec<Spec> {
     let mut specs: Vec<Spec> = LINE_TEXTS.iter().map(|t| Spec::plain(*t, style)).collect();
     specs.push(Spec::plain("aa bb cc dd ee ff gg", style).wrapped(40.0));
     specs.push(Spec::plain("aa bb cc dd ee ff gg\n", style).wrapped(40.0));
+    specs.push(Spec::plain("hello world again      x", style).wrapped(120.0));
+    specs.push(Spec::plain("hello w\u{f6}rld again        x y", style).wrapped(120.0));
+    specs.push(split_break(style));
     specs
 }
 
-fn hit_contract(ts: &mut dyn TextSystem, style: Style) -> Result<(), String> {
+/// A CRLF split across two runs.
+fn split_break(style: Style) -> Spec {
+    Spec {
+        runs: vec![("\u{e9}\r".to_owned(), style), ("\nb".to_owned(), style)],
+        wrap: None,
+    }
+}
+
+fn row_ranges(ts: &mut dyn TextSystem, spec: &Spec, scale: f32) -> Vec<(usize, usize)> {
+    ts.lines(spec, scale)
+        .iter()
+        .map(|l| (l.start, l.end))
+        .collect()
+}
+
+/// P16's table and P14 to P18 on the contract's specs.
+fn line_contract(ts: &mut dyn TextSystem, style: Style) -> Result<(), String> {
+    for (text, want) in BREAK_ROWS {
+        let got = row_ranges(ts, &Spec::plain(*text, style), 1.0);
+        check(got == *want, "P16 rows of a text", || {
+            format!("{text:?}: {got:?}, expected {want:?}")
+        })?;
+    }
+    let got = row_ranges(ts, &split_break(style), 1.0);
+    check(
+        got == [(0, 2), (4, 5)],
+        "P16 a CRLF across two runs",
+        || format!("{got:?}"),
+    )?;
     for spec in line_specs(style) {
-        let text = joined_text(&spec);
-        for scale in [1.0, 2.0] {
-            let lines = ts.lines(&spec, scale);
-            let width = ts.prepare(&spec, scale).1.0;
-            let (first, last) = (lines[0], lines[lines.len() - 1]);
-            for x in [0.0, width / 3.0, width / 2.0, width + 40.0] {
-                let inside = ts.hit(&spec, scale, (x, first.y + first.height / 2.0));
-                let above = ts.hit(&spec, scale, (x, first.y - 40.0));
-                check(above == inside, "P14 hit above the first line", || {
-                    format!("{text:?} at {scale}, x {x}: {above}, on the line {inside}")
-                })?;
-                let inside = ts.hit(&spec, scale, (x, last.y + last.height / 2.0));
-                for y in [last.y + last.height, last.y + last.height + 40.0] {
-                    let below = ts.hit(&spec, scale, (x, y));
-                    check(below == inside, "P14 hit below the last line", || {
-                        format!("{text:?} at {scale}, ({x}, {y}): {below}, on the line {inside}")
-                    })?;
-                }
-            }
-            if spec.wrap.is_none() {
-                for l in &lines {
-                    let mid = l.y + l.height / 2.0;
-                    let (left, right) = (
-                        ts.hit(&spec, scale, (-40.0, mid)),
-                        ts.hit(&spec, scale, (width + 40.0, mid)),
-                    );
-                    check(left == l.start, "P14 hit left of a line", || {
-                        format!("{text:?} at {scale}, {l:?}: {left}")
-                    })?;
-                    check(right == l.end, "P14 hit right of a line", || {
-                        format!("{text:?} at {scale}, {l:?}: {right}")
-                    })?;
-                }
-            }
+        spec_line_contract(ts, &spec)?;
+    }
+    Ok(())
+}
+
+/// P14, P15, the caret around each break of P16, P17 and P18 for one `spec`, at scales 1 and 2. For a
+/// system that lays text out; [`text_system_contract`] runs it on its own specs, and an adapter's
+/// tests may run it on generated ones.
+pub fn spec_line_contract(ts: &mut dyn TextSystem, spec: &Spec) -> Result<(), String> {
+    for scale in [1.0, 2.0] {
+        hit_outside_the_lines(ts, spec, scale)?;
+        rows_agree(ts, spec, scale)?;
+        caret_around_breaks(ts, spec, scale)?;
+        caret_along_rows(ts, spec, scale)?;
+        hit_of_the_caret(ts, spec, scale)?;
+    }
+    Ok(())
+}
+
+fn hit_of_the_caret(ts: &mut dyn TextSystem, spec: &Spec, scale: f32) -> Result<(), String> {
+    let text = joined_text(spec);
+    let lines = ts.lines(spec, scale);
+    for at in ts.segments(&text, Unit::Grapheme) {
+        let c = ts.caret(spec, scale, at);
+        let row = lines[c.line];
+        // Inside a break, and in whitespace dropped at a wrap, no point answers.
+        if at < row.start || at > row.end {
+            continue;
+        }
+        let got = ts.hit(spec, scale, (c.x, c.y + c.height / 2.0));
+        check(got == at, "P18 hit of a caret on a row", || {
+            format!("{text:?} at {scale}, offset {at}: {c:?} hits {got}")
+        })?;
+    }
+    Ok(())
+}
+
+fn hit_outside_the_lines(ts: &mut dyn TextSystem, spec: &Spec, scale: f32) -> Result<(), String> {
+    let text = joined_text(spec);
+    let lines = ts.lines(spec, scale);
+    let width = ts.prepare(spec, scale).1.0;
+    let (first, last) = (lines[0], lines[lines.len() - 1]);
+    for x in [0.0, width / 3.0, width / 2.0, width + 40.0] {
+        let inside = ts.hit(spec, scale, (x, first.y + first.height / 2.0));
+        let above = ts.hit(spec, scale, (x, first.y - 40.0));
+        check(above == inside, "P14 hit above the first line", || {
+            format!("{text:?} at {scale}, x {x}: {above}, on the line {inside}")
+        })?;
+        let inside = ts.hit(spec, scale, (x, last.y + last.height / 2.0));
+        for y in [last.y + last.height, last.y + last.height + 40.0] {
+            let below = ts.hit(spec, scale, (x, y));
+            check(below == inside, "P14 hit below the last line", || {
+                format!("{text:?} at {scale}, ({x}, {y}): {below}, on the line {inside}")
+            })?;
+        }
+    }
+    if spec.wrap.is_none() {
+        for l in &lines {
+            let mid = l.y + l.height / 2.0;
+            let (left, right) = (
+                ts.hit(spec, scale, (-40.0, mid)),
+                ts.hit(spec, scale, (width + 40.0, mid)),
+            );
+            check(left == l.start, "P14 hit left of a line", || {
+                format!("{text:?} at {scale}, {l:?}: {left}")
+            })?;
+            check(right == l.end, "P14 hit right of a line", || {
+                format!("{text:?} at {scale}, {l:?}: {right}")
+            })?;
         }
     }
     Ok(())
 }
 
-fn line_contract(ts: &mut dyn TextSystem, style: Style) -> Result<(), String> {
-    for spec in line_specs(style) {
-        let text = joined_text(&spec);
-        for scale in [1.0, 2.0] {
-            let lines = ts.lines(&spec, scale);
-            let last = lines[lines.len() - 1];
-            let height = ts.measure(&spec, scale).1;
-            check(
-                (height - (last.y + last.height)).abs() < 1e-3,
-                "P15 measure and lines",
-                || format!("{text:?} at {scale}: height {height}, {lines:?}"),
-            )?;
-            check(
-                lines
-                    .windows(2)
-                    .all(|w| (w[0].y + w[0].height - w[1].y).abs() < 1e-3),
-                "P15 rows stack",
-                || format!("{text:?} at {scale}: {lines:?}"),
-            )?;
-            let end = ts.caret(&spec, scale, text.len());
-            check(
-                end.line == lines.len() - 1 && end.y == last.y,
-                "P15 caret at the end",
-                || format!("{text:?} at {scale}: {end:?}, {lines:?}"),
-            )?;
-            for (i, l) in lines.iter().enumerate() {
-                let c = ts.caret(&spec, scale, l.start);
-                check(c.line == i && c.y == l.y, "P15 caret at a row", || {
-                    format!("{text:?} at {scale}, row {i} {l:?}: {c:?}")
-                })?;
-                let got = ts.hit(&spec, scale, (0.0, l.y + l.height / 2.0));
-                check(got == l.start, "P15 hit at a row's left edge", || {
-                    format!("{text:?} at {scale}, row {i} {l:?}: {got}")
-                })?;
-            }
+fn rows_agree(ts: &mut dyn TextSystem, spec: &Spec, scale: f32) -> Result<(), String> {
+    let text = joined_text(spec);
+    let lines = ts.lines(spec, scale);
+    let last = lines[lines.len() - 1];
+    let height = ts.measure(spec, scale).1;
+    check(
+        (height - (last.y + last.height)).abs() < 1e-3,
+        "P15 measure and lines",
+        || format!("{text:?} at {scale}: height {height}, {lines:?}"),
+    )?;
+    check(
+        lines
+            .windows(2)
+            .all(|w| (w[0].y + w[0].height - w[1].y).abs() < 1e-3),
+        "P15 rows stack",
+        || format!("{text:?} at {scale}: {lines:?}"),
+    )?;
+    let end = ts.caret(spec, scale, text.len());
+    check(
+        end.line == lines.len() - 1 && end.y == last.y,
+        "P15 caret at the end",
+        || format!("{text:?} at {scale}: {end:?}, {lines:?}"),
+    )?;
+    for (i, l) in lines.iter().enumerate() {
+        let c = ts.caret(spec, scale, l.start);
+        check(c.line == i && c.y == l.y, "P15 caret at a row", || {
+            format!("{text:?} at {scale}, row {i} {l:?}: {c:?}")
+        })?;
+        let got = ts.hit(spec, scale, (0.0, l.y + l.height / 2.0));
+        check(got == l.start, "P15 hit at a row's left edge", || {
+            format!("{text:?} at {scale}, row {i} {l:?}: {got}")
+        })?;
+    }
+    Ok(())
+}
+
+/// The terminators of `text` as byte ranges: `\n`, `\r\n` or a lone `\r`.
+fn breaks(text: &str) -> Vec<(usize, usize)> {
+    let bytes = text.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < bytes.len() {
+        let len = match (bytes[i], bytes.get(i + 1)) {
+            (b'\r', Some(b'\n')) => 2,
+            (b'\r' | b'\n', _) => 1,
+            _ => 0,
+        };
+        if len > 0 {
+            out.push((i, i + len));
         }
+        i += len.max(1);
+    }
+    out
+}
+
+fn caret_around_breaks(ts: &mut dyn TextSystem, spec: &Spec, scale: f32) -> Result<(), String> {
+    let text = joined_text(spec);
+    for (at, after) in breaks(&text) {
+        let end = ts.caret(spec, scale, at);
+        for inside in at + 1..after {
+            let c = ts.caret(spec, scale, inside);
+            check(c == end, "P16 caret inside a break", || {
+                format!("{text:?} at {scale}, offset {inside}: {c:?}, the break's {end:?}")
+            })?;
+        }
+        let next = ts.caret(spec, scale, after);
+        check(
+            next.x == 0.0 && next.line == end.line + 1,
+            "P16 caret after a break",
+            || format!("{text:?} at {scale}, offset {after}: {next:?}, before it {end:?}"),
+        )?;
+    }
+    Ok(())
+}
+
+fn caret_along_rows(ts: &mut dyn TextSystem, spec: &Spec, scale: f32) -> Result<(), String> {
+    let text = joined_text(spec);
+    let mut prev: Option<(usize, CaretPos)> = None;
+    for at in ts.segments(&text, Unit::Grapheme) {
+        let c = ts.caret(spec, scale, at);
+        if let Some((from, p)) = prev {
+            check(c.line >= p.line, "P17 caret goes down the rows", || {
+                format!("{text:?} at {scale}: {from} {p:?}, {at} {c:?}")
+            })?;
+            check(
+                c.line != p.line || c.x >= p.x - 1e-3,
+                "P17 caret along a row",
+                || format!("{text:?} at {scale}: {from} {p:?}, {at} {c:?}"),
+            )?;
+        }
+        prev = Some((at, c));
     }
     Ok(())
 }
@@ -807,6 +956,75 @@ mod tests {
         let mut t = Drifting { short_extent: true };
         let err = text_system_contract(&mut t).expect_err("caught");
         assert!(err.starts_with("P15 measure and lines"), "{err}");
+    }
+
+    /// A caret that falls back to the row's left edge in the last bytes of a row.
+    struct Jumping;
+
+    impl TextSystem for Jumping {
+        fn prepare(&mut self, spec: &Spec, scale: f32) -> (TextKey, (f32, f32)) {
+            FakeText.prepare(spec, scale)
+        }
+        fn caret(&mut self, spec: &Spec, scale: f32, offset: usize) -> CaretPos {
+            let mut c = FakeText.caret(spec, scale, offset);
+            let row = FakeText.lines(spec, scale)[c.line];
+            if spec.wrap.is_some() && offset > row.start && offset + 1 == row.end {
+                c.x = 0.0;
+            }
+            c
+        }
+        fn hit(&mut self, spec: &Spec, scale: f32, pos: (f32, f32)) -> usize {
+            FakeText.hit(spec, scale, pos)
+        }
+        fn lines(&mut self, spec: &Spec, scale: f32) -> Vec<LineSpan> {
+            FakeText.lines(spec, scale)
+        }
+        fn segments(&self, text: &str, unit: Unit) -> Vec<usize> {
+            FakeText.segments(text, unit)
+        }
+    }
+
+    #[test]
+    fn the_contract_catches_a_caret_that_jumps_back_along_a_row() {
+        let err = text_system_contract(&mut Jumping).expect_err("caught");
+        assert!(err.starts_with("P17 caret along a row"), "{err}");
+    }
+
+    /// A shaper that makes a CRLF two breaks once the text is not ASCII, as `BidiInfo` does.
+    struct DoubleBreak;
+
+    impl DoubleBreak {
+        fn twisted(spec: &Spec) -> Spec {
+            let text = joined_text(spec);
+            if text.is_ascii() || spec.runs.len() != 1 {
+                return spec.clone();
+            }
+            Spec::plain(text.replace("\r\n", "\n\n"), spec.runs[0].1)
+        }
+    }
+
+    impl TextSystem for DoubleBreak {
+        fn prepare(&mut self, spec: &Spec, scale: f32) -> (TextKey, (f32, f32)) {
+            FakeText.prepare(&Self::twisted(spec), scale)
+        }
+        fn caret(&mut self, spec: &Spec, scale: f32, offset: usize) -> CaretPos {
+            FakeText.caret(&Self::twisted(spec), scale, offset)
+        }
+        fn hit(&mut self, spec: &Spec, scale: f32, pos: (f32, f32)) -> usize {
+            FakeText.hit(&Self::twisted(spec), scale, pos)
+        }
+        fn lines(&mut self, spec: &Spec, scale: f32) -> Vec<LineSpan> {
+            FakeText.lines(&Self::twisted(spec), scale)
+        }
+        fn segments(&self, text: &str, unit: Unit) -> Vec<usize> {
+            FakeText.segments(text, unit)
+        }
+    }
+
+    #[test]
+    fn the_contract_catches_a_crlf_that_breaks_twice_in_non_ascii_text() {
+        let err = text_system_contract(&mut DoubleBreak).expect_err("caught");
+        assert!(err.starts_with("P16 rows of a text"), "{err}");
     }
 
     #[test]

@@ -1,9 +1,11 @@
 //! The glyphon text system: a shaped-buffer cache behind [`TextSystem`].
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 use glyphon::{
-    Attrs, Buffer, Color, Cursor, Family, FontSystem, Metrics, Shaping, SwashCache, Weight, Wrap,
+    Attrs, Buffer, Color, Cursor, Family, FontSystem, LayoutRun, Metrics, Shaping, SwashCache,
+    Weight, Wrap,
 };
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -151,6 +153,34 @@ impl TextCache {
     }
 }
 
+/// The runs as cosmic-text gets them: each line break of the joined text as one `\n`.
+///
+/// `BidiParagraphs` splits plain ASCII at `\n` and strips one `\r`, and any other text through
+/// `BidiInfo`, where `\r` and `\n` are a break each, so the same CRLF would be one line or two
+/// depending on the rest of the text. With no `\r` in it, both paths agree. A CRLF split across
+/// two runs is one break too. The queries keep their offsets in the spec's text: [`line_bases`]
+/// walks the joined text, where a CRLF is still two bytes, and a line's own text has no terminator.
+fn shaped_runs(spec: &Spec) -> Vec<Cow<'_, str>> {
+    let runs = &spec.runs;
+    let next_is_lf = |i: usize| {
+        let mut later = runs[i + 1..].iter().filter(|(t, _)| !t.is_empty());
+        later.next().is_some_and(|(t, _)| t.starts_with('\n'))
+    };
+    runs.iter()
+        .enumerate()
+        .map(|(i, (t, _))| {
+            if !t.contains('\r') {
+                return Cow::Borrowed(t.as_str());
+            }
+            let mut text = t.replace("\r\n", "\n");
+            if text.ends_with('\r') && next_is_lf(i) {
+                text.pop();
+            }
+            Cow::Owned(text.replace('\r', "\n"))
+        })
+        .collect()
+}
+
 /// Where each buffer line starts in the spec's joined text, and whether the text ends in a line
 /// terminator that opens one more, empty line (cosmic-text has no buffer line for it).
 ///
@@ -174,6 +204,17 @@ fn line_bases(buffer: &Buffer, joined: &str) -> (Vec<usize>, bool) {
         open = term > 0 && at == joined.len();
     }
     (bases, open)
+}
+
+/// The caret's x for a byte `local` of the row's line that is in none of the row's glyphs: at a
+/// wrap cosmic-text drops the whitespace that does not fit, so such bytes come after the row's
+/// glyphs, or before them for a leading space ahead of a word wider than the wrap. The answer is
+/// the row's edge on that side.
+fn off_the_glyphs(run: &LayoutRun<'_>, local: usize) -> f32 {
+    let left = run.glyphs.first().map_or(0.0, |g| g.x);
+    let right = run.glyphs.last().map_or(0.0, |g| g.x + g.w);
+    let before = local <= glyph_range(run.glyphs).0;
+    if before != run.rtl { left } else { right }
 }
 
 /// The byte range of a layout run's glyphs in its buffer line (empty for an empty line).
@@ -247,8 +288,12 @@ impl TextSystem for TextCache {
                 .color(Color::rgba(r, g, b, a))
         };
         let default = attrs(&first);
+        let shaped = shaped_runs(spec);
         buffer.set_rich_text(
-            spec.runs.iter().map(|(t, st)| (t.as_str(), attrs(st))),
+            shaped
+                .iter()
+                .zip(&spec.runs)
+                .map(|(t, (_, st))| (t.as_ref(), attrs(st))),
             &default,
             Shaping::Advanced,
             None,
@@ -301,11 +346,14 @@ impl TextSystem for TextCache {
             };
         }
         // The visual line that shows `off`: the last run whose first glyph is at or before it, so
-        // the offset where a wrapped line breaks belongs to the later row.
+        // the offset where a wrapped line breaks belongs to the later row. A buffer line's first
+        // run owns the line's start, even when a dropped space puts its first glyph later.
         let mut chosen = None;
+        let mut line = None;
         for (row, run) in runs.iter().enumerate() {
             let base = bases.get(run.line_i).copied().unwrap_or(0);
-            if base + glyph_range(run.glyphs).0 <= off {
+            let first = line.replace(run.line_i) != Some(run.line_i);
+            if base + if first { 0 } else { glyph_range(run.glyphs).0 } <= off {
                 chosen = Some((row, run, base));
             }
         }
@@ -315,7 +363,7 @@ impl TextSystem for TextCache {
         let local = (off - base).min(run.text.len());
         let mut x = run
             .cursor_position(&Cursor::new(run.line_i, local))
-            .unwrap_or(0.0);
+            .unwrap_or_else(|| off_the_glyphs(run, local));
         // Positions are sums of glyph advances; where the caret is at the end of the line, take
         // the line's own width, so the two agree to the last bit.
         if (x - run.line_w).abs() < 0.01 {
@@ -339,20 +387,21 @@ impl TextSystem for TextCache {
         };
         let (bases, open) = line_bases(buffer, &text);
         let (x, y) = (pos.0 * scale, pos.1 * scale);
-        let mut runs = buffer.layout_runs();
-        let Some(first) = runs.next() else {
+        let Some(top) = buffer.layout_runs().next().map(|r| r.line_top) else {
             return 0;
         };
-        let top = first.line_top;
-        let (last_top, below) = runs.last().map_or((top, top + first.line_height), |r| {
-            (r.line_top, r.line_top + r.line_height)
-        });
+        let (row_top, below) = buffer
+            .layout_runs()
+            .take_while(|r| r.line_top <= y)
+            .last()
+            .map_or((top, top), |r| (r.line_top, r.line_top + r.line_height));
         if open && y >= below {
             return text.len();
         }
-        // `Buffer::hit` drops `x` outside the runs (offset 0 above them, the end of the text below
-        // them); the trait keeps the column on the first or last line.
-        let y = if y >= below { last_top } else { y.max(top) };
+        // The top of the row under `y`, or of the nearest one: `Buffer::hit` drops `x` outside the
+        // rows (offset 0 above them, the end of the text below them), and the trait keeps the
+        // column on the first or last line.
+        let y = row_top;
         let Some(cursor) = buffer.hit(x, y) else {
             return 0;
         };

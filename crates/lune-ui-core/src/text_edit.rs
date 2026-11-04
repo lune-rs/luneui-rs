@@ -476,8 +476,7 @@ fn row_end(rows: &[LineSpan], i: usize, bounds: &[usize]) -> usize {
 }
 
 /// `text` as an insertion: in one line, line breaks become a space and control chars drop; in many
-/// lines every line break becomes `\n` (a lone `\r` too, which the text systems would treat
-/// differently) and other chars stay.
+/// lines every line break becomes `\n` (a lone `\r` too) and other chars stay.
 fn clean(text: &str, multiline: bool) -> String {
     let unified = text.replace("\r\n", "\n").replace('\r', "\n");
     if multiline {

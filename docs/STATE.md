@@ -1,12 +1,12 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-04 (M5 steps 1 to 16 done, review fix round 1 applied (F1 to F6, D110); M4 merged at d9fe71f)
+Last updated: 2026-11-04 (M5 steps 1 to 16 done, review fix rounds 1 and 2 applied (F1 to F6, F10, F11; D110, D111); M4 merged at d9fe71f)
 
 ## Now
 
 M4 (interaction and motion) is merged to main at d9fe71f, on top of M3 (catalogue specs) and M2
-(seams and crate split). M5 (foundations) is built on branch `orch/toolkit-v1`, in review (round 1 fixed), and awaits the
+(seams and crate split). M5 (foundations) is built on branch `orch/toolkit-v1`, in review (rounds 1 and 2 fixed), and awaits the
 merge: layout helpers, the shortcut registry, the seven painter primitives and the `ImageStore` seam, the scroll
 area and scrollbar, the virtualized list, popover and tooltip, text queries on `TextSystem`, the `TextEdit`
 engine, the text field and text area upgrade with IME, drag and drop, and 12 new gallery pages with
