@@ -112,6 +112,7 @@ fn alpha(a: f32) -> Xform {
     Xform {
         origin: (0.0, 0.0),
         scale: 1.0,
+        dx: 0.0,
         dy: 0.0,
         alpha: a,
     }
@@ -131,6 +132,7 @@ fn scaled(p: &mut P<'_>, r: Rect, scale: f32, f: impl FnOnce(&mut P<'_>)) {
     p.push_xform(Xform {
         origin: (r.x + r.w / 2.0, r.y + r.h / 2.0),
         scale,
+        dx: 0.0,
         dy: 0.0,
         alpha: 1.0,
     });
@@ -340,7 +342,7 @@ fn swatch(p: &mut P<'_>, area: Rect, kind: Kind, v: f32, transforms: bool, spin_
             p.fill(dot, 3.0, hot);
         }
         Kind::Scroll => {
-            p.set_clip(Some(area.inset(2.0, 2.0)));
+            p.push_clip(area.inset(2.0, 2.0));
             let off = v * 18.0;
             for i in 0..4 {
                 let r = Rect::new(
@@ -351,7 +353,7 @@ fn swatch(p: &mut P<'_>, area: Rect, kind: Kind, v: f32, transforms: bool, spin_
                 );
                 p.fill(r, 3.0, if i == 1 { hot } else { dim });
             }
-            p.set_clip(None);
+            p.pop_clip();
         }
         Kind::Settle => {
             let slot = (area.h * 0.3).round();

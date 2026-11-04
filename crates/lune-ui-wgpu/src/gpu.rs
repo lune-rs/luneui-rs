@@ -6,9 +6,11 @@ use glyphon::{Cache, SwashCache, TextAtlas};
 use wgpu::util::DeviceExt;
 
 use crate::blur;
+use crate::images::{GpuImageInstance, ImageResources};
 use crate::platform;
 use crate::text_cache::TextCache;
-use lune_ui_core::scene::{Scene, Shape, StrokeVertex};
+use lune_ui_core::image::{ImageData, ImageError, ImageId, ImageStore};
+use lune_ui_core::scene::{ImageSource, Scene, Shape, StrokeVertex};
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
@@ -29,6 +31,8 @@ struct GpuShape {
     params: [f32; 4],
     /// Physical clip rect (x, y, w, h); zero width = no clip.
     clip: [f32; 4],
+    round: [f32; 4],
+    round_radius: f32,
 }
 
 /// GPU copy of [`StrokeVertex`]: same fields, same order.
@@ -41,10 +45,12 @@ struct GpuStrokeVertex {
     style: [f32; 4],
     extra: [f32; 4],
     clip: [f32; 4],
+    round: [f32; 4],
+    round_radius: f32,
 }
 
-const _: () = assert!(size_of::<GpuShape>() == 96);
-const _: () = assert!(size_of::<GpuStrokeVertex>() == 80);
+const _: () = assert!(size_of::<GpuShape>() == 116);
+const _: () = assert!(size_of::<GpuStrokeVertex>() == 100);
 
 impl From<&Shape> for GpuShape {
     fn from(s: &Shape) -> Self {
@@ -55,6 +61,8 @@ impl From<&Shape> for GpuShape {
             under: s.under,
             params: s.params,
             clip: s.clip,
+            round: s.round,
+            round_radius: s.round_radius,
         }
     }
 }
@@ -68,6 +76,8 @@ impl From<&StrokeVertex> for GpuStrokeVertex {
             style: v.style,
             extra: v.extra,
             clip: v.clip,
+            round: v.round,
+            round_radius: v.round_radius,
         }
     }
 }
@@ -81,6 +91,7 @@ pub(crate) struct FormatState {
     acrylic_fade_pipeline: wgpu::RenderPipeline,
     shape_pipeline: wgpu::RenderPipeline,
     stroke_pipeline: wgpu::RenderPipeline,
+    image_pipeline: wgpu::RenderPipeline,
     pub(crate) blur: blur::Pipelines,
     pub(crate) atlas: TextAtlas,
 }
@@ -98,6 +109,10 @@ pub struct Gpu {
     pub(crate) globals_layout: wgpu::BindGroupLayout,
     pipeline_layout: wgpu::PipelineLayout,
     shader: wgpu::ShaderModule,
+    image_shader: wgpu::ShaderModule,
+    image_pipeline_layout: wgpu::PipelineLayout,
+    /// Registered pictures and rasterised texts, shared by every target on the device.
+    pub(crate) images: ImageResources,
     pub(crate) noise_view: wgpu::TextureView,
     pub(crate) noise_sampler: wgpu::Sampler,
     pub(crate) blur: blur::Shared,
@@ -117,18 +132,60 @@ impl std::fmt::Debug for Gpu {
     }
 }
 
+impl ImageStore for Gpu {
+    /// Uploads `data` as a premultiplied texture. A side above the device's maximum texture
+    /// size, or a length other than `4 * width * height`, is refused before any GPU call. A
+    /// picture with no pixels is accepted and draws nothing.
+    fn register(&mut self, id: ImageId, data: ImageData) -> Result<(), ImageError> {
+        let limit = self.device.limits().max_texture_dimension_2d;
+        crate::images::check(&data, limit)?;
+        if data.width == 0 || data.height == 0 {
+            self.images.ids.remove(&id);
+            return Ok(());
+        }
+        let img = self.images.upload(
+            &self.device,
+            &self.queue,
+            data.width,
+            data.height,
+            &data.rgba,
+        );
+        self.images.ids.insert(id, img);
+        Ok(())
+    }
+
+    fn release(&mut self, id: ImageId) {
+        self.images.ids.remove(&id);
+    }
+}
+
 type Range = std::ops::Range<u32>;
 
 /// A run of acrylic shapes drawn with one pipeline: opacity 1.0 is the replace pipeline for the
 /// whole run, anything lower is a single shape through the constant-blend pipeline.
 type AcrylicRun = (Range, f32);
 
+/// Where one layer's records sit in the uploaded buffers.
+#[derive(Debug, Clone)]
+struct LayerRanges {
+    acrylic: Vec<AcrylicRun>,
+    under: Range,
+    over: Range,
+    /// Path-fill vertices, in the stroke buffer.
+    fills: Range,
+    strokes: Range,
+}
+
 #[derive(Debug)]
 pub(crate) struct Uploaded {
     shapes: wgpu::Buffer,
     strokes: Option<wgpu::Buffer>,
+    /// Image instances of every layer, in layer order.
+    images: Option<wgpu::Buffer>,
+    /// Per layer: the instance index and bind group of each image to draw, in record order.
+    image_draws: Vec<Vec<(u32, wgpu::BindGroup)>>,
     /// Per layer: the acrylic runs, the under and over shape ranges and the stroke vertex range.
-    ranges: Vec<(Vec<AcrylicRun>, Range, Range, Range)>,
+    ranges: Vec<LayerRanges>,
 }
 
 /// The wgpu instance. `display` is the windowing system's display handle (an event loop's owned
@@ -216,6 +273,17 @@ impl Gpu {
             bind_group_layouts: &[Some(&globals_layout)],
             ..Default::default()
         });
+        let images = ImageResources::new(&device);
+        let image_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("images"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("image.wgsl").into()),
+        });
+        let image_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("images"),
+                bind_group_layouts: &[Some(&globals_layout), Some(&images.layout)],
+                ..Default::default()
+            });
         let blur = blur::Shared::new(&device);
         let glyph_cache = Cache::new(&device);
 
@@ -227,6 +295,9 @@ impl Gpu {
             globals_layout,
             pipeline_layout,
             shader,
+            image_shader,
+            image_pipeline_layout,
+            images,
             noise_view,
             noise_sampler,
             blur,
@@ -250,7 +321,7 @@ impl Gpu {
         let device = &self.device;
         let shape_attrs = wgpu::vertex_attr_array![
             0 => Float32x4, 1 => Float32x4, 2 => Float32x4, 3 => Float32x4, 4 => Float32x4,
-            5 => Float32x4
+            5 => Float32x4, 6 => Float32x4, 7 => Float32
         ];
         let shape_layout = wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<GpuShape>() as u64,
@@ -259,7 +330,7 @@ impl Gpu {
         };
         let stroke_attrs = wgpu::vertex_attr_array![
             0 => Float32x2, 1 => Float32x2, 2 => Float32x4, 3 => Float32x4, 4 => Float32x4,
-            5 => Float32x4
+            5 => Float32x4, 6 => Float32x4, 7 => Float32
         ];
         let stroke_layout = wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<GpuStrokeVertex>() as u64,
@@ -345,6 +416,41 @@ impl Gpu {
             wgpu::PrimitiveTopology::TriangleList,
             Some(premultiplied_over),
         );
+        let image_attrs = wgpu::vertex_attr_array![
+            0 => Float32x4, 1 => Float32x4, 2 => Float32x4, 3 => Float32x4
+        ];
+        let image_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("images"),
+            layout: Some(&self.image_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &self.image_shader,
+                entry_point: Some("vs_image"),
+                buffers: &[Some(wgpu::VertexBufferLayout {
+                    array_stride: size_of::<GpuImageInstance>() as u64,
+                    step_mode: wgpu::VertexStepMode::Instance,
+                    attributes: &image_attrs,
+                })],
+                compilation_options: Default::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &self.image_shader,
+                entry_point: Some("fs_image"),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format,
+                    blend: Some(premultiplied_over),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: Default::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: strip,
+                ..Default::default()
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            cache: None,
+            multiview_mask: None,
+        });
         let atlas = TextAtlas::with_color_mode(
             device,
             &self.queue,
@@ -358,6 +464,7 @@ impl Gpu {
             acrylic_fade_pipeline,
             shape_pipeline,
             stroke_pipeline,
+            image_pipeline,
             blur: self.blur.pipelines(device, format),
             atlas,
         }
@@ -370,6 +477,46 @@ impl Gpu {
             f.atlas.trim();
         }
         text.end_frame();
+        self.images.texts.retain(|key, _| text.contains(*key));
+    }
+
+    /// How many pictures the app has registered (rasterised texts are not counted).
+    pub fn image_count(&self) -> usize {
+        self.images.ids.len()
+    }
+
+    /// How many rasterised texts (from `Painter::text_rotated`) the GPU holds.
+    pub fn text_image_count(&self) -> usize {
+        self.images.texts.len()
+    }
+
+    /// Rasterises and uploads every text of `scene`'s image items that has no raster yet.
+    pub(crate) fn ensure_text_images(&mut self, scene: &Scene, text: &mut TextCache) {
+        let limit = self.device.limits().max_texture_dimension_2d;
+        for layer in &scene.layers {
+            for item in &layer.images {
+                let ImageSource::Text(key, _) = item.source else {
+                    continue;
+                };
+                if self.images.texts.contains_key(&key) {
+                    continue;
+                }
+                let Some(raster) = text.rasterize(key, &mut self.swash) else {
+                    continue;
+                };
+                if raster.width.max(raster.height) > limit {
+                    continue;
+                }
+                let img = self.images.upload(
+                    &self.device,
+                    &self.queue,
+                    raster.width,
+                    raster.height,
+                    &raster.rgba,
+                );
+                self.images.texts.insert(key, img);
+            }
+        }
     }
 
     /// Copies every layer's shapes and stroke vertices of `scene` into fresh vertex buffers,
@@ -396,9 +543,33 @@ impl Gpu {
             let under = push(&layer.under);
             let over = push(&layer.over);
             let start = strokes.len() as u32;
+            strokes.extend(layer.fills.iter().map(GpuStrokeVertex::from));
+            let mid = strokes.len() as u32;
             strokes.extend(layer.strokes.iter().map(GpuStrokeVertex::from));
-            ranges.push((acrylic, under, over, start..strokes.len() as u32));
+            ranges.push(LayerRanges {
+                acrylic,
+                under,
+                over,
+                fills: start..mid,
+                strokes: mid..strokes.len() as u32,
+            });
         }
+        let mut instances: Vec<GpuImageInstance> = Vec::new();
+        let image_draws: Vec<Vec<(u32, wgpu::BindGroup)>> = scene
+            .layers
+            .iter()
+            .map(|layer| {
+                layer
+                    .images
+                    .iter()
+                    .filter_map(|item| self.images.instance(item))
+                    .map(|(inst, group)| {
+                        instances.push(inst);
+                        (instances.len() as u32 - 1, group)
+                    })
+                    .collect()
+            })
+            .collect();
         if shapes.is_empty() {
             shapes.push(GpuShape::zeroed());
         }
@@ -417,9 +588,19 @@ impl Gpu {
                     usage: wgpu::BufferUsages::VERTEX,
                 })
         });
+        let images = (!instances.is_empty()).then(|| {
+            self.device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("images"),
+                    contents: bytemuck::cast_slice(&instances),
+                    usage: wgpu::BufferUsages::VERTEX,
+                })
+        });
         Uploaded {
             shapes,
             strokes,
+            images,
+            image_draws,
             ranges,
         }
     }
@@ -434,7 +615,12 @@ impl FormatState {
         up: &Uploaded,
         layer: usize,
     ) {
-        let (acrylic, under, _, _) = up.ranges[layer].clone();
+        let LayerRanges {
+            acrylic,
+            under,
+            fills,
+            ..
+        } = up.ranges[layer].clone();
         for (range, opacity) in acrylic {
             if opacity >= 1.0 {
                 draw_shapes(pass, globals, up, &self.acrylic_pipeline, range);
@@ -449,6 +635,44 @@ impl FormatState {
             }
         }
         draw_shapes(pass, globals, up, &self.shape_pipeline, under);
+        self.draw_vertices(pass, globals, up, fills);
+    }
+
+    fn draw_vertices(
+        &self,
+        pass: &mut wgpu::RenderPass<'_>,
+        globals: &wgpu::BindGroup,
+        up: &Uploaded,
+        range: Range,
+    ) {
+        if let Some(strokes) = &up.strokes
+            && !range.is_empty()
+        {
+            pass.set_pipeline(&self.stroke_pipeline);
+            pass.set_bind_group(0, globals, &[]);
+            pass.set_vertex_buffer(0, strokes.slice(..));
+            pass.draw(range, 0..1);
+        }
+    }
+
+    /// The image items of `layer`, in record order; they go after its customs and before its text.
+    pub(crate) fn draw_images(
+        &self,
+        pass: &mut wgpu::RenderPass<'_>,
+        globals: &wgpu::BindGroup,
+        up: &Uploaded,
+        layer: usize,
+    ) {
+        let Some(buffer) = &up.images else {
+            return;
+        };
+        for (index, group) in &up.image_draws[layer] {
+            pass.set_pipeline(&self.image_pipeline);
+            pass.set_bind_group(0, globals, &[]);
+            pass.set_bind_group(1, group, &[]);
+            pass.set_vertex_buffer(0, buffer.slice(..));
+            pass.draw(0..4, *index..*index + 1);
+        }
     }
 
     /// Everything of `layer` that goes above its text; `globals` is the target's bind group.
@@ -459,16 +683,9 @@ impl FormatState {
         up: &Uploaded,
         layer: usize,
     ) {
-        let (_, _, over, stroke_range) = up.ranges[layer].clone();
+        let LayerRanges { over, strokes, .. } = up.ranges[layer].clone();
         draw_shapes(pass, globals, up, &self.shape_pipeline, over);
-        if let Some(strokes) = &up.strokes
-            && !stroke_range.is_empty()
-        {
-            pass.set_pipeline(&self.stroke_pipeline);
-            pass.set_bind_group(0, globals, &[]);
-            pass.set_vertex_buffer(0, strokes.slice(..));
-            pass.draw(stroke_range, 0..1);
-        }
+        self.draw_vertices(pass, globals, up, strokes);
     }
 }
 
@@ -568,9 +785,9 @@ mod tests {
 
     #[test]
     fn gpu_records_are_bit_exact() {
-        let v = values(24);
+        let v = values(29);
         let distinct: std::collections::HashSet<u32> = v.iter().map(|f| f.to_bits()).collect();
-        assert_eq!(distinct.len(), 24);
+        assert_eq!(distinct.len(), 29);
         let shape = Shape {
             rect: quad(&v[0..]),
             radii: quad(&v[4..]),
@@ -578,13 +795,15 @@ mod tests {
             under: quad(&v[12..]),
             params: quad(&v[16..]),
             clip: quad(&v[20..]),
+            round: quad(&v[24..]),
+            round_radius: v[28],
         };
         assert_eq!(
             bytemuck::bytes_of(&GpuShape::from(&shape)),
             bytes(&v).as_slice()
         );
 
-        let v = values(20);
+        let v = values(25);
         let vertex = StrokeVertex {
             pos: [v[0], v[1]],
             aa: [v[2], v[3]],
@@ -592,6 +811,8 @@ mod tests {
             style: quad(&v[8..]),
             extra: quad(&v[12..]),
             clip: quad(&v[16..]),
+            round: quad(&v[20..]),
+            round_radius: v[24],
         };
         assert_eq!(
             bytemuck::bytes_of(&GpuStrokeVertex::from(&vertex)),

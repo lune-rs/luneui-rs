@@ -14,10 +14,15 @@
 //! Modules:
 //! - `color`, `theme` (the `Theme` tokens and the dark preset with its glass layers), `acrylic`
 //!   (Avalonia acrylic colour math);
-//! - `paint` (the `Painter`), `scene` (the display list it builds: plain data and the draw-order
+//! - `image` (the `ImageStore` seam and image fit geometry),
+//!   `paint` (the `Painter`), `scene` (the display list it builds: plain data and the draw-order
 //!   contract), `text` (specs and the `TextSystem` seam), `icon`, `widgets` (controls, menus,
 //!   dropdowns, dialogs), `chrome` (tab outline geometry);
-//! - `input` (the input seam: `RawInput` in, `FrameOutput` out, plain data);
+//! - `text_edit` (the pure editing engine: caret, selection, undo, clipboard commands, preedit);
+//! - `input` (the input seam: `RawInput` in, `FrameOutput` out, plain data), `layout` (pure stack,
+//!   row, column and grid helpers);
+//! - `shortcuts` (the scoped key-chord registry the frame resolves in two phases);
+//! - `drag` (in-window drag and drop: the pure reorder and free machines and their `Ui` glue);
 //! - `ui` (the per-window frame: ids, retained state, layered hits, overlays, focus, semantic
 //!   nodes, `Response`, `FrameOutput`), `access` (the semantic tree and accessibility actions),
 //!   `motion` (the closed-form motion system and the time type), `strings` (the string table);
@@ -37,14 +42,19 @@ pub mod acrylic;
 pub mod backdrop;
 pub mod chrome;
 pub mod color;
+pub mod drag;
 pub mod icon;
+pub mod image;
 pub mod input;
+pub mod layout;
 pub mod motion;
 pub mod paint;
 pub mod scene;
+pub mod shortcuts;
 pub mod strings;
 pub mod testing;
 pub mod text;
+pub mod text_edit;
 pub mod theme;
 pub mod ui;
 pub mod widgets;

@@ -3,9 +3,10 @@
 
 use std::time::Duration;
 
-use crate::input::FrameOutput;
+use crate::input::{FrameOutput, Keymap};
 use crate::motion::MotionTier;
 use crate::scene::Scene;
+use crate::shortcuts::Shortcuts;
 use crate::strings::{DisplayFormat, StringTable};
 use crate::theme::{DARK, Theme};
 use crate::ui::{FrameConfig, Ui, UiStore};
@@ -22,6 +23,10 @@ pub struct UiHarness {
     pub input: ScriptedInput,
     pub theme: Theme,
     pub tier: MotionTier,
+    /// The keyboard conventions the frames run with; macOS by default.
+    pub keymap: Keymap,
+    /// The shortcut table the frames run with; empty by default.
+    pub shortcuts: Shortcuts,
 }
 
 impl UiHarness {
@@ -37,6 +42,8 @@ impl UiHarness {
             input,
             theme: DARK,
             tier: MotionTier::Full,
+            keymap: Keymap::MAC,
+            shortcuts: Shortcuts::default(),
         }
     }
 
@@ -54,6 +61,8 @@ impl UiHarness {
             tier: self.tier,
             strings: &self.strings,
             arg_format: &DisplayFormat,
+            keymap: self.keymap,
+            shortcuts: &self.shortcuts,
         };
         let mut ui = Ui::begin(&mut self.store, &raw, config, &mut self.text);
         f(&mut ui);

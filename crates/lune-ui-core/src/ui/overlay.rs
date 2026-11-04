@@ -264,7 +264,10 @@ impl<'a> Ui<'a> {
         let saved = self.painter.save_state();
         self.painter.enter(options.layer, tag);
         let first_hit = self.painter.hits.len();
+        // Scopes opened by the caller are outside the overlay for `Scope::Within`.
+        let floor = std::mem::replace(&mut self.scope_floor, self.scopes.len());
         let r = content(self, &frame);
+        self.scope_floor = floor;
         self.painter.restore_state(saved);
         if self.opened.contains(&id) {
             self.initial_focus(tag, first_hit, options.initial_focus, options.modal);

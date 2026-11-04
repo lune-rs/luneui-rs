@@ -19,6 +19,7 @@ pub mod custom;
 pub mod dump;
 pub mod frame;
 pub mod gpu;
+mod images;
 mod platform;
 pub mod surface;
 pub mod text_cache;

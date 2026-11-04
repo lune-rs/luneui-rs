@@ -2,10 +2,10 @@
 id: layout.virtualized-list
 title: Virtualized list
 area: layout
-status: planned
+status: in-progress
 consumers: lunegit, wane
-source: Lunegit: src/Lunegit.Desktop/MainWindow.axaml
-owner: —
+source: crates/lune-ui-core/src/widgets/virtual_list.rs
+owner: orch/toolkit-v1
 summary: Builds only the visible rows; selection as a set of row keys (single, multi, range); keyboard navigation; no row animation while scrolling
 ---
 
@@ -25,7 +25,7 @@ while the list scrolls.
 
 ## Existing code
 
-None in `lune-ui` today. Design source (not code to move): Lunegit `src/Lunegit.Desktop/Views/RepositoryContentView.axaml:146-153,349-373` (commit list),
+Built in M5 (D97, D100): `crates/lune-ui-core/src/widgets/virtual_list.rs` (`Ui::virtual_list`, `ListState`). Design source (not code to move): Lunegit `src/Lunegit.Desktop/Views/RepositoryContentView.axaml:146-153,349-373` (commit list),
 `MainWindow.axaml:404-418`, `Views/UnifiedDiffView.axaml:44-56`, `Views/SplitDiffView.axaml.cs:133-215` (selection), `Controls/BoundedLru.cs` (bounded geometry cache).
 
 ## Spec
@@ -134,14 +134,14 @@ None: rows carry app text.
 
 ### Build
 
-- Milestone: M5
+- Milestone: M5. Built in M5 (steps 8 and 10; the page is `virtualized-list`, 11 scenes, 1,000,000 rows in window mode and the bench). Open for `done` (D47): M11 re-checks the whole bar on every entry; the Windows and Linux run time is unverified (the Linux and Windows lint is `scripts/check-targets.sh`).
 - Depends on: layout.scroll-area, widget.scrollbar, core.ui, core.focus, infra.accessibility, motion.transitions
 
 ## Open questions
 
-- Measured (variable) row heights: no Lunegit list read needs them (the commit list is a fixed 45 px); the strategy (a height cache with an estimated height) is for M5.
-- `role-gap: multi-selectable` (see Accessibility).
-- Whether the commit list pages data in the toolkit or in the app: Lunegit pages in app code on scroll [L src/Lunegit.Desktop/Views/RepositoryContentView.axaml.cs:74-75]; this entry assumes the app.
+- Answered (D97, D100): measured (variable) row heights: no Lunegit list read needs them (the commit list is a fixed 45 px); the strategy (a height cache with an estimated height) is for M5.
+- Still open (D100: no new state): `role-gap: multi-selectable` (see Accessibility).
+- Answered (D100, the app): whether the commit list pages data in the toolkit or in the app: Lunegit pages in app code on scroll [L src/Lunegit.Desktop/Views/RepositoryContentView.axaml.cs:74-75]; this entry assumes the app.
 
 ## Notes for the planner
 

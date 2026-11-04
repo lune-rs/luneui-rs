@@ -59,6 +59,7 @@ fn scene(alphas: &[Option<f32>]) -> Scene {
         p.set_xform(a.map(|alpha| Xform {
             origin: (0.0, 0.0),
             scale: 1.0,
+            dx: 0.0,
             dy: 0.0,
             alpha,
         }));

@@ -44,6 +44,7 @@ pub(crate) fn label_fade(p: &mut P<'_>, n: usize, frame: u64) {
     p.set_xform(Some(Xform {
         origin: (0.0, 0.0),
         scale: 1.0,
+        dx: 0.0,
         dy: 0.0,
         alpha: phase,
     }));
@@ -86,6 +87,7 @@ pub(crate) fn dialog_blur(p: &mut P<'_>, frame: u64) {
     p.set_xform(Some(Xform {
         origin: (win.w / 2.0, win.h / 2.0),
         scale: 0.96 + 0.04 * e,
+        dx: 0.0,
         dy: 0.0,
         alpha: e,
     }));

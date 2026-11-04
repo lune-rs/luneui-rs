@@ -350,7 +350,7 @@ check 8 no -rn -E \
 crate_deps() {
   case "$1" in
     lune-ui-core) echo "" ;;
-    lune-ui-wgpu) echo "lune-ui-core wgpu glyphon bytemuck png" ;;
+    lune-ui-wgpu) echo "lune-ui-core wgpu glyphon bytemuck png unicode-segmentation" ;;
     lune-ui-winit) echo "lune-ui-core winit" ;;
     lune-ui-platform) echo "lune-ui-core winit window-vibrancy objc2-app-kit raw-window-handle" ;;
     lune-ui) echo "lune-ui-core lune-ui-wgpu lune-ui-winit lune-ui-platform" ;;

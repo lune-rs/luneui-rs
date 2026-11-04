@@ -113,7 +113,7 @@ impl FrameRenderer {
     }
 
     /// [`draw`](Self::draw) with app-owned draws: each layer's [`CustomItem`]s render after the
-    /// layer's acrylic and under shapes and before its text, scissored to the item's clip.
+    /// layer's acrylic and under shapes and before its images and text, scissored to the item's clip.
     /// `customs[slot]` draws the items recorded with that slot. Every element of `customs` gets
     /// one `prepare` call before the first render pass. One queue submit per call.
     pub fn draw_with(
@@ -149,6 +149,7 @@ impl FrameRenderer {
         for c in customs.iter_mut() {
             c.prepare(&gpu.device, &gpu.queue, &custom_frame);
         }
+        gpu.ensure_text_images(scene, text);
         let customs: &[&mut dyn CustomDraw] = customs;
         let FrameParams {
             size,
@@ -242,6 +243,7 @@ impl FrameRenderer {
                 for (i, layer) in layers.iter().enumerate().take(SCENE_LAYERS) {
                     fs.draw_below_text(pass, globals, &uploaded, i);
                     draw_customs(pass, &layer.customs, customs, &custom_frame);
+                    fs.draw_images(pass, globals, &uploaded, i);
                     self.layers[i]
                         .render(&fs.atlas, &self.viewport, pass)
                         .map_err(|e| e.to_string())?;
@@ -265,6 +267,7 @@ impl FrameRenderer {
                 for (i, layer) in layers.iter().enumerate().skip(SCENE_LAYERS) {
                     fs.draw_below_text(pass, globals, &uploaded, i);
                     draw_customs(pass, &layer.customs, customs, &custom_frame);
+                    fs.draw_images(pass, globals, &uploaded, i);
                     self.layers[i]
                         .render(&fs.atlas, &self.viewport, pass)
                         .map_err(|e| e.to_string())?;

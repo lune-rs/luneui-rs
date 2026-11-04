@@ -16,19 +16,21 @@ use winit::keyboard::{Key, ModifiersState, NamedKey};
 use winit::window::{Window, WindowId};
 
 use lune_ui::gpu::{self, Gpu};
-use lune_ui::input::{OutputState, Repaint, Translator, control_flow};
+use lune_ui::input::{ClipboardRequest, Keymap, OutputState, Repaint, Translator, control_flow};
 use lune_ui::lunegit_dark::THEME;
 use lune_ui::material::{self, Material};
 use lune_ui::motion::MotionTier;
+use lune_ui::shortcuts::Shortcuts;
 use lune_ui::strings::{DisplayFormat, StringTable};
 use lune_ui::surface::{Acquired, WindowSurface};
 use lune_ui::ui::{FrameConfig, Ui, UiStore};
 use lune_ui::window::glass_attributes;
 
-use crate::page::{Page, PageKind, PageState};
+use crate::page::{Page, PageKind, PageState, register_images, release_images};
 use crate::pages::PAGES;
 use crate::scenes::{H, W};
 use crate::{Renderer, custom, draw_scene, text_cache};
+use lune_ui::image::ImageId;
 
 /// Window mode: the window, its surface and the renderer drawing into it.
 struct Shown {
@@ -72,8 +74,14 @@ struct App {
     /// The Ui page's retained state; reset when the page changes.
     store: UiStore,
     state: Option<Box<dyn PageState>>,
+    /// The pictures the page's state registered with the renderer.
+    images: Vec<ImageId>,
     strings: StringTable,
+    /// The shortcut table; the gallery's own keys are handled before the frame.
+    shortcuts: Shortcuts,
     mods: ModifiersState,
+    /// The in-process clipboard standing in for the OS's until the platform layer has one.
+    clipboard: Option<String>,
     /// The app's time origin: the frame time is the time since it.
     start: Instant,
     /// Process exit status (non-zero when setup or a frame failed).
@@ -95,8 +103,11 @@ pub(crate) fn run() -> ExitCode {
         scene: 0,
         store: UiStore::default(),
         state: None,
+        images: Vec::new(),
         strings: StringTable::default(),
+        shortcuts: Shortcuts::default(),
         mods: ModifiersState::empty(),
+        clipboard: None,
         start: Instant::now(),
         exit_code: 0,
     };
@@ -165,6 +176,10 @@ impl App {
         self.scene = 0;
         self.store = UiStore::default();
         self.state = None;
+        if let Some(shown) = &mut self.shown {
+            release_images(&mut shown.r.gpu, &self.images);
+            self.images.clear();
+        }
         if let Some(shown) = &self.shown {
             shown
                 .window
@@ -204,18 +219,48 @@ impl App {
                 scenes[self.scene % scenes.len()].paint(&mut r.text, s, size)
             }
             PageKind::Ui(ui_page) => {
-                let state = self.state.get_or_insert_with(ui_page.state);
+                if self.state.is_none() {
+                    let fresh = (ui_page.state)();
+                    match register_images(&mut r.gpu, fresh.images()) {
+                        Ok(ids) => self.images = ids,
+                        Err(e) => eprintln!("images: {e}"),
+                    }
+                    self.state = Some(fresh);
+                }
+                let Some(state) = self.state.as_mut() else {
+                    return Ok(());
+                };
                 let config = FrameConfig {
                     theme: THEME,
                     tier: MotionTier::Full,
                     strings: &self.strings,
                     arg_format: &DisplayFormat,
+                    keymap: if cfg!(target_os = "macos") {
+                        Keymap::MAC
+                    } else {
+                        Keymap::PC
+                    },
+                    shortcuts: &self.shortcuts,
                 };
                 let mut ui = Ui::begin(&mut self.store, &input, config, &mut r.text);
                 ui.scope(page.id, |ui| state.draw(ui));
                 let (display, out) = ui.finish();
                 if output.apply(window, &out) {
                     event_loop.exit();
+                }
+                // The clipboard stub: a write stores, a read is answered with the next frame's
+                // input.
+                for req in &out.clipboard {
+                    match req {
+                        ClipboardRequest::Write(text) => self.clipboard = Some(text.clone()),
+                        ClipboardRequest::Read => {
+                            match &self.clipboard {
+                                Some(text) => translator.clipboard_text(text),
+                                None => translator.clipboard_unavailable(),
+                            }
+                            window.request_redraw();
+                        }
+                    }
                 }
                 repaint = out.repaint;
                 display

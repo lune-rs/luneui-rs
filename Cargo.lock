@@ -956,6 +956,7 @@ dependencies = [
  "lune-ui-core",
  "png",
  "pollster",
+ "unicode-segmentation",
  "wgpu",
 ]
 

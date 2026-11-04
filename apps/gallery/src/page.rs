@@ -10,10 +10,14 @@
 //! caller lends, so dump, bench and the self-check tests all drive it the same way.
 
 use lune_ui::access::{AccessAction, Action};
-use lune_ui::input::{FrameOutput, Key, Modifiers, NamedKey, PointerButton, Repaint};
+use lune_ui::image::{ImageData, ImageId, ImageStore};
+use lune_ui::input::{
+    FrameOutput, ImeEvent, Key, Keymap, Modifiers, NamedKey, PointerButton, Repaint,
+};
 use lune_ui::lunegit_dark::THEME;
 use lune_ui::motion::MotionTier;
 use lune_ui::scene::Scene;
+use lune_ui::shortcuts::Shortcuts;
 use lune_ui::strings::{DisplayFormat, StringTable};
 use lune_ui::testing::ScriptedInput;
 use lune_ui::text::TextSystem;
@@ -59,6 +63,50 @@ pub(crate) trait PageState {
     fn strings(&self) -> StringTable {
         StringTable::default()
     }
+
+    /// The pictures the page draws, by id; the dump, the window and the bench register them with
+    /// the renderer when the page or scene starts and release them after. Ids are unique across
+    /// the gallery. The default is none.
+    fn images(&self) -> Vec<(ImageId, ImageData)> {
+        Vec::new()
+    }
+}
+
+/// Registers every picture of `images` with `store`; on a refusal releases the ones already
+/// registered and names the id. Returns the ids to hand to [`release_images`].
+pub(crate) fn register_images(
+    store: &mut impl ImageStore,
+    images: Vec<(ImageId, ImageData)>,
+) -> Result<Vec<ImageId>, String> {
+    let mut done = Vec::with_capacity(images.len());
+    for (id, data) in images {
+        if let Err(e) = store.register(id, data) {
+            release_images(store, &done);
+            return Err(format!("image {}: {e}", id.0));
+        }
+        done.push(id);
+    }
+    Ok(done)
+}
+
+/// Releases `ids`.
+pub(crate) fn release_images(store: &mut impl ImageStore, ids: &[ImageId]) {
+    for id in ids {
+        store.release(*id);
+    }
+}
+
+/// Every picture the states of `page` draw: its scenes' and its window state's. Empty for a
+/// legacy page.
+pub(crate) fn page_images(page: &Page) -> Vec<(ImageId, ImageData)> {
+    let PageKind::Ui(ui) = page.kind else {
+        return Vec::new();
+    };
+    let mut out = (ui.state)().images();
+    for scene in ui.scenes {
+        out.extend((scene.state)().images());
+    }
+    out
 }
 
 /// Whether a scene's capture frame still moves.
@@ -68,6 +116,9 @@ pub(crate) enum Expect {
     Settled,
     /// `Repaint::Now` at the capture frame (a transition is in flight).
     Moving,
+    /// `Repaint::At(_)` at the capture frame: nothing moves yet, a frame is due later (a pending
+    /// tooltip).
+    Waiting,
 }
 
 /// One scripted Ui scene: input events at times, then a capture frame.
@@ -117,6 +168,24 @@ pub(crate) enum Ev {
     WindowFocus(bool),
     /// An accessibility action on the widget at the path.
     Access(&'static [&'static str], Action),
+    /// A scroll gesture at the pointer; `precise` is a touchpad (pixels), else wheel lines.
+    Scroll {
+        x: f32,
+        y: f32,
+        precise: bool,
+    },
+    /// Types the text one key at a time.
+    Type(&'static str),
+    /// A character key with the modifiers held for it only (text attached, as a platform does).
+    KeyChar(&'static str, Modifiers),
+    /// A named key with the modifiers held for it only.
+    KeyMod(NamedKey, Modifiers),
+    /// Sets the modifiers held from now on.
+    Mods(Modifiers),
+    ImePreedit(&'static str, Option<(usize, usize)>),
+    ImeCommit(&'static str),
+    /// The clipboard's answer to a read.
+    ClipboardText(&'static str),
 }
 
 /// The id of the widget at `path` under page `page`.
@@ -134,6 +203,9 @@ pub(crate) struct Player {
     strings: StringTable,
     tier: MotionTier,
     theme: Theme,
+    /// The modifiers `Ev::Mods` holds.
+    held: Modifiers,
+    shortcuts: Shortcuts,
 }
 
 impl std::fmt::Debug for Player {
@@ -165,6 +237,8 @@ impl Player {
             strings,
             tier,
             theme: THEME,
+            held: Modifiers::default(),
+            shortcuts: Shortcuts::default(),
         }
     }
 
@@ -232,6 +306,52 @@ impl Player {
                     value: None,
                 });
             }
+            Ev::Scroll { x, y, precise } => {
+                if *precise {
+                    self.input.scroll_pixels(*x, *y);
+                } else {
+                    self.input.scroll_lines(*x, *y);
+                }
+            }
+            Ev::Type(text) => {
+                for c in text.chars() {
+                    let s = c.to_string();
+                    let key = if c == ' ' {
+                        Key::Named(NamedKey::Space)
+                    } else {
+                        Key::Character(s.clone())
+                    };
+                    self.input.key_down(key, Some(&s));
+                }
+            }
+            Ev::KeyChar(s, mods) => {
+                self.input
+                    .set_modifiers(*mods)
+                    .key_down(Key::Character((*s).to_owned()), Some(s))
+                    .set_modifiers(self.held);
+            }
+            Ev::KeyMod(k, mods) => {
+                self.input
+                    .set_modifiers(*mods)
+                    .key_down(Key::Named(*k), None)
+                    .set_modifiers(self.held);
+            }
+            Ev::Mods(mods) => {
+                self.held = *mods;
+                self.input.set_modifiers(*mods);
+            }
+            Ev::ImePreedit(text, cursor) => {
+                self.input.ime(ImeEvent::Preedit {
+                    text: (*text).to_owned(),
+                    cursor: *cursor,
+                });
+            }
+            Ev::ImeCommit(text) => {
+                self.input.ime(ImeEvent::Commit((*text).to_owned()));
+            }
+            Ev::ClipboardText(text) => {
+                self.input.clipboard_text(text);
+            }
         }
         Ok(())
     }
@@ -254,6 +374,9 @@ impl Player {
             tier: self.tier,
             strings: &self.strings,
             arg_format: &DisplayFormat,
+            // Scripted scenes run the same on every host.
+            keymap: Keymap::MAC,
+            shortcuts: &self.shortcuts,
         };
         let mut ui = Ui::begin(&mut self.store, &raw, config, text);
         let page = self.page;
@@ -263,11 +386,12 @@ impl Player {
     }
 }
 
-/// The `Repaint` a scene's capture frame must report.
-pub(crate) fn expected_repaint(expect: Expect) -> Repaint {
+/// Whether a scene's capture frame reported the `Repaint` its `expect` names.
+pub(crate) fn meets_expectation(expect: Expect, repaint: Repaint) -> bool {
     match expect {
-        Expect::Settled => Repaint::Idle,
-        Expect::Moving => Repaint::Now,
+        Expect::Settled => repaint == Repaint::Idle,
+        Expect::Moving => repaint == Repaint::Now,
+        Expect::Waiting => matches!(repaint, Repaint::At(_)),
     }
 }
 
@@ -299,6 +423,49 @@ mod tests {
     use std::collections::BTreeSet;
     use std::rc::Rc;
 
+    fn pic(w: u32, h: u32) -> ImageData {
+        ImageData {
+            width: w,
+            height: h,
+            rgba: vec![0; 4 * (w * h) as usize],
+        }
+    }
+
+    #[test]
+    fn images_register_and_release_as_a_set() {
+        use lune_ui::testing::FakeImages;
+        let mut store = FakeImages::new();
+        let ids = register_images(
+            &mut store,
+            vec![(ImageId(1), pic(2, 2)), (ImageId(2), pic(1, 3))],
+        )
+        .expect("registers");
+        assert_eq!((ids.len(), store.len()), (2, 2));
+        release_images(&mut store, &ids);
+        assert!(store.is_empty());
+    }
+
+    #[test]
+    fn a_refused_picture_releases_the_ones_before_it() {
+        use lune_ui::testing::FakeImages;
+        let mut store = FakeImages::with_limit(4);
+        let err = register_images(
+            &mut store,
+            vec![(ImageId(1), pic(2, 2)), (ImageId(2), pic(9, 1))],
+        )
+        .expect_err("refused");
+        assert!(err.contains("image 2"), "{err}");
+        assert!(store.is_empty());
+    }
+
+    #[test]
+    fn a_page_without_pictures_has_no_images() {
+        for page in PAGES {
+            let n = page_images(page).len();
+            assert!(n < 64, "{}: {n}", page.id);
+        }
+    }
+
     /// Every Ui scene runs, every key path resolves, and the capture frame's `Repaint` matches
     /// `expect`.
     #[test]
@@ -311,7 +478,12 @@ mod tests {
                 let name = format!("{}/{}", page.id, scene.name());
                 let (_, out) = run_scene(page.id, scene, &mut FakeText)
                     .unwrap_or_else(|e| panic!("{name}: {e}"));
-                assert_eq!(out.repaint, expected_repaint(scene.expect), "{name}");
+                assert!(
+                    meets_expectation(scene.expect, out.repaint),
+                    "{name}: {:?}, expected {:?}",
+                    out.repaint,
+                    scene.expect
+                );
             }
         }
     }

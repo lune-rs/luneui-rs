@@ -37,7 +37,9 @@ use lune_ui::paint::{Painter, Rect};
 use lune_ui::scene::Scene;
 use lune_ui::text::TextSystem;
 
-use crate::page::{Page, PageKind, PageState, Player, Step};
+use crate::page::{
+    Page, PageKind, PageState, Player, Step, page_images, register_images, release_images,
+};
 use crate::pages::{PAGES, effects};
 use crate::scenes::{BLUR_SATURATION, BLUR_SIGMA, EFFECTS, LegacyScene, P, REFERENCE};
 use crate::{Renderer, offscreen_renderer};
@@ -496,7 +498,18 @@ fn frame(
     })
 }
 
+/// Measures `sc` with the pictures its page draws registered for the duration.
 fn measure(r: &mut Renderer, sc: &Scenario, o: &Options) -> Result<Outcome, String> {
+    let images = match sc.kind {
+        Kind::Page(page) => register_images(&mut r.gpu, page_images(page))?,
+        _ => Vec::new(),
+    };
+    let outcome = measure_runs(r, sc, o);
+    release_images(&mut r.gpu, &images);
+    outcome
+}
+
+fn measure_runs(r: &mut Renderer, sc: &Scenario, o: &Options) -> Result<Outcome, String> {
     let texture = dump::target(&r.gpu.device, r.frame.format(), o.size);
     let view = texture.create_view(&Default::default());
     // Simulated time: frame `n` is at `n / 60` s; the counter keeps running across runs.

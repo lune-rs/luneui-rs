@@ -16,6 +16,7 @@ fn xf(origin: (f32, f32), scale: f32, dy: f32, alpha: f32) -> Xform {
     Xform {
         origin,
         scale,
+        dx: 0.0,
         dy,
         alpha,
     }
@@ -237,4 +238,77 @@ fn recording_renderer_carries_opacity() {
         calls.as_slice(),
         [DrawCall::Acrylic { layer: 0, opacity, .. }] if *opacity == 0.5
     ));
+}
+
+#[test]
+fn push_translate_moves_the_content_and_keeps_the_clip_on_screen() {
+    let mut t = FakeText;
+    let mut p = painter(&mut t);
+    let clip = Rect::new(10.0, 10.0, 100.0, 100.0);
+    p.push_clip(clip);
+    p.push_translate(0.0, -40.0);
+    // 10 px x 10 px at (10, 90) in the shifted space is at (10, 50) on screen
+    p.fill(Rect::new(10.0, 90.0, 10.0, 10.0), 0.0, WHITE);
+    let sh = p.scene.layers[0].geometry.under[0];
+    assert_eq!(sh.rect, [20.0, 100.0, 20.0, 20.0]);
+    // the clip is where it was on screen, in device px
+    assert_eq!(sh.clip, [20.0, 20.0, 200.0, 200.0]);
+    // a hit clips against the clip in the shifted space and lands on screen
+    p.hit(Rect::new(0.0, 0.0, 400.0, 400.0), 1);
+    assert_eq!(p.hits[0].0, clip);
+    p.pop_translate();
+    p.fill(Rect::new(10.0, 90.0, 10.0, 10.0), 0.0, WHITE);
+    let sh = p.scene.layers[0].geometry.under[1];
+    assert_eq!(sh.rect, [20.0, 180.0, 20.0, 20.0]);
+    assert_eq!(sh.clip, [20.0, 20.0, 200.0, 200.0]);
+    p.pop_clip();
+    p.fill(Rect::new(10.0, 90.0, 10.0, 10.0), 0.0, WHITE);
+    assert_eq!(p.scene.layers[0].geometry.under[2].clip[2], 0.0);
+}
+
+#[test]
+fn push_translate_replays_to_the_same_scene() {
+    let draw = |p: &mut P<'_>| {
+        p.push_clip(Rect::new(10.0, 10.0, 100.0, 100.0));
+        p.push_translate(5.0, -40.0);
+        p.fill(Rect::new(10.0, 90.0, 10.0, 10.0), 0.0, WHITE);
+        p.pop_translate();
+        p.pop_clip();
+    };
+    let mut t = FakeText;
+    let mut direct = painter(&mut t);
+    draw(&mut direct);
+    let mut t2 = FakeText;
+    let mut rec = painter(&mut t2);
+    rec.start_recording();
+    draw(&mut rec);
+    let ops = rec.take_recording();
+    let mut t3 = FakeText;
+    let mut replayed = painter(&mut t3);
+    replayed.replay(&ops);
+    assert_eq!(direct.scene, replayed.scene);
+    assert_eq!(direct.scene, rec.scene);
+}
+
+#[test]
+fn text_queries_forward_to_the_text_system() {
+    use lune_ui_core::text::{CaretPos, Unit};
+    let mut t = FakeText;
+    let mut p = painter(&mut t);
+    let spec = Spec::plain("ab\ncd", Style::ui(10.0, THEME.fg_primary));
+    // The fake is in logical px, whatever the painter's scale (2).
+    assert_eq!(
+        p.caret(&spec, 4),
+        CaretPos {
+            x: 5.0,
+            y: 13.0,
+            height: 13.0,
+            line: 1
+        }
+    );
+    assert_eq!(p.text_hit(&spec, (8.0, 14.0)), 5);
+    let lines = p.text_lines(&spec);
+    assert_eq!(lines.len(), 2);
+    assert_eq!((lines[1].start, lines[1].end), (3, 5));
+    assert_eq!(p.segments("a\u{301}b", Unit::Grapheme), [0, 3, 4]);
 }

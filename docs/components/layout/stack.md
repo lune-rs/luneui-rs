@@ -2,10 +2,10 @@
 id: layout.stack
 title: Stack, row, column and grid layout
 area: layout
-status: planned
+status: in-progress
 consumers: any
-source: —
-owner: —
+source: crates/lune-ui-core/src/layout.rs
+owner: orch/toolkit-v1
 summary: Pure layout helpers: stack, row, column and grid with gaps, alignment, insets and fixed, fill and hug sizing
 ---
 
@@ -25,7 +25,7 @@ Avalonia's `StackPanel`, `Grid` and `DockPanel`; Wane specifies gaps on a 4 px g
 
 ## Existing code
 
-None in `lune-ui` today: widgets take rects computed by the caller (`crates/lune-ui-core/src/widgets/mod.rs`).
+Built in M5 (D108): `crates/lune-ui-core/src/layout.rs`, pure `stack`, `row`, `column` and `grid` over `Size`, `Align`, `Insets` and `Track`; widgets still take rects computed by the caller.
 Design sources: Lunegit `StackPanel` (`Spacing` on 444 `<StackPanel` elements in `src/Lunegit.Desktop`), `Grid`
 (165 `<Grid` elements) and `DockPanel` (`Controls/FilterBar.axaml:9`); Wane `docs/ui/mocks/css/tokens.css:131-143`.
 
@@ -99,13 +99,13 @@ None: layout has no text.
 
 ### Build
 
-- Milestone: M5
+- Milestone: M5. Built in M5 (steps 2 and 6; the page is `stack`). Open for `done` (D47): M11 re-checks the whole bar on every entry; the Windows and Linux run time is unverified (the Linux and Windows lint is `scripts/check-targets.sh`).
 - Depends on: core.ui
 
 ## Open questions
 
-- `wrap` (a flow layout) has no Lunegit or Wane use found in the files read; not specified until a consumer names it.
-- Whether min and max size constraints per child are needed (Lunegit's tab has `MinWidth` 108 and `MaxWidth` 270 [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:59-60]); M5 decides on the API.
+- Answered (D108, no consumer yet): `wrap` (a flow layout) has no Lunegit or Wane use found in the files read; not specified until a consumer names it.
+- Answered (D108, no consumer yet): whether min and max size constraints per child are needed (Lunegit's tab has `MinWidth` 108 and `MaxWidth` 270 [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:59-60]); M5 decides on the API.
 
 ## Notes for the planner
 

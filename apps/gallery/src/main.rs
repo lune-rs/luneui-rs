@@ -28,7 +28,7 @@ use lune_ui::frame::{FrameParams, FrameRenderer};
 use lune_ui::gpu::{self, Gpu};
 use lune_ui::scene::Scene;
 use lune_ui::text::TextCache;
-use page::{PageKind, expected_repaint, run_scene};
+use page::{PageKind, meets_expectation, register_images, release_images, run_scene};
 use pages::PAGES;
 use scenes::{BLUR_SATURATION, BLUR_SIGMA, H, W};
 
@@ -177,9 +177,11 @@ fn dump_scenes(r: &mut Renderer, dir: &Path) -> Result<(), String> {
                 for scene in ui.scenes {
                     let s = scene.scale as f32;
                     let size = (W * scene.scale, H * scene.scale);
+                    let images = register_images(&mut r.gpu, (scene.state)().images())
+                        .map_err(|e| format!("scene {}: {e}", scene.name()))?;
                     let (display, out) = run_scene(page.id, scene, &mut r.text)
                         .map_err(|e| format!("scene {}: {e}", scene.name()))?;
-                    if out.repaint != expected_repaint(scene.expect) {
+                    if !meets_expectation(scene.expect, out.repaint) {
                         return Err(format!(
                             "scene {}: capture frame reports {:?}, expected {:?}",
                             scene.name(),
@@ -187,9 +189,11 @@ fn dump_scenes(r: &mut Renderer, dir: &Path) -> Result<(), String> {
                             scene.expect
                         ));
                     }
-                    dump_one(r, dir, &scene.name(), size, |r, view| {
+                    let dumped = dump_one(r, dir, &scene.name(), size, |r, view| {
                         draw_scene(r, &display, s, view, size)
-                    })?;
+                    });
+                    release_images(&mut r.gpu, &images);
+                    dumped?;
                 }
             }
         }

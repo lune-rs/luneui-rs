@@ -2,10 +2,10 @@
 id: text.ime
 title: IME composition input
 area: text
-status: planned
+status: in-progress
 consumers: luneterm, lunegit, wane
-source: —
-owner: —
+source: crates/lune-ui-core/src/widgets/field.rs
+owner: orch/toolkit-v1
 summary: IME composition in text widgets: preedit drawn inline at the caret, commit, candidate-window area, byte offsets from the platform
 ---
 
@@ -26,7 +26,7 @@ the app's: every text widget needs it (decided by R-text-4 resolution, M3).
 
 ## Existing code
 
-Events and output exist, nothing consumes them: `ImeEvent` (`crates/lune-ui-core/src/input.rs:141-153`), `FrameOutput.ime_area` (`:156-163`), the winit translation
+Built in M5 (D103): `field` and `text_area` consume the events (`crates/lune-ui-core/src/widgets/field.rs`, `text_edit.rs`) and report `ime_area`. The input side existed first: events and output, with nothing consuming them: `ImeEvent` (`crates/lune-ui-core/src/input.rs:141-153`), `FrameOutput.ime_area` (`:156-163`), the winit translation
 (`crates/lune-ui-winit/src/input.rs:149-161`) and the output side that enables the input method and sets the cursor area (`crates/lune-ui-winit/src/input.rs:278-312`); the scripted builder
 `ScriptedInput::ime` (`crates/lune-ui-core/src/testing/input.rs:148`); a translation test (`crates/lune-ui-winit/tests/input.rs:42-48`). No widget sets `ime_area`.
 
@@ -119,15 +119,15 @@ None: no text of its own.
 
 ### Build
 
-- Milestone: M5
+- Milestone: M5. Built in M5 (steps 13 and 15; the page is `ime`, 6 scenes; the gallery bundles no CJK font, so the catalogue's "かな" preedit draws as boxes, D90). Open for `done` (D47): M11 re-checks the whole bar on every entry; real typing with an input method (R1) and bidi caret placement are unverified here, and so is the Windows and Linux run time.
 - Depends on: text.text-edit, core.input, platform.input, core.ui, infra.accessibility
 
 ## Open questions
 
-- The look of the underline and of the selected clause (thickness, colour): no source states them; M5 takes them from the theme.
-- What a pointer press inside the field does to a composition (commit or cancel): platform behaviour, not stated by any source read.
-- `role-gap: composition range`: SF8 has no field for a composition range.
-- Whether the preedit shows on a different layer than the committed text when the field scrolls horizontally: M5 decides with the scroll rule in `text.text-edit`.
+- Answered (D103: 1 px `fg_primary`, the clause 2 px over `text_selection`): the look of the underline and of the selected clause (thickness, colour): no source states them; M5 takes them from the theme.
+- Answered (D103, ignored): what a pointer press inside the field does to a composition (commit or cancel): platform behaviour, not stated by any source read.
+- Still open: `role-gap: composition range`: SF8 has no field for a composition range.
+- Answered (D103, it scrolls with the text): whether the preedit shows on a different layer than the committed text when the field scrolls horizontally: M5 decides with the scroll rule in `text.text-edit`.
 
 ## Notes for the planner
 

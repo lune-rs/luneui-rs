@@ -102,6 +102,7 @@ impl PageState for Specimens {
                 p.push_xform(Xform {
                     origin: (0.0, 0.0),
                     scale: 1.0,
+                    dx: 0.0,
                     dy: 0.0,
                     alpha: 0.4,
                 });

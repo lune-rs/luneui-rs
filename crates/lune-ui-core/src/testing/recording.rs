@@ -1,7 +1,8 @@
 //! The display-list seam's fake: a renderer that records draw calls instead of drawing.
 
 use crate::scene::{
-    BackdropRequest, CustomItem, FrameParams, SCENE_LAYERS, Scene, Shape, StrokeVertex, TextItem,
+    BackdropRequest, CustomItem, FrameParams, ImageItem, SCENE_LAYERS, Scene, Shape, StrokeVertex,
+    TextItem,
 };
 
 /// One draw call, in the order a renderer issues it. `layer` is the index into
@@ -16,8 +17,15 @@ pub enum DrawCall {
     },
     /// One shape below the layer's text.
     Under { layer: usize, shape: Shape },
+    /// The layer's path-fill vertices (one draw for the whole non-empty run), below the text.
+    Fills {
+        layer: usize,
+        vertices: Vec<StrokeVertex>,
+    },
     /// One app-owned draw.
     Custom { layer: usize, item: CustomItem },
+    /// One image draw, after the customs and before the text.
+    Image { layer: usize, item: ImageItem },
     /// One text placement.
     Text { layer: usize, item: TextItem },
     /// One shape above the layer's text.
@@ -37,7 +45,9 @@ impl DrawCall {
         match self {
             Self::Acrylic { layer, .. }
             | Self::Under { layer, .. }
+            | Self::Fills { layer, .. }
             | Self::Custom { layer, .. }
+            | Self::Image { layer, .. }
             | Self::Text { layer, .. }
             | Self::Over { layer, .. }
             | Self::Strokes { layer, .. } => Some(*layer),
@@ -55,7 +65,7 @@ pub struct RecordedFrame {
 
 /// Consumes scenes like a renderer does, in the draw order the [`scene`](crate::scene) module
 /// documents, and records one [`DrawCall`] per draw: one per acrylic, under and over shape, one
-/// per non-empty stroke run, one per text item, one per custom item, and the backdrop step when
+/// per non-empty stroke or path-fill run, one per text item, one per custom item, and the backdrop step when
 /// the scene requests one.
 #[derive(Debug, Default)]
 pub struct RecordingRenderer {
@@ -89,7 +99,17 @@ impl RecordingRenderer {
                 layer,
                 shape,
             }));
+            if !g.fills.is_empty() {
+                calls.push(DrawCall::Fills {
+                    layer: i,
+                    vertices: g.fills.clone(),
+                });
+            }
             calls.extend(layer.customs.iter().map(|item| DrawCall::Custom {
+                layer: i,
+                item: *item,
+            }));
+            calls.extend(layer.images.iter().map(|item| DrawCall::Image {
                 layer: i,
                 item: *item,
             }));
@@ -128,6 +148,7 @@ impl RecordingRenderer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::image::{Fit, ImageAlign, ImageId};
     use crate::paint::{LayerId, Painter, Rect, StrokeStyle};
     use crate::testing::FakeText;
     use crate::text::{Spec, Style};
@@ -139,8 +160,10 @@ mod tests {
             DrawCall::Acrylic { .. } => "acrylic",
             DrawCall::Under { shape, .. } if shape.params[0] == 1.0 => "under ring",
             DrawCall::Under { .. } => "under fill",
+            DrawCall::Fills { .. } => "fills",
             DrawCall::Custom { item, .. } if item.slot == 0 => "custom 0",
             DrawCall::Custom { .. } => "custom",
+            DrawCall::Image { .. } => "image",
             DrawCall::Text { .. } => "text",
             DrawCall::Over { shape, .. } if shape.params[0] == 1.0 => "over ring",
             DrawCall::Over { .. } => "over fill",
@@ -171,8 +194,10 @@ mod tests {
             false,
             StrokeStyle::solid(THEME.fg_primary, 1.0),
         );
+        p.fill_path(&[[0.0, 0.0], [20.0, 0.0], [20.0, 20.0]], THEME.fg_primary);
         p.text(&spec, 12.0, 12.0);
         p.custom(0, r);
+        p.image(r, ImageId(1), Fit::Contain, ImageAlign::CENTER, 1.0);
         p.on(LayerId::Popup);
         p.backdrop(r, 4.0);
         p.fill(r, 4.0, THEME.fg_primary);
@@ -196,7 +221,9 @@ mod tests {
                 ("acrylic", Some(0)),
                 ("under fill", Some(0)),
                 ("under ring", Some(0)),
+                ("fills", Some(0)),
                 ("custom 0", Some(0)),
+                ("image", Some(0)),
                 ("text", Some(0)),
                 ("over ring", Some(0)),
                 ("strokes", Some(0)),

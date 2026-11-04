@@ -103,6 +103,7 @@ pub fn paint<H: Copy + PartialEq>(
         p.push_xform(Xform {
             origin: (r.x + r.w / 2.0, r.y + r.h / 2.0),
             scale: look.scale,
+            dx: 0.0,
             dy: 0.0,
             alpha: 1.0,
         });

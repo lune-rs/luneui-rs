@@ -16,18 +16,30 @@ mod checkbox;
 mod combo;
 mod controls_ui;
 mod dialog;
+mod drag_drop;
 mod dropdown;
 pub(crate) mod effects;
 mod focus;
+mod image;
+mod ime;
 mod label;
 mod locale;
 mod menu;
 mod motion;
+mod popover;
+mod primitives;
 pub(crate) mod reference;
+mod scroll_area;
+mod scrollbar;
+mod shortcuts;
+mod stack;
 mod stepper;
+mod text_edit;
 mod text_field;
 mod toggle;
+mod tooltip;
 mod ui;
+mod virtual_list;
 
 /// Every page, in listing and window order.
 pub(crate) static PAGES: &[&Page] = &[
@@ -48,6 +60,18 @@ pub(crate) static PAGES: &[&Page] = &[
     &focus::PAGE,
     &a11y::PAGE,
     &locale::PAGE,
+    &stack::PAGE,
+    &image::PAGE,
+    &shortcuts::PAGE,
+    &primitives::PAGE,
+    &scroll_area::PAGE,
+    &scrollbar::PAGE,
+    &virtual_list::PAGE,
+    &popover::PAGE,
+    &tooltip::PAGE,
+    &text_edit::PAGE,
+    &ime::PAGE,
+    &drag_drop::PAGE,
 ];
 
 /// The window background of a Ui page (glass, focused) and its card. Returns the card.

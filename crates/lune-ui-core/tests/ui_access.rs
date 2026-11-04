@@ -255,6 +255,7 @@ fn node_bounds_follow_the_transform_stack() {
     let x = Xform {
         origin: (200.0, 150.0),
         scale: 0.97,
+        dx: 0.0,
         dy: 4.0,
         alpha: 0.5,
     };

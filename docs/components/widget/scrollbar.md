@@ -2,10 +2,10 @@
 id: widget.scrollbar
 title: Scrollbars
 area: widget
-status: planned
+status: in-progress
 consumers: lunegit, wane
-source: Lunegit: src/Lunegit.Desktop/App.axaml
-owner: —
+source: crates/lune-ui-core/src/widgets/scrollbar.rs
+owner: orch/toolkit-v1
 summary: Overlay scrollbar: 9 px transparent track, 6 px accent thumb, auto-hide while the pointer is away, thumb drag
 ---
 
@@ -26,7 +26,7 @@ Wane mocks it and leaves dragging, the fade and keyboard paging to the native bu
 
 ## Existing code
 
-None in `lune-ui` today. Design source (not code to move): Lunegit `src/Lunegit.Desktop/App.axaml:588-659` (style), `Themes/DarkTheme.axaml:164-165` (thumb fills),
+Built in M5 (D99): `crates/lune-ui-core/src/widgets/scrollbar.rs`, drawn by `Ui::scroll_area`; the thumb colours are `Theme` values. Design source (not code to move): Lunegit `src/Lunegit.Desktop/App.axaml:588-659` (style), `Themes/DarkTheme.axaml:164-165` (thumb fills),
 `Themes/Animations.axaml:616-630` and `Themes/AnimationsReduced.axaml:438-449` (the fade); Wane `docs/ui/mocks/css/components.css:419-442`.
 
 ## Spec
@@ -122,13 +122,13 @@ None: the bar has no text and no tooltip in the style read [L src/Lunegit.Deskto
 
 ### Build
 
-- Milestone: M5
+- Milestone: M5. Built in M5 (steps 7 and 10; the page is `scrollbar`, 8 scenes). Open for `done` (D47): M11 re-checks the whole bar on every entry; the Windows and Linux run time is unverified (the Linux and Windows lint is `scripts/check-targets.sh`).
 - Depends on: layout.scroll-area, core.ui, motion.transitions
 
 ## Open questions
 
-- Click in the empty track: Lunegit hides every `RepeatButton` in the bar template [L src/Lunegit.Desktop/App.axaml:606-608]; whether Fluent's track page buttons are among them is not verified, so page-by-click is unspecified. M5 decides (default: no).
-- Horizontal thumb offset inside the 9 px bar: Wane's 1 px from the end applies to the vertical bar only; the horizontal bar's placement is not stated by either source.
+- Answered (D99, no page-by-click): click in the empty track: Lunegit hides every `RepeatButton` in the bar template [L src/Lunegit.Desktop/App.axaml:606-608]; whether Fluent's track page buttons are among them is not verified, so page-by-click is unspecified. M5 decides (default: no).
+- Answered (D99, 1 px from the bottom edge): horizontal thumb offset inside the 9 px bar: Wane's 1 px from the end applies to the vertical bar only; the horizontal bar's placement is not stated by either source.
 
 ## Notes for the planner
 
