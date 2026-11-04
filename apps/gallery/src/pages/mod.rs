@@ -24,6 +24,7 @@ mod label;
 mod locale;
 mod menu;
 mod motion;
+mod popover;
 mod primitives;
 pub(crate) mod reference;
 mod scroll_area;
@@ -63,6 +64,7 @@ pub(crate) static PAGES: &[&Page] = &[
     &scroll_area::PAGE,
     &scrollbar::PAGE,
     &virtual_list::PAGE,
+    &popover::PAGE,
     &tooltip::PAGE,
 ];
 

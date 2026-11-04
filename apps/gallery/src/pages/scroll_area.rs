@@ -2,12 +2,14 @@
 //! (`layout.scroll-area`). The window shows the live area; the scenes script the wheel and the
 //! pointer. [`AREA`] and [`lines`] are shared with the `scrollbar` page, which draws the same area.
 
+use std::time::Duration;
+
 use lune_ui::lunegit_dark::THEME;
 use lune_ui::motion::MotionTier;
 use lune_ui::paint::Rect;
 use lune_ui::text::{Spec, Style};
 use lune_ui::ui::Ui;
-use lune_ui::widgets::scroll_area::{Bars, Extent, ScrollOptions, ScrollView};
+use lune_ui::widgets::scroll_area::{Bars, Extent, Reveal, ScrollOptions, ScrollView, Target};
 
 use super::{card, heading};
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
@@ -48,10 +50,58 @@ pub(super) fn lines(ui: &mut Ui<'_>, view: &ScrollView, count: u32) -> Extent {
     Extent::new(f64::from(vp.w), f64::from(count) * f64::from(LINE_H))
 }
 
-fn live() -> Box<dyn PageState> {
-    Box::new(Live {
+/// Lines that fit inside the viewport (5 x 45 px < 360 px).
+const FEW: u32 = 5;
+/// The log of the follow-tail scene starts at this many lines and gets one more at [`GROW_AT`].
+const LOG: u32 = 20;
+const GROW_AT: Duration = Duration::from_millis(400);
+/// The scroll-into-view scene asks at this time for the line one viewport down.
+const REVEAL_AT: Duration = Duration::from_millis(300);
+/// The line that starts one viewport (8 lines of 45 px) below the top.
+const FAR_LINE: u32 = 8;
+
+fn base() -> Live {
+    Live {
         lines: TALL,
         bars: (Bars::Auto, Bars::Auto),
+        follow_tail: false,
+        grow_at: None,
+        reveal_at: None,
+        revealed: false,
+    }
+}
+
+fn live() -> Box<dyn PageState> {
+    Box::new(base())
+}
+
+fn fits() -> Box<dyn PageState> {
+    Box::new(Live {
+        lines: FEW,
+        ..base()
+    })
+}
+
+fn disabled() -> Box<dyn PageState> {
+    Box::new(Live {
+        bars: (Bars::Disabled, Bars::Disabled),
+        ..base()
+    })
+}
+
+fn log() -> Box<dyn PageState> {
+    Box::new(Live {
+        lines: LOG,
+        follow_tail: true,
+        grow_at: Some(GROW_AT),
+        ..base()
+    })
+}
+
+fn into_view() -> Box<dyn PageState> {
+    Box::new(Live {
+        reveal_at: Some(REVEAL_AT),
+        ..base()
     })
 }
 
@@ -59,6 +109,12 @@ fn live() -> Box<dyn PageState> {
 struct Live {
     lines: u32,
     bars: (Bars, Bars),
+    follow_tail: bool,
+    /// A line is added from this time on (a log growing).
+    grow_at: Option<Duration>,
+    /// The app asks once, from this time on, to bring [`FAR_LINE`] into view.
+    reveal_at: Option<Duration>,
+    revealed: bool,
 }
 
 impl PageState for Live {
@@ -67,14 +123,31 @@ impl PageState for Live {
         heading(ui, "SCROLL AREA", card.x + 24.0, card.y + 24.0);
         let opts = ScrollOptions {
             bars: self.bars,
+            follow_tail: self.follow_tail,
             ..ScrollOptions::default()
         };
-        let count = self.lines;
+        let count = self.lines + u32::from(self.grow_at.is_some_and(|t| ui.time() >= t));
+        if !self.revealed && self.reveal_at.is_some_and(|t| ui.time() >= t) {
+            self.revealed = true;
+            let top = f64::from(FAR_LINE) * f64::from(LINE_H);
+            ui.scroll_to(
+                "area",
+                Target::span_y(top, f64::from(LINE_H)),
+                Reveal::Center,
+            );
+        }
         ui.scroll_area("area", AREA, &opts, |ui, view| ((), lines(ui, view, count)));
     }
 }
 
 const AREA_PATH: &[&str] = &["area"];
+
+/// A wheel-free scroll to 40 percent of the range (720 px): 288 px, applied 1:1.
+const TO_40: Ev = Ev::Scroll {
+    x: 0.0,
+    y: -288.0,
+    precise: true,
+};
 
 const SCENES: &[UiScene] = &[
     UiScene {
@@ -86,8 +159,70 @@ const SCENES: &[UiScene] = &[
         capture_ms: 0,
         expect: Expect::Settled,
     },
+    // The pointer is over the area, the content is at 40 percent: the thumb shows part way down.
+    UiScene {
+        id: "scroll-area-hover",
+        scale: 2,
+        tier: MotionTier::Full,
+        state: live,
+        script: &[
+            Step {
+                at_ms: 0,
+                events: &[Ev::PointerOver(AREA_PATH)],
+            },
+            Step {
+                at_ms: 100,
+                events: &[TO_40],
+            },
+        ],
+        capture_ms: 800,
+        expect: Expect::Settled,
+    },
+    UiScene {
+        id: "scroll-area-fits",
+        scale: 2,
+        tier: MotionTier::Full,
+        state: fits,
+        script: &[Step {
+            at_ms: 0,
+            events: &[Ev::PointerOver(AREA_PATH)],
+        }],
+        capture_ms: 600,
+        expect: Expect::Settled,
+    },
+    UiScene {
+        id: "scroll-area-disabled",
+        scale: 2,
+        tier: MotionTier::Full,
+        state: disabled,
+        script: &[Step {
+            at_ms: 0,
+            events: &[Ev::PointerOver(AREA_PATH)],
+        }],
+        capture_ms: 600,
+        expect: Expect::Settled,
+    },
+    // One line is added at 400 ms: follow-tail takes the area to the new end.
+    UiScene {
+        id: "scroll-area-follow-tail",
+        scale: 2,
+        tier: MotionTier::Full,
+        state: log,
+        script: &[
+            Step {
+                at_ms: 200,
+                events: &[],
+            },
+            Step {
+                at_ms: 500,
+                events: &[],
+            },
+        ],
+        capture_ms: 1000,
+        expect: Expect::Settled,
+    },
     // One wheel line (48 px) is the `scroll` kind at `fast` (180 ms): half way at 90 ms. The
-    // pointer entered the area 100 ms before, so the thumb has finished its own reveal.
+    // pointer entered the area 300 ms before, so the thumb has finished its own reveal.
     UiScene {
         id: "scroll-area-wheel",
         scale: 2,
@@ -107,6 +242,32 @@ const SCENES: &[UiScene] = &[
                 }],
             },
         ],
+        capture_ms: 390,
+        expect: Expect::Moving,
+    },
+    // The app asks at 300 ms for the line one viewport down: `scroll` kind, `fast`, sine-in-out.
+    UiScene {
+        id: "scroll-area-into-view",
+        scale: 2,
+        tier: MotionTier::Full,
+        state: into_view,
+        script: &[Step {
+            at_ms: 300,
+            events: &[],
+        }],
+        capture_ms: 390,
+        expect: Expect::Moving,
+    },
+    // The pointer enters the area at 300 ms: the thumb fades in over `fast`.
+    UiScene {
+        id: "scroll-area-thumb-reveal",
+        scale: 2,
+        tier: MotionTier::Full,
+        state: live,
+        script: &[Step {
+            at_ms: 300,
+            events: &[Ev::PointerOver(AREA_PATH)],
+        }],
         capture_ms: 390,
         expect: Expect::Moving,
     },

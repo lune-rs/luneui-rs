@@ -116,6 +116,9 @@ pub(crate) enum Expect {
     Settled,
     /// `Repaint::Now` at the capture frame (a transition is in flight).
     Moving,
+    /// `Repaint::At(_)` at the capture frame: nothing moves yet, a frame is due later (a pending
+    /// tooltip).
+    Waiting,
 }
 
 /// One scripted Ui scene: input events at times, then a capture frame.
@@ -383,11 +386,12 @@ impl Player {
     }
 }
 
-/// The `Repaint` a scene's capture frame must report.
-pub(crate) fn expected_repaint(expect: Expect) -> Repaint {
+/// Whether a scene's capture frame reported the `Repaint` its `expect` names.
+pub(crate) fn meets_expectation(expect: Expect, repaint: Repaint) -> bool {
     match expect {
-        Expect::Settled => Repaint::Idle,
-        Expect::Moving => Repaint::Now,
+        Expect::Settled => repaint == Repaint::Idle,
+        Expect::Moving => repaint == Repaint::Now,
+        Expect::Waiting => matches!(repaint, Repaint::At(_)),
     }
 }
 
@@ -474,7 +478,12 @@ mod tests {
                 let name = format!("{}/{}", page.id, scene.name());
                 let (_, out) = run_scene(page.id, scene, &mut FakeText)
                     .unwrap_or_else(|e| panic!("{name}: {e}"));
-                assert_eq!(out.repaint, expected_repaint(scene.expect), "{name}");
+                assert!(
+                    meets_expectation(scene.expect, out.repaint),
+                    "{name}: {:?}, expected {:?}",
+                    out.repaint,
+                    scene.expect
+                );
             }
         }
     }

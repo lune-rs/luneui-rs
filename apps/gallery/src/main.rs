@@ -28,7 +28,7 @@ use lune_ui::frame::{FrameParams, FrameRenderer};
 use lune_ui::gpu::{self, Gpu};
 use lune_ui::scene::Scene;
 use lune_ui::text::TextCache;
-use page::{PageKind, expected_repaint, register_images, release_images, run_scene};
+use page::{PageKind, meets_expectation, register_images, release_images, run_scene};
 use pages::PAGES;
 use scenes::{BLUR_SATURATION, BLUR_SIGMA, H, W};
 
@@ -181,7 +181,7 @@ fn dump_scenes(r: &mut Renderer, dir: &Path) -> Result<(), String> {
                         .map_err(|e| format!("scene {}: {e}", scene.name()))?;
                     let (display, out) = run_scene(page.id, scene, &mut r.text)
                         .map_err(|e| format!("scene {}: {e}", scene.name()))?;
-                    if out.repaint != expected_repaint(scene.expect) {
+                    if !meets_expectation(scene.expect, out.repaint) {
                         return Err(format!(
                             "scene {}: capture frame reports {:?}, expected {:?}",
                             scene.name(),

@@ -1,16 +1,16 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-04 (M5 steps 1 to 9 done; step 10 is next; M4 merged at d9fe71f)
+Last updated: 2026-11-04 (M5 steps 1 to 10 done; step 11 is next; M4 merged at d9fe71f)
 
 ## Now
 
 M4 (interaction and motion) is merged to main at d9fe71f, on top of M3 (catalogue specs) and M2
 (seams and crate split). M5 (foundations: layout, scroll, list, popover, text editing, drag and drop,
-shortcuts, painter primitives) is in progress on branch `orch/toolkit-v1`; steps 1 to 9 (the frame
+shortcuts, painter primitives) is in progress on branch `orch/toolkit-v1`; steps 1 to 10 (the frame
 plumbing, layout helpers, shortcut registry, vector primitives, image and rotate, their gallery pages, the
-scroll area and scrollbar, the virtualized list, popover and tooltip) are done; step 10 (their gallery
-pages) is next.
+scroll area and scrollbar, the virtualized list, popover and tooltip, and the gallery pages of those four) are done; step 11
+(text queries on `TextSystem`) is next.
 `lune-ui-core` holds the per-window `Ui` frame (stable ids, retained state with keep-alive scopes,
 layered hits with modal and pointer capture, `Response`, overlays with exit retention, focus scopes,
 the semantic tree with actions, the string table, `FrameOutput` with `Repaint`) and the closed-form
@@ -29,14 +29,14 @@ the dropdown and menu call it) and `Ui::popover` (popup layer, light dismiss, th
 `MotionTokens::tooltip_delay`, `LAZY_HOVER_DWELL` 150 ms).
 `docs/architecture.md` holds the module map, "The `Ui` frame" and "API changes since M1"; DECISIONS
 D59 to D85 record the M4 choices.
-The gallery has a page registry (two legacy pages, 15 Ui pages), `--dump`, `--list` (62 scene names)
+The gallery has a page registry (two legacy pages, 24 Ui pages), `--dump`, `--list` (123 scene names)
 and `--bench`. The cross-widget contract suite is `crates/lune-ui-core/tests/c4.rs`.
 The pixel gate shows the 15 legacy scenes identical against the M1 base.
 
 ## Next
 
-1. M5 steps 10 to 16 per `m05-foundations/plan.md`: gallery pages, text queries, `TextEdit`,
-   the text field upgrade, drag and drop, gallery pages, docs and the acceptance bench.
+1. M5 steps 11 to 16 per `m05-foundations/plan.md`: text queries, `TextEdit`, the text field
+   upgrade, drag and drop, gallery pages, docs and the acceptance bench.
 2. CI (fmt, clippy `-D warnings`, tests on macOS, Windows and Linux) now that there is code to run.
 3. An export script for Luneterm's vendored snapshot, before Luneterm M9. The migration
    map for M11 is "API changes since M1" in `docs/architecture.md`.
