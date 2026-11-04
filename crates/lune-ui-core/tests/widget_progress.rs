@@ -66,14 +66,27 @@ fn the_fill_colour_is_accent_for_neutral_and_the_tone_otherwise() {
 }
 
 #[test]
-fn at_scale_2_the_track_is_8_px_high_with_an_8_px_radius() {
+fn at_scale_2_the_track_is_8_px_high_with_a_4_px_radius() {
     let win = Rect::new(0.0, 0.0, WIN.0, WIN.1);
     let mut text = FakeText;
     let mut p = Painter::<u8>::new(2.0, win, &mut text, None, DARK);
     progress::paint(&mut p, RECT, 0.5, Tone::Neutral);
     let s = shapes(&p.scene);
     assert_eq!(s[0].rect[3], 8.0);
-    assert_eq!(s[0].radii, [8.0; 4]);
+    assert_eq!(s[0].radii, [4.0; 4], "half the height: a semicircular end");
+}
+
+#[test]
+fn the_indeterminate_track_is_3_high_with_half_that_radius() {
+    let win = Rect::new(0.0, 0.0, WIN.0, WIN.1);
+    let mut text = FakeText;
+    let mut p = Painter::<u8>::new(2.0, win, &mut text, None, DARK);
+    let track = Rect::new(RECT.x, RECT.y, RECT.w, progress::HEIGHT_INDETERMINATE);
+    progress::paint_indeterminate(&mut p, track, Tone::Neutral, Indeterminate::Travel(0.5));
+    let s = shapes(&p.scene);
+    assert_eq!(s[0].rect[3], 6.0);
+    assert_eq!(s[0].radii, [3.0; 4], "half the 3 px height, scale 2");
+    assert_eq!(s[1].radii, [3.0; 4], "the segment takes the same radius");
 }
 
 fn run(

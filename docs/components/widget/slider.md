@@ -33,16 +33,16 @@ Derivation sources: `widget.toggle` (knob), `data.progress` (track and fill), `w
 
 ### Anatomy
 
-- Track: height 4, radius 4, full width of the rect; fill `surface_overlay` #ffffff15 [W docs/ui/components.md:632], [W docs/ui/mocks/css/tokens.css:22]; derived from `data.progress` [D51].
+- Track: height 4, radius 2 (half the height: a CSS radius of 4 clamps to it in the mock, `sd_round_rect` does not, [D135]), full width of the rect; fill `surface_overlay` #ffffff15 [W docs/ui/components.md:632], [W docs/ui/mocks/css/tokens.css:22]; derived from `data.progress` [D51].
 - Value fill: `accent` from the track start to the knob [W docs/ui/components.md:632], [W docs/ui/mocks/css/tokens.css:40]; `accent` is the toggle's on fill [R crates/lune-ui-core/src/theme.rs:64].
-- Knob: circle 12 (14 hovered), centred vertically on the track, centre at the value position [derived: widget.toggle knob geometry, R crates/lune-ui-core/src/widgets/mod.rs:28-29]; fill `fg_primary` (the toggle's off knob) [derived: widget.toggle, R crates/lune-ui-core/src/widgets/mod.rs:45].
+- Knob: circle 12 (14 hovered), centred vertically on the track, centre at the value position [derived: widget.toggle knob geometry, R crates/lune-ui-core/src/widgets/mod.rs:28-29]; fill `on_accent` #FFFFFF, opaque: the knob rides an accent fill, which is the toggle's on state; `fg_primary` (the toggle's off knob) is #FFFFFFCC and let the fill's end show through [derived: widget.toggle, R crates/lune-ui-core/src/widgets/mod.rs:45], [W docs/ui/mocks/css/components.css:169-170], [D134].
 - Hit area: the track grown by 4 px across and 6 px up and down, as the toggle's hit area [derived: widget.toggle, R crates/lune-ui-core/src/widgets/mod.rs:47].
 
 ### States
 
 | state | look | cite |
 |---|---|---|
-| rest | track `surface_overlay`, fill `accent`, knob 12 `fg_primary` | [derived: widget.toggle, R crates/lune-ui-core/src/widgets/mod.rs:29,45], [derived: data.progress, W docs/ui/components.md:632] [D51] |
+| rest | track `surface_overlay`, fill `accent`, knob 12 `on_accent` | [derived: widget.toggle, R crates/lune-ui-core/src/widgets/mod.rs:29,45], [derived: data.progress, W docs/ui/components.md:632] [D51] |
 | hover | knob 14 | [derived: widget.toggle, R crates/lune-ui-core/src/widgets/mod.rs:29] [D51] |
 | focus-visible | 1 px outline, offset 2, around the knob | [widget.button] [D51] |
 | disabled | opacity 0.4, inert | [widget.button], [L src/Lunegit.Desktop/App.axaml:481-483] [D51] |
@@ -98,7 +98,7 @@ None: the slider has no text; the label is the owner's.
 ### Acceptance
 
 - Scripted: Right and Left change the value by one step; the value stops at `min` and `max` (Open questions); a disabled slider changes nothing.
-- Pixel probes at scale 2: track 8 px high, radius 8 px; knob 24 px (28 hovered); knob centre at the value position.
+- Pixel probes at scale 2: track 8 px high, radius 4 px (a semicircular end); knob `on_accent`; knob 24 px (28 hovered); knob centre at the value position.
 - Conformance: knob x over 60 Hz samples is monotonic, ends exact, settles within 180 ms + 1 frame; Reduced snaps.
 - Semantic node: role slider; value follows `value`; injected `AccessAction` increment and decrement change it by one step.
 

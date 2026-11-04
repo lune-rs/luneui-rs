@@ -89,7 +89,7 @@ fn access(h: &mut UiHarness, action: Action, value: Option<AccessValue>) {
 
 fn knob_shape(scene: &Scene) -> Shape {
     let g = &scene.layers[0].geometry;
-    let color = premul(DARK.fg_primary);
+    let color = premul(DARK.on_accent);
     *g.under
         .iter()
         .chain(&g.over)
@@ -995,7 +995,7 @@ fn pixel_probes_at_scale_2() {
     };
     let bar = shape(DARK.surface_overlay);
     assert_eq!(bar.rect, [t.x * 2.0, t.y * 2.0, t.w * 2.0, 8.0]);
-    assert_eq!(bar.radii, [8.0; 4]);
+    assert_eq!(bar.radii, [4.0; 4], "half the height: a semicircular end");
     let fill = shape(DARK.accent);
     assert_eq!(fill.rect, [t.x * 2.0, t.y * 2.0, t.w * 2.0 * 0.25, 8.0]);
     let knob = knob_shape(&scene);

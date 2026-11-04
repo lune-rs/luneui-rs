@@ -33,11 +33,11 @@ Not read: `ToolbarView.axaml:82-220` (the centre and right groups, the branch an
 ### Anatomy
 
 - Bar: padding 0 6 top and bottom, 8 right [L src/Lunegit.Desktop/Views/ToolbarView.axaml:38]; three columns `*, Auto, *` [L src/Lunegit.Desktop/Views/ToolbarView.axaml:39].
-- Left group: spacing 8; icon spacing 0 [L src/Lunegit.Desktop/Views/ToolbarView.axaml:13-14,41-46].
+- Left group: the actions touch (icon spacing 0), and the branch button sits one group gap (8) after the last action, in the same stack [L src/Lunegit.Desktop/Views/ToolbarView.axaml:13-14,38,41-46,96-110]. The gallery page places them so; `GROUP_GAP` is the spacing between groups, not between buttons.
 - Action button: 40 x 40, padding 6, centred content [L src/Lunegit.Desktop/Views/ToolbarView.axaml:13,19,48-50].
 - Action icon: 20 px, `ForegroundMuted` [L src/Lunegit.Desktop/Views/ToolbarView.axaml:11,53-54].
-- Utility icon 16 px [L src/Lunegit.Desktop/Views/ToolbarView.axaml:12]; branch icon 14 px, content spacing 4, max width 420 [L src/Lunegit.Desktop/Views/ToolbarView.axaml:16-18]; branch button padding 6 horizontal, 4 vertical [L src/Lunegit.Desktop/Views/ToolbarView.axaml:20].
-- Glass material: acrylic with the dark tint and opacity, visible while the window is active; when inactive a solid `WindowFallbackBackground` replaces it [L src/Lunegit.Desktop/Views/ToolbarView.axaml:27-37]; the fallback rule is `material` (M3 `material` entry).
+- Utility icon 16 px [L src/Lunegit.Desktop/Views/ToolbarView.axaml:12]; branch icon 14 px, content spacing 4, max width 420 [L src/Lunegit.Desktop/Views/ToolbarView.axaml:16-18]; branch button padding 6 horizontal, 4 vertical [L src/Lunegit.Desktop/Views/ToolbarView.axaml:20]. The branch label draws `fg_subtle` #808080 at `font_m` 14 [L src/Lunegit.Desktop/Views/ToolbarView.axaml:113,116-117], [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:14], [D133].
+- Glass material: acrylic with the dark tint and opacity (`GlassTintDarkOpacity`, `GlassMaterialDarkOpacity`: the preset's `WINDOW` layer, which the gallery page passes), visible while the window is active; when inactive a solid `WindowFallbackBackground` replaces it [L src/Lunegit.Desktop/Views/ToolbarView.axaml:27-37]; the fallback rule is `material` (M3 `material` entry).
 - Button chrome: class `toolbar-action`, see States [L src/Lunegit.Desktop/App.axaml:460-464].
 
 ### States

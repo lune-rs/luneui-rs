@@ -7,11 +7,11 @@
 
 use std::hash::Hash;
 
-use super::button::{ButtonKind, button_width};
+use super::button::{ButtonKind, PRESS, PRESS_SCALE, button_width};
 use super::spinner::SpinnerOptions;
 use crate::access::{Live, Node, Role, State};
 use crate::image::{Fit, ImageAlign, ImageId};
-use crate::paint::{Painter, Rect};
+use crate::paint::{Painter, Rect, Xform};
 use crate::text::{Spec, Style};
 use crate::ui::Ui;
 
@@ -26,11 +26,15 @@ pub const BANNER_ICON: f32 = 14.0;
 pub const BANNER_GAP: f32 = 8.0;
 
 /// The empty view's column: the widest it gets, the space between its parts, the picture's side,
-/// the action buttons' height and the space between them.
+/// the action buttons' height (padding 16 twice, a 17 px line and a 1 px border twice), their
+/// least width and the space between them.
 pub const EMPTY_MAX_WIDTH: f32 = 520.0;
 pub const EMPTY_SPACING: f32 = 24.0;
 pub const EMPTY_IMAGE: f32 = 100.0;
-pub const EMPTY_ACTION_HEIGHT: f32 = 32.0;
+pub const EMPTY_ACTION_HEIGHT: f32 = 51.0;
+pub const EMPTY_ACTION_MIN_WIDTH: f32 = 140.0;
+/// The action buttons' border width.
+pub const EMPTY_ACTION_BORDER: f32 = 1.0;
 pub const EMPTY_ACTION_GAP: f32 = 12.0;
 
 /// What [`Ui::empty_state`] shows.
@@ -163,7 +167,11 @@ impl Ui<'_> {
             p.measure(&Spec::plain(state.subtitle, sub_style).wrapped(col_w))
                 .1
         };
-        let widths: Vec<f32> = state.actions.iter().map(|a| button_width(p, a)).collect();
+        let widths: Vec<f32> = state
+            .actions
+            .iter()
+            .map(|a| button_width(p, a).max(EMPTY_ACTION_MIN_WIDTH))
+            .collect();
 
         let mut parts = vec![title_h];
         if state.image.is_some() {
@@ -214,7 +222,30 @@ impl Ui<'_> {
             let mut bx = x + (col_w - row) / 2.0;
             for (i, (label, w)) in state.actions.iter().zip(&widths).enumerate() {
                 let r = Rect::new(bx, y, *w, EMPTY_ACTION_HEIGHT);
-                let resp = ui.button(format!("action-{i}"), r, label, ButtonKind::Secondary);
+                let key = format!("action-{i}");
+                let resp = ui.button(&key, r, label, ButtonKind::Secondary);
+                // The border follows the button's press scale (the same animation, read again).
+                let bid = ui.id(&key);
+                let scale = ui.animate_f32(
+                    bid.with("press"),
+                    if resp.pressed { PRESS_SCALE } else { 1.0 },
+                    &PRESS,
+                );
+                let (radius, border) = (ui.theme().item_radius, ui.theme().border);
+                let p = ui.painter();
+                if scale != 1.0 {
+                    p.push_xform(Xform {
+                        origin: (r.x + r.w / 2.0, r.y + r.h / 2.0),
+                        scale,
+                        dx: 0.0,
+                        dy: 0.0,
+                        alpha: 1.0,
+                    });
+                }
+                p.ring(r, radius, EMPTY_ACTION_BORDER, border, false);
+                if scale != 1.0 {
+                    p.pop_xform();
+                }
                 if resp.clicked && clicked.is_none() {
                     clicked = Some(i);
                 }

@@ -24,8 +24,9 @@ use crate::ui::{Response, Sense, Ui};
 
 /// The track's height.
 pub const HEIGHT: f32 = 4.0;
-/// The track's and the fill's corner radius.
-pub const RADIUS: f32 = 4.0;
+/// The track's and the fill's corner radius: half the height, a semicircular end. A CSS radius
+/// larger than that clamps to it; `sd_round_rect` does not, so the value is the clamped one (D135).
+pub const RADIUS: f32 = HEIGHT / 2.0;
 /// Knob position after a key or an accessibility step. Snaps under Reduced.
 pub const VALUE: Motion = Motion {
     easing: Easing::SineInOut,
@@ -85,7 +86,7 @@ impl SliderLook {
         SliderLook {
             track: theme.surface_overlay,
             fill: theme.accent,
-            knob: theme.fg_primary,
+            knob: theme.on_accent,
             knob_size: if state.hovered { 14.0 } else { 12.0 },
             fraction: state.fraction,
             focus: if state.focus_visible { 1.0 } else { 0.0 },

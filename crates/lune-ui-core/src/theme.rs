@@ -45,6 +45,8 @@ pub struct Theme {
     pub caption_close_hover: Rgba,
     pub caption_close_fg: Rgba,
     pub fg_muted: Rgba,
+    /// Lunegit `ForegroundSubtle`: the toolbar's label.
+    pub fg_subtle: Rgba,
     pub fg_bright: Rgba,
     pub fg_quaternary: Rgba,
     pub fg_dim: Rgba,
@@ -59,6 +61,9 @@ pub struct Theme {
     pub err: Rgba,
     pub status_warning: Rgba,
     pub status_warning_light: Rgba,
+    /// The error counterpart of `status_warning_light` (Lunegit `StatusErrorLight`): the error
+    /// tint of a busy cue and a tab's progress spinner.
+    pub status_error_light: Rgba,
     pub status_warning_dark: Rgba,
     /// Data tone (chart series) and the text drawn on a data fill.
     pub data: Rgba,
@@ -121,6 +126,7 @@ pub mod lunegit_dark {
         caption_close_hover: [0xC4, 0x2B, 0x1C, 0xFF],
         caption_close_fg: [0xFF, 0xFF, 0xFF, 0xFF],
         fg_muted: [0xB0, 0xB0, 0xB0, 0xFF],
+        fg_subtle: [0x80, 0x80, 0x80, 0xFF],
         fg_bright: [0xFF, 0xFF, 0xFF, 0xDD],
         fg_quaternary: [0xFF, 0xFF, 0xFF, 0x66],
         fg_dim: [0xFF, 0xFF, 0xFF, 0x55],
@@ -134,6 +140,7 @@ pub mod lunegit_dark {
         err: [0xE0, 0x6C, 0x75, 0xFF],
         status_warning: [0xFF, 0xC1, 0x07, 0xFF],
         status_warning_light: [0xFF, 0xD6, 0x66, 0xFF],
+        status_error_light: [0xEF, 0x9A, 0x9A, 0xFF],
         status_warning_dark: [0x5D, 0x43, 0x00, 0xFF],
         data: [0x5C, 0x8F, 0xE6, 0xFF],
         data_hi: [0x8F, 0xBB, 0xFF, 0xFF],
@@ -190,6 +197,7 @@ mod tests {
     fn the_status_and_surface_tokens_hold_their_values() {
         let expected = [
             (THEME.fg_muted, [0xB0, 0xB0, 0xB0, 0xFF]),
+            (THEME.fg_subtle, [0x80, 0x80, 0x80, 0xFF]),
             (THEME.fg_bright, [0xFF, 0xFF, 0xFF, 0xDD]),
             (THEME.fg_quaternary, [0xFF, 0xFF, 0xFF, 0x66]),
             (THEME.fg_dim, [0xFF, 0xFF, 0xFF, 0x55]),
@@ -203,6 +211,7 @@ mod tests {
             (THEME.err, [0xE0, 0x6C, 0x75, 0xFF]),
             (THEME.status_warning, [0xFF, 0xC1, 0x07, 0xFF]),
             (THEME.status_warning_light, [0xFF, 0xD6, 0x66, 0xFF]),
+            (THEME.status_error_light, [0xEF, 0x9A, 0x9A, 0xFF]),
             (THEME.status_warning_dark, [0x5D, 0x43, 0x00, 0xFF]),
             (THEME.data, [0x5C, 0x8F, 0xE6, 0xFF]),
             (THEME.data_hi, [0x8F, 0xBB, 0xFF, 0xFF]),
@@ -210,7 +219,7 @@ mod tests {
             (THEME.paused, [0x8A, 0x90, 0x99, 0xFF]),
             (THEME.window_fallback, [0x33, 0x33, 0x33, 0xFF]),
         ];
-        assert_eq!(expected.len(), 20);
+        assert_eq!(expected.len(), 22);
         for (got, want) in expected {
             assert_eq!(got, want);
         }

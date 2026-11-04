@@ -4,7 +4,7 @@
 
 use lune_ui::icon;
 use lune_ui::input::NamedKey;
-use lune_ui::lunegit_dark::{PANEL, THEME};
+use lune_ui::lunegit_dark::{CARD, THEME, WINDOW};
 use lune_ui::motion::MotionTier;
 use lune_ui::paint::Rect;
 use lune_ui::text::{Spec, Style};
@@ -60,20 +60,21 @@ impl PageState for Live {
         let bar = Rect::new(card.x, y + 24.0, card.w, 52.0);
         let opts = ToolbarOptions {
             active: self.active,
-            glass: PANEL,
-            under: [0.0; 4],
+            glass: WINDOW,
+            under: CARD.premultiplied(),
             name: "Main toolbar",
         };
         let push_enabled = self.push_enabled;
         ui.toolbar("bar", bar, &opts, |ui, cols| {
-            let mut ax = cols.left.x + GROUP_GAP;
+            // The actions touch (spacing 0); the branch label sits one group gap after the last.
+            let mut ax = cols.left.x;
             for (key, glyph, name) in ACTIONS {
                 let at = Rect::new(ax, cols.left.y, ACTION_SIZE, ACTION_SIZE);
                 ui.toolbar_action(key, at, glyph, name, key != "push" || push_enabled);
-                ax += ACTION_SIZE + GROUP_GAP;
+                ax += ACTION_SIZE;
             }
             let w = label_width(ui.painter(), icon::SEARCH, BRANCH);
-            let at = Rect::new(cols.center.x - w / 2.0, cols.left.y, w, ACTION_SIZE);
+            let at = Rect::new(ax + GROUP_GAP, cols.left.y, w, ACTION_SIZE);
             ui.toolbar_label("branch", at, icon::SEARCH, BRANCH, "Branch");
         });
 

@@ -14,11 +14,10 @@ use lune_ui_core::motion::{MotionTier, conformance};
 use lune_ui_core::paint::{LayerId, Rect};
 use lune_ui_core::scene::Scene;
 use lune_ui_core::testing::{FakeText, UiHarness};
-use lune_ui_core::text::{TextKey, elide};
+use lune_ui_core::text::{Spec, Style, TextKey, elide};
 use lune_ui_core::theme::DARK;
 use lune_ui_core::ui::WidgetId;
 use lune_ui_core::widgets::button::{FOCUS, HOVER, PRESS};
-use lune_ui_core::widgets::label;
 use lune_ui_core::widgets::toolbar::{
     ACTION_GLYPH, ACTION_SIZE, LABEL_GAP, LABEL_GLYPH, LABEL_MAX_WIDTH, LABEL_PAD_X, ToolbarCols,
     ToolbarOptions, label_width,
@@ -338,7 +337,7 @@ fn label_frame(h: &mut UiHarness, rect: Rect, text: &str) -> (Scene, bool, Seman
 #[test]
 fn a_short_label_is_drawn_whole_and_a_long_one_is_elided() {
     let theme = DARK;
-    let glyph = icon::glyph(icon::SYNC, LABEL_GLYPH, theme.fg_muted);
+    let glyph = icon::glyph(icon::SYNC, LABEL_GLYPH, theme.fg_subtle);
     let mut tmp = FakeText;
     // A rect much wider than the 420 cap.
     let wide = Rect::new(10.0, 6.0, 800.0, 40.0);
@@ -352,7 +351,7 @@ fn a_short_label_is_drawn_whole_and_a_long_one_is_elided() {
         TextKey(glyph.cache_key(1.0)),
         "the glyph is 14 px"
     );
-    let full = label(&theme, &long, theme.fg_muted);
+    let full = label_spec(&theme, &long, theme.fg_subtle);
     let want = elide(&mut FakeText, &full, 1.0, LABEL_MAX_WIDTH);
     assert_ne!(want, full, "the long text really is cut");
     assert_eq!(texts[1].key, TextKey(want.cache_key(1.0)));
@@ -364,7 +363,7 @@ fn a_short_label_is_drawn_whole_and_a_long_one_is_elided() {
     // Short text is untouched.
     let mut h = UiHarness::new(WIN);
     let (scene, _, _) = label_frame(&mut h, LABEL_RECT, "main");
-    let short = label(&theme, "main", theme.fg_muted);
+    let short = label_spec(&theme, "main", theme.fg_subtle);
     assert_eq!(
         scene.layers[0].texts[1].key,
         TextKey(short.cache_key(1.0)),
@@ -385,10 +384,10 @@ fn a_narrow_rect_cuts_the_text_to_what_is_left() {
     let (scene, _, _) = label_frame(&mut h, narrow, "a-rather-long-branch-name");
     let gw = tmp_width(
         &mut FakeText,
-        &icon::glyph(icon::SYNC, LABEL_GLYPH, theme.fg_muted),
+        &icon::glyph(icon::SYNC, LABEL_GLYPH, theme.fg_subtle),
     );
     let room = 100.0 - 2.0 * LABEL_PAD_X - gw - LABEL_GAP;
-    let full = label(&theme, "a-rather-long-branch-name", theme.fg_muted);
+    let full = label_spec(&theme, "a-rather-long-branch-name", theme.fg_subtle);
     let want = elide(&mut FakeText, &full, 1.0, room);
     assert_eq!(scene.layers[0].texts[1].key, TextKey(want.cache_key(1.0)));
 }
@@ -441,4 +440,13 @@ fn the_bar_is_a_toolbar_node_holding_the_named_actions() {
         assert_eq!(node.bounds, action_rect(i));
         assert!(node.states.contains(State::Focusable));
     }
+}
+
+/// The label's text: UI face at `font_m`.
+fn label_spec(
+    theme: &lune_ui_core::theme::Theme,
+    text: &str,
+    color: lune_ui_core::color::Rgba,
+) -> Spec {
+    Spec::plain(text, Style::ui(theme.font_m, color))
 }

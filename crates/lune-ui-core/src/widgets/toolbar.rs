@@ -16,7 +16,6 @@ use std::hash::Hash;
 
 use super::button::{self, ButtonLook, ButtonState, FOCUS, HOVER, IconButton, PRESS};
 use super::focus_ring::{self, RingKind};
-use super::label;
 use crate::access::{Action, Node, Role, State};
 use crate::backdrop::GlassLayer;
 use crate::icon;
@@ -29,7 +28,7 @@ pub const PAD_LEFT: f32 = 0.0;
 pub const PAD_TOP: f32 = 6.0;
 pub const PAD_RIGHT: f32 = 8.0;
 pub const PAD_BOTTOM: f32 = 6.0;
-/// The spacing between the buttons of a group.
+/// The spacing between the groups of a column; the buttons of a group touch.
 pub const GROUP_GAP: f32 = 8.0;
 /// An action button's side, and its glyph's size.
 pub const ACTION_SIZE: f32 = 40.0;
@@ -49,6 +48,9 @@ pub struct ToolbarOptions<'a> {
     /// The glass layer drawn while active.
     pub glass: GlassLayer,
     /// What the glass layer is composed over (the colour below it, premultiplied).
+    /// Pass the layer the bar sits on: acrylic replaces what is under it, and the pixel just outside
+    /// the rect takes this colour, so a zero `under` leaves a 1 px transparent rim over anything but
+    /// the window edge.
     pub under: [f32; 4],
     /// The accessible name of the bar.
     pub name: &'a str,
@@ -134,7 +136,7 @@ impl Ui<'_> {
     }
 
     /// A button under `key` in `rect` with a 14 px glyph and a text: padding 6 and 4, the text
-    /// elided to at most 420 px (less when `rect` is narrower), `fg_muted`. The look is the ghost
+    /// elided to at most 420 px (less when `rect` is narrower), `fg_subtle` at `font_m` (D133). The look is the ghost
     /// button's. Role `Button` named `name`. Disabled through [`Ui::with_enabled`].
     pub fn toolbar_label(
         &mut self,
@@ -162,7 +164,7 @@ impl Ui<'_> {
         let scale = self.animate_f32(id.with("press"), target.scale, &PRESS);
         let ring = self.animate_f32(id.with("ring"), target.ring, &FOCUS);
 
-        let color = theme.fg_muted;
+        let color = theme.fg_subtle;
         let p = self.painter();
         let scaled = scale != 1.0;
         if scaled {
@@ -181,7 +183,7 @@ impl Ui<'_> {
         let gw = p.measure(&glyph).0;
         let room = rect.w - 2.0 * LABEL_PAD_X - gw - LABEL_GAP;
         let spec = p.elide(
-            &label(&theme, text, color),
+            &label_spec(&theme, text, color),
             room.clamp(0.0, LABEL_MAX_WIDTH),
         );
         let x = rect.x + LABEL_PAD_X;
@@ -205,6 +207,15 @@ impl Ui<'_> {
     }
 }
 
+/// The label's text: the theme's medium size (`font_m`).
+fn label_spec(
+    theme: &crate::theme::Theme,
+    text: &str,
+    color: crate::color::Rgba,
+) -> crate::text::Spec {
+    crate::text::Spec::plain(text, crate::text::Style::ui(theme.font_m, color))
+}
+
 /// The width [`Ui::toolbar_label`] wants for `text`: padding, glyph, gap and the text (at most
 /// [`LABEL_MAX_WIDTH`]).
 pub fn label_width<H: Copy + PartialEq>(
@@ -214,8 +225,8 @@ pub fn label_width<H: Copy + PartialEq>(
 ) -> f32 {
     let theme = p.theme;
     let gw = p
-        .measure(&icon::glyph(glyph, LABEL_GLYPH, theme.fg_muted))
+        .measure(&icon::glyph(glyph, LABEL_GLYPH, theme.fg_subtle))
         .0;
-    let tw = p.measure(&label(&theme, text, theme.fg_muted)).0;
+    let tw = p.measure(&label_spec(&theme, text, theme.fg_subtle)).0;
     2.0 * LABEL_PAD_X + gw + LABEL_GAP + tw.min(LABEL_MAX_WIDTH)
 }

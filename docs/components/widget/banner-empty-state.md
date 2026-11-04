@@ -41,7 +41,7 @@ Empty-repository view:
 - Icon: app icon, 100 x 100, uniform stretch [L src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:17-21], [L src/Lunegit.Desktop/App.axaml:213].
 - Title: 18 px `FontSizeL` [L src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:24-27], [L src/Lunegit.Desktop/App.axaml:162], `ForegroundPrimary`.
 - Subtitle: 13 px, centred, wrapped, `ForegroundSecondary` [L src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:30-35].
-- Actions: row of `Button.empty-state-action`, spacing 12 [L src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:38-39].
+- Actions: row of `Button.empty-state-action`, spacing 12 [L src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:38-39]; each at least 140 wide, 51 high (padding 16 above and below, a 17 px line, a 1 px `border` ring that scales with the press), radius `item_radius`, the Secondary button's fill [L src/Lunegit.Desktop/App.axaml:440-450], [D136].
 
 ### States
 
@@ -100,7 +100,7 @@ None. The banner text, the empty view's title and subtitle and the action labels
 
 ### Acceptance
 
-- Pixel probes at scale 2: banner radius 12 px, 2 px border; empty icon 200 x 200 px; subtitle centred.
+- Pixel probes at scale 2: banner radius 12 px, 2 px border; empty icon 200 x 200 px; subtitle centred; action buttons at least 280 wide and 102 high with a 2 px ring.
 - Conformance: action press scale over 60 Hz samples settles within 180 ms + 1 frame; Reduced snaps the scale.
 - Semantic node: banner role status, polite live region; empty-view title role static-text.
 
@@ -112,6 +112,8 @@ None. The banner text, the empty view's title and subtitle and the action labels
 ## Open questions
 
 None. Closed by [D128] and [D129]: `scope` (the startup loading view and the EULA and Git gate views stay app code), `design-gap` (the banner's solid fill and the callout's tint are two widgets with two looks, each per its source). The empty view has no field for the picture's name, so its `Image` node is always hidden.
+
+Marked gap (ruling C13, [D136]): Lunegit stacks a 24 px glyph over each action's label, spacing 8 [L src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:38-62]; `EmptyState.actions` has no glyph, which is an API change outside M6 step 13. The actions' Secondary fill (#10) also differs from Lunegit's `SurfaceOverlay` (#15).
 
 ## Notes for the planner
 

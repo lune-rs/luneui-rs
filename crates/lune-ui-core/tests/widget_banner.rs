@@ -218,11 +218,13 @@ fn the_column_is_centred_with_the_entrys_sizes_and_spacing() {
         sub.bounds,
         Rect::new(col_x, top + 124.0 + title_h + 24.0, col_w, sub_h)
     );
-    // Actions: secondary buttons 32 high, 12 apart, centred as a row.
+    // Actions: secondary buttons 51 high (E1: padding 16, a 17 px line, a 1 px border), 12 apart,
+    // centred as a row.
     let a0 = v.tree.get(id("e").with("action-0")).expect("a0").bounds;
     let a1 = v.tree.get(id("e").with("action-1")).expect("a1").bounds;
     let ay = top + 124.0 + title_h + 24.0 + sub_h + 24.0;
-    assert_eq!((a0.y, a0.h, a1.y, a1.h), (ay, 32.0, ay, 32.0));
+    assert_eq!((a0.y, a0.h, a1.y, a1.h), (ay, 51.0, ay, 51.0));
+    assert!(a0.w >= 140.0 && a1.w >= 140.0, "at least 140 wide");
     assert_eq!(a1.x - (a0.x + a0.w), EMPTY_ACTION_GAP);
     assert!(((a0.x + a1.x + a1.w) / 2.0 - 450.0).abs() < 1e-3, "centred");
 }
@@ -328,6 +330,28 @@ fn pixel_probes_at_scale_two_empty_view() {
     let v = view_frame(&mut h, &state(Some(PIC), &ACTIONS));
     let dst = v.scene.layers[0].images[0].dst;
     assert_eq!((dst.w, dst.h), (200.0, 200.0), "icon 200 x 200 px");
+}
+
+#[test]
+fn each_action_has_a_one_px_border_ring_on_the_button_rect() {
+    let mut h = UiHarness::new(WIN);
+    let v = view_frame(&mut h, &state(None, &ACTIONS));
+    let g = &v.scene.layers[0].geometry;
+    for i in 0..ACTIONS.len() {
+        let b = v
+            .tree
+            .get(id("e").with(format!("action-{i}")))
+            .expect("button")
+            .bounds;
+        let on_rect = g.under.iter().any(|s| {
+            s.params[0] == 1.0
+                && s.params[1] == 1.0
+                && s.color == premul(DARK.border)
+                && s.rect == [b.x, b.y, b.w, b.h]
+                && s.radii == [DARK.item_radius; 4]
+        });
+        assert!(on_rect, "action {i}: a 1 px ring, radius item_radius");
+    }
 }
 
 fn press_scale(tier: MotionTier, after_ms: u64) -> (f32, Repaint) {

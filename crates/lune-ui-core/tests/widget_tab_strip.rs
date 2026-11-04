@@ -1116,7 +1116,24 @@ fn the_cue_takes_the_tone() {
     let mut h = bench(&mut app);
     let r = run(&mut h, &mut app);
     let last = r.scene.layers[0].geometry.strokes.last().expect("stroke");
-    assert_eq!(last.color, premul(DARK.err));
+    assert_eq!(last.color, premul(DARK.status_error_light));
+}
+
+#[test]
+fn the_cue_tints_are_the_light_status_brushes() {
+    for (tone, want) in [
+        (Tone::Warn, DARK.status_warning_light),
+        (Tone::Err, DARK.status_error_light),
+        (Tone::Neutral, DARK.accent),
+    ] {
+        let mut app = App::of(3, Some(1));
+        app.busy = Some(BusyCue::Comet);
+        app.tone = tone;
+        let mut h = bench(&mut app);
+        let r = run(&mut h, &mut app);
+        let last = r.scene.layers[0].geometry.strokes.last().expect("stroke");
+        assert_eq!(last.color, premul(want), "{tone:?}");
+    }
 }
 
 // Progress.

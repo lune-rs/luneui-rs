@@ -21,8 +21,10 @@ use crate::ui::Ui;
 pub const HEIGHT: f32 = 4.0;
 /// The indeterminate track's height (thinner than a measured bar).
 pub const HEIGHT_INDETERMINATE: f32 = 3.0;
-/// The track's corner radius.
-pub const RADIUS: f32 = 4.0;
+/// The track's corner radius: half the height, a semicircular end (D135).
+pub const RADIUS: f32 = HEIGHT / 2.0;
+/// The indeterminate track's corner radius, half its own height.
+pub const RADIUS_INDETERMINATE: f32 = HEIGHT_INDETERMINATE / 2.0;
 /// The head's line height.
 pub const HEAD_LINE: f32 = 20.0;
 /// The gap below the head.
@@ -137,18 +139,26 @@ pub fn paint_indeterminate<H: Copy + PartialEq>(
     how: Indeterminate,
 ) {
     let theme = p.theme;
-    p.fill(track, RADIUS, theme.surface_overlay);
+    p.fill(track, RADIUS_INDETERMINATE, theme.surface_overlay);
     let color = fill_color(&theme, tone);
     match how {
         Indeterminate::Travel(phase) => {
             let seg = track.w * SEGMENT;
             let x = track.x - seg + (track.w + seg) * phase.clamp(0.0, 1.0);
-            p.push_clip_rounded(track, RADIUS);
-            p.fill(Rect::new(x, track.y, seg, track.h), RADIUS, color);
+            p.push_clip_rounded(track, RADIUS_INDETERMINATE);
+            p.fill(
+                Rect::new(x, track.y, seg, track.h),
+                RADIUS_INDETERMINATE,
+                color,
+            );
             p.pop_clip();
         }
         Indeterminate::Fade(opacity) => {
-            p.fill(track, RADIUS, faded(color, opacity.clamp(0.0, 1.0)));
+            p.fill(
+                track,
+                RADIUS_INDETERMINATE,
+                faded(color, opacity.clamp(0.0, 1.0)),
+            );
         }
     }
 }

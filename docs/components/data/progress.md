@@ -36,7 +36,7 @@ Conflicts:
 
 ### Anatomy
 
-- Track: 4 high; radius 4; fill `--surface-overlay` [W docs/ui/components.md:627-640]. The repo has no `surface_overlay` token (`grep -n surface_overlay crates/lune-ui-core/src/theme.rs` empty): token to add (M4), #FFFFFF15 [W docs/ui/mocks/css/tokens.css:22], [D58].
+- Track: 4 high; radius 2, half the height (the mock's radius 4 clamps to it in CSS; `sd_round_rect` does not, so the value is the clamped one, [D135]); the 3 px indeterminate bar takes radius 1.5 (`RADIUS_INDETERMINATE`); fill `--surface-overlay` [W docs/ui/components.md:627-640]. The repo has no `surface_overlay` token (`grep -n surface_overlay crates/lune-ui-core/src/theme.rs` empty): token to add (M4), #FFFFFF15 [W docs/ui/mocks/css/tokens.css:22], [D58].
 - Fill: `accent`, from the track's left, width = value fraction [W docs/ui/components.md:627-640], [R crates/lune-ui-core/src/theme.rs:64].
 - Variants: warn, err (colours not in the sources read; Open questions).
 - Head: name 13 at the left; value RznMono at the right; 13/20 with 4 px below [W docs/ui/components.md:627-640].
@@ -97,7 +97,7 @@ None: the head text is app text.
 ### Acceptance
 
 - Behaviour (scripted input, injected time): the fill width equals the value fraction at 0, 50 and 100%; a value outside 0–100 clamps. None exists.
-- Pixel probes at scale 2: track 8 px high, radius 8 px, head 26 px line height, 8 px gap below the head.
+- Pixel probes at scale 2: track 8 px high, radius 4 px (indeterminate: 6 px high, radius 3 px), head 26 px line height, 8 px gap below the head.
 - Conformance: none (no motion).
 - Semantic node: `progress` with min 0 and max 100; no value when indeterminate.
 

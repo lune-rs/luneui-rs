@@ -35,7 +35,7 @@ const INSET: f32 = 24.0;
 const CARD_W: f32 = 720.0;
 const CARD_H: f32 = 300.0;
 /// The header's darker band, punched out by the outline. The toolkit's look has no token for it:
-/// the header layer is a material of the preset, so the app chooses it.
+/// the header layer is a material of the preset, so the app chooses it (D131).
 const HEADER_TINT: [u8; 4] = [0x00, 0x00, 0x00, 0x24];
 
 /// The inner card's top-left corner in the window: the page card's, plus [`INSET`].

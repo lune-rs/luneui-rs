@@ -92,7 +92,7 @@ None: the star names are numbers, and the control has no text keys [L src/Lunegi
 ### Acceptance
 
 - Scripted: click star N sets N; a second click on N sets 0; `Max` changes the count.
-- Pixel probes at scale 2: star 40 x 40 px button area (20 px glyph plus padding 2); hover fill radius 8 px; spacing 4 px.
+- Pixel probes at scale 2: star 48 x 48 px button area (20 px glyph plus padding 2 each side; the hover fill measures 48, `StarRatingControl.axaml:9-15`); hover fill radius 8 px; spacing 4 px.
 - Conformance: hover fill over 60 Hz samples settles within 120 ms + 1 frame.
 - Semantic node: role radio-group; checked follows `Value`; injected `AccessAction` default sets the value.
 

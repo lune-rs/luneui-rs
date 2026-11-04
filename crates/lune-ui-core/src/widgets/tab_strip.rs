@@ -186,10 +186,13 @@ fn chrome_width(spinner: bool, close: bool) -> f32 {
     PAD_LEFT + spin + TITLE_MARGIN + PAD_RIGHT + close
 }
 
-/// `tone`'s colour for a progress cue: `Neutral` is `accent`.
+/// `tone`'s colour for a progress cue: `Neutral` is `accent`, `Warn` and `Err` are the light
+/// status brushes the source names for the cue and the spinner (D132).
 fn cue_color(p: &Painter<'_, WidgetId>, tone: Tone) -> Rgba {
     match tone {
         Tone::Neutral => p.theme.accent,
+        Tone::Warn => p.theme.status_warning_light,
+        Tone::Err => p.theme.status_error_light,
         _ => tone.color(&p.theme),
     }
 }
