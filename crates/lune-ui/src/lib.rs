@@ -13,8 +13,8 @@
 
 pub use lune_ui_core::{Backdrop, BackdropKind, GlassLayer};
 pub use lune_ui_core::{
-    access, acrylic, backdrop, chrome, color, icon, motion, paint, scene, strings, testing, theme,
-    ui, widgets,
+    access, acrylic, backdrop, chrome, color, icon, layout, motion, paint, scene, strings, testing,
+    theme, ui, widgets,
 };
 pub use theme::lunegit_dark;
 
