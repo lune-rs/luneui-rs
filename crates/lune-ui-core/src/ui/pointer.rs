@@ -225,4 +225,25 @@ impl PointerState {
                 .map(|h| h.id),
         };
     }
+
+    /// Drops a primary press without capturing (an outside press that dismissed an overlay).
+    pub(crate) fn press_consumed(&mut self, pos: (f32, f32)) {
+        self.pos = Some(pos);
+        self.press = Some(Press {
+            id: None,
+            at: pos,
+            last: pos,
+            dragging: false,
+        });
+    }
+
+    /// Releases a capture whose id `lost` says can no longer hold it (it fell under a modal).
+    pub(crate) fn drop_capture_if(&mut self, lost: impl Fn(WidgetId) -> bool) {
+        if let Some(p) = &mut self.press
+            && p.id.is_some_and(&lost)
+        {
+            p.id = None;
+            p.dragging = false;
+        }
+    }
 }

@@ -145,6 +145,15 @@ impl Ops {
     }
 }
 
+/// The painter state an overlay saves and restores around its content.
+#[derive(Debug, Clone)]
+pub(crate) struct PainterState {
+    layer: usize,
+    clip: Option<Rect>,
+    xforms: Vec<Xform>,
+    hit_tag: u32,
+}
+
 pub struct Painter<'a, H> {
     pub s: f32,
     pub window: Rect,
@@ -252,16 +261,47 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
     }
 
     /// Sets the tag the next [`Self::hit`] calls record with their layer, for the `Ui`'s hit list.
-    #[allow(dead_code)] // first caller arrives with the Ui frame
+    #[cfg(test)]
     pub(crate) fn set_hit_tag(&mut self, tag: u32) {
         self.hit_tag = tag;
     }
 
     /// `(layer index, tag)` for each entry of `hits`, in the same order. Valid while `hits` is only
     /// appended to through [`Self::hit`].
-    #[allow(dead_code)] // first caller arrives with the Ui frame
     pub(crate) fn hit_meta(&self) -> &[(usize, u32)] {
         &self.hit_meta
+    }
+
+    /// The current layer index and hit tag.
+    pub(crate) fn hit_context(&self) -> (usize, u32) {
+        (self.layer, self.hit_tag)
+    }
+
+    /// The layer, clip, transform stack and hit tag, to restore with [`Self::restore_state`].
+    pub(crate) fn save_state(&self) -> PainterState {
+        PainterState {
+            layer: self.layer,
+            clip: self.clip,
+            xforms: self.xforms.clone(),
+            hit_tag: self.hit_tag,
+        }
+    }
+
+    /// Puts back a [`Self::save_state`] result. Not recorded.
+    pub(crate) fn restore_state(&mut self, s: PainterState) {
+        self.layer = s.layer;
+        self.clip = s.clip;
+        self.xforms = s.xforms;
+        self.hit_tag = s.hit_tag;
+    }
+
+    /// Switches to `layer` with no clip, an empty transform stack and hit tag `tag`, for the
+    /// `Ui`'s overlays. Not recorded.
+    pub(crate) fn enter(&mut self, layer: LayerId, tag: u32) {
+        self.layer = layer as usize;
+        self.clip = None;
+        self.xforms.clear();
+        self.hit_tag = tag;
     }
 
     pub fn on(&mut self, layer: LayerId) {

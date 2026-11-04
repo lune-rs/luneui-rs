@@ -1,26 +1,38 @@
 //! The per-window `Ui` frame: stable widget ids under scopes, a retained store with transient and
-//! keep-alive state, layered hit testing with pointer capture, [`Response`], animated values and
-//! the [`FrameOutput`] (with [`Repaint`]) a frame returns.
+//! keep-alive state, layered hit testing with pointer capture, [`Response`], animated values, the
+//! overlay stack with modal capture, dismissal and exit retention, focus scopes, key routing,
+//! semantic nodes with accessibility actions, strings, and the [`FrameOutput`] (with [`Repaint`])
+//! a frame returns.
 //!
-//! A frame: [`Ui::begin`] resolves this frame's events against the previous frame's hit regions
-//! (D4), widgets call [`Ui::interact`] and draw through [`Ui::painter`], and [`Ui::finish`] turns
-//! this frame's regions into the next frame's, drops unused state and returns the `Scene` and the
-//! `FrameOutput`. Hits from `interact` and from raw `Painter::hit` calls share one ordered list, so
-//! widgets of both APIs mix in one frame; `painter.hover` is the hovered id (D3).
+//! A frame: [`Ui::begin`] resolves this frame's events against the previous frame's hit regions,
+//! overlays, tab stops and semantic tree (D4), widgets call [`Ui::interact`] and draw through
+//! [`Ui::painter`], and [`Ui::finish`] closes the overlays the app stopped calling (drawing their
+//! exit frames), turns this frame's regions into the next frame's, drops unused state and returns
+//! the `Scene` and the `FrameOutput`. Hits from `interact` and from raw `Painter::hit` calls share
+//! one ordered list, so widgets of both APIs mix in one frame; `painter.hover` is the hovered id
+//! (D3).
 
+mod access;
 mod animate;
+mod focus;
 mod id;
+mod keys;
+mod overlay;
 mod pointer;
 mod response;
 mod store;
 
+use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::Display;
 use std::ops::Range;
 
 pub use id::WidgetId;
+pub use overlay::{Dismissal, OverlayFrame, OverlayOptions, OverlayPhase};
 pub use response::{Response, Sense};
 pub use store::UiStore;
 
-use crate::input::{ClipboardRequest, Event, FrameOutput, RawInput, Repaint};
+use crate::access::{AccessValue, SemanticTree};
+use crate::input::{ClipboardRequest, Event, FrameOutput, Key, NamedKey, RawInput, Repaint};
 use crate::motion::{MotionTier, Time};
 use crate::paint::{Painter, Rect, Xform};
 use crate::scene::Scene;
@@ -28,7 +40,10 @@ use crate::strings::{ArgFormat, StringTable};
 use crate::text::TextSystem;
 use crate::theme::Theme;
 
-use pointer::{Ctx, HitRecord, PointerFrame};
+use access::Routed;
+use keys::KeyPress;
+use overlay::{Dismissal as D, SUPPRESSED};
+use pointer::{Ctx, HitRecord, PointerFrame, topmost};
 
 /// The opacity of a disabled subtree.
 const DISABLED_ALPHA: f32 = 0.4;
@@ -57,6 +72,16 @@ impl std::fmt::Debug for FrameConfig<'_> {
 struct Registration {
     index: usize,
     sense: Sense,
+    enabled: bool,
+}
+
+/// An active overlay as the previous frame left it, for begin's input rules.
+#[derive(Debug, Clone, Copy)]
+struct Active {
+    id: WidgetId,
+    tag: u32,
+    layer: usize,
+    opts: OverlayOptions,
 }
 
 /// One window's frame. Built by [`Ui::begin`], consumed by [`Ui::finish`].
@@ -78,6 +103,19 @@ pub struct Ui<'a> {
     repaint_at: Option<Time>,
     clipboard_write: Option<String>,
     clipboard_read: bool,
+    /// Dismiss requests found at begin, handed out by `overlay`.
+    dismissed: BTreeMap<WidgetId, Dismissal>,
+    /// Overlays pushed or reopened this frame.
+    opened: Vec<WidgetId>,
+    keys: Vec<KeyPress>,
+    /// The focused widget of the active scope, which may take keys.
+    key_focus: Option<WidgetId>,
+    set_values: BTreeMap<WidgetId, AccessValue>,
+    scroll_into_view: BTreeSet<WidgetId>,
+    tree: SemanticTree,
+    /// Indices in `tree` of the open containers.
+    containers: Vec<usize>,
+    node_meta: BTreeMap<WidgetId, (usize, u32)>,
 }
 
 impl std::fmt::Debug for Ui<'_> {
@@ -91,8 +129,24 @@ impl std::fmt::Debug for Ui<'_> {
     }
 }
 
+/// Dismisses, for focus loss, every active overlay that asks for it and does not hold `to`.
+fn focus_loss(
+    active: &[Active],
+    hits: &[HitRecord],
+    to: Option<WidgetId>,
+    dismissed: &mut BTreeMap<WidgetId, Dismissal>,
+) {
+    for o in active.iter().filter(|o| o.opts.dismiss_on_focus_loss) {
+        let inside = to.is_some_and(|id| hits.iter().any(|h| h.id == id && h.tag >= o.tag));
+        if !inside {
+            dismissed.entry(o.id).or_insert(D::FocusLoss);
+        }
+    }
+}
+
 impl<'a> Ui<'a> {
-    /// Starts a frame: resolves `input`'s events against the previous frame's hit regions.
+    /// Starts a frame: resolves `input`'s events against the previous frame's hit regions,
+    /// overlays, tab stops and semantic tree.
     pub fn begin(
         store: &'a mut UiStore,
         input: &'a RawInput,
@@ -108,11 +162,48 @@ impl<'a> Ui<'a> {
                 let t = a.transition.target();
                 a.transition.snap(t);
             }
+            // D12: everything in flight snaps, overlays too.
+            store.overlays.retain(|o| o.active());
+            for o in &mut store.overlays {
+                o.phase = overlay::RecPhase::Open;
+            }
         }
+        let active: Vec<Active> = store
+            .overlays
+            .iter()
+            .filter(|o| o.active())
+            .map(|o| Active {
+                id: o.id,
+                tag: o.tag,
+                layer: o.opts.layer as usize,
+                opts: o.opts,
+            })
+            .collect();
+        let top = active.last().copied();
+        let modal = active
+            .iter()
+            .rev()
+            .find(|o| o.opts.modal)
+            .map(|o| (o.tag, o.layer));
+        let eligible = move |h: &HitRecord| modal.is_none_or(|(t, l)| h.tag >= t || h.layer > l);
+        let eligible_at =
+            move |(layer, tag): (usize, u32)| modal.is_none_or(|(t, l)| tag >= t || layer > l);
+
+        let hits = std::mem::take(&mut store.prev_hits);
         let mut pointer = PointerFrame::default();
+        let mut dismissed = BTreeMap::new();
+        let mut routed = Routed::default();
+        let mut keys = Vec::new();
+
+        if let Some(id) = store.focus.pending.take() {
+            store.focus.focused = Some(id);
+            store.focus.visible = false;
+            focus_loss(&active, &hits, Some(id), &mut dismissed);
+        }
+        store
+            .pointer
+            .drop_capture_if(|id| !hits.iter().any(|h| h.id == id && eligible(h)));
         {
-            let hits = std::mem::take(&mut store.prev_hits);
-            let eligible = |_: &HitRecord| true;
             let cx = Ctx {
                 hits: &hits,
                 eligible: &eligible,
@@ -122,6 +213,29 @@ impl<'a> Ui<'a> {
                 match ev {
                     Event::PointerMoved { pos } => store.pointer.moved(*pos, &cx, &mut pointer),
                     Event::PointerLeft => store.pointer.left(),
+                    Event::PointerButton {
+                        pos,
+                        button: button @ crate::input::PointerButton::Primary,
+                        pressed: true,
+                        ..
+                    } => {
+                        let target = topmost(&hits, *pos, &eligible);
+                        store.focus.visible = false;
+                        store.focus.keyboard = false;
+                        if let Some(t) = top
+                            && t.opts.dismiss_on_outside_press
+                            && target.is_none_or(|h| h.tag < t.tag)
+                        {
+                            // D22: the press that dismisses reaches nothing.
+                            dismissed.entry(t.id).or_insert(D::OutsidePress);
+                            store.pointer.press_consumed(*pos);
+                            continue;
+                        }
+                        store.pointer.button(*pos, *button, true, &cx, &mut pointer);
+                        if let Some(h) = target.filter(|h| h.enabled && h.sense.focusable) {
+                            store.focus.focused = Some(h.id);
+                        }
+                    }
                     Event::PointerButton {
                         pos,
                         button,
@@ -135,12 +249,90 @@ impl<'a> Ui<'a> {
                     Event::Scroll { pos, delta, .. } => {
                         store.pointer.scroll(*pos, *delta, &cx, &mut pointer);
                     }
+                    Event::Key {
+                        key,
+                        pressed: true,
+                        modifiers,
+                        ..
+                    } => {
+                        store.focus.keyboard = true;
+                        match key {
+                            Key::Named(NamedKey::Escape)
+                                if top.is_some_and(|t| t.opts.dismiss_on_escape) =>
+                            {
+                                if let Some(t) = top {
+                                    dismissed.entry(t.id).or_insert(D::Escape);
+                                }
+                            }
+                            Key::Named(NamedKey::Tab) => {
+                                let scopes = active.iter().rev().map(|o| (o.tag, o.opts.modal));
+                                let mut to = None;
+                                for (tag, trap) in scopes.chain([(0, true)]) {
+                                    let stops = focus::tab_stops(&hits, tag, &eligible);
+                                    if !stops.is_empty() || trap {
+                                        to = focus::step(
+                                            &stops,
+                                            store.focus.focused,
+                                            modifiers.shift,
+                                        );
+                                        break;
+                                    }
+                                }
+                                if to.is_some() {
+                                    store.focus.focused = to;
+                                }
+                                store.focus.visible = true;
+                            }
+                            Key::Named(k) => keys.push(KeyPress {
+                                key: *k,
+                                target: None,
+                                consumed: false,
+                            }),
+                            _ => {}
+                        }
+                    }
+                    Event::Focus(false) => {
+                        focus_loss(&active, &hits, None, &mut dismissed);
+                    }
+                    Event::Access(a) => {
+                        let Some(node) = store.prev_tree.get(a.target) else {
+                            continue;
+                        };
+                        let meta = store.prev_node_meta.get(&a.target).copied();
+                        if !meta.is_some_and(eligible_at) {
+                            continue;
+                        }
+                        let top_escape = top.map(|t| (t.id, t.opts.dismiss_on_escape));
+                        let focus_to = access::route(
+                            a,
+                            node,
+                            top_escape,
+                            &mut pointer,
+                            &mut routed,
+                            &mut dismissed,
+                        );
+                        if let Some(id) = focus_to {
+                            store.focus.focused = Some(id);
+                            store.focus.visible = false;
+                            focus_loss(&active, &hits, Some(id), &mut dismissed);
+                        }
+                    }
                     _ => {}
                 }
             }
             store.pointer.settle(&cx, &mut pointer);
-            store.prev_hits = hits;
         }
+        keys.extend(routed.keys);
+        let key_focus = store.focus.focused.filter(|id| {
+            let mut own = hits.iter().filter(|h| h.id == *id).peekable();
+            if own.peek().is_none() {
+                modal.is_none()
+            } else {
+                own.any(eligible)
+            }
+        });
+        store.prev_hits = hits;
+
         let window = Rect::new(0.0, 0.0, input.size.0, input.size.1);
         let painter = Painter::new(input.scale, window, text, pointer.hovered, config.theme);
         Ui {
@@ -158,52 +350,103 @@ impl<'a> Ui<'a> {
             repaint_at: None,
             clipboard_write: None,
             clipboard_read: false,
+            dismissed,
+            opened: Vec::new(),
+            keys,
+            key_focus,
+            set_values: routed.set_values,
+            scroll_into_view: routed.scroll_into_view,
+            tree: SemanticTree::default(),
+            containers: Vec::new(),
+            node_meta: BTreeMap::new(),
         }
     }
 
-    /// Ends the frame: this frame's hit regions become the next frame's, unused state is dropped.
+    /// Ends the frame: closes the overlays the app did not call and draws their exit frames,
+    /// turns this frame's hit regions into the next frame's and drops unused state.
     pub fn finish(self) -> (Scene, FrameOutput) {
         let Ui {
             store,
             input,
             config,
-            painter,
+            mut painter,
             registered,
             disabled,
             in_flight,
             repaint_at,
             clipboard_write,
             clipboard_read,
+            mut tree,
+            node_meta,
             ..
         } = self;
-        let mut senses = vec![Sense::CLICK; painter.hits.len()];
+        let now = input.time;
+        let mut ids: BTreeMap<WidgetId, u32> = BTreeMap::new();
+        for (&(_, id), &(_, tag)) in painter.hits.iter().zip(painter.hit_meta()) {
+            let t = ids.entry(id).or_insert(tag);
+            *t = (*t).max(tag);
+        }
+        let moving = Ui::settle_overlays(
+            store,
+            &mut painter,
+            &ids,
+            now,
+            &config.theme.motion,
+            config.tier,
+        );
+
+        let mut senses: Vec<Option<(Sense, bool)>> = vec![None; painter.hits.len()];
         for r in &registered {
-            senses[r.index] = r.sense;
+            senses[r.index] = Some((r.sense, r.enabled));
         }
         let mut hits = Vec::with_capacity(painter.hits.len());
-        let mut rects = std::collections::BTreeMap::new();
+        let mut rects = BTreeMap::new();
         for (i, (&(rect, id), &(layer, tag))) in
             painter.hits.iter().zip(painter.hit_meta()).enumerate()
         {
-            let enabled = !disabled.iter().any(|d| d.contains(&i));
+            if tag == SUPPRESSED {
+                continue;
+            }
+            let (sense, enabled) = senses
+                .get(i)
+                .copied()
+                .flatten()
+                .unwrap_or_else(|| (Sense::CLICK, !disabled.iter().any(|d| d.contains(&i))));
             hits.push(HitRecord {
                 id,
                 rect,
                 layer,
-                sense: senses[i],
+                sense,
                 tag,
                 enabled,
             });
             rects.insert(id, rect);
         }
+
+        // D15: a focused id that did not register clears, unless a live keep-alive scope holds it.
+        if let Some(f) = store.focus.focused
+            && !ids.contains_key(&f)
+            && !store
+                .focus
+                .chain
+                .iter()
+                .any(|s| store.live_scopes.contains(s))
+        {
+            store.focus.focused = None;
+        }
+        let focused = store.focus.focused;
+        access::mark_focus(&mut tree, focused);
+        let out_focused = focused.filter(|id| tree.get(*id).is_some());
+
         store.prev_hits = hits;
         store.prev_rects = rects;
+        store.prev_tree = tree.clone();
+        store.prev_node_meta = node_meta;
         store.collect(store.frame);
         store.frame += 1;
         store.last_tier = Some(config.tier);
 
-        let now = input.time;
-        let repaint = if in_flight {
+        let repaint = if in_flight || moving {
             Repaint::Now
         } else if let Some(t) = repaint_at.filter(|t| *t > now) {
             Repaint::At(t)
@@ -220,9 +463,28 @@ impl<'a> Ui<'a> {
         let output = FrameOutput {
             repaint,
             clipboard,
+            tree,
+            focused: out_focused,
             ..FrameOutput::default()
         };
         (painter.scene, output)
+    }
+
+    /// The text for `key`: the string table's, else the toolkit default, else the key. Borrows
+    /// the table and the key, not the frame.
+    pub fn tr<'k>(&self, key: &'k str) -> &'k str
+    where
+        'a: 'k,
+    {
+        let table: &'k StringTable = self.config.strings;
+        table.tr(key)
+    }
+
+    /// [`Self::tr`] with the placeholders filled from `args` through the frame's `ArgFormat`.
+    pub fn tr_fmt(&self, key: &str, args: &[&dyn Display]) -> String {
+        self.config
+            .strings
+            .tr_fmt(key, args, self.config.arg_format)
     }
 
     /// The painter this frame draws with; old-API widgets take it directly.
@@ -303,9 +565,17 @@ impl<'a> Ui<'a> {
         let index = self.painter.hits.len();
         self.painter.hit(rect, id);
         let rect = self.painter.hits[index].0;
-        self.registered.push(Registration { index, sense });
+        self.registered.push(Registration {
+            index,
+            sense,
+            enabled: self.enabled,
+        });
         if !self.enabled {
             return Response::inert(id, rect, false);
+        }
+        let focus = &mut self.store.focus;
+        if focus.focused == Some(id) && focus.chain.as_slice() != self.alive.as_slice() {
+            focus.chain = self.alive.clone();
         }
         let p = &self.pointer;
         let mut r = Response::inert(id, rect, true);
@@ -320,6 +590,10 @@ impl<'a> Ui<'a> {
         r.drag_stopped = p.drag_stopped.contains(&id);
         r.scroll_lines = p.scroll_lines.get(&id).copied().unwrap_or((0.0, 0.0));
         r.scroll_pixels = p.scroll_pixels.get(&id).copied().unwrap_or((0.0, 0.0));
+        r.focused = self.store.focus.focused == Some(id);
+        r.focus_visible = r.focused && self.store.focus.visible && self.input.focused;
+        r.set_value = self.set_values.get(&id).cloned();
+        r.scroll_into_view = self.scroll_into_view.contains(&id);
         r
     }
 

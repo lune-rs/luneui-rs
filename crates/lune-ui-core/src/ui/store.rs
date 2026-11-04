@@ -8,7 +8,10 @@ use crate::motion::{MotionTier, Transition};
 use crate::paint::Rect;
 
 use super::WidgetId;
+use super::focus::FocusState;
+use super::overlay::OverlayRec;
 use super::pointer::{HitRecord, PointerState};
+use crate::access::SemanticTree;
 
 /// One retained value and the frame that last used it.
 pub(crate) struct Entry {
@@ -44,6 +47,14 @@ pub struct UiStore {
     pub(crate) anim_color: BTreeMap<WidgetId, Anim<[f32; 4]>>,
     /// The tier of the previous frame, `None` before the first.
     pub(crate) last_tier: Option<MotionTier>,
+    /// Open, opening and closing overlays, in open order.
+    pub(crate) overlays: Vec<OverlayRec>,
+    /// The tag of the most recently opened overlay (0: none yet).
+    pub(crate) next_tag: u32,
+    pub(crate) focus: FocusState,
+    pub(crate) prev_tree: SemanticTree,
+    /// `(layer, hit tag)` each node of the previous frame was emitted under.
+    pub(crate) prev_node_meta: BTreeMap<WidgetId, (usize, u32)>,
 }
 
 impl std::fmt::Debug for UiStore {
@@ -55,6 +66,8 @@ impl std::fmt::Debug for UiStore {
             .field("persistent", &self.persistent.len())
             .field("live_scopes", &self.live_scopes)
             .field("animations", &(self.anim_f32.len() + self.anim_color.len()))
+            .field("overlays", &self.overlays)
+            .field("focus", &self.focus)
             .finish_non_exhaustive()
     }
 }
