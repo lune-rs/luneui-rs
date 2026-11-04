@@ -1,15 +1,15 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-04 (M5 steps 1 to 7 done; step 8 is next; M4 merged at d9fe71f)
+Last updated: 2026-11-04 (M5 steps 1 to 8 done; step 9 is next; M4 merged at d9fe71f)
 
 ## Now
 
 M4 (interaction and motion) is merged to main at d9fe71f, on top of M3 (catalogue specs) and M2
 (seams and crate split). M5 (foundations: layout, scroll, list, popover, text editing, drag and drop,
-shortcuts, painter primitives) is in progress on branch `orch/toolkit-v1`; steps 1 to 7 (the frame
+shortcuts, painter primitives) is in progress on branch `orch/toolkit-v1`; steps 1 to 8 (the frame
 plumbing, layout helpers, shortcut registry, vector primitives, image and rotate, their gallery pages, the
-scroll area and scrollbar) are done; step 8 (virtualized list) is next.
+scroll area and scrollbar, the virtualized list) are done; step 9 (popover and tooltip) is next.
 `lune-ui-core` holds the per-window `Ui` frame (stable ids, retained state with keep-alive scopes,
 layered hits with modal and pointer capture, `Response`, overlays with exit retention, focus scopes,
 the semantic tree with actions, the string table, `FrameOutput` with `Repaint`) and the closed-form
@@ -19,7 +19,10 @@ IME-area output, `Xform::translate` and `Painter::push_clip`/`pop_clip`. `layout
 stack, row, column and grid helpers; `shortcuts` the scoped chord registry (preempt at begin, bubble at
 finish, `FrameOutput.fired`). `Ui::scroll_area` (f64 offsets, wheel and trackpad, reveals, follow-tail,
 identity-keyed preservation, the overlay thumb) is in `widgets/scroll_area.rs` and `scrollbar.rs`;
-`Painter::push_translate` moves content and keeps clips put on screen.
+`Painter::push_translate` moves content and keeps clips put on screen. `Ui::virtual_list`
+(`widgets/virtual_list.rs`) builds only the rows in view on an untranslated scroll area: fixed rows or
+measured ones in a Fenwick tree, keyed selection in a persistent `ListState`, no row tween while the
+content moves.
 `docs/architecture.md` holds the module map, "The `Ui` frame" and "API changes since M1"; DECISIONS
 D59 to D85 record the M4 choices.
 The gallery has a page registry (two legacy pages, 15 Ui pages), `--dump`, `--list` (62 scene names)
@@ -28,7 +31,7 @@ The pixel gate shows the 15 legacy scenes identical against the M1 base.
 
 ## Next
 
-1. M5 steps 8 to 16 per `m05-foundations/plan.md`: virtualized list (on `scroll_area_untranslated`), popover and tooltip, text queries, `TextEdit`,
+1. M5 steps 9 to 16 per `m05-foundations/plan.md`: popover and tooltip, text queries, `TextEdit`,
    the text field upgrade, drag and drop, gallery pages, docs and the acceptance bench.
 2. CI (fmt, clippy `-D warnings`, tests on macOS, Windows and Linux) now that there is code to run.
 3. An export script for Luneterm's vendored snapshot, before Luneterm M9. The migration

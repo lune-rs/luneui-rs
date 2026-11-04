@@ -257,6 +257,12 @@ impl AxisState {
         (self.base + f64::from(rel), moving)
     }
 
+    /// Moves the whole offset by `by`, keeping any animation's course relative to it.
+    fn shift(&mut self, by: f64) {
+        self.wanted += by;
+        self.base += by;
+    }
+
     /// Sets the offset at once, cancelling any animation.
     fn jump(&mut self, to: f64) {
         self.wanted = to;
@@ -290,9 +296,12 @@ struct ScrollState {
     last_focus: Option<WidgetId>,
 }
 
-/// `Ui::scroll_to` requests, taken by the area on its next call.
+/// `Ui::scroll_to` and `Ui::scroll_shift` requests, taken by the area on its next call.
 #[derive(Debug, Default)]
-struct Requests(Vec<(Target, Reveal)>);
+struct Requests {
+    reveals: Vec<(Target, Reveal)>,
+    shift_y: f64,
+}
 
 /// `r`, drawn in the area's space, as a box in content coordinates: the content's origin is the
 /// viewport's top-left corner at offset 0.
@@ -337,7 +346,15 @@ impl Ui<'_> {
     /// comes later). A target outside the content changes nothing.
     pub fn scroll_to(&mut self, key: impl Hash, target: Target, how: Reveal) {
         let id = self.id(key);
-        self.transient::<Requests>(id).0.push((target, how));
+        self.transient::<Requests>(id).reveals.push((target, how));
+    }
+
+    /// Asks the area under `key` (of the current scope) to move its vertical offset by `by` when
+    /// it is next called, before anything else: the content above the viewport changed height by
+    /// that much, so what is on screen stays put. Any animation keeps its course.
+    pub(crate) fn scroll_shift(&mut self, key: impl Hash, by: f64) {
+        let id = self.id(key);
+        self.transient::<Requests>(id).shift_y += by;
     }
 
     fn scroll_area_with<R>(
@@ -362,7 +379,10 @@ impl Ui<'_> {
         );
         let vp = [f64::from(rect.w), f64::from(rect.h)];
         let mut st = std::mem::take(self.persistent::<ScrollState>(id));
-        let requests = std::mem::take(&mut self.transient::<Requests>(id).0);
+        let Requests {
+            mut reveals,
+            shift_y,
+        } = std::mem::take(self.transient::<Requests>(id));
 
         // Identity: a new key starts at the top; the same key keeps `wanted` through short frames.
         if st.rendered && opts.identity != st.key {
@@ -371,6 +391,7 @@ impl Ui<'_> {
         let preserve = should_restore(st.rendered, st.key, opts.identity);
         st.key = opts.identity;
         st.rendered = true;
+        st.a[1].shift(shift_y);
 
         let known = opts.extent.map(|(w, h)| [clean(w), clean(h)]);
         let ext_pre = known.unwrap_or(st.extent);
@@ -471,7 +492,6 @@ impl Ui<'_> {
         // a keyboard focus move to a child (the least movement).
         let (focused, ring) = self.focus_state();
         let inside = focused.and_then(|f| watched.iter().rev().find(|(w, _)| *w == f).copied());
-        let mut reveals = requests;
         if translate {
             for (w, r) in &watched {
                 if self.is_scroll_target(*w) {

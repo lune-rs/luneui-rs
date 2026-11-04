@@ -926,6 +926,11 @@ impl<'a> Ui<'a> {
         )
     }
 
+    /// Whether the current call runs enabled (outside `with_enabled(false, ..)`).
+    pub(crate) fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
     /// Whether an accessibility action asked to scroll `id` into view this frame.
     pub(crate) fn is_scroll_target(&self, id: WidgetId) -> bool {
         self.scroll_into_view.contains(&id)
