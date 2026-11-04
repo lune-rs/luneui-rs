@@ -634,3 +634,57 @@ fn ids_nest_under_scopes() {
         assert_eq!(ui.id("x"), top);
     });
 }
+
+#[test]
+fn a_focus_request_repeated_every_frame_settles_to_idle() {
+    // Review F10: "keep the field focused" each frame must not keep the window redrawing once
+    // the field is focused and shows no ring.
+    let mut h = harness();
+    h.tier = MotionTier::Off;
+    let mut seq = Vec::new();
+    for i in 0..6u64 {
+        let mut focused = false;
+        let (_, out) = h.at_ms(i * 10).frame(|ui| {
+            let id = ui.id("field");
+            focused = ui.interact(id, A, Sense::CLICK_FOCUS).focused;
+            ui.request_focus(id);
+        });
+        seq.push((out.repaint, focused));
+    }
+    let now = seq.iter().filter(|(r, _)| *r == Repaint::Now).count();
+    assert!(now <= 1, "at most one Now: {seq:?}");
+    assert!(seq[2..].iter().all(|(r, f)| *r == Repaint::Idle && *f));
+}
+
+#[test]
+fn a_region_that_moves_with_its_own_hover_does_not_loop_the_catch_up() {
+    // Review F11, D81: region A sits under the still pointer; while A is hovered, region B is
+    // drawn over it, so the hover never settles. The move frame asks for one catch-up frame, and
+    // an event-less frame never asks for another one right after: no two Nows in a row.
+    let mut h = harness();
+    h.tier = MotionTier::Off;
+    let run = |h: &mut UiHarness, ms: u64| {
+        let mut a_hovered = false;
+        let (_, out) = h.at_ms(ms).frame(|ui| {
+            a_hovered = w(ui, "a", A, Sense::CLICK).hovered;
+            if a_hovered {
+                w(ui, "b", A, Sense::CLICK);
+            }
+        });
+        (a_hovered, out.repaint)
+    };
+    assert_eq!(run(&mut h, 0), (false, Repaint::Idle));
+    h.input.pointer_to(20.0, 20.0);
+    let (hovered, repaint) = run(&mut h, 10);
+    assert!(hovered);
+    assert_eq!(repaint, Repaint::Now, "the move frame asks for a catch-up");
+    let mut seq = vec![repaint];
+    for i in 2..10u64 {
+        seq.push(run(&mut h, i * 10).1);
+    }
+    assert_eq!(seq[1], Repaint::Idle, "the event-less frame after the move");
+    assert!(
+        seq.windows(2).all(|w| w != [Repaint::Now, Repaint::Now]),
+        "{seq:?}"
+    );
+}

@@ -487,9 +487,19 @@ impl<'a> Ui<'a> {
             next.hovered != pointer.hovered && !(store.hover_catch_up && input.events.is_empty())
         };
         store.hover_catch_up = stale_hover;
+        // A pending focus request counts only when applying it at the next begin changes
+        // something: another widget, a ring to hide, or a focus-loss overlay to dismiss.
+        let request_acts = store.focus.pending.is_some_and(|p| {
+            store.focus.focused != Some(p)
+                || store.focus.visible
+                || store
+                    .overlays
+                    .iter()
+                    .any(|o| o.active() && o.opts.dismiss_on_focus_loss)
+        });
         let catch_up = input_acted
             || stale_hover
-            || store.focus.pending.is_some()
+            || request_acts
             || (store.focus.focused, store.focus.visible) != focus_at_begin;
 
         let focused = store.focus.focused;

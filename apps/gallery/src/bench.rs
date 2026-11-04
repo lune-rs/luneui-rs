@@ -579,6 +579,9 @@ fn run_inner(o: &Options) -> Result<u8, String> {
         if matches!(sc.kind, Kind::SelftestSleep4) {
             let spread = (m.p99 - m.p50, out.worst - m.p50);
             let in_range = (4.0..=6.0).contains(&out.cpu_p50);
+            // D85: load only lengthens a 4 ms wait, so a reading below 4 ms means the
+            // instrument under-measures, and no verdict it prints can be trusted.
+            let broken = out.cpu_p50 < 4.0;
             println!(
                 "bench: calibration {} cpu_p50={:.2} (expected 4.0-6.0: {}) p50={:.2} p99={:.2} worst={:.2} spread_p99=+{:.2} spread_max=+{:.2} load1={}",
                 sc.name,
@@ -591,6 +594,9 @@ fn run_inner(o: &Options) -> Result<u8, String> {
                 spread.1,
                 load1(),
             );
+            if broken {
+                return Err("instrument check failed: self-test below 4 ms".to_owned());
+            }
             calib = Some(spread);
             continue;
         }
