@@ -219,6 +219,28 @@ pub struct Node {
     pub sort: Option<Sort>,
 }
 
+impl Node {
+    /// A node with no description, value, text, live region, sort, states or actions. The `Ui`
+    /// sets `parent` and `children` when it appends the node.
+    pub fn new(id: WidgetId, role: Role, name: &str, bounds: Rect) -> Node {
+        Node {
+            id,
+            role,
+            name: name.to_owned(),
+            description: None,
+            value: None,
+            text: None,
+            bounds,
+            parent: None,
+            children: Vec::new(),
+            live: None,
+            states: States::default(),
+            actions: Actions::default(),
+            sort: None,
+        }
+    }
+}
+
 /// The semantic tree of one frame: nodes in call order, parents before children.
 #[derive(Clone, PartialEq, Debug, Default)]
 pub struct SemanticTree {

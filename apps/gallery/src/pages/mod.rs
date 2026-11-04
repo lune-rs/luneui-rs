@@ -54,6 +54,18 @@ pub(crate) fn card(ui: &mut Ui<'_>, title: &str) -> Rect {
     background(ui.painter(), true, true, title)
 }
 
+/// A small section heading at (`x`, `y`).
+pub(crate) fn heading(ui: &mut Ui<'_>, text: &str, x: f32, y: f32) {
+    let spec = Spec::plain(text, Style::ui(THEME.font_s, THEME.fg_tertiary).medium());
+    ui.painter().text(&spec, x, y);
+}
+
+/// A small caption at (`x`, `y`).
+pub(crate) fn caption(ui: &mut Ui<'_>, text: &str, x: f32, y: f32) {
+    let spec = Spec::plain(text, Style::ui(THEME.font_s, THEME.fg_secondary));
+    ui.painter().text(&spec, x, y);
+}
+
 /// A page that is not built yet: its card and a heading.
 #[derive(Debug)]
 pub(crate) struct Stub(pub(crate) &'static str);

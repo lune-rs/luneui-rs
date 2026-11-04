@@ -56,7 +56,6 @@ pub(crate) trait PageState {
 }
 
 /// Whether a scene's capture frame still moves.
-#[allow(dead_code)] // the Ui pages' scenes construct these (none exist before step 12)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Expect {
     /// `Repaint::Idle` at the capture frame.
