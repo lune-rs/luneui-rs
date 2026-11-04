@@ -145,6 +145,10 @@ pub struct Ui<'a> {
     key_focus: Option<WidgetId>,
     set_values: BTreeMap<WidgetId, AccessValue>,
     scroll_into_view: BTreeSet<WidgetId>,
+    /// The unclipped rect, in the space `interact` was called in, of each widget that registered
+    /// this frame and is the key focus or an accessibility scroll-into-view target, in call order:
+    /// a scroll area reads it, because the clipped hit of an off-screen child is empty.
+    watch: Vec<(WidgetId, Rect)>,
     tree: SemanticTree,
     /// Indices in `tree` of the open containers.
     containers: Vec<usize>,
@@ -501,6 +505,7 @@ impl<'a> Ui<'a> {
             key_focus,
             set_values: routed.set_values,
             scroll_into_view: routed.scroll_into_view,
+            watch: Vec::new(),
             tree: SemanticTree::default(),
             containers: Vec::new(),
             node_meta: BTreeMap::new(),
@@ -831,6 +836,7 @@ impl<'a> Ui<'a> {
     /// Registers `rect` as a hit region of `id` on the painter's current layer and returns the
     /// frame's reading of it. The region is clipped and transformed like `Painter::hit`.
     pub fn interact(&mut self, id: WidgetId, rect: Rect, sense: Sense) -> Response {
+        let content_rect = rect;
         let index = self.painter.hits.len();
         self.painter.hit(rect, id);
         let rect = self.painter.hits[index].0;
@@ -875,7 +881,72 @@ impl<'a> Ui<'a> {
         r.focus_visible = r.focused && self.store.focus.visible && self.input.focused;
         r.set_value = self.set_values.get(&id).cloned();
         r.scroll_into_view = self.scroll_into_view.contains(&id);
+        if r.focused || r.scroll_into_view {
+            self.watch.push((id, content_rect));
+        }
         r
+    }
+
+    /// The length of the watch list now: a scroll area's mark before it runs its content.
+    pub(crate) fn watch_mark(&self) -> usize {
+        self.watch.len()
+    }
+
+    /// The watched widgets (focused or scroll-into-view targets) registered since `mark`.
+    pub(crate) fn watched_since(&self, mark: usize) -> Vec<(WidgetId, Rect)> {
+        self.watch.get(mark..).unwrap_or_default().to_vec()
+    }
+
+    /// Replaces the watched widgets registered since `mark` by `keep`: a scroll area hands its own
+    /// viewport on to an outer area in place of the children it already dealt with.
+    pub(crate) fn watch_replace(&mut self, mark: usize, keep: Vec<(WidgetId, Rect)>) {
+        self.watch.truncate(mark);
+        self.watch.extend(keep);
+    }
+
+    /// The number of regions registered through `interact` so far.
+    pub(crate) fn registration_mark(&self) -> usize {
+        self.registered.len()
+    }
+
+    /// Whether an enabled tab stop registered through `interact` since `mark`.
+    pub(crate) fn focusable_since(&self, mark: usize) -> bool {
+        self.registered
+            .get(mark..)
+            .unwrap_or_default()
+            .iter()
+            .any(|r| r.enabled && r.sense.focusable)
+    }
+
+    /// The focused widget and whether its ring shows (keyboard origin).
+    pub(crate) fn focus_state(&self) -> (Option<WidgetId>, bool) {
+        (
+            self.store.focus.focused,
+            self.store.focus.visible && self.input.focused,
+        )
+    }
+
+    /// Whether an accessibility action asked to scroll `id` into view this frame.
+    pub(crate) fn is_scroll_target(&self, id: WidgetId) -> bool {
+        self.scroll_into_view.contains(&id)
+    }
+
+    /// Asks for a frame after this one: the picture just drawn is one a state change this frame
+    /// has already outdated.
+    pub(crate) fn request_catch_up(&mut self) {
+        self.input_acted = true;
+    }
+
+    /// Marks something as moving: the frame reports `Repaint::Now`.
+    pub(crate) fn mark_moving(&mut self) {
+        self.in_flight = true;
+    }
+
+    /// Edits the node `id` emitted this frame, if any (the latest one with that id).
+    pub(crate) fn patch_node(&mut self, id: WidgetId, f: impl FnOnce(&mut crate::access::Node)) {
+        if let Some(n) = self.tree.nodes.iter_mut().rev().find(|n| n.id == id) {
+            f(n);
+        }
     }
 
     /// State of type `T` for `id`, dropped at the finish of the first frame that does not use it.

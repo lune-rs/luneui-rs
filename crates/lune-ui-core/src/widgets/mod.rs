@@ -11,6 +11,8 @@ pub mod focus_ring;
 pub mod label;
 pub mod menu;
 pub mod popup_panel;
+pub mod scroll_area;
+pub mod scrollbar;
 pub mod stepper;
 pub mod toggle;
 

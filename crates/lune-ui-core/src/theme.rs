@@ -21,6 +21,10 @@ pub struct Theme {
     pub border_subtle: Rgba,
     pub accent: Rgba,
     pub accent_hover: Rgba,
+    /// The scrollbar thumb: `accent` at alpha 0x8C (Wane's `--scroll-thumb`).
+    pub scroll_thumb: Rgba,
+    /// The thumb while hovered or held: `accent` at alpha 0xE6.
+    pub scroll_thumb_hover: Rgba,
     /// Knob and check mark on an accent fill.
     pub on_accent: Rgba,
     /// Label on a primary button.
@@ -91,6 +95,8 @@ pub mod lunegit_dark {
         border_subtle: [0xFF, 0xFF, 0xFF, 0x1A],
         accent: [0x76, 0x7D, 0x85, 0xFF],
         accent_hover: [0x86, 0x8D, 0x95, 0xFF],
+        scroll_thumb: [0x76, 0x7D, 0x85, 0x8C],
+        scroll_thumb_hover: [0x76, 0x7D, 0x85, 0xE6],
         on_accent: [0xFF, 0xFF, 0xFF, 0xFF],
         on_accent_text: [0xFF, 0xFF, 0xFF, 0xF0],
         dropdown_bg: [0x00, 0x00, 0x00, 0xF0],

@@ -137,6 +137,8 @@ enum Op {
     SetXform(Option<Xform>),
     PushXform(Xform),
     PopXform,
+    PushTranslate(f32, f32),
+    PopTranslate,
     FillRadii(Rect, [f32; 4], Rgba),
     FillOver(Rect, f32, [f32; 4]),
     Ring(Rect, f32, f32, Rgba, bool),
@@ -305,6 +307,8 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
                 Op::SetXform(x) => self.set_xform(*x),
                 Op::PushXform(x) => self.push_xform(*x),
                 Op::PopXform => self.pop_xform(),
+                Op::PushTranslate(dx, dy) => self.push_translate(*dx, *dy),
+                Op::PopTranslate => self.pop_translate(),
                 Op::FillRadii(r, radii, c) => self.fill_radii(*r, *radii, *c),
                 Op::FillOver(r, radius, c) => self.fill_over(*r, *radius, *c),
                 Op::Ring(r, radius, w, c, above) => self.ring(*r, *radius, *w, *c, *above),
@@ -475,6 +479,31 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
     pub fn pop_xform(&mut self) {
         self.rec(|| Op::PopXform);
         self.xforms.pop();
+    }
+
+    /// Adds a translation by `dx`, `dy` inside the current transforms, like
+    /// [`Self::push_xform`] with [`Xform::translate`], and keeps the current clip and rounded clip
+    /// where they are on screen (a plain `push_xform` moves them with the new space). Pair it with
+    /// [`Self::pop_translate`]; a scroll area draws its content this way.
+    pub fn push_translate(&mut self, dx: f32, dy: f32) {
+        self.rec(|| Op::PushTranslate(dx, dy));
+        self.xforms.push(Xform::translate(dx, dy));
+        self.shift_clips(-dx, -dy);
+    }
+
+    /// Removes the innermost transform, put there by [`Self::push_translate`], and moves the clips
+    /// back; does nothing on an empty stack.
+    pub fn pop_translate(&mut self) {
+        self.rec(|| Op::PopTranslate);
+        if let Some(x) = self.xforms.pop() {
+            self.shift_clips(x.dx, x.dy);
+        }
+    }
+
+    fn shift_clips(&mut self, dx: f32, dy: f32) {
+        let moved = |r: Rect| Rect::new(r.x + dx, r.y + dy, r.w, r.h);
+        self.clip = self.clip.map(moved);
+        self.round = self.round.map(|(r, radius)| (moved(r), radius));
     }
 
     /// `x, y` through the stack, innermost first.
