@@ -10,9 +10,9 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | status | count |
 | --- | --- |
 | in-luneterm | 0 |
-| planned | 62 |
+| planned | 55 |
 | stub | 0 |
-| in-progress | 31 |
+| in-progress | 38 |
 | done | 0 |
 | external | 4 |
 | **total** | **97** |
@@ -23,7 +23,7 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | --- | --- | --- | --- | --- |
 | [core.acrylic](core/acrylic.md) | Acrylic colour math and noise opacity | in-progress | luneterm | Avalonia acrylic colour math with tests, and the noise opacity |
 | [core.color](core/color.md) | Colour helpers | in-progress | luneterm | Straight-alpha RGBA values with premultiply, blend-over and alpha helpers |
-| [core.focus](core/focus.md) | Keyboard focus | planned | any | Tab order by call order within focus scopes, focus-visible, scope push, trap and restore, roving focus in composites |
+| [core.focus](core/focus.md) | Keyboard focus | in-progress | any | Tab order by call order within focus scopes, focus-visible, scope push, trap and restore, roving focus in composites |
 | [core.icon](core/icon.md) | Codicon glyph constants | in-progress | luneterm, wane | Codicon glyph constants and a glyph helper; the app supplies the icon font |
 | [core.image](core/image.md) | Image drawing | planned | lunegit, wane | Image primitive: app-decoded RGBA drawn into a rect with a fit mode, alpha and optional corner radius; explicit resource lifetime |
 | [core.input](core/input.md) | Input model | in-progress | any | Plain-data RawInput in, FrameOutput out; the windowing adapter translates both |
@@ -32,7 +32,7 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | [core.tab-outline](core/tab-outline.md) | Tab outline geometry | in-progress | luneterm | Tab-chrome outline loop geometry |
 | [core.testing](core/testing.md) | Seam fakes and contract suites | in-progress | any | Public testing module: RecordingRenderer, FakeText, ScriptedInput, NullMaterial and the contract suites |
 | [core.theme](core/theme.md) | Theme tokens and Lunegit dark preset | in-progress | luneterm | Theme token struct and the lunegit_dark preset with the WINDOW, PANEL and CARD glass layers |
-| [core.ui](core/ui.md) | Ui frame context | planned | any | Immediate-mode Ui frame: ids, transient and persistent retained state, Response, layers and modality, Repaint |
+| [core.ui](core/ui.md) | Ui frame context | in-progress | any | Immediate-mode Ui frame: ids, transient and persistent retained state, Response, layers and modality, Repaint |
 
 ## render
 
@@ -49,7 +49,7 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
-| [platform.clipboard](platform/clipboard.md) | Clipboard | planned | any | Text clipboard through FrameOutput requests and input events; types in M4, fake in M5, platform adapter in M10 |
+| [platform.clipboard](platform/clipboard.md) | Clipboard | in-progress | any | Text clipboard through FrameOutput requests and input events; types in M4, fake in M5, platform adapter in M10 |
 | [platform.input](platform/input.md) | winit input translation and output | in-progress | any | Translator turns winit events into RawInput; OutputState applies FrameOutput to a window |
 | [platform.material](platform/material.md) | OS glass materials | in-progress | luneterm | Backdrop seam in core (Material, Backdrop, NullMaterial); OS glass behind it: macOS NSVisualEffect and Liquid Glass, Windows acrylic and mica, opaque elsewhere |
 | [platform.tray-icon](platform/tray-icon.md) | Tray icon with status dot | planned | wane | 16 px monochrome glyph with a status dot (green serving, amber degraded, grey paused), rendered to OS bitmaps at 1x and 2x; opens toolkit glass menus |
@@ -145,18 +145,18 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
-| [motion.animation-tiers](motion/animation-tiers.md) | Animation tiers and reduced motion | planned | any | Full, Reduced and Off motion tiers passed in by the app, with the per-token Reduced duration map |
+| [motion.animation-tiers](motion/animation-tiers.md) | Animation tiers and reduced motion | in-progress | any | Full, Reduced and Off motion tiers passed in by the app, with the per-token Reduced duration map |
 | [motion.curves](motion/curves.md) | Easing curves and menu motion | in-progress | luneterm | cubic_bezier easing and the menu open and close values; becomes the cubic-out and ease-in tokens |
-| [motion.transitions](motion/transitions.md) | Motion system and transitions | planned | any | Time, Easing, Tween, Spring, Keyframes and Transition evaluated in closed form, tier-aware, with a 60 Hz conformance harness |
+| [motion.transitions](motion/transitions.md) | Motion system and transitions | in-progress | any | Time, Easing, Tween, Spring, Keyframes and Transition evaluated in closed form, tier-aware, with a 60 Hz conformance harness |
 
 ## infra
 
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
-| [infra.accessibility](infra/accessibility.md) | Semantic tree and accessibility | planned | any | One semantic node per interactive widget per frame (role, name, value, states, actions), AccessAction routing, AccessKit bridge in M10 |
+| [infra.accessibility](infra/accessibility.md) | Semantic tree and accessibility | in-progress | any | One semantic node per interactive widget per frame (role, name, value, states, actions), AccessAction routing, AccessKit bridge in M10 |
 | [infra.drag-and-drop](infra/drag-and-drop.md) | In-window drag and drop | planned | lunegit | In-window drag state machine (press, threshold, drag, release or cancel), nearest-slot target, edge auto-scroll; no OS drag |
 | [infra.json](infra/json.md) | Bounded JSON reader | planned | any | Small JSON reader in core with input, depth and string limits, fail-closed errors and no panics; backs theme and locale loading |
-| [infra.localization](infra/localization.md) | Localization | planned | any | One string table of flat dotted keys in core, luneui. keys with English defaults, positional formatting; locale JSON loaded in M10 |
+| [infra.localization](infra/localization.md) | Localization | in-progress | any | One string table of flat dotted keys in core, luneui. keys with English defaults, positional formatting; locale JSON loaded in M10 |
 | [infra.shortcut-routing](infra/shortcut-routing.md) | Keyboard shortcut routing | planned | any | A scoped chord registry resolved in three phases (preempt, focused widget, bubble); Lunegit has no central one |
 | [infra.theme-hot-reload](infra/theme-hot-reload.md) | Theme JSON loading and hot reload | planned | lunegit | Theme files as JSON mapped onto the Theme value, partial overrides over a baseline, acrylic level, swapped at a frame boundary by the app |
 

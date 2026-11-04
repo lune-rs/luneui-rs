@@ -4,14 +4,14 @@ title: Popup panel surface
 area: overlay
 status: in-progress
 consumers: luneterm
-source: crates/lune-ui-core/src/widgets/mod.rs
+source: crates/lune-ui-core/src/widgets/popup_panel.rs
 owner: orch/toolkit-v1
 summary: Shared popup surface: radius-8 fill and 1 px ring, colours passed by the caller (used by the drop-down list)
 ---
 
 ## What it is
 
-`popup_panel`: a filled surface at radius 8 with a 1 px ring; the caller passes the fill and the border [R crates/lune-ui-core/src/widgets/mod.rs:199-203]. Its one caller is the drop-down list [R crates/lune-ui-core/src/widgets/dropdown.rs:26]; the context menu draws its own glass instead [R crates/lune-ui-core/src/widgets/menu.rs:109-111].
+`popup_panel`: a filled surface at radius 8 with a 1 px ring; the caller passes the fill and the border [R crates/lune-ui-core/src/widgets/popup_panel.rs:6-11]. Its one caller is the drop-down list [R crates/lune-ui-core/src/widgets/dropdown.rs:26]; the context menu draws its own glass instead [R crates/lune-ui-core/src/widgets/menu.rs:109-111].
 
 ## Needs
 
@@ -31,20 +31,20 @@ Pinned: Lunegit 33a1dd41, Wane 69931d6, this repo fa2958b. Read: `crates/lune-ui
 `crates/lune-ui-core/src/theme.rs:62,68`; Lunegit `src/Lunegit.Desktop/App.axaml:757-783` (MenuFlyoutPresenter
 template: outer radius 12, inner 11); Wane `docs/ui/components.md:571-584`; Luneterm `crates/lune-ui/src/widgets/menu.rs:109-111` at 296cfdc.
 Conflicts (winner):
-- Radius: Lunegit popups 12 outer, 11 inner [L src/Lunegit.Desktop/App.axaml:764-772] vs 8 in the moved code [R crates/lune-ui-core/src/widgets/mod.rs:201-202]. The moved code wins (pixel gate).
-- Flyout fill: Wane `--menu-glass` with blur 30 and saturate 1.8 [W docs/ui/components.md:571-584] vs a caller-passed `bg` with no blur here [R crates/lune-ui-core/src/widgets/mod.rs:200]. The caller's fill wins; the blur is an Open question.
+- Radius: Lunegit popups 12 outer, 11 inner [L src/Lunegit.Desktop/App.axaml:764-772] vs 8 in the moved code [R crates/lune-ui-core/src/widgets/popup_panel.rs:8-9]. The moved code wins (pixel gate).
+- Flyout fill: Wane `--menu-glass` with blur 30 and saturate 1.8 [W docs/ui/components.md:571-584] vs a caller-passed `bg` with no blur here [R crates/lune-ui-core/src/widgets/popup_panel.rs:7]. The caller's fill wins; the blur is an Open question.
 
 ### Anatomy
 
-- Fill: the caller's `bg`, radius 8 [R crates/lune-ui-core/src/widgets/mod.rs:201].
-- Ring: 1 px, the caller's `border`, radius 8 [R crates/lune-ui-core/src/widgets/mod.rs:202].
+- Fill: the caller's `bg`, radius 8 [R crates/lune-ui-core/src/widgets/popup_panel.rs:8].
+- Ring: 1 px, the caller's `border`, radius 8 [R crates/lune-ui-core/src/widgets/popup_panel.rs:9].
 - Dropdown values for reference: `dropdown_bg` #000000F0 and `border` #FFFFFF30 [R crates/lune-ui-core/src/theme.rs:68,62; crates/lune-ui-core/src/widgets/dropdown.rs:26].
 
 ### States
 
 | state | look | cite |
 |---|---|---|
-| rest (the only state) | fill `bg`, ring `border` | [R crates/lune-ui-core/src/widgets/mod.rs:201-202] |
+| rest (the only state) | fill `bg`, ring `border` | [R crates/lune-ui-core/src/widgets/popup_panel.rs:8-9] |
 
 ### Transitions
 
@@ -58,7 +58,7 @@ n/a — the surface takes no pointer input and no focus. Its owner adds the hit 
 
 - Transient: none.
 - Persistent: none.
-- App-owned: rect, `bg`, `border` (passed every frame) [R crates/lune-ui-core/src/widgets/mod.rs:200].
+- App-owned: rect, `bg`, `border` (passed every frame) [R crates/lune-ui-core/src/widgets/popup_panel.rs:7].
 - Exit retention: no.
 
 ### Accessibility
@@ -75,7 +75,7 @@ None: the surface draws no text.
 
 ### Painter primitives
 
-- Existing: fill, ring. [R crates/lune-ui-core/src/widgets/mod.rs:201-202]
+- Existing: fill, ring. [R crates/lune-ui-core/src/widgets/popup_panel.rs:8-9]
 - New: none.
 
 ### Acceptance

@@ -35,7 +35,7 @@ selector), `src/Lunegit.Desktop/App.axaml:720-745` (ComboBox item states), `src/
 (popup corner 12); Wane `docs/ui/components.md:529-542`.
 Conflicts (winner):
 - Surface: Wane `--menu-glass` blur 30 [W docs/ui/components.md:529-542] vs opaque `dropdown_bg` #000000F0 [R crates/lune-ui-core/src/theme.rs:68, crates/lune-ui-core/src/widgets/dropdown.rs:26]. The moved code wins (pixel gate); the glass look is an Open question for a DECISIONS row.
-- Radius: Wane 9, Lunegit popup 12 [L src/Lunegit.Desktop/App.axaml:761], code 8 [R crates/lune-ui-core/src/widgets/mod.rs:201-202]. The code wins.
+- Radius: Wane 9, Lunegit popup 12 [L src/Lunegit.Desktop/App.axaml:761], code 8 [R crates/lune-ui-core/src/widgets/popup_panel.rs:8-9]. The code wins.
 - Panel inset: Wane 4 and code 4 agree [R crates/lune-ui-core/src/widgets/dropdown.rs:28-29].
 
 ### Anatomy
@@ -56,7 +56,7 @@ Conflicts (winner):
 | selected | fill `surface_selected` #FFFFFF18, check mark | [R crates/lune-ui-core/src/widgets/dropdown.rs:35-36,46-48, crates/lune-ui-core/src/theme.rs:61] |
 | selected and hovered | selected fill (the hover fill is skipped) | [R crates/lune-ui-core/src/widgets/dropdown.rs:35-38] |
 | disabled option | label `fg_tertiary`; no hit region, so no hover | [R crates/lune-ui-core/src/widgets/dropdown.rs:40-44,50-52] |
-| focus-visible (keyboard row) | not in the moved code | open question |
+| focus-visible (keyboard row) | the hover fill on the highlighted row | [D76] |
 | open | the list drawn by the caller | [R crates/lune-ui-core/src/widgets/dropdown.rs:9-15] |
 | flipped | list above the anchor | [R crates/lune-ui-core/src/widgets/dropdown.rs:20-24] |
 
@@ -69,7 +69,7 @@ No transition is given for row hover or selection; open question.
 ### Input and focus
 
 - Pointer: hover an enabled row, click picks it [R crates/lune-ui-core/src/widgets/dropdown.rs:37,50-52]; a disabled row has no hit region. An outside click closes [W docs/ui/components.md:529-542].
-- Keyboard: Up, Down, Enter choose; Esc closes [W docs/ui/components.md:529-542] (requirements, not mocked).
+- Keyboard: Up, Down, Enter choose; Esc closes [W docs/ui/components.md:529-542] (requirements, not mocked); built as [D76].
 - Tab stop: the combo owns the tab stop; the rows do not take focus (open question).
 - Layer: Popup (the Wane native note: the list is drawn above scrolling content) [W docs/ui/components.md:529-542]. The moved code does not set a layer (dropdown.rs:9-54).
 - Focus scope: push on open; pop restores focus to the anchor combo [core.focus]. Escape and outside click act on the top overlay only [core.focus].
@@ -77,7 +77,7 @@ No transition is given for row hover or selection; open question.
 
 ### Retained state
 
-- Transient: row hover; keyboard row highlight (none yet, open question).
+- Transient: row hover; keyboard row highlight [D76].
 - Persistent: none. Scroll offset for long lists is not in the moved code [layout.scroll-area].
 - App-owned: options (text and enabled flag), selected index, the anchor rect, the open flag [R crates/lune-ui-core/src/widgets/dropdown.rs:9-15].
 - Exit retention: no (no motion).
@@ -123,7 +123,7 @@ None: option texts come from the app (dropdown.rs:9-12).
 - Glass look (Wane `--menu-glass`, blur 30) vs the moved opaque `dropdown_bg`: a look change needs a DECISIONS row (hard rule 8); open.
 - Long option lists scroll: not in the moved code and not mocked (W docs/ui/components.md:529-542); open for layout.scroll-area.
 - Type-ahead: not mocked; open.
-- Keyboard focus-visible on a row and the Tab stop: not in any source; open.
+- Resolved [D76]: the list takes focus; a keyboard row highlight (Up and Down skip disabled rows, Enter picks, it starts at the selected row) is drawn with the hover fill.
 
 ## Notes for the planner
 

@@ -4,7 +4,7 @@ title: Numeric stepper
 area: widget
 status: in-progress
 consumers: luneterm, wane
-source: crates/lune-ui-core/src/widgets/mod.rs
+source: crates/lune-ui-core/src/widgets/stepper.rs
 owner: orch/toolkit-v1
 summary: Numeric stepper: value with minus and plus buttons; clamping and step size belong to the app
 ---
@@ -32,23 +32,23 @@ Pinned: Lunegit 33a1dd41, Wane 69931d6, this repo fa2958b. Read: `crates/lune-ui
 `crates/lune-ui-core/src/theme.rs:62,68,85`; `apps/gallery/src/scenes.rs:278-285`; Wane `docs/ui/components.md:361-373`;
 Lunegit `src/Lunegit.Tests/Desktop/Settings/TerminalSettingsViewModelTests.cs:216` (the only trace of an old NumericUpDown in Lunegit's source).
 Instrument: `git grep -n NumericUpDown 33a1dd41 -- src/` at Lunegit 33a1dd41 returns two hits, the test comment above and `src/Lunegit.Desktop/STRUCTURE.md:344` (a doc line). No Lunegit control uses the type, so Lunegit gives no look for this entry.
-Conflicts: (1) Wane sets the value in RznMono 13 [W docs/ui/components.md:366]; the moved code draws it in the UI font [R crates/lune-ui-core/src/widgets/mod.rs:16,103]; the code wins. (2) Wane's boxes sit 3 px from the top and 31 and 3 px from the right [W docs/ui/components.md:366]; the moved code puts them 4 px from the top and at right 32 and 4 [R crates/lune-ui-core/src/widgets/mod.rs:106-108]; the code wins. (3) Wane's width is 130 [W docs/ui/components.md:366]; the gallery passes 140 [R apps/gallery/src/scenes.rs:281]; the width is the caller's, and 130 is the spec value.
+Conflicts: (1) Wane sets the value in RznMono 13 [W docs/ui/components.md:366]; the moved code draws it in the UI font [R crates/lune-ui-core/src/widgets/stepper.rs:79-156] [R crates/lune-ui-core/src/widgets/label.rs:15]; the code wins. (2) Wane's boxes sit 3 px from the top and 31 and 3 px from the right [W docs/ui/components.md:366]; the moved code puts them 4 px from the top and at right 32 and 4 [R crates/lune-ui-core/src/widgets/stepper.rs:79-156]; the code wins. (3) Wane's width is 130 [W docs/ui/components.md:366]; the gallery passes 140 [R apps/gallery/src/scenes.rs:281]; the width is the caller's, and 130 is the spec value.
 
 ### Anatomy
 
 - Rect supplied by the caller; 130 x 32 in Wane (`--control-w-stepper`, `--control-h`) [W docs/ui/components.md:366].
-- Input box: fill `surface_input`, 1 px ring `border`, corner radius `item_radius` 6 [R crates/lune-ui-core/src/widgets/mod.rs:50-68,102], [R crates/lune-ui-core/src/theme.rs:62,85].
-- Value: `value` as text in the UI font, left 10 px, `fg_primary` [R crates/lune-ui-core/src/widgets/mod.rs:103].
-- Minus and plus boxes: 24 wide, height `r.h - 8` (24 at 32), top 4 px, corner radius 4 [R crates/lune-ui-core/src/widgets/mod.rs:105-110,112]. Minus box spans right 32 to right 56; plus box right 4 to right 28 [R crates/lune-ui-core/src/widgets/mod.rs:106].
-- Glyphs: "−" and "+" in 13 px `fg_secondary`, centred in each box [R crates/lune-ui-core/src/widgets/mod.rs:104,114]. The minus is U+2212.
-- Button hover: fill `surface_hover` in the hovered box [R crates/lune-ui-core/src/widgets/mod.rs:111-113].
+- Input box: fill `surface_input`, 1 px ring `border`, corner radius `item_radius` 6 [R crates/lune-ui-core/src/widgets/input_box.rs:29-34] [R crates/lune-ui-core/src/widgets/stepper.rs:80] [R crates/lune-ui-core/src/widgets/combo.rs:53], [R crates/lune-ui-core/src/theme.rs:62,85].
+- Value: `value` as text in the UI font, left 10 px, `fg_primary` [R crates/lune-ui-core/src/widgets/stepper.rs:79-156].
+- Minus and plus boxes: 24 wide, height `r.h - 8` (24 at 32), top 4 px, corner radius 4 [R crates/lune-ui-core/src/widgets/stepper.rs:79-156]. Minus box spans right 32 to right 56; plus box right 4 to right 28 [R crates/lune-ui-core/src/widgets/stepper.rs:79-156].
+- Glyphs: "−" and "+" in 13 px `fg_secondary`, centred in each box [R crates/lune-ui-core/src/widgets/stepper.rs:79-156]. The minus is U+2212.
+- Button hover: fill `surface_hover` in the hovered box [R crates/lune-ui-core/src/widgets/stepper.rs:79-156].
 
 ### States
 
 | state | look | cite |
 |---|---|---|
-| rest | input box as Anatomy; buttons unfilled | [R crates/lune-ui-core/src/widgets/mod.rs:102] |
-| button hover | that box's fill `surface_hover` | [R crates/lune-ui-core/src/widgets/mod.rs:111-112], [W docs/ui/components.md:365] |
+| rest | input box as Anatomy; buttons unfilled | [R crates/lune-ui-core/src/widgets/stepper.rs:79-156] |
+| button hover | that box's fill `surface_hover` | [R crates/lune-ui-core/src/widgets/stepper.rs:79-156], [W docs/ui/components.md:365] |
 | focus-within | ring `accent` instead of `border` | [W docs/ui/components.md:365]; not drawn by the moved code (`input_box` gets `focused` false at mod.rs:102) |
 | disabled | opacity 0.4, inert | [W docs/ui/components.md:365], [L src/Lunegit.Desktop/App.axaml:481-483] |
 
@@ -63,7 +63,7 @@ Lunegit has no stepper or NumericUpDown motion; both rows are the general rule u
 
 ### Input and focus
 
-- Pointer: click on minus or plus steps once [R crates/lune-ui-core/src/widgets/mod.rs:115]; hover tracks each button.
+- Pointer: click on minus or plus steps once [R crates/lune-ui-core/src/widgets/stepper.rs:79-156]; hover tracks each button.
 - Keyboard: Up and Down step; typed digits set the value [W docs/ui/components.md:367]; Tab stop yes [core.focus].
 - Layer: `Base`; no overlay, no focus scope.
 - Pointer capture while pressed [core.input].
@@ -72,7 +72,7 @@ Lunegit has no stepper or NumericUpDown motion; both rows are the general rule u
 
 - Transient: button hover, press, focus ring colour [core.ui].
 - Persistent: none; typed text in progress belongs to the app.
-- App-owned: `value` (passed every frame), the minimum, maximum and step (clamping is the app's) [R crates/lune-ui-core/src/widgets/mod.rs:94-100], [W docs/ui/components.md:367].
+- App-owned: `value` (passed every frame), the minimum, maximum and step (clamping is the app's) [R crates/lune-ui-core/src/widgets/stepper.rs:109-114], [W docs/ui/components.md:367].
 - Exit retention: no.
 
 ### Accessibility
@@ -81,7 +81,7 @@ Lunegit has no stepper or NumericUpDown motion; both rows are the general rule u
 
 ### Strings
 
-None: "−" and "+" are symbols drawn from literals [R crates/lune-ui-core/src/widgets/mod.rs:104].
+None: "−" and "+" are symbols drawn from literals [R crates/lune-ui-core/src/widgets/stepper.rs:79-156].
 
 ### Gallery scenes
 

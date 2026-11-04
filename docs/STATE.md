@@ -1,39 +1,41 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-04 (M3 review round 1 fixes: milestone order of new-code dependencies, clipboard types in M4, colour tokens in D58)
+Last updated: 2026-11-04 (M4 steps 20 and 21: core pages, C4 contract suite, docs)
 
 ## Now
 
-M3 (catalogue specs) is implemented on branch `orch/toolkit-v1`, awaiting review and merge, on top of
-M2 (seams and crate split). All 97 catalogue entries carry a `## Spec` (format: DECISIONS
-D49, README "Body sections") with Lunegit, Wane or repo `file:line` cites; none is a `stub`.
-`docs/motion.md` fixes the motion vocabulary (D50); `docs/requirements.md` has no open item;
-`core.painter` holds the aggregate table of new painter primitives (image, rotate, dash,
-clip-rounded, sector, path-fill, arc), the list M5 builds. DECISIONS D40 to D58 record the M3 choices,
-including the interaction-model additions M4 builds from: a `Toast` layer above `Modal` (D54), the
-36 roles and 15 states (D55), new `Theme` tokens (D58, which supersedes D56), `{n:spec}` formatting through an `ArgFormat`
-hook (D52). The code is the M2 five-crate toolkit (pure `lune-ui-core`, adapters `lune-ui-wgpu`,
-`lune-ui-winit`, `lune-ui-platform`, facade `lune-ui`); M3 changed docs only, so the 15 gallery scenes
-are unchanged. Window-mode code is compile- and review-checked only: no gate opens a visible window.
-Review round 1 moved `data.stat`, `data.kv-list` and `data.progress` to M6 and `infra.shortcut-routing` to M5
-(entries come after what they depend on); `overlay.flyout` ships its surface in M7 and tray anchoring in M10; the
-`ClipboardRequest` type is M4, its fake M5, its adapter M10.
-
-Wane is a third consumer (2026-11-04): its UI spec is catalogued, R-platform-6 narrowed (tray, flyout
-and glass menu in toolkit; close-to-tray, single instance, autostart and notifications app-side).
+M4 (interaction and motion) is implemented on branch `orch/toolkit-v1`, awaiting the acceptance
+bench, review and merge, on top of M3 (catalogue specs) and M2 (seams and crate split).
+`lune-ui-core` now holds the per-window `Ui` frame (stable ids, retained state with keep-alive
+scopes, layered hits with modal and pointer capture, `Response`, overlays with exit retention, focus
+scopes, the semantic tree with actions, the string table, `FrameOutput` with `Repaint`) and the
+closed-form motion system (easings, tween, spring, keyframes, velocity-preserving transitions, the
+Full, Reduced and Off tiers, theme motion tokens, a 60 Hz conformance harness). Every moved widget
+and overlay has a `Look`, a `paint` function, its old Painter-API wrapper (same pixels) and a `Ui`
+method; rest identity is proven by exact `Scene` equality tests. `docs/architecture.md` holds the
+module map, "The `Ui` frame" and "API changes since M1"; DECISIONS D59 to D80 record the M4 choices.
+The gallery has a page registry (two legacy pages, 15 Ui pages), `--dump`, `--list` (62 scene names)
+and `--bench`. The cross-widget contract suite is `crates/lune-ui-core/tests/c4.rs`.
+The pixel gate shows the 15 legacy scenes identical against the M1 base.
 
 ## Next
 
-1. Review and merge M3, then M4 (roadmap): the interaction model in core (`Ui`, ids, retained state,
-   layers, focus, semantic tree, string table, motion system) and the retrofit of the moved widgets,
-   built from the `core.ui`, `core.focus`, `infra.accessibility`, `infra.localization` and
-   `motion.transitions` specs.
-2. CI (fmt, clippy `-D warnings`, tests on macOS, Windows and Linux) now that there is code to run.
-3. `scripts/export-snapshot.sh` for Luneterm's vendored snapshot (D13), before Luneterm M9. The
-   migration map for M11 is "API changes since M1" in `docs/architecture.md`.
+1. Run the acceptance bench alone (`cargo run --release -p gallery -- --bench`, plus `--size
+   3456x2234` report-only); a failure is reported with per-page numbers, never loosened. Then review
+   and merge M4.
+2. M5 onward per the roadmap: text input (typing, search clear, IME composition) and the clipboard
+   fake, then the remaining controls (button variants, the radio) and the layout and data
+   components.
+3. CI (fmt, clippy `-D warnings`, tests on macOS, Windows and Linux) now that there is code to run.
+4. An export script for Luneterm's vendored snapshot, before Luneterm M9. The migration
+   map for M11 is "API changes since M1" in `docs/architecture.md`.
 
 ## Blockers / open questions
 
-- None. Wane's OS behaviours (close-to-tray, single instance, autostart, notifications; R-platform-6)
-  are assumed app-side and documented (answer 2026-11-03, reversible).
+- None. Deferred by decision (D74): button variants and the radio, text-field variants, typing and
+  composition. Nested popups above a modal (a combo inside a dialog) are not supported: an overlay
+  draws on the layer it names, and a later overlay's text on the same layer would draw under earlier
+  fills; revisit with the dialog form variants.
+- Wane's OS behaviours (close-to-tray, single instance, autostart, notifications) are assumed
+  app-side and documented (answer 2026-11-03, reversible).

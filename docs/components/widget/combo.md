@@ -4,7 +4,7 @@ title: Combo box
 area: widget
 status: in-progress
 consumers: luneterm, wane
-source: crates/lune-ui-core/src/widgets/mod.rs
+source: crates/lune-ui-core/src/widgets/combo.rs
 owner: orch/toolkit-v1
 summary: Combo box: value and chevron in an input box; opens overlay.dropdown on click or key
 ---
@@ -33,25 +33,25 @@ Pinned: Lunegit 33a1dd41, Wane 69931d6, this repo fa2958b. Read: `crates/lune-ui
 Lunegit `src/Lunegit.Desktop/App.axaml:720-744`, `src/Lunegit.Desktop/Themes/DarkTheme.axaml:278-295`,
 `.claude/docs/animation-rules.md:102,104`, `src/Lunegit.Desktop/Views/Settings/GeneralSettingsView.axaml:244-246` (use site).
 Lunegit has no `ComboBox` motion selector in `Themes/Animations.axaml` or `AnimationsReduced.axaml`.
-Conflicts: (1) Wane text inset is 9 px [W docs/ui/components.md:380]; the moved code insets 10 px [R crates/lune-ui-core/src/widgets/mod.rs:83]; the code wins. (2) Lunegit keeps the border `#30FFFFFF` when focused [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:294]; the moved code and Wane draw the accent border when open or focused [R crates/lune-ui-core/src/widgets/mod.rs:65], [W docs/ui/components.md:379]; the code wins. (3) Lunegit's ComboBox padding is 11,6 [L src/Lunegit.Desktop/App.axaml:722]; the moved code's text inset and right gutter win for the drawn look.
+Conflicts: (1) Wane text inset is 9 px [W docs/ui/components.md:380]; the moved code insets 10 px [R crates/lune-ui-core/src/widgets/combo.rs:52-91]; the code wins. (2) Lunegit keeps the border `#30FFFFFF` when focused [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:294]; the moved code and Wane draw the accent border when open or focused [R crates/lune-ui-core/src/widgets/input_box.rs:29-34], [W docs/ui/components.md:379]; the code wins. (3) Lunegit's ComboBox padding is 11,6 [L src/Lunegit.Desktop/App.axaml:722]; the moved code's text inset and right gutter win for the drawn look.
 
 ### Anatomy
 
 - Rect supplied by the caller; 230 x 32 in Wane [W docs/ui/components.md:380]; the gallery passes 210 x 32 [R apps/gallery/src/scenes.rs:308].
-- Input box: corner radius `item_radius` 6 [R crates/lune-ui-core/src/widgets/mod.rs:54,63], [R crates/lune-ui-core/src/theme.rs:85]; 1 px ring `border` (#30FFFFFF) [R crates/lune-ui-core/src/widgets/mod.rs:65], [R crates/lune-ui-core/src/theme.rs:62]; the same ring is Lunegit's combo border [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:291].
-- Fill: `surface_input` at rest, `surface_hover` when hovered [R crates/lune-ui-core/src/widgets/mod.rs:55-58]; Wane fill `--surface-input` [W docs/ui/components.md:380].
-- Value text: 13 px UI text `fg_primary`, left 10 px, clipped 30 px short of the right edge, centred vertically [R crates/lune-ui-core/src/widgets/mod.rs:81-83].
-- Chevron: `CHEVRON_DOWN` glyph 12 px in `fg_secondary`, in a 20 px slot ending 8 px from the right edge [R crates/lune-ui-core/src/widgets/mod.rs:85-89]; Wane chevron 12 px at right 7 [W docs/ui/components.md:380].
+- Input box: corner radius `item_radius` 6 [R crates/lune-ui-core/src/widgets/input_box.rs:29-34], [R crates/lune-ui-core/src/theme.rs:85]; 1 px ring `border` (#30FFFFFF) [R crates/lune-ui-core/src/widgets/input_box.rs:29-34], [R crates/lune-ui-core/src/theme.rs:62]; the same ring is Lunegit's combo border [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:291].
+- Fill: `surface_input` at rest, `surface_hover` when hovered [R crates/lune-ui-core/src/widgets/input_box.rs:29-34]; Wane fill `--surface-input` [W docs/ui/components.md:380].
+- Value text: 13 px UI text `fg_primary`, left 10 px, clipped 30 px short of the right edge, centred vertically [R crates/lune-ui-core/src/widgets/combo.rs:52-91].
+- Chevron: `CHEVRON_DOWN` glyph 12 px in `fg_secondary`, in a 20 px slot ending 8 px from the right edge [R crates/lune-ui-core/src/widgets/combo.rs:52-91]; Wane chevron 12 px at right 7 [W docs/ui/components.md:380].
 - Dropdown surface: `dropdown_bg` #F0000000 [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:278], [R crates/lune-ui-core/src/theme.rs:68]; dropdown rows hover `SurfaceHover`, selected `SurfaceSelected` [L src/Lunegit.Desktop/App.axaml:736-741] (the list itself is `overlay.dropdown`).
 
 ### States
 
 | state | look | cite |
 |---|---|---|
-| rest | fill `surface_input`, ring `border`, value `fg_primary`, chevron `fg_secondary` | [R crates/lune-ui-core/src/widgets/mod.rs:58,65,83,87] |
-| hover | fill `surface_hover` | [R crates/lune-ui-core/src/widgets/mod.rs:55-56] |
-| open | ring `accent`; dropdown open | [R crates/lune-ui-core/src/widgets/mod.rs:65,80]; [W docs/ui/components.md:379] |
-| focus-visible | ring `accent` (same as open in the moved code); keyboard focus has no separate ring | [R crates/lune-ui-core/src/widgets/mod.rs:65]; [W docs/ui/components.md:379] |
+| rest | fill `surface_input`, ring `border`, value `fg_primary`, chevron `fg_secondary` | [R crates/lune-ui-core/src/widgets/combo.rs:52-91] [R crates/lune-ui-core/src/widgets/input_box.rs:29-34] |
+| hover | fill `surface_hover` | [R crates/lune-ui-core/src/widgets/input_box.rs:29-34] |
+| open | ring `accent`; dropdown open | [R crates/lune-ui-core/src/widgets/combo.rs:52-91] [R crates/lune-ui-core/src/widgets/input_box.rs:29-34]; [W docs/ui/components.md:379] |
+| focus-visible | ring `accent` (same as open in the moved code); keyboard focus has no separate ring | [R crates/lune-ui-core/src/widgets/input_box.rs:29-34]; [W docs/ui/components.md:379] |
 | disabled | opacity 0.4, inert | [W docs/ui/components.md:379], [L src/Lunegit.Desktop/App.axaml:481-483] |
 
 ### Transitions
@@ -65,7 +65,7 @@ The dropdown's open and close motion belongs to `overlay.dropdown`, not to this 
 
 ### Input and focus
 
-- Pointer: click opens the dropdown [R crates/lune-ui-core/src/widgets/mod.rs:90]; hover over the rect.
+- Pointer: click opens the dropdown [R crates/lune-ui-core/src/widgets/combo.rs:89]; hover over the rect.
 - Keyboard: Enter, Space and Down open the dropdown; Esc closes it; the chosen value replaces the label [W docs/ui/components.md:381]; Tab stop yes [core.focus].
 - Layer: `Base` for the box; the open list is `Popup` (`overlay.dropdown`) with its own focus scope.
 - Focus scope: the combo itself has none; opening pushes the dropdown's scope, and closing restores focus to the combo [overlay.dropdown].
@@ -76,7 +76,7 @@ The dropdown's open and close motion belongs to `overlay.dropdown`, not to this 
 
 - Transient: hover, focus-ring colour, fill transition [core.ui].
 - Persistent: none.
-- App-owned: the value text, `open` (passed every frame) [R crates/lune-ui-core/src/widgets/mod.rs:71-77]; the option list and the highlighted option belong to `overlay.dropdown`.
+- App-owned: the value text, `open` (passed every frame) [R crates/lune-ui-core/src/widgets/combo.rs:74-80]; the option list and the highlighted option belong to `overlay.dropdown`.
 - Exit retention: no.
 
 ### Accessibility

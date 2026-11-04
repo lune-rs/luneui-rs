@@ -80,7 +80,7 @@ Never animated: the rows and their hover fill, and the panel's size (the menu si
 ### Input and focus
 
 - Pointer: a click on an item picks it [R crates/lune-ui-core/src/widgets/menu.rs:140-141]; hover over an item fills it [R crates/lune-ui-core/src/widgets/menu.rs:123]; separators are not hit targets. The menu opens at the pointer [R crates/lune-ui-core/src/widgets/menu.rs:67]. An outside click closes [W docs/ui/components.md:543-556]; the gallery covers the window with a dismiss hit [R apps/gallery/src/scenes.rs:371].
-- Keyboard: Enter picks; Esc closes [W docs/ui/components.md:543-556]. Arrow keys and shortcut routing: requirements, not mocked (open question).
+- Keyboard: Enter picks; Esc closes [W docs/ui/components.md:543-556]. Enter picks the hovered item [D76]. Arrow keys and shortcut routing: requirements, not mocked (open question).
 - Tab stop: no (open question).
 - Layer: Popup; the menu does not set its layer (menu.rs:64-161), and the gallery draws it on `LayerId::Popup` [R apps/gallery/src/scenes.rs:369]. Layers under popups go to an offscreen scene so the glass can blur them [R crates/lune-ui-core/src/scene.rs:26-27].
 - Focus scope: push on open; pop restores focus to the previous widget or anchor [core.focus]. Esc and outside click act on the top overlay only [core.focus].
@@ -130,7 +130,7 @@ None: item text and shortcut come from the app (`MenuEntry`, [R crates/lune-ui-c
 ## Open questions
 
 - Submenus (chevron hint), the two-line header and the danger item are Wane variants, not in the moved code; open for M7.
-- Arrow-key navigation and shortcut routing: requirements, not mocked (W docs/ui/components.md:543-556); open.
+- Arrow-key navigation (Enter on the hovered item is built, D76) and shortcut routing: requirements, not mocked (W docs/ui/components.md:543-556); open.
 - Pressed and disabled looks (Wane `--popup-item-pressed`, `--menu-disabled`; Lunegit App.axaml:802-810): not in the moved code; open for a look decision (hard rule 8).
 - On macOS the tray menu may be the native NSMenu instead (W docs/ui/components.md:543-556; D8 chose the glass surface); open for the tray work.
 

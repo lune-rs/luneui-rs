@@ -2,10 +2,10 @@
 id: core.ui
 title: Ui frame context
 area: core
-status: planned
+status: in-progress
 consumers: any
-source: —
-owner: —
+source: crates/lune-ui-core/src/ui.rs
+owner: orch/toolkit-v1
 summary: Immediate-mode Ui frame: ids, transient and persistent retained state, Response, layers and modality, Repaint
 ---
 
@@ -150,7 +150,7 @@ n/a — no drawing of its own; the frame builds on the existing painter [core.pa
 
 ## Open questions
 
-- Mixed frames: the moved widgets take an app `hit: H` and read `Painter::hover`, while new widgets use `ui.interact`. Whether `Ui` derives `Painter::hover` from the topmost id so both coexist in one frame is M4's call; the spec only fixes that the old API keeps working at zero pixel delta [D10].
+- None. Resolved: the `Ui` owns a `Painter<WidgetId>`, `painter.hover` is the hovered id and raw `Painter::hit` regions join the layered hit list as click and hover hits, so both APIs coexist in one frame [D61].
 
 ## Notes for the planner
 

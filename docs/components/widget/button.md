@@ -4,7 +4,7 @@ title: Button
 area: widget
 status: in-progress
 consumers: luneterm, wane
-source: crates/lune-ui-core/src/widgets/mod.rs
+source: crates/lune-ui-core/src/widgets/button.rs
 owner: orch/toolkit-v1
 summary: Button: primary and secondary fills, measured width, hover and press motion
 ---
@@ -33,26 +33,26 @@ Pinned: Lunegit 33a1dd41, Wane 69931d6, this repo fa2958b. Read: `crates/lune-ui
 Lunegit `.claude/docs/animation-rules.md:95,102-104,143-150`, `src/Lunegit.Desktop/Themes/Animations.axaml:39-61`,
 `src/Lunegit.Desktop/Themes/AnimationsReduced.axaml:16-29`, `src/Lunegit.Desktop/App.axaml:460-483`,
 `src/Lunegit.Desktop/Themes/DarkTheme.axaml:25-29`. Lunegit has no generic `Button` style or template (rg over `src/Lunegit.Desktop` at 33a1dd41: only classed `Button.*` selectors).
-Conflicts: (1) Wane lists no rest fill for secondary; the moved code fills rest with `surface_hover` [R crates/lune-ui-core/src/widgets/mod.rs:158]; the code wins. (2) Wane's `active` (`--surface-active`) is the pressed fill [W docs/ui/components.md:295]; the moved code draws no pressed state; this spec takes the Lunegit value [L src/Lunegit.Desktop/App.axaml:473-476] and records a token gap in Open questions. (3) Primary hover agrees across sources [R crates/lune-ui-core/src/widgets/mod.rs:157] = [W docs/ui/components.md:295].
+Conflicts: (1) Wane lists no rest fill for secondary; the moved code fills rest with `surface_hover` [R crates/lune-ui-core/src/widgets/button.rs:93-143]; the code wins. (2) Wane's `active` (`--surface-active`) is the pressed fill [W docs/ui/components.md:295]; the moved code draws no pressed state; this spec takes the Lunegit value [L src/Lunegit.Desktop/App.axaml:473-476] and records a token gap in Open questions. (3) Primary hover agrees across sources [R crates/lune-ui-core/src/widgets/button.rs:93-143] = [W docs/ui/components.md:295].
 
 ### Anatomy
 
-- Rect supplied by the caller; corner radius `item_radius` 6 [R crates/lune-ui-core/src/widgets/mod.rs:161], [R crates/lune-ui-core/src/theme.rs:85]. Height 32 (`--control-h`) [W docs/ui/components.md:296]; the gallery passes 32 [R apps/gallery/src/scenes.rs:240].
-- Label: 13 px UI text at `font_base`, centred in the rect [R crates/lune-ui-core/src/widgets/mod.rs:16,167], [R crates/lune-ui-core/src/theme.rs:83].
-- Width: `button_width` = measured label width + 32 [R crates/lune-ui-core/src/widgets/mod.rs:173]; Wane states the same (text + 32) [W docs/ui/components.md:296].
-- Primary label colour `on_accent_text` [R crates/lune-ui-core/src/widgets/mod.rs:163], value #FFFFFFF0 [R crates/lune-ui-core/src/theme.rs:67].
+- Rect supplied by the caller; corner radius `item_radius` 6 [R crates/lune-ui-core/src/widgets/button.rs:93-143], [R crates/lune-ui-core/src/theme.rs:85]. Height 32 (`--control-h`) [W docs/ui/components.md:296]; the gallery passes 32 [R apps/gallery/src/scenes.rs:240].
+- Label: 13 px UI text at `font_base`, centred in the rect [R crates/lune-ui-core/src/widgets/button.rs:93-143] [R crates/lune-ui-core/src/widgets/label.rs:15], [R crates/lune-ui-core/src/theme.rs:83].
+- Width: `button_width` = measured label width + 32 [R crates/lune-ui-core/src/widgets/button.rs:141]; Wane states the same (text + 32) [W docs/ui/components.md:296].
+- Primary label colour `on_accent_text` [R crates/lune-ui-core/src/widgets/button.rs:93-143], value #FFFFFFF0 [R crates/lune-ui-core/src/theme.rs:67].
 - Wane variants not in the moved code (M4 adds them): sm 24 high, radius 4, padding 0 12; icon 28 x 28 (sm 24 x 24) with 16 px glyph and 8 gap; ghost transparent with secondary text; fill = container width [W docs/ui/components.md:294,296]. Lunegit's ghost is the toolbar action: transparent at rest [L src/Lunegit.Desktop/App.axaml:460-464].
 
 ### States
 
 | state | look | cite |
 |---|---|---|
-| rest, secondary | fill `surface_hover`, label `fg_primary` | [R crates/lune-ui-core/src/widgets/mod.rs:158,165] |
-| hover, secondary | fill `surface_selected` | [R crates/lune-ui-core/src/widgets/mod.rs:159], [W docs/ui/components.md:295] |
-| rest, primary | fill `accent`, label `on_accent_text` | [R crates/lune-ui-core/src/widgets/mod.rs:156,163] |
-| hover, primary | fill `accent_hover` | [R crates/lune-ui-core/src/widgets/mod.rs:157] |
+| rest, secondary | fill `surface_hover`, label `fg_primary` | [R crates/lune-ui-core/src/widgets/button.rs:93-143] |
+| hover, secondary | fill `surface_selected` | [R crates/lune-ui-core/src/widgets/button.rs:93-143], [W docs/ui/components.md:295] |
+| rest, primary | fill `accent`, label `on_accent_text` | [R crates/lune-ui-core/src/widgets/button.rs:93-143] |
+| hover, primary | fill `accent_hover` | [R crates/lune-ui-core/src/widgets/button.rs:93-143] |
 | pressed | fill `surface_active` (#20FFFFFF); not drawn by the moved code | [W docs/ui/components.md:295], [L src/Lunegit.Desktop/App.axaml:473-476], [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:29] |
-| focus-visible | 1 px ring `fg_secondary`, inset; not drawn by the moved code | [W docs/ui/components.md:295], [R crates/lune-ui-core/src/widgets/mod.rs:43] (ring colour mapping) |
+| focus-visible | 1 px ring `fg_secondary`, inset; not drawn by the moved code | [W docs/ui/components.md:295], [R crates/lune-ui-core/src/widgets/toggle.rs:103-147] (ring colour mapping) |
 | disabled | opacity 0.4, inert | [W docs/ui/components.md:295], [L src/Lunegit.Desktop/App.axaml:481-483] |
 
 ### Transitions
@@ -67,7 +67,7 @@ Lunegit animates classed buttons only (`toolbar-action`, `commit-primary`, `empt
 
 ### Input and focus
 
-- Pointer: click activates; hover over the rect [R crates/lune-ui-core/src/widgets/mod.rs:154,168]; pointer capture while pressed [core.input].
+- Pointer: click activates; hover over the rect [R crates/lune-ui-core/src/widgets/button.rs:136]; pointer capture while pressed [core.input].
 - Keyboard: Enter and Space activate; Tab stop yes; focus-visible after keyboard navigation [W docs/ui/components.md:297], [core.focus].
 - Layer: whatever layer the app draws it on; no overlay, no focus scope.
 - Disabled: no hit, no activation [W docs/ui/components.md:295].
@@ -76,7 +76,7 @@ Lunegit animates classed buttons only (`toolbar-action`, `commit-primary`, `empt
 
 - Transient: hover, press scale, focus-ring opacity [core.ui].
 - Persistent: none.
-- App-owned: label text, `primary` flag, the hit value (passed every frame) [R crates/lune-ui-core/src/widgets/mod.rs:146-152].
+- App-owned: label text, `primary` flag, the hit value (passed every frame) [R crates/lune-ui-core/src/widgets/button.rs:118-123].
 - Exit retention: no.
 
 ### Accessibility
@@ -109,7 +109,7 @@ None: the label is app text.
 
 ### Build
 
-- Milestone: M4 (retrofit: transitions, focus, semantic node); done by M11.
+- Milestone: M4 (retrofit: transitions, focus, semantic node); done by M11. Deferred [D74]: the variants (small, icon, ghost), which no M4 scene needs.
 - Depends on: core.ui, core.focus, infra.accessibility, motion.transitions.
 
 ## Open questions

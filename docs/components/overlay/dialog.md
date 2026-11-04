@@ -126,7 +126,7 @@ size and the content inside it (laid out once per open, [R crates/lune-ui-core/s
 
 - Form variant (600 wide, two-column fields) is not drawn by the moved code [W docs/ui/components.md:557-570]; whether the toolkit owns the form width or the app does is open.
 - Scrim blur (Wane 8 px) is not drawn: the moved code fills the scrim solid (dialog.rs:53). The existing `backdrop` primitive (paint.rs:189) is the candidate; open.
-- Initial focus target (Cancel or confirm) is not in any source; open.
+- Resolved [D75]: initial focus is Confirm, Cancel's tab stop comes first, Enter activates the focused button.
 - Exit easing: `animation-rules.md:83,106` (QuadraticEaseIn) vs the shipped QuadraticEaseOut (Animations.axaml:430-431); open.
 - Disabled button look inside the dialog: none in the moved code; open.
 

@@ -4,7 +4,7 @@ title: Label
 area: widget
 status: in-progress
 consumers: luneterm, wane
-source: crates/lune-ui-core/src/widgets/mod.rs
+source: crates/lune-ui-core/src/widgets/label.rs
 owner: orch/toolkit-v1
 summary: Label: UI-font text at the theme base size; colour from the caller; section and title roles from the font scale
 ---
@@ -30,11 +30,11 @@ summary: Label: UI-font text at the theme base size; colour from the caller; sec
 Pinned: Lunegit 33a1dd41, Wane 69931d6, this repo fa2958b. Read: `crates/lune-ui-core/src/widgets/mod.rs:15-17`;
 `crates/lune-ui-core/src/theme.rs:82-84`; `apps/gallery/src/scenes.rs:314-331`; Wane `docs/ui/components.md:277-289`;
 Lunegit `src/Lunegit.Desktop/App.axaml:158-160` (font scale), `src/Lunegit.Desktop/Views/Settings/GeneralSettingsView.axaml:151-156` (TextBlock use).
-Conflicts: (1) Wane gives the base size 13/20 at weight 400 in primary text [W docs/ui/components.md:282]; the moved code uses `font_base` 13 with the caller's colour [R crates/lune-ui-core/src/widgets/mod.rs:16]; the code wins for the base role. (2) Wane's section role is 14 Medium and title 18/24 Medium [W docs/ui/components.md:280,282]; the moved theme has `font_m` 14 [R crates/lune-ui-core/src/theme.rs:84] and the gallery draws the medium weight at `font_m` [R apps/gallery/src/scenes.rs:328]; no title size exists in the moved theme (Open questions).
+Conflicts: (1) Wane gives the base size 13/20 at weight 400 in primary text [W docs/ui/components.md:282]; the moved code uses `font_base` 13 with the caller's colour [R crates/lune-ui-core/src/widgets/label.rs:15]; the code wins for the base role. (2) Wane's section role is 14 Medium and title 18/24 Medium [W docs/ui/components.md:280,282]; the moved theme has `font_m` 14 [R crates/lune-ui-core/src/theme.rs:84] and the gallery draws the medium weight at `font_m` [R apps/gallery/src/scenes.rs:328]; no title size exists in the moved theme (Open questions).
 
 ### Anatomy
 
-- Font: RznSans for UI text, RznMono for ids, paths, money and numbers [W docs/ui/components.md:282,288]; the moved code draws every label in the UI style [R crates/lune-ui-core/src/widgets/mod.rs:16].
+- Font: RznSans for UI text, RznMono for ids, paths, money and numbers [W docs/ui/components.md:282,288]; the moved code draws every label in the UI style [R crates/lune-ui-core/src/widgets/label.rs:15].
 - Base: 13 px at `font_base` [R crates/lune-ui-core/src/theme.rs:83]; Lunegit's `FontSizeBase` is 13 [L src/Lunegit.Desktop/App.axaml:160].
 - Small: 11 px at `font_s`, tertiary colour [R crates/lune-ui-core/src/theme.rs:82]; Lunegit `FontSizeS` 11 [L src/Lunegit.Desktop/App.axaml:159]; Wane small 11/16 tertiary [W docs/ui/components.md:280].
 - Section: 14 px Medium at `font_m` [R crates/lune-ui-core/src/theme.rs:84]; Wane 14 Medium [W docs/ui/components.md:280].
@@ -60,7 +60,7 @@ n/a — static text takes no pointer or key input. Selectable copy of ids and pa
 
 - Transient: none.
 - Persistent: none.
-- App-owned: the text, the colour, the size role (passed every frame) [R crates/lune-ui-core/src/widgets/mod.rs:15].
+- App-owned: the text, the colour, the size role (passed every frame) [R crates/lune-ui-core/src/widgets/label.rs:14].
 - Exit retention: no.
 
 ### Accessibility

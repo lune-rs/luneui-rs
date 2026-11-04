@@ -2,10 +2,10 @@
 id: infra.accessibility
 title: Semantic tree and accessibility
 area: infra
-status: planned
+status: in-progress
 consumers: any
-source: —
-owner: —
+source: crates/lune-ui-core/src/access.rs
+owner: orch/toolkit-v1
 summary: One semantic node per interactive widget per frame (role, name, value, states, actions), AccessAction routing, AccessKit bridge in M10
 ---
 

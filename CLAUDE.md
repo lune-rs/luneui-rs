@@ -22,6 +22,7 @@ for the extraction; Luneterm's `docs/architecture.md` sections "lune-ui modules"
 - Lint: `cargo clippy --workspace --all-targets -- -D warnings`
 - Boundaries: `scripts/check-boundaries.sh`
 - Catalogue index (regenerate after adding or editing a component file): `scripts/gen-component-index.sh`
+- Acceptance bench (milestone acceptance only, run alone with no concurrent builds; every page's median p99 <= 16.6 ms and no frame over 33 ms; exit 0): `cargo run --release -p gallery -- --bench` (`--runs 3` is the default; `--size 3456x2234` is report-only)
 - Gate (before every commit; must be green): `cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && scripts/check-boundaries.sh && scripts/gen-component-index.sh --check`
 - Pixel gate (any drawing change): `scripts/pixel-gate.sh [--base <rev>] [--allow <id>…]` dumps the
   gallery's 15 reference scenes for `<rev>` (default `HEAD`) and for the working tree and compares them
