@@ -81,7 +81,7 @@ None: keys and values are app text.
 - `kv-list-default` (new): six pairs with the longest key sizing the column, settled.
 - `kv-list-stacked` (new): stacked two-column variant, settled.
 - `kv-list-wrap` (new): a wrapped value over two lines, settled.
-- `kv-list-selected` (new): the commit value selected whole (elided), focused by a press, settled.
+- `kv-list-selected` (new): the commit value selected whole, focused by a press, settled.
 
 ### Painter primitives
 

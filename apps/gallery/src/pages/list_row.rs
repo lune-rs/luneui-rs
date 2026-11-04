@@ -93,9 +93,9 @@ fn row_of(i: usize) -> ListRow<'static> {
     }
 }
 
-/// The height of a row with every part: the inset 2, the padding 12, the three lines and two gaps
+/// The height of a row with every part: the inset 2, the padding 12, the three lines (head, sub, meta) and two gaps
 /// (the scenes' pointer positions are consts, so the height is one too; a test pins it).
-const ROW_H: f32 = 78.0;
+const ROW_H: f32 = 74.0;
 
 fn row_height() -> f32 {
     ROW_H

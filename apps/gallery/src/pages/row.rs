@@ -131,9 +131,11 @@ impl PageState for Rows {
                                 ui.painter()
                                     .text(&Spec::plain(title, style), c[1].x, c[1].y + 6.0);
                                 ui.badge(("badge", i), (c[2].x, c[2].y + 7.0), badge, tone, false);
-                                let mono = Style::mono(THEME.font_base, 20.0, THEME.fg_secondary);
-                                ui.painter()
-                                    .text(&Spec::plain(value, mono), c[3].x, c[3].y + 6.0);
+                                // Right-aligned to the column's end, primary.
+                                let mono = Style::mono(THEME.font_base, 20.0, THEME.fg_primary);
+                                let value = Spec::plain(value, mono);
+                                let w = ui.painter().measure(&value).0;
+                                ui.painter().text(&value, c[3].right() - w, c[3].y + 6.0);
                             },
                         );
                 }

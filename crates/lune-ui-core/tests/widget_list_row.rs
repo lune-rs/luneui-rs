@@ -106,16 +106,17 @@ fn first_name(scene: &Scene) -> TextItem {
 fn the_height_is_the_inset_the_padding_and_the_lines() {
     // 2 * 1 (the highlight's inset) + 2 * 6 + 20.
     assert_eq!(height(&name_only(), SIDE_PANEL_PADDING), 34.0);
-    // Plus the value line and the sub-line, 4 px apart.
+    // Plus the sub-line and the meta line, 4 px apart: the value shares the head line.
     assert_eq!(
         height(&full(), SIDE_PANEL_PADDING),
-        2.0 + 12.0 + 20.0 + 4.0 + 20.0 + 4.0 + 16.0
+        2.0 + 12.0 + 20.0 + 4.0 + 16.0 + 4.0 + 16.0
     );
+    assert_eq!(height(&full(), SIDE_PANEL_PADDING), 74.0);
     let meta_only = ListRow {
         meta: Some("3 h"),
         ..name_only()
     };
-    assert_eq!(height(&meta_only, SIDE_PANEL_PADDING), 34.0 + 24.0);
+    assert_eq!(height(&meta_only, SIDE_PANEL_PADDING), 34.0 + 20.0);
     let mut h = UiHarness::new(WIN);
     assert_eq!(
         frame(&mut h, &full()).height,
@@ -240,7 +241,7 @@ fn nothing_animates_while_the_list_scrolls() {
 }
 
 #[test]
-fn the_head_has_the_dot_the_name_and_the_badge_the_value_line_the_meta_and_a_sub_line() {
+fn the_head_has_the_dot_the_name_the_badge_and_the_value_then_the_sub_line_and_the_meta() {
     let mut h = UiHarness::new(WIN);
     let d = frame(&mut h, &full());
     let t = texts(&d.scene);
@@ -251,31 +252,31 @@ fn the_head_has_the_dot_the_name_and_the_badge_the_value_line_the_meta_and_a_sub
         .find(|s| s.rect == [x, LIST.y + 7.0 + 6.0, 8.0, 8.0])
         .expect("the dot");
     assert_eq!(dot.color, premul(DARK.warn));
-    // The name follows the dot and its 6 px gap.
-    assert_eq!((t[0].x, t[0].y), (x + 14.0, LIST.y + 7.0));
-    // The badge is right-aligned in the content width (300 - 24), 18 px high, centred on the line.
-    let badge = under(&d.scene)
-        .into_iter()
-        .find(|s| s.rect[3] == 18.0 && s.radii == [8.0; 4])
-        .expect("the badge");
-    assert_eq!(
-        badge.rect[0] + badge.rect[2],
-        LIST.x + 4.0 + 8.0 + 300.0 - 24.0
-    );
-    assert_eq!(badge.rect[1], LIST.y + 7.0 + 1.0);
-    // The value line (mono) and the sub-line (mono 11 tertiary).
+    // The name follows the dot and its 8 px gap (`status_dot::GAP`).
+    assert_eq!((t[0].x, t[0].y), (x + 16.0, LIST.y + 7.0));
+    // The value takes the right edge of the content width (300 - 24); mono 13 is 6.5 px a glyph
+    // on the fake text. The badge ends 8 px before it, 18 px high, centred on the line.
     let value = Spec::plain("a1b2c3d", Style::mono(13.0, 20.0, DARK.fg_secondary));
-    let sub = Spec::plain("2 commits ahead", Style::mono(11.0, 16.0, DARK.fg_tertiary));
     let value_item = t
         .iter()
         .find(|i| i.key.0 == value.cache_key(1.0))
         .expect("value");
+    let right = LIST.x + 4.0 + 8.0 + 300.0 - 24.0;
+    assert_eq!(value_item.x, right - 7.0 * 6.5);
+    assert_eq!(value_item.y, LIST.y + 7.0);
+    let badge = under(&d.scene)
+        .into_iter()
+        .find(|s| s.rect[3] == 18.0 && s.radii == [8.0; 4])
+        .expect("the badge");
+    assert_eq!(badge.rect[0] + badge.rect[2], value_item.x - 8.0);
+    assert_eq!(badge.rect[1], LIST.y + 7.0 + 1.0);
+    // Then the sub-line (mono 11 tertiary) and the meta (11 tertiary) at the left, 4 px apart.
+    let sub = Spec::plain("2 commits ahead", Style::mono(11.0, 16.0, DARK.fg_tertiary));
     let sub_item = t
         .iter()
         .find(|i| i.key.0 == sub.cache_key(1.0))
         .expect("sub");
-    assert_eq!(value_item.y, LIST.y + 7.0 + 24.0);
-    assert_eq!(sub_item.y, LIST.y + 7.0 + 48.0);
+    assert_eq!((sub_item.x, sub_item.y), (x, LIST.y + 7.0 + 24.0));
     let meta = Spec::plain(
         "3 h",
         Style {
@@ -287,7 +288,7 @@ fn the_head_has_the_dot_the_name_and_the_badge_the_value_line_the_meta_and_a_sub
         .iter()
         .find(|i| i.key.0 == meta.cache_key(1.0))
         .expect("meta");
-    assert_eq!(meta_item.x, x + 276.0 - 3.0 * 5.5);
+    assert_eq!((meta_item.x, meta_item.y), (x, LIST.y + 7.0 + 44.0));
 }
 
 #[test]

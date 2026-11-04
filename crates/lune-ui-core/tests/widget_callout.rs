@@ -1,5 +1,5 @@
 //! The callout (`widget.callout` acceptance): the box (radius 6, a 1 px border, padding 8 10), the
-//! 14 px icon in a 20 px slot, the tone recipe, the figure and the action at the right, wrapping,
+//! 14 px icon in a 14 by 20 px slot, the tone recipe, the figure and the action at the right, wrapping,
 //! the `Note` node and its live region, and that the callout takes no input of its own.
 
 use lune_ui_core::access::{Live, Role, SemanticTree, State, Value};
@@ -97,19 +97,19 @@ fn at_scale_2_the_radius_is_12_px_the_border_2_px_and_the_icon_slot_40_px() {
     assert_eq!(s[0].radii, [12.0; 4]);
     assert_eq!(s[1].params[1], 2.0);
     let t = texts(&d.scene);
-    // The 14 px glyph is 7 px wide on the fake text, centred in the 20 px slot after the border
-    // and the 10 px padding; the text follows the slot and the 8 px gap.
+    // The 14 px glyph is 7 px wide on the fake text, centred in the 14 px wide slot after the
+    // border and the 10 px padding; the text follows the slot and the 8 px gap.
     let slot_x = 20.0 + 1.0 + 10.0;
-    assert_eq!(t[0].x, slot_x + (20.0 - 7.0) / 2.0);
+    assert_eq!(t[0].x, slot_x + (14.0 - 7.0) / 2.0);
     assert_eq!(
         (t[1].x - slot_x) * 2.0,
-        40.0 + 16.0,
-        "slot 40 px, gap 16 px"
+        28.0 + 16.0,
+        "slot 28 px, gap 16 px"
     );
 }
 
 #[test]
-fn the_icon_is_14_px_in_a_20_px_slot_and_the_text_follows_after_8() {
+fn the_icon_is_14_px_in_a_14_by_20_slot_and_the_text_follows_after_8() {
     let d = draw(&opts(Tone::Warn));
     let t = texts(&d.scene);
     assert_eq!(t.len(), 2);
@@ -120,10 +120,10 @@ fn the_icon_is_14_px_in_a_20_px_slot_and_the_text_follows_after_8() {
         "a tone-coloured 14 px glyph"
     );
     let slot = 20.0 + 1.0 + 10.0;
-    assert_eq!(t[0].x, slot + (20.0 - width(&glyph)) / 2.0);
+    assert_eq!(t[0].x, slot + (14.0 - width(&glyph)) / 2.0);
     assert_eq!(t[0].y, 30.0 + 1.0 + 8.0 + (20.0 - 14.0 * 1.25) / 2.0);
-    assert_eq!((t[1].x, t[1].y), (slot + 28.0, 39.0));
-    let want = Spec::plain("The proxy is offline", body_style()).wrapped(400.0 - 22.0 - 28.0);
+    assert_eq!((t[1].x, t[1].y), (slot + 22.0, 39.0));
+    let want = Spec::plain("The proxy is offline", body_style()).wrapped(400.0 - 22.0 - 22.0);
     assert_eq!(
         t[1].key.0,
         want.cache_key(1.0),
@@ -138,8 +138,8 @@ fn neutral_is_surface_input_with_border_subtle_and_a_tone_is_the_badge_recipe() 
     assert_eq!(s[0].color, premul(DARK.surface_input));
     assert_eq!(s[1].color, premul(DARK.border_subtle));
     let t = texts(&d.scene);
-    let glyph = icon::glyph(icon::INFO, 14.0, DARK.fg_secondary);
-    assert_eq!(t[0].key.0, glyph.cache_key(1.0), "a secondary icon");
+    let glyph = icon::glyph(icon::INFO, 14.0, DARK.fg_tertiary);
+    assert_eq!(t[0].key.0, glyph.cache_key(1.0), "a tertiary icon");
     for tone in [Tone::Data, Tone::Warn, Tone::Err] {
         let d = draw(&opts(tone));
         let s = under(&d.scene);
@@ -150,7 +150,12 @@ fn neutral_is_surface_input_with_border_subtle_and_a_tone_is_the_badge_recipe() 
             f32::from(0x1A_u8) / 255.0,
             "{tone:?} fill at 1A"
         );
-        let glyph = icon::glyph(icon::INFO, 14.0, tone.color(&DARK));
+        let color = if tone == Tone::Data {
+            DARK.data_hi
+        } else {
+            tone.color(&DARK)
+        };
+        let glyph = icon::glyph(icon::INFO, 14.0, color);
         assert_eq!(
             texts(&d.scene)[0].key.0,
             glyph.cache_key(1.0),
@@ -186,7 +191,7 @@ fn a_figure_sits_at_the_right_in_mono_bright_and_never_gold() {
     );
     // The text gives up the figure's width and the gap.
     let want = Spec::plain("The proxy is offline", body_style())
-        .wrapped(400.0 - 22.0 - 28.0 - width(&figure) - 8.0);
+        .wrapped(400.0 - 22.0 - 22.0 - width(&figure) - 8.0);
     assert_eq!(t[1].key.0, want.cache_key(1.0));
 }
 

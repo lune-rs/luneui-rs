@@ -29,7 +29,7 @@ Pinned: Lunegit 33a1dd41, Wane 69931d6, this repo fa2958b. Read: `docs/ui/compon
 
 ### Anatomy
 
-- Circle 8 px [W docs/ui/components.md:394]; radius `--radius-round` 50% [W docs/ui/mocks/css/tokens.css:107].
+- Gap 8 px between the dot and its word (the mock; no Lunegit line was read for it; the badge's own dot gap stays 6 [W docs/ui/components.md:436]); visual batch 1 C2. Circle 8 px [W docs/ui/components.md:394]; radius `--radius-round` 50% [W docs/ui/mocks/css/tokens.css:107].
 - Tone fills, the tokens of [D58]: `ok` #73C991 [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:116]; `warn` #E2B93D [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:115]; `err` #E06C75 [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:117]; `data` #5c8fe6 [W docs/ui/mocks/css/tokens.css:58].
 - Paused: neutral; the token is `paused` #8a9099 [W docs/ui/mocks/css/tokens.css:62], added by [D58] (Wane's components text names none, [W docs/ui/components.md:392]).
 - The tray icon's dot is a separate part of `platform.tray-icon` [W docs/ui/components.md:394].

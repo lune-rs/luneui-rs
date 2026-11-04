@@ -16,6 +16,8 @@ use crate::ui::Ui;
 pub const HEIGHT: f32 = 18.0;
 /// The corner radius.
 pub const RADIUS: f32 = 8.0;
+/// The border's width.
+pub const BORDER: f32 = 1.0;
 /// The padding left and right of the content, inside the border.
 pub const PAD: f32 = 6.0;
 /// The gap between the leading dot and the text.
@@ -34,7 +36,7 @@ fn style(theme: &Theme, tone: Tone) -> Style {
 pub fn width<H: Copy + PartialEq>(p: &mut Painter<'_, H>, text: &str, dot: bool) -> f32 {
     let spec = Spec::plain(text, style(&p.theme, Tone::Neutral));
     let lead = if dot { status_dot::SIZE + GAP } else { 0.0 };
-    PAD + lead + p.measure(&spec).0 + PAD
+    2.0 * (BORDER + PAD) + lead + p.measure(&spec).0
 }
 
 /// Draws the badge with its top left at `at`; returns its rect.
@@ -48,8 +50,8 @@ pub fn paint<H: Copy + PartialEq>(
     let theme = p.theme;
     let r = Rect::new(at.0, at.1, width(p, text, dot), HEIGHT);
     p.fill(r, RADIUS, tone.fill(&theme));
-    p.ring(r, RADIUS, 1.0, tone.border(&theme), false);
-    let mut x = r.x + PAD;
+    p.ring(r, RADIUS, BORDER, tone.border(&theme), false);
+    let mut x = r.x + BORDER + PAD;
     if dot {
         status_dot::paint(p, (x + status_dot::SIZE / 2.0, r.y + HEIGHT / 2.0), tone);
         x += status_dot::SIZE + GAP;

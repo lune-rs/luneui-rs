@@ -75,10 +75,10 @@ fn every_tone_uses_the_one_recipe() {
 }
 
 #[test]
-fn the_text_sits_6_px_in_and_centred_on_the_16_px_line() {
+fn the_text_sits_7_px_in_and_centred_on_the_16_px_line() {
     let (scene, r) = painted(1.0, Tone::Ok, false);
     let t = &scene.layers[0].texts[0];
-    assert_eq!((t.x, t.y), (r.x + 6.0, r.y + 1.0));
+    assert_eq!((t.x, t.y), (r.x + 7.0, r.y + 1.0));
 }
 
 #[test]
@@ -89,7 +89,7 @@ fn width_counts_padding_text_and_the_dot() {
     let plain = badge::width(&mut p, "added", false);
     let dotted = badge::width(&mut p, "added", true);
     let text_w = p.measure(&medium_spec(Tone::Neutral)).0;
-    assert_eq!(plain, 6.0 + text_w + 6.0);
+    assert_eq!(plain, 7.0 + text_w + 7.0);
     assert_eq!(dotted, plain + 8.0 + 6.0);
     let (_, r) = painted(1.0, Tone::Ok, true);
     assert_eq!(r.w, dotted);
@@ -101,10 +101,10 @@ fn a_leading_dot_adds_one_circle_in_the_tone_and_moves_the_text() {
     let g = &scene.layers[0].geometry;
     assert_eq!(g.under.len(), 3, "fill, ring, dot");
     let dot = g.under[2];
-    assert_eq!(dot.rect, [r.x + 6.0, r.y + 5.0, 8.0, 8.0]);
+    assert_eq!(dot.rect, [r.x + 7.0, r.y + 5.0, 8.0, 8.0]);
     assert_eq!(dot.color, premul(DARK.warn));
     let t = &scene.layers[0].texts[0];
-    assert_eq!(t.x, r.x + 6.0 + 8.0 + 6.0);
+    assert_eq!(t.x, r.x + 7.0 + 8.0 + 6.0);
 }
 
 #[test]

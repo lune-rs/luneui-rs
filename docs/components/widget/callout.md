@@ -32,18 +32,18 @@ Conflicts: (1) Fill: the Lunegit banner fills with the solid key `StatusWarningD
 
 - Padding 8 vertical, 10 horizontal, inside the border [L src/Lunegit.Desktop/Controls/IndexingBanner.axaml:13]; the content starts 1 px border + 10 px in.
 - Radius 6 [L src/Lunegit.Desktop/App.axaml:209]; 1 px tone border [L src/Lunegit.Desktop/Controls/IndexingBanner.axaml:10-11].
-- Icon 14 px in a 20 px slot; gap 8 [W docs/ui/components.md:492]; Lunegit icon 14 px, spacing 8 [L src/Lunegit.Desktop/Controls/IndexingBanner.axaml:14,17-18].
+- Icon 14 px in a slot 14 wide and 20 high (the line); gap 8, so the text starts 33 from the box edge (1 border + 10 padding + 14 + 8) [W docs/ui/components.md:492]; Lunegit icon 14 px, spacing 8 [L src/Lunegit.Desktop/Controls/IndexingBanner.axaml:14,17-18].
 - Text 13/20 [W docs/ui/components.md:492]; Lunegit `FontSizeBase` 13 [L src/Lunegit.Desktop/Controls/IndexingBanner.axaml:22].
 - Figure: mono, bright, weight 500, never gold; the one number the callout is about [W docs/ui/components.md:490,682].
-- Action: a small `widget.button` (24 high) at the right [W docs/ui/components.md:490]; 8 px between the text, the figure and the action; the box grows to the button's height when that is taller than the text.
+- Action: a small `widget.button` (24 high) at the right [W docs/ui/components.md:490]; 8 px between the text and the figure, 16 px before the action (flex gap 8 plus the action's own 8 margin in the mock; visual batch 1, V-A1); the box grows to the button's height when that is taller than the text. A text shorter than that height is centred with its icon (the mock's action is `align-self: center`; visual batch 1).
 - Neutral: fill `--surface-input` #ffffff0a [W docs/ui/mocks/css/tokens.css:20]; border `--border-subtle` [W docs/ui/mocks/css/tokens.css:25]. Tone fills and borders: badge recipe, tone at 1A and 44 [W docs/ui/components.md:492], [W docs/ui/mocks/css/tokens.css:50-51,53-54,56-57]. No full-width bar, no accent stripe [W docs/ui/components.md:492].
 
 ### States
 
 | state | look | cite |
 |---|---|---|
-| neutral | neutral fill and border, primary text, secondary icon | [W docs/ui/components.md:492] |
-| data | data tone border and icon, tone fill at 1A | [W docs/ui/components.md:492], [W docs/ui/mocks/css/tokens.css:58-61] |
+| neutral | neutral fill and border, primary text, tertiary icon | [W docs/ui/components.md:492] |
+| data | data tone border, `data_hi` icon, tone fill at 1A | [W docs/ui/components.md:492], [W docs/ui/mocks/css/tokens.css:58-61] |
 | warn | warn tone border and icon, tone fill at 1A | [W docs/ui/mocks/css/tokens.css:52-54] |
 | err | err tone border and icon, tone fill at 1A | [W docs/ui/mocks/css/tokens.css:55-57] |
 
@@ -83,7 +83,7 @@ None: the notice text is app data.
 
 ### Acceptance
 
-- Pixel probes at scale 2: radius 12 px; 2 px border; icon 28 px in a 40 px slot; text starts 78 px from the box edge (2 px border, 20 px padding, the 40 px slot, 16 px gap; the first draft said 36, which is neither the Wane nor the Lunegit anatomy).
+- Pixel probes at scale 2: radius 12 px; 2 px border; icon 28 px in a 28 px wide slot, 22 px in from the box edge; text starts 66 px from the box edge (2 px border, 20 px padding, the 28 px slot, 16 px gap; the earlier 20 px slot misread the slot's height).
 - Conformance: n/a — no transition.
 - Semantic node: role `note`; live region polite on appear.
 
@@ -94,7 +94,7 @@ None: the notice text is app data.
 
 ## Open questions
 
-- None. (`design-gap`, the callout's tint and primary text against the Lunegit banner's solid `StatusWarningDark` and tone text [L src/Lunegit.Desktop/Controls/IndexingBanner.axaml:9], is answered by [D129]: a banner's solid fill and a callout's tint are two widgets with two looks, each per its source; the callout keeps Wane's.)
+- Marked gap: the mock's callout has a title line and the figure inline with the text; `CalloutOptions` has neither (API, out of the visual pass). The action sits 16 px after the body or figure (batch 1). (`design-gap`, the callout's tint and primary text against the Lunegit banner's solid `StatusWarningDark` and tone text [L src/Lunegit.Desktop/Controls/IndexingBanner.axaml:9], is answered by [D129]: a banner's solid fill and a callout's tint are two widgets with two looks, each per its source; the callout keeps Wane's.)
 
 ## Notes for the planner
 

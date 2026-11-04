@@ -23,14 +23,18 @@ pub const BORDER: f32 = 1.0;
 /// Padding inside the border: vertical and horizontal.
 pub const PAD_Y: f32 = 8.0;
 pub const PAD_X: f32 = 10.0;
-/// The icon's size, the slot it is centred in, and the gap after the slot.
+/// The icon's size, the slot it is centred in (as wide as the icon, one line high), and the gap
+/// after the slot.
 pub const ICON: f32 = 14.0;
-pub const SLOT: f32 = 20.0;
+pub const SLOT_W: f32 = 14.0;
+pub const SLOT_H: f32 = 20.0;
 pub const GAP: f32 = 8.0;
 /// A text line.
 pub const LINE: f32 = 20.0;
 /// Between the text, the figure and the action.
 pub const SIDE_GAP: f32 = 8.0;
+/// Before the action: the side gap and the action's own margin.
+pub const ACTION_GAP: f32 = 16.0;
 
 /// What a callout shows.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
@@ -91,9 +95,10 @@ impl Ui<'_> {
 
         let left = rect.x + BORDER + PAD_X;
         let right = rect.right() - BORDER - PAD_X;
-        let side = |w: f32| if w > 0.0 { w + SIDE_GAP } else { 0.0 };
-        let text_x = left + SLOT + GAP;
-        let text_w = (right - text_x - side(figure_w) - side(action_w)).max(0.0);
+        let side = |w: f32, gap: f32| if w > 0.0 { w + gap } else { 0.0 };
+        let text_x = left + SLOT_W + GAP;
+        let text_w =
+            (right - text_x - side(figure_w, SIDE_GAP) - side(action_w, ACTION_GAP)).max(0.0);
         let text_style = Style {
             line: LINE,
             ..Style::ui(t.font_base, t.fg_primary)
@@ -109,16 +114,22 @@ impl Ui<'_> {
         let height = BORDER + PAD_Y + content_h + PAD_Y + BORDER;
         let bounds = Rect::new(rect.x, rect.y, rect.w, height);
         let top = rect.y + BORDER + PAD_Y;
+        // A text shorter than the content (the action is taller) is centred with its icon.
+        let text_top = top + (content_h - text_h) / 2.0;
 
         let p = self.painter();
         p.fill(bounds, RADIUS, fill(&t, opts.tone));
         p.ring(bounds, RADIUS, BORDER, opts.tone.border(&t), false);
-        let icon_color = opts.tone.color(&t);
+        let icon_color = match opts.tone {
+            Tone::Neutral => t.fg_tertiary,
+            Tone::Data => t.data_hi,
+            tone => tone.color(&t),
+        };
         p.text_centered(
             &icon::glyph(opts.icon, ICON, icon_color),
-            Rect::new(left, top, SLOT, SLOT),
+            Rect::new(left, text_top, SLOT_W, SLOT_H),
         );
-        p.text(&text, text_x, top);
+        p.text(&text, text_x, text_top);
         let mut x = right;
         let mut action_at = None;
         if let Some(label) = opts.action {
@@ -127,7 +138,7 @@ impl Ui<'_> {
                 label,
                 Rect::new(x, top + (content_h - action_h) / 2.0, action_w, action_h),
             ));
-            x -= SIDE_GAP;
+            x -= ACTION_GAP;
         }
         if let Some(f) = &figure {
             x -= figure_w;

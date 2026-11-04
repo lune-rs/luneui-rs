@@ -24,7 +24,7 @@ const X: f32 = 34.0;
 const WIDTH: f32 = 360.0;
 const TOP: f32 = 82.0;
 /// The controls' height.
-const CONTROL: f32 = 28.0;
+const CONTROL: f32 = 32.0;
 
 struct States {
     name: String,

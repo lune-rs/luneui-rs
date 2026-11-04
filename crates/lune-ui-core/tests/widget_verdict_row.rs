@@ -202,13 +202,13 @@ fn the_stacked_row_has_mark_and_name_above_the_small_text_and_a_hairline() {
     let small = Spec::plain(
         "Fits in memory",
         Style {
-            line: 14.0,
+            line: 16.0,
             ..Style::ui(11.0, DARK.fg_secondary)
         },
     )
     .wrapped(360.0);
     assert_eq!(t[2].key.0, small.cache_key(1.0));
-    assert_eq!(d.height, 4.0 + 20.0 + 14.0 + 4.0 + 1.0);
+    assert_eq!(d.height, 4.0 + 20.0 + 16.0 + 4.0 + 1.0);
     let g = &d.scene.layers[0].geometry;
     assert_eq!(g.under.len(), 1, "the hairline");
     assert_eq!(g.under[0].rect, [20.0, 30.0 + d.height - 1.0, 400.0, 1.0]);
@@ -235,7 +235,7 @@ fn the_stacked_text_wraps_in_a_narrow_column() {
         true,
     );
     // 174 px at 5.5 px a glyph: 31 per line, 99 glyphs: 4 lines.
-    let lines = (d.height - 4.0 - 20.0 - 4.0 - 1.0) / 14.0;
+    let lines = (d.height - 4.0 - 20.0 - 4.0 - 1.0) / 16.0;
     assert!(lines >= 3.0 && lines.fract() == 0.0, "{lines}");
 }
 

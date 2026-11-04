@@ -64,7 +64,7 @@ fn the_ui_dot_draws_the_circle_then_its_word_and_settles() {
     assert_eq!(g.under[0].rect[0], 10.0);
     let texts: Vec<_> = scene.layers.iter().flat_map(|l| &l.texts).collect();
     assert_eq!(texts.len(), 1);
-    assert_eq!(texts[0].x, 10.0 + 8.0 + 6.0);
+    assert_eq!(texts[0].x, 10.0 + 8.0 + 8.0);
     assert_eq!(texts[0].key.0, Spec::plain("Healthy", style).cache_key(1.0));
     assert_eq!((r.x, r.y), (10.0, 10.0));
     assert!(r.w > 14.0 && r.h == style.line, "{r:?}");

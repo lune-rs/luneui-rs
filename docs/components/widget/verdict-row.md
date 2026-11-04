@@ -31,8 +31,8 @@ Conflict: the mark tones. Wane's `--ok` #6fd39a and `--warn` #f2a65a against Lun
 ### Anatomy
 
 - Rows min 24 high; grid 40 / 92 / 1fr [W docs/ui/components.md:520].
-- Mark: RznMono 11 Medium [W docs/ui/components.md:520]; name 13 tertiary [W docs/ui/components.md:520], [W docs/ui/mocks/css/tokens.css:14]; text 13/20 primary [W docs/ui/components.md:520], [W docs/ui/mocks/css/tokens.css:12,125].
-- Stacked (`--stacked`): grid 40 / 1fr, padding 4 0; mark and name on line 1; text 11 secondary below, wrapping; hairlines between rows; for a column about 214 px wide [W docs/ui/components.md:518,686].
+- Mark: RznMono 11 Medium [W docs/ui/components.md:520]; name 13 tertiary (stacked: primary, as `.c-verdict--stacked .c-verdict__name` in the mock) [W docs/ui/components.md:520], [W docs/ui/mocks/css/tokens.css:14]; text 13/20 primary [W docs/ui/components.md:520], [W docs/ui/mocks/css/tokens.css:12,125].
+- Stacked (`--stacked`): grid 40 / 1fr, padding 4 0; mark and name on line 1; text 11 secondary on a 16 px line below, wrapping (row 90 px at scale 2 for one line); hairlines between rows (the widget draws one under every stacked row: it cannot know the last row, [D130]); for a column about 214 px wide [W docs/ui/components.md:518,686].
 
 ### States
 

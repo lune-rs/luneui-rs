@@ -13,7 +13,7 @@ use crate::ui::Ui;
 /// The dot's diameter.
 pub const SIZE: f32 = 8.0;
 /// The gap between the dot and its word.
-pub const GAP: f32 = 6.0;
+pub const GAP: f32 = 8.0;
 
 /// Draws the dot centred on `center`. No node: the embedding widget names the whole.
 pub fn paint<H: Copy + PartialEq>(p: &mut Painter<'_, H>, center: (f32, f32), tone: Tone) {

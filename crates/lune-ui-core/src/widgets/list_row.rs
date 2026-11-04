@@ -2,10 +2,11 @@
 //!
 //! The list owns selection, keys, the highlight fill and the focus ring; [`Ui::list_row`] draws
 //! the content of one row from inside the list's `draw`: a head line (an optional status dot, the
-//! name in 13 Medium on a 20 px line, an optional badge at the right), a value line (mono 13, the
-//! meta at the right) and a sub-line (mono 11 on a 16 px line), 4 px apart. The name is
-//! `fg_secondary` at rest and `fg_bright` once selected, with the `selection` motion; a row never
-//! animates while the list scrolls. [`paint`] draws the same content for a specimen.
+//! name in 13 Medium on a 20 px line, an optional badge, then the value, mono 13, at the right
+//! edge, 8 px apart), a sub-line (mono 11 on a 16 px line) and the meta (11 on a 16 px line), 4 px
+//! between lines. The name is `fg_secondary` at rest and `fg_bright` once selected, with the
+//! `selection` motion; a row never animates while the list scrolls. [`paint`] draws the same
+//! content for a specimen.
 
 use crate::access::{Node, Role, Value};
 use crate::color::Rgba;
@@ -26,13 +27,12 @@ pub const SELECTION: Motion = Motion::of(Kind::Selection);
 pub const SIDE_PANEL_PADDING: (f32, f32) = (8.0, 6.0);
 /// A master list's padding, wider than the side panel's.
 pub const MASTER_PADDING: (f32, f32) = (12.0, 6.0);
-/// The name's and the value's line, and the small lines.
+/// The head line (name, badge and value), and the small lines.
 pub const NAME_LINE: f32 = 20.0;
-pub const VALUE_LINE: f32 = 20.0;
 pub const SMALL_LINE: f32 = 16.0;
 /// Between the lines of a row.
 pub const LINE_GAP: f32 = 4.0;
-/// Between the name and the badge.
+/// Between the dot, the name, the badge and the value.
 pub const BADGE_GAP: f32 = 8.0;
 
 /// What a list row shows.
@@ -51,10 +51,10 @@ pub struct ListRow<'a> {
 /// the padding and the lines.
 pub fn height(row: &ListRow<'_>, padding: (f32, f32)) -> f32 {
     let mut lines = vec![NAME_LINE];
-    if row.value.is_some() || row.meta.is_some() {
-        lines.push(VALUE_LINE);
-    }
     if row.sub.is_some() {
+        lines.push(SMALL_LINE);
+    }
+    if row.meta.is_some() {
         lines.push(SMALL_LINE);
     }
     let content: f32 = lines.iter().sum::<f32>() + LINE_GAP * (lines.len() - 1) as f32;
@@ -75,7 +75,7 @@ pub fn paint<H: Copy + PartialEq>(
     let w = (rect.w - 2.0 * (HIGHLIGHT_INSET.0 + padding.0)).max(0.0);
     let mut y = rect.y + HIGHLIGHT_INSET.1 + padding.1;
 
-    // The head: dot, name, badge.
+    // The head: dot, name, badge, value at the right edge.
     let badge_w = row
         .badge
         .map_or(0.0, |(text, _)| badge::width(p, text, false));
@@ -87,24 +87,31 @@ pub fn paint<H: Copy + PartialEq>(
     if let Some(tone) = row.dot {
         status_dot::paint(p, (x + status_dot::SIZE / 2.0, y + NAME_LINE / 2.0), tone);
     }
-    let side = if badge_w > 0.0 {
-        badge_w + BADGE_GAP
-    } else {
-        0.0
-    };
+    let value = row.value.map(|v| {
+        let style = Style::mono(t.font_base, NAME_LINE, t.fg_secondary);
+        p.elide(&Spec::plain(v, style), (w - lead).max(0.0))
+    });
+    let value_w = value.as_ref().map_or(0.0, |v| p.measure(v).0);
+    let side = |w: f32| if w > 0.0 { w + BADGE_GAP } else { 0.0 };
     let name_style = Style {
         line: NAME_LINE,
         ..Style::ui(t.font_base, name_color).medium()
     };
     let name = p.elide(
         &Spec::plain(row.name, name_style),
-        (w - lead - side).max(0.0),
+        (w - lead - side(badge_w) - side(value_w)).max(0.0),
     );
     p.text(&name, x + lead, y);
+    let mut right = x + w;
+    if let Some(v) = &value {
+        right -= value_w;
+        p.text(v, right, y);
+        right -= BADGE_GAP;
+    }
     if let Some((text, tone)) = row.badge {
         badge::paint(
             p,
-            (x + w - badge_w, y + (NAME_LINE - badge::HEIGHT) / 2.0),
+            (right - badge_w, y + (NAME_LINE - badge::HEIGHT) / 2.0),
             text,
             tone,
             false,
@@ -112,33 +119,19 @@ pub fn paint<H: Copy + PartialEq>(
     }
     y += NAME_LINE + LINE_GAP;
 
-    // The value line: the value, the meta at the right.
-    if row.value.is_some() || row.meta.is_some() {
-        let meta_style = Style {
-            line: SMALL_LINE,
-            ..Style::ui(t.font_s, t.fg_tertiary)
-        };
-        let meta = row.meta.map(|m| Spec::plain(m, meta_style));
-        let meta_w = meta.as_ref().map_or(0.0, |m| p.measure(m).0);
-        if let Some(m) = &meta {
-            p.text(m, x + w - meta_w, y + (VALUE_LINE - SMALL_LINE) / 2.0);
-        }
-        if let Some(v) = row.value {
-            let style = Style::mono(t.font_base, VALUE_LINE, t.fg_secondary);
-            let side = if meta_w > 0.0 {
-                meta_w + BADGE_GAP
-            } else {
-                0.0
-            };
-            let spec = p.elide(&Spec::plain(v, style), (w - side).max(0.0));
-            p.text(&spec, x, y);
-        }
-        y += VALUE_LINE + LINE_GAP;
-    }
-
+    // The sub-line, then the meta.
     if let Some(s) = row.sub {
         let style = Style::mono(t.font_s, SMALL_LINE, t.fg_tertiary);
         let spec = p.elide(&Spec::plain(s, style), w);
+        p.text(&spec, x, y);
+        y += SMALL_LINE + LINE_GAP;
+    }
+    if let Some(m) = row.meta {
+        let style = Style {
+            line: SMALL_LINE,
+            ..Style::ui(t.font_s, t.fg_tertiary)
+        };
+        let spec = p.elide(&Spec::plain(m, style), w);
         p.text(&spec, x, y);
     }
     height(row, padding)

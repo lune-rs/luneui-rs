@@ -27,7 +27,7 @@ pub const PAD: f32 = 2.0;
 /// Vertical padding of the stacked layout.
 pub const STACKED_PAD: f32 = 4.0;
 /// The stacked text's line.
-pub const STACKED_LINE: f32 = 14.0;
+pub const STACKED_LINE: f32 = 16.0;
 
 /// A verdict.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -80,7 +80,14 @@ impl Ui<'_> {
         );
         let name_style = Style {
             line: LINE,
-            ..Style::ui(theme.font_base, theme.fg_tertiary)
+            ..Style::ui(
+                theme.font_base,
+                if stacked {
+                    theme.fg_primary
+                } else {
+                    theme.fg_tertiary
+                },
+            )
         };
         let (name_x, name_max) = (
             rect.x + MARK_W,

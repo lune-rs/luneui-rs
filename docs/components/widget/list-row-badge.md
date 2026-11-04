@@ -33,9 +33,9 @@ Conflicts: (1) Padding: Lunegit's side-panel item pads 8 horizontal and 6 vertic
 - Row radius 6 [L src/Lunegit.Desktop/App.axaml:209], rows 2 apart and gap 4 [W docs/ui/components.md:478].
 - Padding 8 horizontal, 6 vertical in the side panel [L src/Lunegit.Desktop/App.axaml:360].
 - Name 13/20 Medium [W docs/ui/components.md:478]; Medium weight as the gallery draws it [R apps/gallery/src/scenes.rs:328].
-- Layout (the sources give no line plan): a head line of the optional dot, the name (elided) and the badge at the right; a value line (mono 13, `fg_secondary`) with the meta at its right; a sub-line (mono 11, tertiary); 4 px between lines. The padding is the pair (horizontal, vertical): `SIDE_PANEL_PADDING` (8, 6), `MASTER_PADDING` (12, 6), inside the list's 4 px by 1 px highlight inset. `height(row, padding)` is the slot height for `Heights::Fixed`.
+- Layout (the Lunegit source gives no line plan, so the mock is the source [W docs/ui/mocks/css/components.css, `c-row` sessions and upstreams]; visual batch 3): a head line of the optional dot, the name (elided), the badge and the value (mono 13, `fg_secondary`) at the far right edge, 8 px between them; then the sub-line (mono 11/16, tertiary); then the meta (11/16, tertiary) at the left; 4 px between lines. With both a badge and a value the value takes the right edge, so figures line up down a list (taste call; the mock has no row with both). The name stays `fg_secondary` at rest, cited to Lunegit [L src/Lunegit.Desktop/App.axaml:687-690] (hard rule 8); the value is `fg_secondary`, so it is not brighter than the name. A full row is 74 high with the side-panel padding (2 + 12 + 20 + 4 + 16 + 4 + 16). The padding is the pair (horizontal, vertical): `SIDE_PANEL_PADDING` (8, 6), `MASTER_PADDING` (12, 6), inside the list's 4 px by 1 px highlight inset. `height(row, padding)` is the slot height for `Heights::Fixed`.
 - Value RznMono 13; sub-line RznMono 11/16 tertiary; meta 11/16 tertiary [W docs/ui/components.md:478].
-- Badge in the head: `widget.badge`; a lead dot: `widget.status-dot` [W docs/ui/components.md:483].
+- Badge in the head: `widget.badge`; a lead dot: `widget.status-dot` [W docs/ui/components.md:483], 8 px before the name (the dot's own gap, `status_dot::GAP`; the mock's dot-to-name distance is 16 px at scale 2).
 
 ### States
 
