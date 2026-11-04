@@ -18,6 +18,7 @@
 //!   `paint` (the `Painter`), `scene` (the display list it builds: plain data and the draw-order
 //!   contract), `text` (specs and the `TextSystem` seam), `icon`, `widgets` (controls, menus,
 //!   dropdowns, dialogs), `chrome` (tab outline geometry);
+//! - `text_edit` (the pure editing engine: caret, selection, undo, clipboard commands, preedit);
 //! - `input` (the input seam: `RawInput` in, `FrameOutput` out, plain data), `layout` (pure stack,
 //!   row, column and grid helpers);
 //! - `shortcuts` (the scoped key-chord registry the frame resolves in two phases);
@@ -51,6 +52,7 @@ pub mod shortcuts;
 pub mod strings;
 pub mod testing;
 pub mod text;
+pub mod text_edit;
 pub mod theme;
 pub mod ui;
 pub mod widgets;

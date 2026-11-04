@@ -1,7 +1,7 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-04 (M5 steps 1 to 11 done; step 12 is next; M4 merged at d9fe71f)
+Last updated: 2026-11-04 (M5 steps 1 to 12 done; step 13 is next; M4 merged at d9fe71f)
 
 ## Now
 
@@ -10,7 +10,7 @@ M4 (interaction and motion) is merged to main at d9fe71f, on top of M3 (catalogu
 shortcuts, painter primitives) is in progress on branch `orch/toolkit-v1`; steps 1 to 11 (the frame
 plumbing, layout helpers, shortcut registry, vector primitives, image and rotate, their gallery pages, the
 scroll area and scrollbar, the virtualized list, popover and tooltip, and the gallery pages of those four, and the text queries on `TextSystem`: caret, hit, lines,
-segments, D86) are done; step 12 (`TextEdit`) is next.
+segments, D86, and the `TextEdit` engine, D87) are done; step 13 (the text field upgrade) is next.
 `lune-ui-core` holds the per-window `Ui` frame (stable ids, retained state with keep-alive scopes,
 layered hits with modal and pointer capture, `Response`, overlays with exit retention, focus scopes,
 the semantic tree with actions, the string table, `FrameOutput` with `Repaint`) and the closed-form
@@ -26,7 +26,8 @@ measured ones in a Fenwick tree, keyed selection in a persistent `ListState`, no
 content moves. `widgets/popover.rs` holds the pure `place` (side, alignment, gap, margin, flip, shift;
 the dropdown and menu call it) and `Ui::popover` (popup layer, light dismiss, the menu's curves);
 `widgets/tooltip.rs` holds `Ui::tooltip`/`tooltip_with` and `Ui::hover_dwell` (800 ms
-`MotionTokens::tooltip_delay`, `LAZY_HOVER_DWELL` 150 ms).
+`MotionTokens::tooltip_delay`, `LAZY_HOVER_DWELL` 150 ms). `text_edit` holds the pure `TextEdit`
+(caret, selection, undo, clipboard commands, preedit; `SpecLayout` over a `TextSystem`); no widget uses it yet.
 `docs/architecture.md` holds the module map, "The `Ui` frame" and "API changes since M1"; DECISIONS
 D59 to D85 record the M4 choices.
 The gallery has a page registry (two legacy pages, 24 Ui pages), `--dump`, `--list` (123 scene names)
@@ -35,7 +36,7 @@ The pixel gate shows the 15 legacy scenes identical against the M1 base.
 
 ## Next
 
-1. M5 steps 12 to 16 per `m05-foundations/plan.md`: `TextEdit`, the text field
+1. M5 steps 13 to 16 per `m05-foundations/plan.md`: the text field
    upgrade, drag and drop, gallery pages, docs and the acceptance bench.
 2. CI (fmt, clippy `-D warnings`, tests on macOS, Windows and Linux) now that there is code to run.
 3. An export script for Luneterm's vendored snapshot, before Luneterm M9. The migration
