@@ -1,6 +1,6 @@
 //! The `text-field` page: a live field (window mode, the bench and the mid-transition scenes) and a
-//! specimen sheet of every state painted through the public look (D16). M4 has the focus, node and
-//! transitions only; variants, search clear and composing come with M5.
+//! specimen sheet of every state painted through the public look (D16), the variants side by side,
+//! the search field with its clear button, and a field composing with an input method.
 
 use lune_ui::motion::MotionTier;
 use lune_ui::paint::{Rect, Xform};
@@ -24,6 +24,43 @@ fn live() -> Box<dyn PageState> {
     Box::new(Live {
         text: String::new(),
     })
+}
+
+/// The live field holding "lune": the composing scene's start.
+fn lune() -> Box<dyn PageState> {
+    Box::new(Live {
+        text: "lune".to_owned(),
+    })
+}
+
+fn search() -> Box<dyn PageState> {
+    Box::new(Search {
+        text: "lune".to_owned(),
+    })
+}
+
+/// The search variant with text in it, so the clear button shows.
+struct Search {
+    text: String,
+}
+
+impl PageState for Search {
+    fn draw(&mut self, ui: &mut Ui<'_>) {
+        let card = card(ui, "Search field");
+        let (x, y) = (card.x + 24.0, card.y + 24.0);
+        heading(ui, "SEARCH WITH CLEAR", x, y);
+        let opts = FieldOptions {
+            variant: Variant::Search,
+            placeholder: "Search",
+            ..FieldOptions::default()
+        };
+        ui.text_field_with(
+            "field",
+            Rect::new(x, y + 20.0, 260.0, 32.0),
+            &mut self.text,
+            &opts,
+        );
+    }
 }
 
 fn specimens() -> Box<dyn PageState> {
@@ -186,6 +223,36 @@ const SCENES: &[UiScene] = &[
         capture_ms: 0,
         expect: Expect::Settled,
     },
+    // Not focused, so the clear button is the only extra: a press on it empties the field.
+    UiScene {
+        id: "text-field-search-clear",
+        scale: 2,
+        tier: MotionTier::Full,
+        state: search,
+        script: &[],
+        capture_ms: 0,
+        expect: Expect::Settled,
+    },
+    // The same preedit as `ime-preedit` (cursor (0, 3) in bytes), here as a field's own state. The
+    // gallery has no CJK font, so "かな" draws as boxes (D90).
+    UiScene {
+        id: "text-field-composing",
+        scale: 2,
+        tier: MotionTier::Full,
+        state: lune,
+        script: &[
+            Step {
+                at_ms: 0,
+                events: &[Ev::Tab],
+            },
+            Step {
+                at_ms: 50,
+                events: &[Ev::ImePreedit("かな", Some((0, 3)))],
+            },
+        ],
+        capture_ms: 400,
+        expect: Expect::Settled,
+    },
     // Hover is `instant` (120 ms): half way at 60 ms.
     UiScene {
         id: "text-field-hover-fade",
@@ -214,7 +281,7 @@ const SCENES: &[UiScene] = &[
     },
 ];
 
-/// What the bench replays: hover, click, Tab.
+/// What the bench replays: hover, click, a word typed, Tab.
 const BENCH: &[Step] = &[
     Step {
         at_ms: 0,
@@ -223,6 +290,10 @@ const BENCH: &[Step] = &[
     Step {
         at_ms: 200,
         events: &[Ev::Click],
+    },
+    Step {
+        at_ms: 300,
+        events: &[Ev::Type("lune")],
     },
     Step {
         at_ms: 400,

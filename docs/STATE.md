@@ -1,16 +1,16 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-04 (M5 steps 1 to 14 done; step 15 is next; M4 merged at d9fe71f)
+Last updated: 2026-11-04 (M5 steps 1 to 15 done; step 16 is next; M4 merged at d9fe71f)
 
 ## Now
 
 M4 (interaction and motion) is merged to main at d9fe71f, on top of M3 (catalogue specs) and M2
 (seams and crate split). M5 (foundations: layout, scroll, list, popover, text editing, drag and drop,
-shortcuts, painter primitives) is in progress on branch `orch/toolkit-v1`; steps 1 to 14 (the frame
+shortcuts, painter primitives) is in progress on branch `orch/toolkit-v1`; steps 1 to 15 (the frame
 plumbing, layout helpers, shortcut registry, vector primitives, image and rotate, their gallery pages, the
 scroll area and scrollbar, the virtualized list, popover and tooltip, and the gallery pages of those four, and the text queries on `TextSystem`: caret, hit, lines,
-segments, D86, the `TextEdit` engine, D87, and the text field upgrade, D88, and drag and drop, D89) are done; step 15 (their gallery pages) is next.
+segments, D86, the `TextEdit` engine, D87, and the text field upgrade, D88, and drag and drop, D89, and their gallery pages: text edit, IME, text field and drag and drop) are done; step 16 (docs, catalogue, bench) is next.
 `lune-ui-core` holds the per-window `Ui` frame (stable ids, retained state with keep-alive scopes,
 layered hits with modal and pointer capture, `Response`, overlays with exit retention, focus scopes,
 the semantic tree with actions, the string table, `FrameOutput` with `Repaint`) and the closed-form
