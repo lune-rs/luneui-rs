@@ -19,7 +19,7 @@ summary: Badge: static 18 px tag with tone fill and border; neutral, ok, warn, e
 
 ## Existing code
 
-None in luneui-rs or Luneterm's `lune-ui` [W docs/ui/components.md:440]. Design source, not code to move: Lunegit `src/Lunegit.Desktop/Views/DiffView.axaml:12-16` (shape).
+`crates/lune-ui-core/src/widgets/badge.rs` (M6): `badge::width`, `badge::paint`, `Ui::badge`; the colours are `widgets/tone.rs`'s `Tone`. Gallery page `apps/gallery/src/pages/badge.rs`; tests `crates/lune-ui-core/tests/widget_badge.rs`. Design source, not code to move: Lunegit `src/Lunegit.Desktop/Views/DiffView.axaml:12-16` (shape).
 
 ## Spec
 
@@ -93,7 +93,7 @@ None: the badge text is app data (live, upstream kind, verdict, risk level) [W d
 
 ## Open questions
 
-- `tone-map`: the tone values are settled by [D58] (ok = added, warn = modified, err = deleted; data is Wane's). Open: which Lunegit file status the app maps to which tone, and Renamed (#61AFEF) and Conflicted (#F14C4C), which have no tone. M6 confirms the mapping before drawing.
+- `tone-map` (answered by [D129]): the tone values are settled by [D58] (ok = added, warn = modified, err = deleted; data is Wane's). Which domain status stands for which tone, Renamed and Conflicted included, is the app's choice: the toolkit ships the five tones in `Tone` and maps no status. Nothing open.
 
 ## Notes for the planner
 

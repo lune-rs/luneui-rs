@@ -19,7 +19,7 @@ summary: Status dot: static 8 px circle in ok, warn, err, data or paused tone; n
 
 ## Existing code
 
-None in luneui-rs or Luneterm's `lune-ui` [W docs/ui/components.md:398]. Wane is the only source read for this entry.
+`crates/lune-ui-core/src/widgets/status_dot.rs` (M6): `status_dot::paint` for widgets that embed a dot (the badge) and `Ui::status_dot` for dot and word. Gallery page `apps/gallery/src/pages/status_dot.rs`; tests `crates/lune-ui-core/tests/widget_status_dot.rs`. Wane is the only source read for this entry.
 
 ## Spec
 

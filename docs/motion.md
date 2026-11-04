@@ -30,9 +30,11 @@ it does not depend on the frame rate [motion.transitions]. Five tokens, no inter
 | slow | 500 | `AnimDurationSlow` | none | full-screen or large reveals only | [L src/Lunegit.Desktop/App.axaml:155], [L .claude/docs/animation-rules.md:26] |
 
 Not on the scale, by design: the flash highlight (3000 ms, `CubicEaseOut`, an attention cue)
-[L .claude/docs/animation-rules.md:28], and the busy-outline loops (2400 ms sweep, 1800 ms breath), which
-are state indicators, not feedback on a user action [L .claude/docs/animation-rules.md:30-38]. Nothing longer than
-`slow` animates except those and the spinner [L .claude/docs/animation-rules.md:150].
+[L .claude/docs/animation-rules.md:28], the busy-outline loops (2400 ms sweep, 1800 ms breath), and the
+indeterminate progress loop (a 2400 ms trip of the segment under Full, the same 1800 ms breath of the fill
+under Reduced, a static fill under Off [D118]), which are state indicators, not feedback on a user action
+[L .claude/docs/animation-rules.md:30-38]. Nothing longer than `slow` animates except those and the spinner
+[L .claude/docs/animation-rules.md:150].
 
 Durations are theme tokens (`motion` tokens on `Theme`, M4); a component names the token, never the
 milliseconds [L src/Lunegit.Desktop/App.axaml:147-150].
@@ -142,6 +144,9 @@ From Lunegit's rules plus D40's performance rules:
   [L .claude/docs/animation-rules.md:149].
 - Anything longer than `slow` (500 ms), except the flash cue and the indicator loops
   [L .claude/docs/animation-rules.md:150].
+- A determinate progress bar: its fill follows the value directly, however often the value changes.
+  Only the indeterminate loop above moves, because nothing is known [D118]
+  [L .claude/docs/animation-rules.md:148].
 
 ## Tab-crossfade exception
 

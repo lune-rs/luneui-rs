@@ -22,7 +22,7 @@ summary: 4 px track with an accent fill; warn and err only for meaning
 
 ## Existing code
 
-None in luneui-rs or Luneterm's `lune-ui` (Wane: missing). Design source (not code to move): Lunegit Desktop App/src/Lunegit.Desktop/App.axaml:253.
+`crates/lune-ui-core/src/widgets/progress.rs` (M6): `ProgressOptions`, `Ui::progress`, and the public `progress::paint` and `paint_indeterminate` for the stat meter. Gallery page `apps/gallery/src/pages/progress.rs`; tests `crates/lune-ui-core/tests/widget_progress.rs`. Design source (not code to move): Lunegit Desktop App/src/Lunegit.Desktop/App.axaml:253.
 
 ## Spec
 
@@ -108,10 +108,11 @@ None: the head text is app text.
 
 ## Open questions
 
-- The track colour `--surface-overlay`: token to add (M4), #FFFFFF15 [W docs/ui/mocks/css/tokens.css:22], [D58].
-- Warn and err colours: not in the sources read (the Lunegit toast accents at DarkTheme.axaml:337-338 are a candidate, not confirmed); open.
-- Indeterminate motion: Lunegit has a moving bar and Wane does not mock it; the motion kind and duration are open.
-- Indeterminate height 3 (Lunegit) versus determinate 4 (Wane): both kept as stated; open for the look owner.
+- The track colour `--surface-overlay`: the token exists (M4), #FFFFFF15 [W docs/ui/mocks/css/tokens.css:22], [D58]. Answered.
+- Warn and err colours (answered by [D118]): the `warn` and `err` tones of [D58], through `Tone`; neutral is `accent`.
+- Indeterminate motion (answered by [D118]): a segment 30% of the track travelling left to right, linear, period 2400 ms (the accepted busy-loop period, outside the motion scale), clipped by the track. Under Reduced the full-width fill breathes 0.38 to 1.0 over 1800 ms (opacity only); under Off it is a static full fill at 0.38. Determinate never animates. Listed in `docs/motion.md`'s not-on-the-scale paragraph.
+- Indeterminate height 3 (Lunegit) versus determinate 4 (Wane) (answered by [D118]): both kept, each for its own bar.
+- Disabled: not in the sources and not built; the bar takes no input, and a `with_enabled(false)` scope dims it like any widget.
 
 ## Notes for the planner
 
