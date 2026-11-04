@@ -233,6 +233,64 @@ fn the_rows_stay_in_text_order() {
     }
 }
 
+/// Texts ending in a cluster of several glyphs: the caret is after all of them, at the text's width.
+const CLUSTER_ENDINGS: [&str; 5] = [
+    "ok \u{1F44D}\u{1F3FD}",
+    "\u{1F1F2}\u{1F1FE}",
+    "fix \u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}",
+    "\u{e17}\u{e33}",
+    "\u{915}\u{93f}",
+];
+
+fn end_caret_is_the_width(text: &mut TextCache, s: &str) {
+    use lune_ui_core::text::{Spec, Style, TextSystem};
+    let spec = Spec::plain(s, Style::ui(13.0, [255; 4]));
+    for scale in [1.0, 1.25, 1.5, 1.75, 2.0, 3.0] {
+        let width = text.measure(&spec, scale).0;
+        assert!(width > 0.0, "{s:?}");
+        assert_eq!(
+            text.caret(&spec, scale, s.len()).x,
+            width,
+            "{s:?} at {scale}"
+        );
+    }
+}
+
+#[test]
+fn the_caret_after_a_cluster_of_several_glyphs_is_at_the_width() {
+    let mut text = with_fonts();
+    for s in CLUSTER_ENDINGS {
+        end_caret_is_the_width(&mut text, s);
+    }
+}
+
+/// The same with fonts that cover the script, where the system has them: the gallery's draw Thai
+/// and Devanagari as boxes.
+#[test]
+fn the_caret_after_a_shaped_cluster_is_at_the_width() {
+    let fonts = [
+        ("Ayuthaya.ttf", "Ayuthaya", "\u{e17}\u{e33}"),
+        (
+            "Devanagari Sangam MN.ttc",
+            "Devanagari Sangam MN",
+            "\u{915}\u{93f}",
+        ),
+        (
+            "Devanagari Sangam MN.ttc",
+            "Devanagari Sangam MN",
+            "\u{915}\u{940}",
+        ),
+    ];
+    for (file, family, s) in fonts {
+        let Ok(data) = std::fs::read(format!("/System/Library/Fonts/Supplemental/{file}")) else {
+            println!("skipped: no {file}");
+            continue;
+        };
+        let mut text = TextCache::new(&[&data], family, family);
+        end_caret_is_the_width(&mut text, s);
+    }
+}
+
 /// A seeded walk over the texts that trip shaping: wide and narrow chars, spaces, each break.
 fn generated(seed: u64, style: lune_ui_core::text::Style) -> lune_ui_core::text::Spec {
     use lune_ui_core::text::Spec;
@@ -248,6 +306,9 @@ fn generated(seed: u64, style: lune_ui_core::text::Style) -> lune_ui_core::text:
         "\r",
         "word",
         "wwwwwwwwwwwwwwwwwwww",
+        "\u{1F44D}\u{1F3FD}",
+        "\u{1F1F2}\u{1F1FE}",
+        "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}",
     ];
     let mut state = seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1;
     let mut next = |n: u64| {

@@ -293,7 +293,7 @@ fn finite_size(property: &str, size: (f32, f32)) -> Result<(), String> {
 ///   line) and a `pos` that is not finite hits 0;
 /// - P9: an offset past the end clamps to the end, one inside a char to the char's start;
 /// - P10: the caret at 0 has `x == 0`, and at the end of one unwrapped line it has exactly the
-///   width `prepare` returns;
+///   width `prepare` returns, also after a cluster of several glyphs;
 /// - P11: for a system that lays text out (width above 0), `hit` of the caret of each boundary of
 ///   an ASCII line is that boundary;
 /// - P12: on a three-line spec joined with `\n` and `\r\n` the lines start at the joined offsets, in
@@ -518,8 +518,8 @@ fn query_contract(ts: &mut dyn TextSystem) -> Result<(), String> {
 
     // P10
     for scale in [1.0, 2.0] {
-        for text in ["Hello world", "fn main() {}", "a\u{e9}b"] {
-            let spec = Spec::plain(text, style);
+        for text in P10_TEXTS {
+            let spec = Spec::plain(*text, style);
             let width = ts.prepare(&spec, scale).1.0;
             let first = ts.caret(&spec, scale, 0);
             let last = ts.caret(&spec, scale, text.len());
@@ -599,6 +599,17 @@ fn query_contract(ts: &mut dyn TextSystem) -> Result<(), String> {
     }
     Ok(())
 }
+
+/// The texts of P10, ending in clusters a shaper may give several glyphs: a skin tone, a flag, a ZWJ
+/// family.
+const P10_TEXTS: &[&str] = &[
+    "Hello world",
+    "fn main() {}",
+    "a\u{e9}b",
+    "ok \u{1F44D}\u{1F3FD}",
+    "\u{1F1F2}\u{1F1FE}",
+    "fix \u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}",
+];
 
 /// The texts of P14 to P20: hard breaks of each kind, with and without a final terminator, each
 /// in ASCII and with a non-ASCII char.

@@ -1,12 +1,12 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-04 (M5 steps 1 to 16 done, review fix rounds 1 to 3 applied (F1 to F6, F10, F11, F13, F14; D110 to D112); M4 merged at d9fe71f)
+Last updated: 2026-11-04 (M5 steps 1 to 16 done, review fix rounds 1 to 4 applied (F1 to F6, F10, F11, F13 to F15; D110 to D112); M4 merged at d9fe71f)
 
 ## Now
 
 M4 (interaction and motion) is merged to main at d9fe71f, on top of M3 (catalogue specs) and M2
-(seams and crate split). M5 (foundations) is built on branch `orch/toolkit-v1`, in review (rounds 1 to 3 fixed), and awaits the
+(seams and crate split). M5 (foundations) is built on branch `orch/toolkit-v1`, in review (rounds 1 to 4 fixed), and awaits the
 merge: layout helpers, the shortcut registry, the seven painter primitives and the `ImageStore` seam, the scroll
 area and scrollbar, the virtualized list, popover and tooltip, text queries on `TextSystem`, the `TextEdit`
 engine, the text field and text area upgrade with IME, drag and drop, and 12 new gallery pages with
@@ -29,9 +29,10 @@ dependency). The gallery has a page registry (two legacy pages, 27 Ui pages), `-
   corners. Text draws above every fill of its layer, so labels show through a sliding tab during `dnd-slide`
   and `dnd-settle`.
 - The gallery bundles no CJK font: the IME scenes' "かな" draws as boxes (D90).
-- A cluster shaped into several glyphs at a row's end: the caret after it sits after its first glyph, so
-  it is short of the row's end (cosmic-text's `cursor_glyph` stops at the first glyph with that end).
-  Seen with a skin-tone emoji in fonts without it, where it also breaks "the caret at the end is the width".
+- Inside a cluster of several glyphs a click lands on either edge non-monotonically: `Buffer::hit` halves
+  each glyph, not the cluster.
+- A drag stopped right of a row cut inside a word (a URL, a path) leaves one grapheme out until the pointer
+  reaches the next row (P20; the seam has no caret affinity, D112).
 
 ## Unverified here
 

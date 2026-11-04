@@ -329,6 +329,17 @@ impl Row {
             } else {
                 self.right
             });
+        // cosmic-text stops at the first glyph with this end; a cluster can have several.
+        let x = if run.glyphs.iter().any(|g| g.start == local) {
+            x
+        } else {
+            run.glyphs
+                .iter()
+                .filter(|g| g.end == local)
+                .map(|g| (g.level.is_rtl(), g.x, g.x + g.w))
+                .reduce(|a, b| (a.0, a.1.min(b.1), a.2.max(b.2)))
+                .map_or(x, |(rtl, l, r)| if rtl { l } else { r })
+        };
         // Positions are sums of glyph advances; where the caret is at the end of the line, take
         // the line's own width, so the two agree to the last bit.
         if (x - run.line_w).abs() < 0.01 {
