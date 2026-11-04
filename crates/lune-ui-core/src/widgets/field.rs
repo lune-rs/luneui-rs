@@ -644,7 +644,7 @@ pub(super) fn caret_at(ui: &mut Ui<'_>, spec: &Spec, offset: usize) -> CaretPos 
 }
 
 /// The boxes of chars `range` of `spec`, one per visual line it touches, from the text's top-left.
-fn range_boxes(ui: &mut Ui<'_>, spec: &Spec, range: &Range<usize>) -> Vec<Rect> {
+pub(super) fn range_boxes(ui: &mut Ui<'_>, spec: &Spec, range: &Range<usize>) -> Vec<Rect> {
     let Some((text, style)) = spec.runs.first().filter(|_| !range.is_empty()) else {
         return Vec::new();
     };
