@@ -4,6 +4,8 @@
 
 use std::collections::BTreeMap;
 
+use crate::input::{FocusEvent, Key, NamedKey};
+
 use super::pointer::HitRecord;
 use super::{Ui, UiStore, WidgetId};
 
@@ -15,8 +17,13 @@ pub(crate) struct FocusState {
     pub(crate) visible: bool,
     /// Whether the last input was a key press (true) or a pointer press (false).
     pub(crate) keyboard: bool,
-    /// A `request_focus` to apply at the next frame's begin.
+    /// A `request_focus` or `rove_focus` to apply at the next frame's begin.
     pub(crate) pending: Option<WidgetId>,
+    /// The ring `pending` leaves: on after `rove_focus`, off after `request_focus`.
+    pub(crate) pending_ring: bool,
+    /// The children of each roving composite, as `rove_keys` lists them; `begin` reads the
+    /// previous frame's.
+    pub(crate) roves: Vec<Vec<WidgetId>>,
     /// The keep-alive scopes open when the focused id last registered.
     pub(crate) chain: Vec<WidgetId>,
     /// The id scopes open around the focused widget when it last registered, outermost first,
@@ -27,15 +34,78 @@ pub(crate) struct FocusState {
     pub(crate) composing: Option<WidgetId>,
 }
 
+/// Which arrows a roving composite takes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RoveAxis {
+    /// Up and Down.
+    Vertical,
+    /// Left and Right.
+    Horizontal,
+    /// All four.
+    Both,
+}
+
+/// Where a roving key goes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RoveStep {
+    Previous,
+    Next,
+    First,
+    Last,
+}
+
+impl RoveStep {
+    fn of(key: NamedKey, axis: RoveAxis) -> Option<RoveStep> {
+        let (vertical, horizontal) = (axis != RoveAxis::Horizontal, axis != RoveAxis::Vertical);
+        match key {
+            NamedKey::ArrowUp if vertical => Some(RoveStep::Previous),
+            NamedKey::ArrowDown if vertical => Some(RoveStep::Next),
+            NamedKey::ArrowLeft if horizontal => Some(RoveStep::Previous),
+            NamedKey::ArrowRight if horizontal => Some(RoveStep::Next),
+            NamedKey::Home => Some(RoveStep::First),
+            NamedKey::End => Some(RoveStep::Last),
+            _ => None,
+        }
+    }
+
+    /// The enabled child this step reaches from `at`, if any.
+    fn target(self, items: &[(WidgetId, bool)], at: usize, wrap: bool) -> Option<usize> {
+        let n = items.len();
+        let on = |i: &usize| items[*i].1;
+        match (self, wrap) {
+            (RoveStep::First, _) => (0..n).find(on),
+            (RoveStep::Last, _) => (0..n).rev().find(on),
+            (RoveStep::Next, true) => (1..n).map(|d| (at + d) % n).find(on),
+            (RoveStep::Next, false) => (at + 1..n).find(on),
+            (RoveStep::Previous, true) => (1..n).map(|d| (at + n - d) % n).find(on),
+            (RoveStep::Previous, false) => (0..at).rev().find(on),
+        }
+    }
+}
+
 /// The tab stops of the scope `tag` in the previous frame, in call order, each id once.
+///
+/// `current` (the focus) is listed where its region is, also when that is no stop, so [`step`]
+/// continues from it. Focus can reach a child of a roving composite after the frame that
+/// registered `hits`, when another child is still the stop there: `roves` names the composite, and
+/// `current` stands in for all of it, so the composite stays one stop whichever side of `current`
+/// the old stop is on.
 pub(crate) fn tab_stops(
     hits: &[HitRecord],
     tag: u32,
     eligible: &dyn Fn(&HitRecord) -> bool,
+    current: Option<WidgetId>,
+    roves: &[Vec<WidgetId>],
 ) -> Vec<WidgetId> {
+    let group = current.and_then(|c| roves.iter().find(|g| g.contains(&c)));
     let mut stops: Vec<WidgetId> = Vec::new();
     for h in hits {
-        if h.tag == tag && h.sense.focusable && h.enabled && eligible(h) && !stops.contains(&h.id) {
+        let stop = if Some(h.id) == current {
+            h.enabled || h.sense.skip_tab
+        } else {
+            h.enabled && !h.sense.skip_tab && !group.is_some_and(|g| g.contains(&h.id))
+        };
+        if stop && h.tag == tag && h.sense.focusable && eligible(h) && !stops.contains(&h.id) {
             stops.push(h.id);
         }
     }
@@ -113,6 +183,68 @@ impl Ui<'_> {
     /// Focuses `id` at the next frame's begin, without the ring.
     pub fn request_focus(&mut self, id: WidgetId) {
         self.store.focus.pending = Some(id);
+        self.store.focus.pending_ring = false;
+    }
+
+    /// [`Self::request_focus`] of keyboard origin: the ring shows after it.
+    pub fn rove_focus(&mut self, id: WidgetId) {
+        self.store.focus.pending = Some(id);
+        self.store.focus.pending_ring = true;
+    }
+
+    /// The child of a roving composite that is its tab stop this frame, given its `(id, enabled)`
+    /// children in order: the focused enabled child, else `active` if enabled, else the first
+    /// enabled, else none. Register that child as a stop and the others with [`Sense::CLICK_ROVE`](
+    /// super::Sense::CLICK_ROVE).
+    pub fn rove_stop(&self, items: &[(WidgetId, bool)], active: Option<usize>) -> Option<usize> {
+        let focused = self.store.focus.focused;
+        items
+            .iter()
+            .position(|(id, enabled)| *enabled && Some(*id) == focused)
+            .or(active.filter(|a| items.get(*a).is_some_and(|c| c.1)))
+            .or_else(|| items.iter().position(|c| c.1))
+    }
+
+    /// Moves focus inside a roving composite: while a child is focused, takes the arrows of `axis`,
+    /// Home and End (not a Control, Alt or Command chord, which stays a shortcut), skips disabled
+    /// children, calls [`Self::rove_focus`] on the new child and returns its index. A key that
+    /// finds no move is still taken. Call it every frame: the Tab order reads the list it was
+    /// given.
+    pub fn rove_keys(
+        &mut self,
+        items: &[(WidgetId, bool)],
+        axis: RoveAxis,
+        wrap: bool,
+    ) -> Option<usize> {
+        self.store
+            .focus
+            .roves
+            .push(items.iter().map(|c| c.0).collect());
+        let focused = self.store.focus.focused?;
+        let from = items.iter().position(|c| c.0 == focused)?;
+        let mut at = from;
+        for (index, event) in self.focus_events(focused) {
+            let FocusEvent::Key {
+                key: Key::Named(key),
+                modifiers,
+                ..
+            } = event
+            else {
+                continue;
+            };
+            if modifiers.control || modifiers.alt || modifiers.logo {
+                continue;
+            }
+            if let Some(step) = RoveStep::of(key, axis) {
+                self.consume_focus_event(index);
+                at = step.target(items, at, wrap).unwrap_or(at);
+            }
+        }
+        if at == from {
+            return None;
+        }
+        self.rove_focus(items[at].0);
+        Some(at)
     }
 
     /// After a newly opened overlay's content: focus its `initial` stop if it registered one,
@@ -129,7 +261,8 @@ impl Ui<'_> {
         let meta = self.painter.hit_meta();
         let mut stops = Vec::new();
         for r in &self.registered {
-            if r.index >= first_hit && r.sense.focusable && r.enabled && meta[r.index].1 == tag {
+            let stop = r.sense.focusable && !r.sense.skip_tab && r.enabled;
+            if r.index >= first_hit && stop && meta[r.index].1 == tag {
                 stops.push(self.painter.hits[r.index].1);
             }
         }

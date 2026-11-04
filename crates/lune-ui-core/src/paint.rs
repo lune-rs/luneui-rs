@@ -535,7 +535,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         Rect::new(x, y, r.w * k, r.h * k)
     }
 
-    /// `r` with the transform stack applied and no clip.
+    /// `r` from drawing space to window space: the transform stack applied, no clip.
     pub fn transformed(&self, r: Rect) -> Rect {
         self.tr(r)
     }
@@ -805,6 +805,11 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
 
     pub fn measure(&mut self, spec: &Spec) -> (f32, f32) {
         self.text.measure(spec, self.s)
+    }
+
+    /// `spec` cut to `max_w` at this frame's scale: [`crate::text::elide`].
+    pub fn elide(&mut self, spec: &Spec, max_w: f32) -> Spec {
+        crate::text::elide(&mut *self.text, spec, self.s, max_w)
     }
 
     /// Where the caret sits at byte `offset` of `spec`'s joined text ([`TextSystem::caret`]).

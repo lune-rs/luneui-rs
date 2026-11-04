@@ -1,9 +1,13 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-04 (M5 merged to main at 1aeaf1b after six review rounds; paused by the user before M6)
+Last updated: 2026-11-04 (M6 in progress: step 1 of 14, focus and frame plumbing)
 
 ## Now
+
+M6 (widgets) in progress on `orch/toolkit-v1`: step 1 of 14 added roving focus (`Sense.skip_tab`, `Sense::CLICK_ROVE`,
+`RoveAxis`, `Ui::rove_stop`, `rove_keys`, `rove_focus`), `text::elide` and `Painter::elide`, and `Ui::snap_f32`. No widget uses
+them yet.
 
 M5 (foundations) is merged to main at 1aeaf1b, on top of M4 (interaction and motion, d9fe71f), M3 (catalogue specs) and M2
 (seams and crate split). M5 added layout helpers, the shortcut registry, the seven painter primitives and the `ImageStore` seam, the scroll
@@ -41,7 +45,7 @@ dependency). The gallery has a page registry (two legacy pages, 27 Ui pages), `-
 
 ## Next
 
-1. M6 per `docs/` roadmap (data.stat, kv-list and progress moved there by Q3).
+1. M6 step 2 onward (scaffolding, then the widgets; data.stat, kv-list and progress moved there by Q3).
 2. CI (fmt, clippy `-D warnings`, tests on macOS, Windows and Linux) now that there is code to run.
 3. An export script for Luneterm's vendored snapshot, before Luneterm M9. The migration
    map for M11 is "API changes since M1" in `docs/architecture.md`.

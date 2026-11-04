@@ -75,6 +75,7 @@ pub(super) const EDIT_SENSE: Sense = Sense {
     drag: true,
     focusable: true,
     scroll: false,
+    skip_tab: false,
 };
 
 /// What the app says about the field: an error flag (the form around it sets it).

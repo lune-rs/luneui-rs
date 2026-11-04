@@ -19,6 +19,8 @@ pub struct Sense {
     pub focusable: bool,
     /// Receives scroll gestures.
     pub scroll: bool,
+    /// With `focusable`: takes focus on a press and through accessibility but is no tab stop.
+    pub skip_tab: bool,
 }
 
 impl Sense {
@@ -29,6 +31,7 @@ impl Sense {
         drag: false,
         focusable: false,
         scroll: false,
+        skip_tab: false,
     };
     /// Hover and click, not a tab stop.
     pub const CLICK: Sense = Sense {
@@ -37,6 +40,7 @@ impl Sense {
         drag: false,
         focusable: false,
         scroll: false,
+        skip_tab: false,
     };
     /// Hover, click and focus: a button, a toggle.
     pub const CLICK_FOCUS: Sense = Sense {
@@ -45,6 +49,12 @@ impl Sense {
         drag: false,
         focusable: true,
         scroll: false,
+        skip_tab: false,
+    };
+    /// [`Self::CLICK_FOCUS`] with no tab stop: a composite's child that is not its stop this frame.
+    pub const CLICK_ROVE: Sense = Sense {
+        skip_tab: true,
+        ..Sense::CLICK_FOCUS
     };
     /// Hover, click and drag.
     pub const DRAG: Sense = Sense {
@@ -53,6 +63,7 @@ impl Sense {
         drag: true,
         focusable: false,
         scroll: false,
+        skip_tab: false,
     };
     /// Scroll only.
     pub const SCROLL: Sense = Sense {
@@ -61,6 +72,7 @@ impl Sense {
         drag: false,
         focusable: false,
         scroll: true,
+        skip_tab: false,
     };
 }
 
