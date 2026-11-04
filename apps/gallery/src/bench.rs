@@ -4,10 +4,14 @@
 //! warm-up of 3, `--runs` times; a line per scenario reports the median over runs of each field.
 //! Offscreen only: no window, no event loop, no screen capture.
 //!
-//! Scenarios: the 15 reference scenes (static), two text-fade probes (alpha moves every frame and
-//! every label carries the cycle number, so each fade frame shapes fresh text keys), a scaling and
-//! fading dialog over a blurred stripe page, and a self-test (a 4 ms busy-wait in the build phase) that checks the
-//! instrument. Simulated time advances 1/60 s per frame.
+//! Scenarios: one timeline per page, then the effects page's cost probes and a self-test.
+//! A legacy page cycles its static scenes (each held for `HOLD` frames). A Ui page replays, for
+//! each of its scenes, frame 0, the script and 60 Hz frames until the frame reports `Idle` (at most
+//! `SETTLE_MAX`), then its `bench` steps on a fresh state; the timeline restarts when it ends.
+//! The probes: two text-fade grids (alpha moves every frame and every label carries the cycle
+//! number, so each fade frame shapes fresh text keys), a scaling and fading dialog over a blurred
+//! stripe page, one static reference scene, and a self-test (a 4 ms busy-wait in the build phase)
+//! that checks the instrument. Probe time advances 1/60 s per frame.
 //!
 //! GPU time is the wait of `device.poll` after the draw's submit (submit to done): the frame
 //! renderer builds and submits its encoder internally, so encoder timestamps around the draw
@@ -17,16 +21,19 @@
 use std::process::ExitCode;
 use std::time::{Duration, Instant};
 
-use lune_ui::color::Rgba;
 use lune_ui::dump;
 use lune_ui::frame::FrameParams;
 use lune_ui::gpu::{self, Gpu};
-use lune_ui::lunegit_dark::{self, THEME};
-use lune_ui::paint::{LayerId, Painter, Rect, Xform};
-use lune_ui::text::{Spec, Style};
-use lune_ui::widgets::dialog::{DialogGlass, DialogHits, DialogSpec, dialog};
+use lune_ui::input::Repaint;
+use lune_ui::lunegit_dark::THEME;
+use lune_ui::motion::MotionTier;
+use lune_ui::paint::{Painter, Rect};
+use lune_ui::scene::Scene;
+use lune_ui::text::TextSystem;
 
-use crate::scenes::{BLUR_SATURATION, BLUR_SIGMA, Hit, P, SCENES, Scene};
+use crate::page::{Page, PageKind, PageState, Player, Step};
+use crate::pages::{PAGES, effects};
+use crate::scenes::{BLUR_SATURATION, BLUR_SIGMA, EFFECTS, LegacyScene, P, REFERENCE};
 use crate::{Renderer, offscreen_renderer};
 
 /// Frames drawn and not measured at the start of each run.
@@ -37,8 +44,10 @@ const BUDGET_P99_MS: f64 = 16.6;
 const BUDGET_MAX_MS: f64 = 33.0;
 /// The size the budget is judged at (1040 x 660 logical at 2x).
 const DEFAULT_SIZE: (u32, u32) = (2080, 1320);
-/// Probe ramp: 250 ms at 60 Hz.
-const RAMP_FRAMES: u64 = 15;
+/// Frames a legacy page holds each of its scenes.
+const HOLD: u64 = 8;
+/// Most 60 Hz frames a Ui scene's timeline runs while waiting for `Idle`.
+const SETTLE_MAX: u32 = 60;
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Options {
@@ -82,7 +91,10 @@ fn positive(s: &str) -> Result<usize, String> {
 
 #[derive(Clone, Copy)]
 enum Kind {
-    Scene(&'static Scene),
+    /// A page's timeline.
+    Page(&'static Page),
+    /// One static legacy scene (a reference for the instrument check).
+    Scene(&'static LegacyScene),
     LabelFade(usize),
     DialogBlur,
     SelftestSleep4,
@@ -102,13 +114,18 @@ fn scenarios(size: (u32, u32)) -> Vec<Scenario> {
         kind: Kind::SelftestSleep4,
         judged: false,
     }];
-    for scene in SCENES {
+    for page in PAGES {
         v.push(Scenario {
-            name: format!("scene:{}", scene.name()),
-            kind: Kind::Scene(scene),
+            name: format!("page:{}", page.id),
+            kind: Kind::Page(page),
             judged: at_default,
         });
     }
+    v.push(Scenario {
+        name: CONTROLS_PROBE.into(),
+        kind: Kind::Scene(scene_named("controls", 2)),
+        judged: false,
+    });
     v.push(Scenario {
         name: "probe:label-fade-64".into(),
         kind: Kind::LabelFade(64),
@@ -126,6 +143,9 @@ fn scenarios(size: (u32, u32)) -> Vec<Scenario> {
     });
     v
 }
+
+/// The static reference the label-fade probe must exceed (more shaping per frame).
+const CONTROLS_PROBE: &str = "probe:controls@2x";
 
 /// One measured frame, in milliseconds.
 #[derive(Clone, Copy, Default)]
@@ -215,118 +235,182 @@ fn ms(d: Duration) -> f64 {
 
 // ---- scenario drawing ----
 
-const FILL_TEXT: &str = "the quick brown fox jumps over the lazy dog ";
-
-/// Label `i` of a fade probe: 12 to 40 characters, starting with the cycle number so each cycle
-/// shapes text no earlier frame did.
-fn label_text(i: usize, cycle: u64) -> String {
-    let len = 12 + (i * 7) % 29;
-    let mut s = format!("{cycle}-{i} ");
-    s.extend(FILL_TEXT.chars().cycle().take(len));
-    s.truncate(len);
-    s
-}
-
-/// `n` base-size labels in a grid of 16 rows under an alpha-only transform that ramps 0 to 1.
-fn label_fade(p: &mut P<'_>, n: usize, frame: u64) {
-    let (phase, cycle) = (
-        (frame % RAMP_FRAMES) as f32 / RAMP_FRAMES as f32,
-        frame / RAMP_FRAMES,
-    );
-    p.on(LayerId::Base);
-    let win = p.window;
-    p.fill(win, 0.0, [0x1F, 0x1F, 0x1F, 0xFF]);
-    p.set_xform(Some(Xform {
-        origin: (0.0, 0.0),
-        scale: 1.0,
-        dy: 0.0,
-        alpha: phase,
-    }));
-    let rows = 16;
-    let cols = n / rows;
-    let (cw, ch) = (win.w / cols as f32, win.h / rows as f32);
-    for i in 0..n {
-        let spec = Spec::plain(
-            label_text(i, cycle),
-            Style::ui(THEME.font_base, THEME.fg_primary),
-        );
-        p.text(
-            &spec,
-            (i % cols) as f32 * cw + 8.0,
-            (i / cols) as f32 * ch + 8.0,
-        );
-    }
-    p.set_xform(None);
-}
-
-/// The stripes of `blur_contrast_scene` on Base, a window-sized backdrop request, and a dialog
-/// scaling 0.96 to 1 and fading 0 to 1 about the window centre (the card's centre) over 250 ms,
-/// quad-out, repeating.
-fn dialog_blur(p: &mut P<'_>, frame: u64) {
-    p.on(LayerId::Base);
-    let win = p.window;
-    let stripes = (win.w / 16.0).ceil() as usize;
-    for i in 0..stripes {
-        let c: Rgba = if i % 2 == 0 {
-            [0, 0, 0, 255]
-        } else {
-            [255, 255, 255, 255]
-        };
-        p.fill(Rect::new(i as f32 * 16.0, 0.0, 16.0, win.h), 0.0, c);
-    }
-    p.on(LayerId::Popup);
-    p.backdrop(win, 0.0);
-    let phase = (frame % RAMP_FRAMES) as f32 / RAMP_FRAMES as f32;
-    let e = 1.0 - (1.0 - phase) * (1.0 - phase);
-    p.set_xform(Some(Xform {
-        origin: (win.w / 2.0, win.h / 2.0),
-        scale: 0.96 + 0.04 * e,
-        dy: 0.0,
-        alpha: e,
-    }));
-    let spec = DialogSpec {
-        title: "Discard changes",
-        message: "The document has unsaved changes. Closing it will discard them.",
-        extra_h: 0.0,
-        confirm: "Discard",
-        cancel: Some("Cancel"),
-    };
-    let glass = DialogGlass {
-        panel: lunegit_dark::PANEL.premultiplied(),
-        fill: lunegit_dark::WINDOW.premultiplied(),
-        noise: true,
-    };
-    let hits = DialogHits {
-        block: Hit::Block,
-        confirm: Hit::Confirm,
-        cancel: Hit::Cancel,
-    };
-    dialog(p, &spec, &glass, &hits, |_, _, _, _| {});
-    p.set_xform(None);
-}
-
-fn scene_named(id: &str, scale: u32) -> &'static Scene {
-    SCENES
+fn scene_named(id: &str, scale: u32) -> &'static LegacyScene {
+    REFERENCE
         .iter()
+        .chain(EFFECTS)
         .find(|s| s.id == id && s.scale == scale)
         .expect("reference scene present")
 }
 
-/// Paints frame number `frame` of `kind`.
-fn build(kind: Kind, p: &mut P<'_>, frame: u64) {
-    match kind {
-        Kind::Scene(scene) => (scene.draw)(p, scene.time),
-        Kind::LabelFade(n) => label_fade(p, n, frame),
-        Kind::DialogBlur => dialog_blur(p, frame),
+/// One scripted run of a Ui page: a scene's script, or the page's bench steps.
+struct Seg {
+    page: &'static str,
+    state: fn() -> Box<dyn PageState>,
+    scale: u32,
+    tier: MotionTier,
+    steps: &'static [Step],
+}
+
+/// A Ui page's frames in order: each segment's frame 0, its steps, then 60 Hz frames until
+/// `Idle`.
+struct Timeline {
+    segs: Vec<Seg>,
+    at: usize,
+    run: Option<Run>,
+    size: (u32, u32),
+}
+
+struct Run {
+    player: Player,
+    /// Frame 0 has run.
+    started: bool,
+    steps: &'static [Step],
+    next: usize,
+    /// Time of the last frame, ms.
+    ms: u32,
+    /// Settle frames run so far; `None` while the script still runs.
+    settle: Option<u32>,
+}
+
+impl Timeline {
+    fn new(page: &'static Page, size: (u32, u32)) -> Self {
+        let PageKind::Ui(ui) = page.kind else {
+            unreachable!("only Ui pages have timelines")
+        };
+        let mut segs: Vec<Seg> = ui
+            .scenes
+            .iter()
+            .map(|s| Seg {
+                page: page.id,
+                state: s.state,
+                scale: s.scale,
+                tier: s.tier,
+                steps: s.script,
+            })
+            .collect();
+        if !ui.bench.is_empty() || segs.is_empty() {
+            segs.push(Seg {
+                page: page.id,
+                state: ui.state,
+                scale: 2,
+                tier: MotionTier::Full,
+                steps: ui.bench,
+            });
+        }
+        Timeline {
+            segs,
+            at: 0,
+            run: None,
+            size,
+        }
+    }
+
+    /// The next frame's display list and its scale.
+    fn frame(&mut self, text: &mut dyn TextSystem) -> Result<(Scene, f32), String> {
+        let seg = &self.segs[self.at];
+        let scale = seg.scale as f32;
+        let run = self.run.get_or_insert_with(|| {
+            let logical = (self.size.0 as f32 / scale, self.size.1 as f32 / scale);
+            Run {
+                player: Player::new(seg.page, (seg.state)(), logical, scale, seg.tier),
+                started: false,
+                steps: seg.steps,
+                next: 0,
+                ms: 0,
+                settle: None,
+            }
+        });
+        let (scene, out) = if !run.started {
+            run.started = true;
+            run.player.frame(text, 0, &[])?
+        } else if run.settle.is_none()
+            && let Some(step) = run.steps.get(run.next)
+        {
+            run.next += 1;
+            run.ms = step.at_ms;
+            run.player.frame(text, step.at_ms, step.events)?
+        } else {
+            let k = run.settle.unwrap_or(0) + 1;
+            run.settle = Some(k);
+            run.ms += 1000 / 60;
+            run.player.frame(text, run.ms, &[])?
+        };
+        if run
+            .settle
+            .is_some_and(|k| out.repaint == Repaint::Idle || k >= SETTLE_MAX)
+        {
+            self.run = None;
+            self.at = (self.at + 1) % self.segs.len();
+        }
+        Ok((scene, scale))
+    }
+}
+/// What `frame` draws: a probe, a page's static scenes, or a Ui page's timeline.
+struct Driver {
+    kind: Kind,
+    timeline: Option<Timeline>,
+}
+
+impl Driver {
+    fn new(kind: Kind, size: (u32, u32)) -> Self {
+        let timeline = match kind {
+            Kind::Page(page) if matches!(page.kind, PageKind::Ui(_)) => {
+                Some(Timeline::new(page, size))
+            }
+            _ => None,
+        };
+        Driver { kind, timeline }
+    }
+}
+
+/// Paints one legacy `scene` at its own scale over `size` physical pixels.
+fn paint_legacy(text: &mut dyn TextSystem, scene: &LegacyScene, size: (u32, u32)) -> (Scene, f32) {
+    let s = scene.scale as f32;
+    (scene.paint(text, s, size), s)
+}
+
+/// Paints `draw` at scale 2 with no hover.
+fn paint_probe(
+    text: &mut dyn TextSystem,
+    size: (u32, u32),
+    draw: impl FnOnce(&mut P<'_>),
+) -> (Scene, f32) {
+    let win = Rect::new(0.0, 0.0, size.0 as f32 / 2.0, size.1 as f32 / 2.0);
+    let mut p = Painter::new(2.0, win, text, None, THEME);
+    draw(&mut p);
+    (p.scene, 2.0)
+}
+
+/// Builds frame number `n` of the driver's scenario: its display list and scale.
+fn build(
+    d: &mut Driver,
+    text: &mut dyn TextSystem,
+    n: u64,
+    size: (u32, u32),
+) -> Result<(Scene, f32), String> {
+    match d.kind {
+        Kind::Page(page) => match (&mut d.timeline, page.kind) {
+            (Some(t), _) => t.frame(text),
+            (None, PageKind::Legacy(scenes)) => {
+                let scene = &scenes[(n / HOLD) as usize % scenes.len()];
+                Ok(paint_legacy(text, scene, size))
+            }
+            (None, PageKind::Ui(_)) => Err("a Ui page without a timeline".into()),
+        },
+        Kind::Scene(scene) => Ok(paint_legacy(text, scene, size)),
+        Kind::LabelFade(count) => Ok(paint_probe(text, size, |p| {
+            effects::label_fade(p, count, n);
+        })),
+        Kind::DialogBlur => Ok(paint_probe(text, size, |p| effects::dialog_blur(p, n))),
         Kind::SelftestSleep4 => {
-            let scene = scene_named("acrylic", 2);
             // A busy-wait of 4 ms, not `thread::sleep`: macOS sleeps 4 ms for about 6.0 ms here
             // (checked with Python's `perf_counter`), so a sleep is not a known answer.
             let start = Instant::now();
             while start.elapsed() < Duration::from_millis(4) {
                 std::hint::spin_loop();
             }
-            (scene.draw)(p, scene.time);
+            Ok(paint_legacy(text, scene_named("acrylic", 2), size))
         }
     }
 }
@@ -334,20 +418,13 @@ fn build(kind: Kind, p: &mut P<'_>, frame: u64) {
 /// One timed frame.
 fn frame(
     r: &mut Renderer,
-    kind: Kind,
+    d: &mut Driver,
     n: u64,
     target: &wgpu::TextureView,
     size: (u32, u32),
 ) -> Result<Sample, String> {
-    let (s, hover) = match kind {
-        Kind::Scene(scene) => (scene.scale as f32, scene.hover),
-        _ => (2.0, None),
-    };
-    let win = Rect::new(0.0, 0.0, size.0 as f32 / s, size.1 as f32 / s);
     let t0 = Instant::now();
-    let mut p = Painter::new(s, win, &mut r.text, hover, THEME);
-    build(kind, &mut p, n);
-    let Painter { scene, .. } = p;
+    let (scene, s) = build(d, &mut r.text, n, size)?;
     let t1 = Instant::now();
     let params = FrameParams {
         size,
@@ -390,13 +467,14 @@ fn measure(r: &mut Renderer, sc: &Scenario, o: &Options) -> Result<Outcome, Stri
     let mut worst: f64 = 0.0;
     let mut cpu: Vec<f64> = Vec::new();
     for _ in 0..o.runs {
+        let mut driver = Driver::new(sc.kind, o.size);
         for _ in 0..WARMUP {
-            frame(r, sc.kind, n, &view, o.size)?;
+            frame(r, &mut driver, n, &view, o.size)?;
             n += 1;
         }
         let mut samples = Vec::with_capacity(o.frames);
         for _ in 0..o.frames {
-            samples.push(frame(r, sc.kind, n, &view, o.size)?);
+            samples.push(frame(r, &mut driver, n, &view, o.size)?);
             n += 1;
         }
         let st = stats(&samples);
@@ -475,7 +553,7 @@ fn run_inner(o: &Options) -> Result<u8, String> {
             sc.name, o.frames, m.p50, m.p95, m.p99, m.max, m.cpu_p99, m.gpu_p99, out.worst, verdict
         );
         match sc.name.as_str() {
-            "scene:controls@2x" => controls_p50 = Some(m.p50),
+            CONTROLS_PROBE => controls_p50 = Some(m.p50),
             "probe:label-fade-64" => label_p50 = Some(m.p50),
             _ => {}
         }
@@ -485,7 +563,7 @@ fn run_inner(o: &Options) -> Result<u8, String> {
         && l <= c
     {
         return Err(format!(
-            "instrument check failed: label-fade-64 p50 {l:.2} ms is not above controls@2x p50 {c:.2} ms"
+            "instrument check failed: label-fade-64 p50 {l:.2} ms is not above {CONTROLS_PROBE} p50 {c:.2} ms"
         ));
     }
     Ok(u8::from(over > 0))

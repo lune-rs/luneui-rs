@@ -247,3 +247,30 @@ fn every_cursor_icon_maps_to_the_same_named_winit_icon() {
         assert_eq!(cursor_icon(core), winit, "{core:?}");
     }
 }
+
+#[test]
+fn control_flow_maps_each_repaint_without_reading_the_clock() {
+    use lune_ui_core::input::Repaint;
+    use lune_ui_winit::input::control_flow;
+    use winit::event_loop::ControlFlow;
+
+    // The origin is a test-owned instant; the function only adds to it.
+    let origin = std::time::Instant::now();
+    assert_eq!(
+        control_flow(Repaint::Idle, origin),
+        (ControlFlow::Wait, false)
+    );
+    assert_eq!(
+        control_flow(Repaint::Now, origin),
+        (ControlFlow::Wait, true)
+    );
+    let at = Duration::from_millis(250);
+    assert_eq!(
+        control_flow(Repaint::At(at), origin),
+        (ControlFlow::WaitUntil(origin + at), false)
+    );
+    assert_eq!(
+        control_flow(Repaint::At(Duration::ZERO), origin),
+        (ControlFlow::WaitUntil(origin), false)
+    );
+}

@@ -1,16 +1,17 @@
 //! The input seam on winit: [`Translator`] turns `WindowEvent`s into [`RawInput`], and
 //! [`OutputState`] applies a [`FrameOutput`] to the window. One of each per window.
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use winit::dpi::{LogicalPosition, LogicalSize, PhysicalSize};
 use winit::event::{ElementState, Ime, MouseButton, MouseScrollDelta, WindowEvent};
+use winit::event_loop::ControlFlow;
 use winit::keyboard::{Key as WKey, ModifiersState, NamedKey as WNamed};
 use winit::window::{CursorIcon as WCursor, Window};
 
 use lune_ui_core::input::{
     CursorIcon, Event, FrameOutput, ImeEvent, Key, Modifiers, NamedKey, PointerButton, RawInput,
-    ScrollDelta, WindowCommand, printable,
+    Repaint, ScrollDelta, WindowCommand, printable,
 };
 use lune_ui_core::paint::Rect;
 
@@ -273,6 +274,17 @@ pub fn cursor_icon(icon: CursorIcon) -> WCursor {
         // `CursorIcon` is `#[non_exhaustive]`: an icon added in core shows the default cursor
         // until this adapter maps it.
         _ => WCursor::Default,
+    }
+}
+
+/// The event loop's control flow for a frame's [`Repaint`], and whether to request a redraw now:
+/// `Idle` waits for input, `Now` waits and asks for a redraw, `At(t)` waits until `origin + t`,
+/// where `origin` is the instant the app's time `0` was taken. Reads no clock.
+pub fn control_flow(repaint: Repaint, origin: Instant) -> (ControlFlow, bool) {
+    match repaint {
+        Repaint::Idle => (ControlFlow::Wait, false),
+        Repaint::Now => (ControlFlow::Wait, true),
+        Repaint::At(t) => (ControlFlow::WaitUntil(origin + t), false),
     }
 }
 

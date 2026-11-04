@@ -1,0 +1,67 @@
+//! The page registry. Legacy pages first (they keep the Painter API and the pixel gate's 15
+//! scenes), then the Ui pages in the order they are built. Adding a page is its own file plus one
+//! line in [`PAGES`].
+
+use lune_ui::lunegit_dark::THEME;
+use lune_ui::paint::Rect;
+use lune_ui::text::{Spec, Style};
+use lune_ui::ui::Ui;
+
+use crate::page::{Page, PageState};
+use crate::scenes::background;
+
+mod a11y;
+mod button;
+mod checkbox;
+mod combo;
+mod dialog;
+mod dropdown;
+pub(crate) mod effects;
+mod focus;
+mod label;
+mod locale;
+mod menu;
+mod motion;
+pub(crate) mod reference;
+mod stepper;
+mod text_field;
+mod toggle;
+mod ui;
+
+/// Every page, in listing and window order.
+pub(crate) static PAGES: &[&Page] = &[
+    &reference::PAGE,
+    &effects::PAGE,
+    &button::PAGE,
+    &toggle::PAGE,
+    &checkbox::PAGE,
+    &label::PAGE,
+    &stepper::PAGE,
+    &combo::PAGE,
+    &text_field::PAGE,
+    &dialog::PAGE,
+    &dropdown::PAGE,
+    &menu::PAGE,
+    &motion::PAGE,
+    &ui::PAGE,
+    &focus::PAGE,
+    &a11y::PAGE,
+    &locale::PAGE,
+];
+
+/// The window background of a Ui page (glass, focused) and its card. Returns the card.
+pub(crate) fn card(ui: &mut Ui<'_>, title: &str) -> Rect {
+    background(ui.painter(), true, true, title)
+}
+
+/// A page that is not built yet: its card and a heading.
+#[derive(Debug)]
+pub(crate) struct Stub(pub(crate) &'static str);
+
+impl PageState for Stub {
+    fn draw(&mut self, ui: &mut Ui<'_>) {
+        let card = card(ui, self.0);
+        let spec = Spec::plain(self.0, Style::ui(THEME.font_m, THEME.fg_secondary).medium());
+        ui.painter().text(&spec, card.x + 24.0, card.y + 24.0);
+    }
+}

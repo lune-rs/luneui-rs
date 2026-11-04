@@ -1,7 +1,7 @@
-//! The reference scenes: a fixed table of id, scale, frame time and hover, each with a draw
-//! function over the gallery's own hit type. Dump mode renders every row to
-//! `<id>@<scale>x.png`; window mode shows one row at a time. Nothing here reads the clock: the
-//! time of a scene is its table value.
+//! The legacy scenes: fixed tables of id, scale, frame time and hover, each with a draw function
+//! over the gallery's own hit type (the Painter API, D1). The `reference` and `effects` pages hold
+//! them. Dump mode renders every row to `<id>@<scale>x.png`; window mode shows one row at a time.
+//! Nothing here reads the clock: the time of a scene is its table value.
 
 use lune_ui::chrome;
 use lune_ui::chrome::TabSpan;
@@ -9,7 +9,8 @@ use lune_ui::color::{Rgba, over, premul};
 use lune_ui::icon;
 use lune_ui::lunegit_dark::{self, THEME};
 use lune_ui::paint::{LayerId, Painter, Rect, StrokeStyle};
-use lune_ui::text::{Spec, Style};
+use lune_ui::scene::Scene;
+use lune_ui::text::{Spec, Style, TextSystem};
 use lune_ui::widgets::dialog::{DialogGlass, DialogHits, DialogSpec, dialog};
 use lune_ui::widgets::dropdown::dropdown;
 use lune_ui::widgets::menu::{MENU_IN, MenuEntry, menu, menu_open_anim};
@@ -55,9 +56,9 @@ pub(crate) enum Hit {
 
 pub(crate) type P<'a> = Painter<'a, Hit>;
 
-/// One reference scene.
+/// One legacy scene.
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct Scene {
+pub(crate) struct LegacyScene {
     pub(crate) id: &'static str,
     /// Device pixels per logical pixel in dump mode (1 or 2).
     pub(crate) scale: u32,
@@ -67,116 +68,129 @@ pub(crate) struct Scene {
     pub(crate) draw: fn(&mut P<'_>, f32),
 }
 
-impl Scene {
+impl LegacyScene {
     /// `<id>@<scale>x`, the listing name.
     pub(crate) fn name(&self) -> String {
         format!("{}@{}x", self.id, self.scale)
+    }
+
+    /// Paints the scene at device scale `s` into a window of `size` physical pixels.
+    pub(crate) fn paint(&self, text: &mut dyn TextSystem, s: f32, size: (u32, u32)) -> Scene {
+        let win = Rect::new(0.0, 0.0, size.0 as f32 / s, size.1 as f32 / s);
+        let mut p = Painter::new(s, win, text, self.hover, THEME);
+        (self.draw)(&mut p, self.time);
+        p.scene
     }
 }
 
 /// Time at which every animation is settled.
 const SETTLED: f32 = 10.0;
 
-pub(crate) const SCENES: &[Scene] = &[
-    Scene {
+/// The `reference` page: widgets, menus, dropdowns and dialogs.
+pub(crate) const REFERENCE: &[LegacyScene] = &[
+    LegacyScene {
         id: "controls",
         scale: 2,
         time: SETTLED,
         hover: Some(Hit::Secondary),
         draw: controls_scene,
     },
-    Scene {
+    LegacyScene {
         id: "controls",
         scale: 1,
         time: SETTLED,
         hover: Some(Hit::Secondary),
         draw: controls_scene,
     },
-    Scene {
+    LegacyScene {
         id: "menu",
         scale: 2,
         time: SETTLED,
         hover: Some(Hit::MenuItem(1)),
         draw: menu_scene,
     },
-    Scene {
+    LegacyScene {
         id: "menu-opening",
         scale: 2,
         time: 0.09,
         hover: None,
         draw: menu_scene,
     },
-    Scene {
-        id: "custom-draw",
-        scale: 2,
-        time: SETTLED,
-        hover: None,
-        draw: custom_draw_scene,
-    },
-    Scene {
+    LegacyScene {
         id: "dropdown",
         scale: 2,
         time: SETTLED,
         hover: None,
         draw: dropdown_scene,
     },
-    Scene {
+    LegacyScene {
         id: "dropdown-flipped",
         scale: 2,
         time: SETTLED,
         hover: None,
         draw: dropdown_flipped_scene,
     },
-    Scene {
+    LegacyScene {
         id: "dialog-confirm",
         scale: 2,
         time: SETTLED,
         hover: None,
         draw: dialog_confirm_scene,
     },
-    Scene {
+    LegacyScene {
         id: "dialog-message",
         scale: 2,
         time: SETTLED,
         hover: None,
         draw: dialog_message_scene,
     },
-    Scene {
+    LegacyScene {
         id: "dialog-body",
         scale: 2,
         time: SETTLED,
         hover: None,
         draw: dialog_body_scene,
     },
-    Scene {
+];
+
+/// The `effects` page: glass, blur, chrome, acrylic and the custom-draw hook.
+pub(crate) const EFFECTS: &[LegacyScene] = &[
+    LegacyScene {
+        id: "custom-draw",
+        scale: 2,
+        time: SETTLED,
+        hover: None,
+        draw: custom_draw_scene,
+    },
+    LegacyScene {
         id: "glass-off",
         scale: 2,
         time: SETTLED,
         hover: Some(Hit::Secondary),
         draw: glass_off_scene,
     },
-    Scene {
+    LegacyScene {
         id: "unfocused",
         scale: 2,
         time: SETTLED,
         hover: Some(Hit::Secondary),
         draw: unfocused_scene,
     },
-    Scene {
+    LegacyScene {
         id: "blur-contrast",
         scale: 2,
         time: SETTLED,
         hover: None,
         draw: blur_contrast_scene,
     },
-    Scene {
+    LegacyScene {
         id: "chrome",
         scale: 2,
         time: SETTLED,
         hover: Some(Hit::Caption(2)),
         draw: chrome_scene,
     },
-    Scene {
+    LegacyScene {
         id: "acrylic",
         scale: 2,
         time: SETTLED,
@@ -190,7 +204,12 @@ pub(crate) const SCENES: &[Scene] = &[
 /// The window background: a panel layer over the whole window and the card on top (each
 /// replaces what is below). `glass` off puts the layers over an opaque base; unfocused swaps
 /// them for the solid inactive fill. Returns the card.
-pub(crate) fn background(p: &mut P<'_>, glass: bool, focused: bool, title: &str) -> Rect {
+pub(crate) fn background<H: Copy + PartialEq>(
+    p: &mut Painter<'_, H>,
+    glass: bool,
+    focused: bool,
+    title: &str,
+) -> Rect {
     p.on(LayerId::Base);
     let win = p.window;
     let card = Rect::new(
