@@ -19,7 +19,7 @@ summary: Master list row: name, value and sub-line with a badge in the head; res
 
 ## Existing code
 
-Lunegit side-panel list styles: `src/Lunegit.Desktop/App.axaml:352-365,687-698`. `src/Lunegit.Desktop/ViewModels/SidePanelRow.cs` is named in the survey and was not read. Luneterm has no list-row widget.
+`crates/lune-ui-core/src/widgets/list_row.rs` (M6): `ListRow`, `Ui::list_row`, `paint`, `height`, `SIDE_PANEL_PADDING`, `MASTER_PADDING`. Gallery page `apps/gallery/src/pages/list_row.rs`; tests `crates/lune-ui-core/tests/widget_list_row.rs`. Lunegit side-panel list styles (design source): `src/Lunegit.Desktop/App.axaml:352-365,687-698`. `src/Lunegit.Desktop/ViewModels/SidePanelRow.cs` is named in the survey and was not read. Luneterm has no list-row widget.
 
 ## Spec
 
@@ -33,6 +33,7 @@ Conflicts: (1) Padding: Lunegit's side-panel item pads 8 horizontal and 6 vertic
 - Row radius 6 [L src/Lunegit.Desktop/App.axaml:209], rows 2 apart and gap 4 [W docs/ui/components.md:478].
 - Padding 8 horizontal, 6 vertical in the side panel [L src/Lunegit.Desktop/App.axaml:360].
 - Name 13/20 Medium [W docs/ui/components.md:478]; Medium weight as the gallery draws it [R apps/gallery/src/scenes.rs:328].
+- Layout (the sources give no line plan): a head line of the optional dot, the name (elided) and the badge at the right; a value line (mono 13, `fg_secondary`) with the meta at its right; a sub-line (mono 11, tertiary); 4 px between lines. The padding is the pair (horizontal, vertical): `SIDE_PANEL_PADDING` (8, 6), `MASTER_PADDING` (12, 6), inside the list's 4 px by 1 px highlight inset. `height(row, padding)` is the slot height for `Heights::Fixed`.
 - Value RznMono 13; sub-line RznMono 11/16 tertiary; meta 11/16 tertiary [W docs/ui/components.md:478].
 - Badge in the head: `widget.badge`; a lead dot: `widget.status-dot` [W docs/ui/components.md:483].
 
@@ -74,7 +75,7 @@ Never animated: the rows of a virtualized list on scroll [L .claude/docs/animati
 
 ### Accessibility
 
-- Role `list-item` inside a `list`; name = the name; value = the value text; states selected, focusable, focused, disabled; actions `default` selects and `scroll-into-view` [infra.accessibility], [W docs/ui/components.md:479].
+- Role `list-item` inside a `list`, made by the virtual list (which owns selected, focused, disabled and the actions `default`, `focus`, `scroll-into-view`, `show-menu`); the row adds a `static-text` child valued by the name and, with a value, one named by the name and valued by the value text, which is how the list names its row [infra.accessibility], [W docs/ui/components.md:479].
 
 ### Strings
 
@@ -85,7 +86,7 @@ None: names, values and meta are app data.
 - `list-row-badge-states`: rest, hover, selected, selected + hover, focus-visible, disabled; settled.
 - `list-row-badge-hover-mid`: rest → hover, t = 60 ms (half of `instant`).
 - `list-row-badge-select-mid`: unselected → selected, t = 90 ms (half of `fast`).
-- `list-row-badge-focus-mid`: focus-visible on, t = 90 ms (half of `fast`).
+- `list-row-badge-focus-mid`: focus-visible on, t = 90 ms (half of `fast`). The virtual list draws its ring at full opacity at once, so the frame at 90 ms is settled.
 
 ### Painter primitives
 
@@ -106,7 +107,7 @@ None: names, values and meta are app data.
 
 ## Open questions
 
-- `conflict-padding`: the 12 px horizontal padding (Wane master list) against Lunegit's 8 px side-panel padding. Lunegit wins for the side panel; M6 decides whether the master list uses 12.
+- None. `conflict-padding` is answered by [D127]: the side panel pads 8 (Lunegit wins, `SIDE_PANEL_PADDING`); a master list outside it pads 12 (`MASTER_PADDING`), a named constant the app picks.
 
 ## Notes for the planner
 
