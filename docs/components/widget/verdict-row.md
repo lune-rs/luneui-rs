@@ -19,7 +19,7 @@ summary: Verdict row: mark OK, WARN or NO in its tone, then name and text; three
 
 ## Existing code
 
-None in luneui-rs or Luneterm's `lune-ui` [W docs/ui/components.md:524]. Wane is the only source for this entry.
+`crates/lune-ui-core/src/widgets/verdict_row.rs` (M6): `Verdict`, `Ui::verdict_row`. Gallery page `apps/gallery/src/pages/verdict_row.rs`; tests `crates/lune-ui-core/tests/widget_verdict_row.rs`. Wane is the only source for this entry.
 
 ## Spec
 
@@ -65,7 +65,7 @@ n/a — static [W docs/ui/components.md:521].
 
 ### Strings
 
-None: the mark words OK, WARN and NO are fixed mock words; no Lunegit `en.json` line was read for them.
+The mark words are the toolkit strings `luneui.verdict-row.ok` (OK), `luneui.verdict-row.warn` (WARN) and `luneui.verdict-row.no` (NO), read through `ui.tr` so an app's table can translate them [D129]. The name and the text are app data.
 
 ### Gallery scenes
 
@@ -89,7 +89,7 @@ None: the mark words OK, WARN and NO are fixed mock words; no Lunegit `en.json` 
 
 ## Open questions
 
-- None.
+- None. (The mark words' source, once unsettled, is answered by [D129]: toolkit strings.)
 
 ## Notes for the planner
 
