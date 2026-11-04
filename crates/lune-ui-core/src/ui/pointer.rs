@@ -4,7 +4,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::Duration;
 
-use crate::input::{PointerButton, ScrollDelta};
+use crate::input::{Modifiers, PointerButton, ScrollDelta};
 use crate::motion::Time;
 use crate::paint::Rect;
 
@@ -47,6 +47,14 @@ fn senses_drag(hits: &[HitRecord], id: WidgetId) -> bool {
     hits.iter().any(|h| h.id == id && h.sense.drag && h.enabled)
 }
 
+/// A primary press a region captured this frame.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct PressInfo {
+    pub(crate) pos: (f32, f32),
+    pub(crate) count: u8,
+    pub(crate) modifiers: Modifiers,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct Press {
     /// The captured id; `None` when the press landed on nothing that captures.
@@ -64,6 +72,8 @@ pub(crate) struct PointerState {
     /// The id a secondary press landed on, until its release.
     secondary: Option<Option<WidgetId>>,
     last_click: Option<(WidgetId, Time)>,
+    /// The id, time and count of the last captured primary press, for `press_count`.
+    last_press: Option<(WidgetId, Time, u8)>,
 }
 
 /// One frame's pointer reading.
@@ -77,6 +87,7 @@ pub(crate) struct PointerFrame {
     pub(crate) secondary_clicked: BTreeSet<WidgetId>,
     pub(crate) drag_started: BTreeSet<WidgetId>,
     pub(crate) drag_stopped: BTreeSet<WidgetId>,
+    pub(crate) press_started: BTreeMap<WidgetId, PressInfo>,
     pub(crate) drag_delta: BTreeMap<WidgetId, (f32, f32)>,
     pub(crate) scroll_lines: BTreeMap<WidgetId, (f32, f32)>,
     pub(crate) scroll_pixels: BTreeMap<WidgetId, (f32, f32)>,
@@ -134,6 +145,11 @@ impl PointerState {
         p.last = pos;
     }
 
+    /// The pointer's last known position; `None` outside the window.
+    pub(crate) fn pos(&self) -> Option<(f32, f32)> {
+        self.pos
+    }
+
     /// The pointer left the window.
     pub(crate) fn left(&mut self) {
         self.pos = None;
@@ -150,6 +166,7 @@ impl PointerState {
         pos: (f32, f32),
         button: PointerButton,
         pressed: bool,
+        modifiers: Modifiers,
         cx: &Ctx<'_>,
         out: &mut PointerFrame,
     ) -> Option<WidgetId> {
@@ -164,6 +181,28 @@ impl PointerState {
                     last: pos,
                     dragging: false,
                 });
+                self.last_press = match id {
+                    Some(id) => {
+                        let count = match self.last_press {
+                            Some((last, t0, n))
+                                if last == id && cx.time.saturating_sub(t0) < DOUBLE_CLICK =>
+                            {
+                                n % 3 + 1
+                            }
+                            _ => 1,
+                        };
+                        out.press_started.insert(
+                            id,
+                            PressInfo {
+                                pos,
+                                count,
+                                modifiers,
+                            },
+                        );
+                        Some((id, cx.time, count))
+                    }
+                    None => None,
+                };
                 return id;
             }
             (PointerButton::Primary, false) => {

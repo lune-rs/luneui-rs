@@ -10,7 +10,9 @@
 //! caller lends, so dump, bench and the self-check tests all drive it the same way.
 
 use lune_ui::access::{AccessAction, Action};
-use lune_ui::input::{FrameOutput, Key, Modifiers, NamedKey, PointerButton, Repaint};
+use lune_ui::input::{
+    FrameOutput, ImeEvent, Key, Keymap, Modifiers, NamedKey, PointerButton, Repaint,
+};
 use lune_ui::lunegit_dark::THEME;
 use lune_ui::motion::MotionTier;
 use lune_ui::scene::Scene;
@@ -117,6 +119,24 @@ pub(crate) enum Ev {
     WindowFocus(bool),
     /// An accessibility action on the widget at the path.
     Access(&'static [&'static str], Action),
+    /// A scroll gesture at the pointer; `precise` is a touchpad (pixels), else wheel lines.
+    Scroll {
+        x: f32,
+        y: f32,
+        precise: bool,
+    },
+    /// Types the text one key at a time.
+    Type(&'static str),
+    /// A character key with the modifiers held for it only (text attached, as a platform does).
+    KeyChar(&'static str, Modifiers),
+    /// A named key with the modifiers held for it only.
+    KeyMod(NamedKey, Modifiers),
+    /// Sets the modifiers held from now on.
+    Mods(Modifiers),
+    ImePreedit(&'static str, Option<(usize, usize)>),
+    ImeCommit(&'static str),
+    /// The clipboard's answer to a read.
+    ClipboardText(&'static str),
 }
 
 /// The id of the widget at `path` under page `page`.
@@ -134,6 +154,8 @@ pub(crate) struct Player {
     strings: StringTable,
     tier: MotionTier,
     theme: Theme,
+    /// The modifiers `Ev::Mods` holds.
+    held: Modifiers,
 }
 
 impl std::fmt::Debug for Player {
@@ -165,6 +187,7 @@ impl Player {
             strings,
             tier,
             theme: THEME,
+            held: Modifiers::default(),
         }
     }
 
@@ -232,6 +255,52 @@ impl Player {
                     value: None,
                 });
             }
+            Ev::Scroll { x, y, precise } => {
+                if *precise {
+                    self.input.scroll_pixels(*x, *y);
+                } else {
+                    self.input.scroll_lines(*x, *y);
+                }
+            }
+            Ev::Type(text) => {
+                for c in text.chars() {
+                    let s = c.to_string();
+                    let key = if c == ' ' {
+                        Key::Named(NamedKey::Space)
+                    } else {
+                        Key::Character(s.clone())
+                    };
+                    self.input.key_down(key, Some(&s));
+                }
+            }
+            Ev::KeyChar(s, mods) => {
+                self.input
+                    .set_modifiers(*mods)
+                    .key_down(Key::Character((*s).to_owned()), Some(s))
+                    .set_modifiers(self.held);
+            }
+            Ev::KeyMod(k, mods) => {
+                self.input
+                    .set_modifiers(*mods)
+                    .key_down(Key::Named(*k), None)
+                    .set_modifiers(self.held);
+            }
+            Ev::Mods(mods) => {
+                self.held = *mods;
+                self.input.set_modifiers(*mods);
+            }
+            Ev::ImePreedit(text, cursor) => {
+                self.input.ime(ImeEvent::Preedit {
+                    text: (*text).to_owned(),
+                    cursor: *cursor,
+                });
+            }
+            Ev::ImeCommit(text) => {
+                self.input.ime(ImeEvent::Commit((*text).to_owned()));
+            }
+            Ev::ClipboardText(text) => {
+                self.input.clipboard_text(text);
+            }
         }
         Ok(())
     }
@@ -254,6 +323,8 @@ impl Player {
             tier: self.tier,
             strings: &self.strings,
             arg_format: &DisplayFormat,
+            // Scripted scenes run the same on every host.
+            keymap: Keymap::MAC,
         };
         let mut ui = Ui::begin(&mut self.store, &raw, config, text);
         let page = self.page;

@@ -160,6 +160,89 @@ pub enum ImeEvent {
     Disabled,
 }
 
+/// One event a focused widget reads through `Ui::focus_events`, in arrival order. Keys carry
+/// their modifiers and repeat flag; characters come as [`Key::Character`], named keys as
+/// [`Key::Named`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FocusEvent {
+    Key {
+        key: Key,
+        modifiers: Modifiers,
+        repeat: bool,
+    },
+    /// Typed text. Dropped at frame begin after a Command or Control chord (see `Ui::begin`).
+    Text(String),
+    /// An input-method event.
+    Ime(ImeEvent),
+    /// The clipboard's text, answering a read.
+    ClipboardText(String),
+    /// The clipboard could not answer a read.
+    ClipboardUnavailable,
+}
+
+/// The modifier that makes a chord "primary" on a platform.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Primary {
+    /// Command / Windows / Super.
+    Logo,
+    Control,
+}
+
+/// The modifier that turns arrow keys into word motion.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WordModifier {
+    Alt,
+    Control,
+}
+
+/// Where a word-right motion lands.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WordMotion {
+    /// The end of the current word (macOS).
+    EndOfWord,
+    /// The start of the next word (Windows, Linux).
+    StartOfNext,
+}
+
+/// The platform's keyboard conventions, handed in by the app (the toolkit never reads the OS).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Keymap {
+    pub primary: Primary,
+    pub word: WordModifier,
+    pub word_motion: WordMotion,
+}
+
+impl Keymap {
+    /// macOS: Command is primary, Option moves by word, to the end of the word.
+    pub const MAC: Keymap = Keymap {
+        primary: Primary::Logo,
+        word: WordModifier::Alt,
+        word_motion: WordMotion::EndOfWord,
+    };
+    /// Windows and Linux: Control is primary and the word modifier, to the next word's start.
+    pub const PC: Keymap = Keymap {
+        primary: Primary::Control,
+        word: WordModifier::Control,
+        word_motion: WordMotion::StartOfNext,
+    };
+
+    /// Whether the primary modifier is held (other modifiers are the caller's concern).
+    pub fn is_primary(&self, m: Modifiers) -> bool {
+        match self.primary {
+            Primary::Logo => m.logo,
+            Primary::Control => m.control,
+        }
+    }
+
+    /// Whether the word modifier is held.
+    pub fn is_word(&self, m: Modifiers) -> bool {
+        match self.word {
+            WordModifier::Alt => m.alt,
+            WordModifier::Control => m.control,
+        }
+    }
+}
+
 /// A clipboard operation the toolkit asks of the adapter. Requests are answered, if at all, by
 /// an `Event` on a later frame.
 #[derive(Debug, Clone, PartialEq, Eq)]

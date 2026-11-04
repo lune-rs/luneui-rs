@@ -16,6 +16,7 @@ fn xf(origin: (f32, f32), scale: f32, dy: f32, alpha: f32) -> Xform {
     Xform {
         origin,
         scale,
+        dx: 0.0,
         dy,
         alpha,
     }

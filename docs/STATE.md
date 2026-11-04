@@ -1,35 +1,33 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-04 (M4 review fix rounds 1-3: focus stack across overlays, Repaint catch-up, passive overlays, bench on a busy machine, a repeated focus request settles (inside a focus-loss overlay too), bench self-test below 4 ms exits 2; D81-D85)
+Last updated: 2026-11-04 (M5 step 1: frame plumbing; M4 merged at d9fe71f)
 
 ## Now
 
-M4 (interaction and motion) is implemented on branch `orch/toolkit-v1`, awaiting the acceptance
-bench, review and merge, on top of M3 (catalogue specs) and M2 (seams and crate split).
-`lune-ui-core` now holds the per-window `Ui` frame (stable ids, retained state with keep-alive
-scopes, layered hits with modal and pointer capture, `Response`, overlays with exit retention, focus
-scopes, the semantic tree with actions, the string table, `FrameOutput` with `Repaint`) and the
-closed-form motion system (easings, tween, spring, keyframes, velocity-preserving transitions, the
-Full, Reduced and Off tiers, theme motion tokens, a 60 Hz conformance harness). Every moved widget
-and overlay has a `Look`, a `paint` function, its old Painter-API wrapper (same pixels) and a `Ui`
-method; rest identity is proven by exact `Scene` equality tests. `docs/architecture.md` holds the
-module map, "The `Ui` frame" and "API changes since M1"; DECISIONS D59 to D85 record the M4 choices
-(D81-D85 from review fix round 1).
+M4 (interaction and motion) is merged to main at d9fe71f, on top of M3 (catalogue specs) and M2
+(seams and crate split). M5 (foundations: layout, scroll, list, popover, text editing, drag and drop,
+shortcuts, painter primitives) is in progress on branch `orch/toolkit-v1`; steps 1 to 3 are the frame
+plumbing, the layout helpers and the shortcut registry.
+`lune-ui-core` holds the per-window `Ui` frame (stable ids, retained state with keep-alive scopes,
+layered hits with modal and pointer capture, `Response`, overlays with exit retention, focus scopes,
+the semantic tree with actions, the string table, `FrameOutput` with `Repaint`) and the closed-form
+motion system. M5 step 1 opened the frame to ordered focus input (`Ui::focus_events`, keys with
+modifiers, text, IME and clipboard answers), the `Keymap`, press details on `Response`, cursor and
+IME-area output, `Xform::translate` and `Painter::push_clip`/`pop_clip`.
+`docs/architecture.md` holds the module map, "The `Ui` frame" and "API changes since M1"; DECISIONS
+D59 to D85 record the M4 choices.
 The gallery has a page registry (two legacy pages, 15 Ui pages), `--dump`, `--list` (62 scene names)
 and `--bench`. The cross-widget contract suite is `crates/lune-ui-core/tests/c4.rs`.
 The pixel gate shows the 15 legacy scenes identical against the M1 base.
 
 ## Next
 
-1. Run the acceptance bench (`cargo run --release -p gallery -- --bench`, 5 runs, runnable on a
-   busy machine per D85, plus `--size 3456x2234` report-only); a failure is reported with per-page numbers, never loosened. Then review
-   and merge M4.
-2. M5 onward per the roadmap: text input (typing, search clear, IME composition) and the clipboard
-   fake, then the remaining controls (button variants, the radio) and the layout and data
-   components.
-3. CI (fmt, clippy `-D warnings`, tests on macOS, Windows and Linux) now that there is code to run.
-4. An export script for Luneterm's vendored snapshot, before Luneterm M9. The migration
+1. M5 steps 2 to 16 per `m05-foundations/plan.md`: layout helpers, shortcut registry, painter
+   primitives, images, scroll area, virtualized list, popover and tooltip, text queries, `TextEdit`,
+   the text field upgrade, drag and drop, gallery pages, docs and the acceptance bench.
+2. CI (fmt, clippy `-D warnings`, tests on macOS, Windows and Linux) now that there is code to run.
+3. An export script for Luneterm's vendored snapshot, before Luneterm M9. The migration
    map for M11 is "API changes since M1" in `docs/architecture.md`.
 
 ## Blockers / open questions

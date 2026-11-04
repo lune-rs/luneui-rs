@@ -127,6 +127,17 @@ impl ScriptedInput {
         self
     }
 
+    /// Presses `key` as an auto-repeat (no text).
+    pub fn key_repeat(&mut self, key: Key) -> &mut Self {
+        self.events.push(Event::Key {
+            key,
+            pressed: true,
+            repeat: true,
+            modifiers: self.modifiers,
+        });
+        self
+    }
+
     /// Releases `key`.
     pub fn key_up(&mut self, key: Key) -> &mut Self {
         self.events.push(Event::Key {

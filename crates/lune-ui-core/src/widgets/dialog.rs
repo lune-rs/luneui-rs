@@ -136,6 +136,7 @@ impl Layout {
                 self.card.y + self.card.h / 2.0,
             ),
             scale,
+            dx: 0.0,
             dy: 0.0,
             alpha,
         }
@@ -254,6 +255,7 @@ fn fade(alpha: f32) -> Xform {
     Xform {
         origin: (0.0, 0.0),
         scale: 1.0,
+        dx: 0.0,
         dy: 0.0,
         alpha,
     }

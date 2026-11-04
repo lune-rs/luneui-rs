@@ -19,6 +19,9 @@ pub(crate) struct FocusState {
     pub(crate) pending: Option<WidgetId>,
     /// The keep-alive scopes open when the focused id last registered.
     pub(crate) chain: Vec<WidgetId>,
+    /// The widget whose IME composition is open (`Ui::set_composing`); only counts while it is
+    /// the focused widget.
+    pub(crate) composing: Option<WidgetId>,
 }
 
 /// The tab stops of the scope `tag` in the previous frame, in call order, each id once.
@@ -85,6 +88,18 @@ pub(crate) fn restore_on_close(
 }
 
 impl Ui<'_> {
+    /// Says whether `id` is composing text (an open IME preedit). While the focused widget
+    /// composes, the next frames' Escape and Tab are not handled by the frame: they join the focus
+    /// event queue instead. Cleared when focus moves off `id`.
+    pub fn set_composing(&mut self, id: WidgetId, composing: bool) {
+        let focus = &mut self.store.focus;
+        if composing {
+            focus.composing = Some(id);
+        } else if focus.composing == Some(id) {
+            focus.composing = None;
+        }
+    }
+
     /// Focuses `id` at the next frame's begin, without the ring.
     pub fn request_focus(&mut self, id: WidgetId) {
         self.store.focus.pending = Some(id);

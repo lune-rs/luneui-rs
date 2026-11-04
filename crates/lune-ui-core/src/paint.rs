@@ -83,21 +83,35 @@ impl StrokeStyle {
     }
 }
 
-/// Animation transform for a popup: scale about `origin`, then move down `dy`, and fade.
+/// Animation transform for a popup: scale about `origin`, then move by `dx`, `dy`, and fade.
 ///
 /// Transforms stack ([`Painter::push_xform`]): the innermost applies first, then the next one out.
 #[derive(Debug, Clone, Copy)]
 pub struct Xform {
     pub origin: (f32, f32),
     pub scale: f32,
+    /// Moves right, after the scale.
+    pub dx: f32,
+    /// Moves down, after the scale.
     pub dy: f32,
     pub alpha: f32,
 }
 
 impl Xform {
+    /// A pure translation by `dx`, `dy`: scale 1, alpha 1.
+    pub fn translate(dx: f32, dy: f32) -> Self {
+        Self {
+            origin: (0.0, 0.0),
+            scale: 1.0,
+            dx,
+            dy,
+            alpha: 1.0,
+        }
+    }
+
     fn point(&self, x: f32, y: f32) -> (f32, f32) {
         (
-            self.origin.0 + (x - self.origin.0) * self.scale,
+            self.origin.0 + (x - self.origin.0) * self.scale + self.dx,
             self.origin.1 + (y - self.origin.1) * self.scale + self.dy,
         )
     }
@@ -113,6 +127,8 @@ impl Xform {
 enum Op {
     On(LayerId),
     SetClip(Option<Rect>),
+    PushClip(Rect),
+    PopClip,
     SetXform(Option<Xform>),
     PushXform(Xform),
     PopXform,
@@ -150,6 +166,7 @@ impl Ops {
 pub(crate) struct PainterState {
     layer: usize,
     clip: Option<Rect>,
+    clips: Vec<Option<Rect>>,
     xforms: Vec<Xform>,
     hit_tag: u32,
 }
@@ -161,6 +178,8 @@ pub struct Painter<'a, H> {
     pub scene: Scene,
     layer: usize,
     clip: Option<Rect>,
+    /// The clips [`Self::push_clip`] replaced, innermost last.
+    clips: Vec<Option<Rect>>,
     pub hits: Vec<(Rect, H)>,
     pub text: &'a mut dyn TextSystem,
     pub hover: Option<H>,
@@ -204,6 +223,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
             scene: Scene::default(),
             layer: 0,
             clip: None,
+            clips: Vec::new(),
             hits: Vec::new(),
             text,
             hover,
@@ -257,6 +277,8 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
             match op {
                 Op::On(l) => self.on(*l),
                 Op::SetClip(c) => self.set_clip(*c),
+                Op::PushClip(r) => self.push_clip(*r),
+                Op::PopClip => self.pop_clip(),
                 Op::SetXform(x) => self.set_xform(*x),
                 Op::PushXform(x) => self.push_xform(*x),
                 Op::PopXform => self.pop_xform(),
@@ -298,6 +320,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         PainterState {
             layer: self.layer,
             clip: self.clip,
+            clips: self.clips.clone(),
             xforms: self.xforms.clone(),
             hit_tag: self.hit_tag,
         }
@@ -307,6 +330,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
     pub(crate) fn restore_state(&mut self, s: PainterState) {
         self.layer = s.layer;
         self.clip = s.clip;
+        self.clips = s.clips;
         self.xforms = s.xforms;
         self.hit_tag = s.hit_tag;
     }
@@ -316,6 +340,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
     pub(crate) fn enter(&mut self, layer: LayerId, tag: u32) {
         self.layer = layer as usize;
         self.clip = None;
+        self.clips.clear();
         self.xforms.clear();
         self.hit_tag = tag;
     }
@@ -324,11 +349,31 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         self.rec(|| Op::On(layer));
         self.layer = layer as usize;
         self.clip = None;
+        self.clips.clear();
     }
 
     pub fn set_clip(&mut self, clip: Option<Rect>) {
         self.rec(|| Op::SetClip(clip));
         self.clip = clip;
+    }
+
+    /// Narrows the clip to `rect` intersected with the current clip, until the matching
+    /// [`Self::pop_clip`]. The rect is in the space draws are made in now, like [`Self::set_clip`]'s.
+    pub fn push_clip(&mut self, rect: Rect) {
+        self.rec(|| Op::PushClip(rect));
+        self.clips.push(self.clip);
+        self.clip = Some(match self.clip {
+            Some(c) => c.intersect(&rect),
+            None => rect,
+        });
+    }
+
+    /// Restores the clip that held before the last [`Self::push_clip`]; does nothing without one.
+    pub fn pop_clip(&mut self) {
+        self.rec(|| Op::PopClip);
+        if let Some(c) = self.clips.pop() {
+            self.clip = c;
+        }
     }
 
     /// Replaces the transform stack: with `xform` as its only entry, or empty for `None`.

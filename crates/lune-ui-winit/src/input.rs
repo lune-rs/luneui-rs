@@ -161,6 +161,16 @@ impl Translator {
         self.events.push(Event::Ime(e));
     }
 
+    /// The clipboard's text, answering a `ClipboardRequest::Read`.
+    pub fn clipboard_text(&mut self, text: &str) {
+        self.events.push(Event::ClipboardText(text.to_owned()));
+    }
+
+    /// The clipboard holds no text or cannot be read, answering a `ClipboardRequest::Read`.
+    pub fn clipboard_unavailable(&mut self) {
+        self.events.push(Event::ClipboardUnavailable);
+    }
+
     /// The window gained or lost focus.
     pub fn focused(&mut self, focused: bool) {
         self.focused = focused;

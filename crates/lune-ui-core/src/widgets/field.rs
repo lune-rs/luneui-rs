@@ -84,7 +84,7 @@ pub fn paint<H: Copy + PartialEq>(
             border,
         },
     );
-    p.set_clip(Some(r.inset(6.0, 0.0)));
+    p.push_clip(r.inset(6.0, 0.0));
     let (w, h) = if text.is_empty() {
         p.text_in(&label(&t, placeholder, t.fg_tertiary), r, 10.0);
         (0.0, 0.0)
@@ -96,7 +96,7 @@ pub fn paint<H: Copy + PartialEq>(
         let caret = Rect::new(r.x + 10.0 + w + 1.0, r.y + (r.h - ch) / 2.0, 1.5, ch);
         p.fill_over(caret, 0.0, premul(t.fg_primary));
     }
-    p.set_clip(None);
+    p.pop_clip();
 }
 
 /// The Painter-API field: the discrete look (`focused` given, hover from the painter), then its

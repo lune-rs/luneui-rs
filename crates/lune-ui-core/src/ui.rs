@@ -32,7 +32,10 @@ pub use response::{Response, Sense};
 pub use store::UiStore;
 
 use crate::access::{AccessValue, SemanticTree};
-use crate::input::{ClipboardRequest, Event, FrameOutput, Key, NamedKey, RawInput, Repaint};
+use crate::input::{
+    ClipboardRequest, CursorIcon, Event, FocusEvent, FrameOutput, Key, Keymap, Modifiers, NamedKey,
+    RawInput, Repaint, ScrollDelta,
+};
 use crate::motion::{MotionTier, Time};
 use crate::paint::{Painter, Rect, Xform};
 use crate::scene::Scene;
@@ -55,6 +58,8 @@ pub struct FrameConfig<'a> {
     pub tier: MotionTier,
     pub strings: &'a StringTable,
     pub arg_format: &'a dyn ArgFormat,
+    /// The platform's keyboard conventions (the app reads the OS, not the toolkit).
+    pub keymap: Keymap,
 }
 
 impl std::fmt::Debug for FrameConfig<'_> {
@@ -63,6 +68,7 @@ impl std::fmt::Debug for FrameConfig<'_> {
             .field("theme", &self.theme)
             .field("tier", &self.tier)
             .field("strings", &self.strings)
+            .field("keymap", &self.keymap)
             .finish_non_exhaustive()
     }
 }
@@ -116,10 +122,13 @@ pub struct Ui<'a> {
     repaint_at: Option<Time>,
     clipboard_write: Option<String>,
     clipboard_read: bool,
+    cursor: CursorIcon,
+    ime_area: Option<Rect>,
     /// Dismiss requests found at begin, handed out by `overlay`.
     dismissed: BTreeMap<WidgetId, Dismissal>,
     /// Overlays pushed or reopened this frame.
     opened: Vec<WidgetId>,
+    /// The frame's focus-bound input in arrival order, then the accessibility actions' keys.
     keys: Vec<KeyPress>,
     /// The focused widget of the active scope, which may take keys.
     key_focus: Option<WidgetId>,
@@ -230,6 +239,8 @@ impl<'a> Ui<'a> {
         let mut routed = Routed::default();
         let mut keys = Vec::new();
         let mut acted = false;
+        // The modifiers of the key press that came immediately before the current event.
+        let mut last_key: Option<Modifiers> = None;
 
         if let Some(id) = store.focus.pending.take() {
             store.focus.focused = Some(id);
@@ -246,6 +257,7 @@ impl<'a> Ui<'a> {
                 time: input.time,
             };
             for ev in &input.events {
+                let after_key = last_key.take();
                 match ev {
                     Event::PointerMoved { pos } => store.pointer.moved(*pos, &cx, &mut pointer),
                     Event::PointerLeft => store.pointer.left(),
@@ -253,7 +265,7 @@ impl<'a> Ui<'a> {
                         pos,
                         button: button @ crate::input::PointerButton::Primary,
                         pressed: true,
-                        ..
+                        modifiers,
                     } => {
                         let target = topmost(&hits, *pos, &eligible);
                         store.focus.visible = false;
@@ -267,7 +279,9 @@ impl<'a> Ui<'a> {
                             store.pointer.press_consumed(*pos);
                             continue;
                         }
-                        store.pointer.button(*pos, *button, true, &cx, &mut pointer);
+                        store
+                            .pointer
+                            .button(*pos, *button, true, *modifiers, &cx, &mut pointer);
                         if let Some(h) = target.filter(|h| h.enabled && h.sense.focusable) {
                             store.focus.focused = Some(h.id);
                         }
@@ -276,31 +290,52 @@ impl<'a> Ui<'a> {
                         pos,
                         button,
                         pressed,
-                        ..
+                        modifiers,
                     } => {
-                        store
-                            .pointer
-                            .button(*pos, *button, *pressed, &cx, &mut pointer);
+                        store.pointer.button(
+                            *pos,
+                            *button,
+                            *pressed,
+                            *modifiers,
+                            &cx,
+                            &mut pointer,
+                        );
                     }
-                    Event::Scroll { pos, delta, .. } => {
-                        store.pointer.scroll(*pos, *delta, &cx, &mut pointer);
+                    Event::Scroll {
+                        pos,
+                        delta,
+                        modifiers,
+                    } => {
+                        // Shift turns a notched vertical wheel into a horizontal one.
+                        let delta = match *delta {
+                            ScrollDelta::Lines { x, y } if modifiers.shift && x == 0.0 => {
+                                ScrollDelta::Lines { x: y, y: 0.0 }
+                            }
+                            d => d,
+                        };
+                        store.pointer.scroll(*pos, delta, &cx, &mut pointer);
                     }
                     Event::Key {
                         key,
                         pressed: true,
                         modifiers,
-                        ..
+                        repeat,
                     } => {
                         store.focus.keyboard = true;
+                        last_key = Some(*modifiers);
+                        // While the focused widget composes, Escape and Tab belong to the IME.
+                        let composing = store.focus.composing.is_some()
+                            && store.focus.composing == store.focus.focused;
                         match key {
                             Key::Named(NamedKey::Escape)
-                                if top_escape.is_some_and(|t| t.opts.dismiss_on_escape) =>
+                                if !composing
+                                    && top_escape.is_some_and(|t| t.opts.dismiss_on_escape) =>
                             {
                                 if let Some(t) = top_escape {
                                     dismissed.entry(t.id).or_insert(D::Escape);
                                 }
                             }
-                            Key::Named(NamedKey::Tab) => {
+                            Key::Named(NamedKey::Tab) if !composing => {
                                 let scopes = active.iter().rev().map(|o| (o.tag, o.opts.modal));
                                 let mut to = None;
                                 for (tag, trap) in scopes.chain([(0, true)]) {
@@ -319,18 +354,35 @@ impl<'a> Ui<'a> {
                                 }
                                 store.focus.visible = true;
                             }
-                            Key::Named(k) => keys.push(KeyPress {
-                                key: *k,
-                                target: None,
-                                consumed: false,
-                            }),
-                            _ => {}
+                            Key::Named(_) | Key::Character(_) => {
+                                keys.push(KeyPress::real(FocusEvent::Key {
+                                    key: key.clone(),
+                                    modifiers: *modifiers,
+                                    repeat: *repeat,
+                                }))
+                            }
+                            Key::Unidentified => {}
                         }
                     }
+                    // A Command or Control chord (not AltGr, which reports Control and Alt) types
+                    // nothing: platforms attach the character to the press.
+                    Event::Text(t)
+                        if !after_key.is_some_and(|m| m.logo || (m.control && !m.alt)) =>
+                    {
+                        keys.push(KeyPress::real(FocusEvent::Text(t.clone())));
+                    }
+                    Event::Ime(e) => keys.push(KeyPress::real(FocusEvent::Ime(e.clone()))),
                     Event::Focus(false) => {
                         focus_loss(&active, &hits, None, &mut dismissed);
                     }
-                    Event::ClipboardText(_) | Event::ClipboardUnavailable => acted = true,
+                    Event::ClipboardText(t) => {
+                        acted = true;
+                        keys.push(KeyPress::real(FocusEvent::ClipboardText(t.clone())));
+                    }
+                    Event::ClipboardUnavailable => {
+                        acted = true;
+                        keys.push(KeyPress::real(FocusEvent::ClipboardUnavailable));
+                    }
                     Event::Access(a) => {
                         let Some(node) = store.prev_tree.get(a.target) else {
                             continue;
@@ -362,6 +414,10 @@ impl<'a> Ui<'a> {
         }
         acted |= !dismissed.is_empty() || pointer.acted();
         keys.extend(routed.keys);
+        // A composition ends when focus leaves its widget.
+        if store.focus.composing != store.focus.focused {
+            store.focus.composing = None;
+        }
         let key_focus = store.focus.focused.filter(|id| {
             let mut own = hits.iter().filter(|h| h.id == *id).peekable();
             if own.peek().is_none() {
@@ -390,6 +446,8 @@ impl<'a> Ui<'a> {
             repaint_at: None,
             clipboard_write: None,
             clipboard_read: false,
+            cursor: CursorIcon::Default,
+            ime_area: None,
             dismissed,
             opened: Vec::new(),
             keys,
@@ -418,6 +476,8 @@ impl<'a> Ui<'a> {
             repaint_at,
             clipboard_write,
             clipboard_read,
+            cursor,
+            ime_area,
             mut tree,
             node_meta,
             pointer,
@@ -545,6 +605,8 @@ impl<'a> Ui<'a> {
             clipboard,
             tree,
             focused: out_focused,
+            cursor,
+            ime_area,
             ..FrameOutput::default()
         };
         (painter.scene, output)
@@ -583,6 +645,45 @@ impl<'a> Ui<'a> {
 
     pub fn tier(&self) -> MotionTier {
         self.config.tier
+    }
+
+    /// The platform's keyboard conventions for this frame.
+    pub fn keymap(&self) -> Keymap {
+        self.config.keymap
+    }
+
+    /// The cursor icon this frame asks for; the last call wins. Default: [`CursorIcon::Default`].
+    pub fn set_cursor(&mut self, icon: CursorIcon) {
+        self.cursor = icon;
+    }
+
+    /// Where text is being edited this frame, in logical pixels, or `None` (the adapter then
+    /// disables IME); the last call wins.
+    pub fn set_ime_area(&mut self, area: Option<Rect>) {
+        self.ime_area = area;
+    }
+
+    /// The pointer's position in logical pixels, or `None` when it is outside the window.
+    pub fn pointer_pos(&self) -> Option<(f32, f32)> {
+        self.store.pointer.pos()
+    }
+
+    /// Whether the pointer is inside `rect` (through the transform stack) with nothing of a later
+    /// overlay or a higher layer than the current painter context under it. Ignores `enabled` and
+    /// `Sense`, so it reads true over a disabled anchor, and reads the previous frame's regions.
+    pub fn pointer_in(&self, rect: Rect) -> bool {
+        let Some(pos) = self.store.pointer.pos() else {
+            return false;
+        };
+        if !self.painter.transformed(rect).contains(pos) {
+            return false;
+        }
+        let (layer, tag) = self.painter.hit_context();
+        !self
+            .store
+            .prev_hits
+            .iter()
+            .any(|h| (h.tag > tag || h.layer > layer) && h.rect.contains(pos))
     }
 
     /// The frame's raw input (for events a widget handles itself, such as clipboard replies).
@@ -668,6 +769,12 @@ impl<'a> Ui<'a> {
         r.dragged = p.dragging == Some(id);
         r.drag_delta = p.drag_delta.get(&id).copied().unwrap_or((0.0, 0.0));
         r.drag_stopped = p.drag_stopped.contains(&id);
+        if let Some(press) = p.press_started.get(&id) {
+            r.press_started = true;
+            r.press_pos = Some(press.pos);
+            r.press_count = press.count;
+            r.press_modifiers = press.modifiers;
+        }
         r.scroll_lines = p.scroll_lines.get(&id).copied().unwrap_or((0.0, 0.0));
         r.scroll_pixels = p.scroll_pixels.get(&id).copied().unwrap_or((0.0, 0.0));
         r.focused = self.store.focus.focused == Some(id);
@@ -710,6 +817,7 @@ impl<'a> Ui<'a> {
         self.painter.push_xform(Xform {
             origin: (0.0, 0.0),
             scale: 1.0,
+            dx: 0.0,
             dy: 0.0,
             alpha: DISABLED_ALPHA,
         });

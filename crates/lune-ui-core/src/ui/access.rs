@@ -31,11 +31,7 @@ pub(crate) fn route(
 ) -> Option<WidgetId> {
     let t = a.target;
     let expanded = node.states.contains(State::Expanded);
-    let key = |key| KeyPress {
-        key,
-        target: Some(t),
-        consumed: false,
-    };
+    let key = |key| KeyPress::synthetic(key, t);
     match a.action {
         Action::Default => {
             pointer.clicked.insert(t);

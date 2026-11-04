@@ -60,9 +60,9 @@ pub fn paint<H: Copy + PartialEq>(p: &mut Painter<'_, H>, r: Rect, value: &str, 
         },
     );
     let text_clip = Rect::new(r.x, r.y, r.w - 30.0, r.h);
-    p.set_clip(Some(text_clip));
+    p.push_clip(text_clip);
     p.text_in(&label(&t, value, t.fg_primary), r, 10.0);
-    p.set_clip(None);
+    p.pop_clip();
     let chevron = Rect::new(r.right() - 28.0, r.y, 20.0, r.h);
     p.text_centered(
         &icon::glyph(icon::CHEVRON_DOWN, 12.0, t.fg_secondary),

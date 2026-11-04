@@ -224,6 +224,7 @@ pub fn menu<H: Copy + PartialEq>(
     p.set_xform(Some(Xform {
         origin: (layout.panel.x, layout.panel.y),
         scale,
+        dx: 0.0,
         dy,
         alpha,
     }));
@@ -315,6 +316,7 @@ fn xform_of(anim: MenuAnim, origin: (f32, f32), transforms: bool) -> Xform {
         Xform {
             origin,
             scale,
+            dx: 0.0,
             dy,
             alpha,
         }
@@ -322,6 +324,7 @@ fn xform_of(anim: MenuAnim, origin: (f32, f32), transforms: bool) -> Xform {
         Xform {
             origin,
             scale: 1.0,
+            dx: 0.0,
             dy: 0.0,
             alpha,
         }

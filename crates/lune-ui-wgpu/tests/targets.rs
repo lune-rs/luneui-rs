@@ -128,6 +128,7 @@ fn paint(spec: SceneSpec, text: &mut TextCache) -> Scene {
     p.set_xform(Some(Xform {
         origin: (menu.x, menu.y),
         scale: 0.95,
+        dx: 0.0,
         dy: 3.0,
         alpha: 0.6,
     }));

@@ -1,6 +1,7 @@
 //! What a widget asks of a hit region ([`Sense`]) and what the frame reports back ([`Response`]).
 
 use crate::access::AccessValue;
+use crate::input::Modifiers;
 use crate::paint::Rect;
 
 use super::WidgetId;
@@ -83,6 +84,15 @@ pub struct Response {
     /// the press point).
     pub drag_delta: (f32, f32),
     pub drag_stopped: bool,
+    /// A primary press captured by this region started this frame.
+    pub press_started: bool,
+    /// Where that press landed, in logical pixels.
+    pub press_pos: Option<(f32, f32)>,
+    /// 1, 2 or 3 for presses on this id each within the double-click time of the last, then back
+    /// to 1; 0 when no press started this frame.
+    pub press_count: u8,
+    /// The modifiers held at that press.
+    pub press_modifiers: Modifiers,
     pub focused: bool,
     pub focus_visible: bool,
     /// Set by the widget ([`Response::mark_changed`]) when it changed the value it was handed.
@@ -111,6 +121,10 @@ impl Response {
             dragged: false,
             drag_delta: (0.0, 0.0),
             drag_stopped: false,
+            press_started: false,
+            press_pos: None,
+            press_count: 0,
+            press_modifiers: Modifiers::default(),
             focused: false,
             focus_visible: false,
             changed: false,
