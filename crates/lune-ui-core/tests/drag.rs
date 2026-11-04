@@ -19,6 +19,7 @@ use lune_ui_core::scene::{Scene, Shape};
 use lune_ui_core::testing::UiHarness;
 use lune_ui_core::theme::DARK;
 use lune_ui_core::ui::{Sense, Ui, WidgetId};
+use lune_ui_core::widgets::scroll_area::{Extent, ScrollOptions};
 
 const SPACING: f64 = 5.0;
 const TICK: Duration = AUTO_SCROLL_TICK;
@@ -1383,4 +1384,159 @@ fn the_free_glue_drops_on_a_column_and_cancels_on_escape() {
     let (f, _) = frame(&mut h, 70, &mut drag);
     assert!(f.cancelled);
     assert!(!drag.is_active());
+}
+
+/// A reorder gesture in screen terms: the first of three items pressed, dragged and released at the
+/// same screen points, on a strip placed at screen x `ORIGIN` directly or through a parent scrolled
+/// by (30, 100).
+fn reorder_result(scrolled: bool) -> DropResult {
+    let widths = [100.0, 100.0, 100.0];
+    let mut drag = ReorderDrag::new();
+    let mut h = UiHarness::new(WIN);
+    let (cx, cy) = if scrolled { (30.0, 100.0) } else { (0.0, 0.0) };
+    let area = Rect::new(0.0, 0.0, 590.0, 390.0);
+    let opts = ScrollOptions {
+        extent: Some((1000.0, 1000.0)),
+        ..ScrollOptions::default()
+    };
+    let frame = |h: &mut UiHarness, ms: u64, drag: &mut ReorderDrag| {
+        let mut result = DropResult::None;
+        let mut items = |ui: &mut Ui<'_>| {
+            let strip_at = Rect::new(ORIGIN as f32 + cx, 40.0 + cy, 320.0, ITEM_H);
+            let origin = f64::from(ui.painter().transformed(strip_at).x);
+            let m = Metrics {
+                viewport: 400.0,
+                offset: 0.0,
+                extent: 310.0,
+                ..metrics(&widths)
+            };
+            let r = ui.interact(
+                item(1),
+                Rect {
+                    w: 100.0,
+                    ..strip_at
+                },
+                Sense::DRAG,
+            );
+            let strip = Strip {
+                index: 0,
+                origin,
+                metrics: m,
+            };
+            result = ui.drag_gesture(item(1), &r, drag, &strip).result;
+        };
+        h.at_ms(ms).frame(|ui| {
+            if scrolled {
+                ui.scroll_area("o", area, &opts, |ui, _| {
+                    items(ui);
+                    ((), Extent::default())
+                });
+            } else {
+                items(ui);
+            }
+        });
+        result
+    };
+    h.input.pointer_to(580.0, 380.0);
+    frame(&mut h, 0, &mut drag);
+    if scrolled {
+        h.input.scroll_pixels(-cx, -cy);
+        frame(&mut h, 5, &mut drag);
+        frame(&mut h, 10, &mut drag);
+    }
+    h.input.pointer_to(ORIGIN as f32 + 50.0, 50.0);
+    frame(&mut h, 20, &mut drag);
+    h.input.press(P);
+    frame(&mut h, 30, &mut drag);
+    h.input.pointer_to(ORIGIN as f32 + 110.0, 50.0);
+    frame(&mut h, 40, &mut drag);
+    h.input.pointer_to(ORIGIN as f32 + 170.0, 50.0);
+    frame(&mut h, 50, &mut drag);
+    h.input.release(P);
+    frame(&mut h, 60, &mut drag)
+}
+
+#[test]
+fn a_reorder_gesture_in_a_scrolled_parent_reads_the_same_as_on_a_plain_page() {
+    let plain = reorder_result(false);
+    assert!(
+        matches!(plain, DropResult::Commit { from: 0, .. }),
+        "{plain:?}"
+    );
+    assert_eq!(reorder_result(true), plain);
+}
+
+/// [`reorder_result`] for a card dragged to the third column of a board.
+fn free_result(scrolled: bool) -> FreeResult {
+    let mut drag = FreeDrag::new();
+    let mut h = UiHarness::new(WIN);
+    let (cx, cy) = if scrolled { (30.0, 100.0) } else { (0.0, 0.0) };
+    let area = Rect::new(0.0, 0.0, 590.0, 390.0);
+    let opts = ScrollOptions {
+        extent: Some((1000.0, 1000.0)),
+        ..ScrollOptions::default()
+    };
+    let card = WidgetId::ROOT.with("card");
+    let frame = |h: &mut UiHarness, ms: u64, drag: &mut FreeDrag| {
+        let mut result = FreeResult::None;
+        let mut items = |ui: &mut Ui<'_>| {
+            let at = |ui: &mut Ui<'_>, x: f32, y: f32| {
+                let r = ui
+                    .painter()
+                    .transformed(Rect::new(x + cx, y + cy, 0.0, 0.0));
+                (f64::from(r.x), f64::from(r.y))
+            };
+            let mids = [at(ui, 0.0, 20.0).1, at(ui, 0.0, 60.0).1];
+            let columns = [0.0, 110.0, 220.0].map(|x| Column {
+                x: at(ui, x, 0.0).0,
+                w: 100.0,
+                card_mids: &mids,
+            });
+            let rect = Rect::new(10.0 + cx, 60.0 + cy, 80.0, 40.0);
+            let r = ui.interact(card, rect, Sense::DRAG);
+            result = ui.free_drag_gesture(card, &r, drag, 5, &columns).result;
+        };
+        h.at_ms(ms).frame(|ui| {
+            if scrolled {
+                ui.scroll_area("o", area, &opts, |ui, _| {
+                    items(ui);
+                    ((), Extent::default())
+                });
+            } else {
+                items(ui);
+            }
+        });
+        result
+    };
+    h.input.pointer_to(580.0, 380.0);
+    frame(&mut h, 0, &mut drag);
+    if scrolled {
+        h.input.scroll_pixels(-cx, -cy);
+        frame(&mut h, 5, &mut drag);
+        frame(&mut h, 10, &mut drag);
+    }
+    h.input.pointer_to(50.0, 80.0);
+    frame(&mut h, 20, &mut drag);
+    h.input.press(P);
+    frame(&mut h, 30, &mut drag);
+    h.input.pointer_to(53.0, 83.0);
+    frame(&mut h, 40, &mut drag);
+    h.input.pointer_to(300.0, 40.0);
+    frame(&mut h, 50, &mut drag);
+    h.input.release(P);
+    frame(&mut h, 60, &mut drag)
+}
+
+#[test]
+fn a_free_gesture_in_a_scrolled_parent_reads_the_same_as_on_a_plain_page() {
+    let plain = free_result(false);
+    let want = FreeResult::Drop {
+        source: 5,
+        target: DropTarget {
+            column: 2,
+            index: 1,
+        },
+    };
+    assert_eq!(plain, want);
+    assert_eq!(free_result(true), plain);
 }

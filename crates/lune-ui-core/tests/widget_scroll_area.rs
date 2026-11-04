@@ -929,3 +929,92 @@ fn the_area_draws_nothing_itself_and_registers_one_region() {
     let g = &scene.layers[0].geometry;
     assert!(g.under.is_empty() && g.over.is_empty());
 }
+
+/// The area over 1000 px of content, with `after` run once it has been called and `inside` from
+/// its content. Returns the offset it ended on and what the frame reported.
+fn requesting(
+    h: &mut UiHarness,
+    ms: u64,
+    inside: impl FnOnce(&mut Ui<'_>),
+    after: impl FnOnce(&mut Ui<'_>),
+) -> (f64, Repaint) {
+    let o = ScrollOptions {
+        extent: Some((300.0, 1000.0)),
+        ..ScrollOptions::default()
+    };
+    let mut offset = 0.0;
+    let (_, out) = h.at_ms(ms).frame(|ui| {
+        let r = ui.scroll_area("a", AREA, &o, |ui, _| {
+            inside(ui);
+            ((), Extent::default())
+        });
+        offset = r.offset.1;
+        after(ui);
+    });
+    (offset, out.repaint)
+}
+
+fn ask(ui: &mut Ui<'_>) {
+    ui.scroll_to("a", Target::span_y(800.0, 10.0), Reveal::Nearest);
+}
+
+/// Frames with `ask` in the given slot until one reports `Idle`; the offset it ended on.
+fn until_idle(h: &mut UiHarness, ms: &mut u64, late: bool) -> f64 {
+    for _ in 0..200 {
+        *ms += 17;
+        let (offset, repaint) = if late {
+            requesting(h, *ms, |_| (), ask)
+        } else {
+            requesting(h, *ms, |_| (), |_| ())
+        };
+        if repaint == Repaint::Idle {
+            return offset;
+        }
+    }
+    panic!("never settled");
+}
+
+#[test]
+fn scroll_to_after_the_area_on_a_quiet_frame_asks_for_the_frame_that_applies_it() {
+    let mut h = UiHarness::new(WIN);
+    requesting(&mut h, 0, |_| (), |_| ());
+    assert_eq!(requesting(&mut h, 100, |_| (), |_| ()).1, Repaint::Idle);
+    let (offset, repaint) = requesting(&mut h, 200, |_| (), ask);
+    assert_eq!((offset, repaint), (0.0, Repaint::Now));
+    let mut ms = 200;
+    assert_eq!(until_idle(&mut h, &mut ms, false), 410.0);
+}
+
+#[test]
+fn scroll_to_every_frame_after_the_area_settles_to_idle() {
+    let mut h = UiHarness::new(WIN);
+    requesting(&mut h, 0, |_| (), |_| ());
+    let mut ms = 0;
+    assert_eq!(until_idle(&mut h, &mut ms, true), 410.0);
+    for _ in 0..3 {
+        ms += 17;
+        assert_eq!(requesting(&mut h, ms, |_| (), ask).1, Repaint::Idle);
+    }
+}
+
+#[test]
+fn scroll_to_after_the_area_that_changes_nothing_stays_idle() {
+    let mut h = UiHarness::new(WIN);
+    requesting(&mut h, 0, |_| (), |_| ());
+    requesting(&mut h, 100, |_| (), |_| ());
+    let showing = |ui: &mut Ui<'_>| ui.scroll_to("a", Target::span_y(10.0, 10.0), Reveal::Nearest);
+    assert_eq!(requesting(&mut h, 200, |_| (), showing).1, Repaint::Idle);
+    let outside =
+        |ui: &mut Ui<'_>| ui.scroll_to("a", Target::span_y(5000.0, 10.0), Reveal::Nearest);
+    assert_eq!(requesting(&mut h, 300, |_| (), outside).1, Repaint::Idle);
+}
+
+#[test]
+fn scroll_to_from_the_areas_own_content_is_served_in_that_frame() {
+    let mut h = UiHarness::new(WIN);
+    requesting(&mut h, 0, |_| (), |_| ());
+    requesting(&mut h, 100, |_| (), |_| ());
+    assert_eq!(requesting(&mut h, 200, ask, |_| ()).1, Repaint::Now);
+    let mut ms = 200;
+    assert_eq!(until_idle(&mut h, &mut ms, false), 410.0);
+}

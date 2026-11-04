@@ -691,8 +691,10 @@ impl Ui<'_> {
             }
             pressing |= r.pressed;
             if r.dragged && rows.mode() == SelectionMode::Multi {
+                // The pointer is in window coordinates, `rect` in the caller's space.
+                let top = self.painter().transformed(rect).y;
                 let to = self.pointer_pos().map_or(index, |(_, y)| {
-                    let inside = f64::from(y - rect.y).clamp(0.0, viewport);
+                    let inside = f64::from(y - top).clamp(0.0, viewport);
                     mem.heights.row_at(offset + inside)
                 });
                 if mem.drag_end != Some(to) {

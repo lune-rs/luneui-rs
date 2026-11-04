@@ -143,7 +143,8 @@ fn step(options: &[bool], from: usize, down: bool) -> usize {
 }
 
 impl<'a> Ui<'a> {
-    /// The options list of the combo `anchor_id` (at `anchor`), on the popup layer: non-modal,
+    /// The options list of the combo `anchor_id` (at `anchor`, in window coordinates, as
+    /// [`Response::rect`](crate::ui::Response::rect) is), on the popup layer: non-modal,
     /// Escape and a press outside dismiss it (`dismissed`), focus returns to `anchor_id` when it
     /// closes. Up and Down move a keyboard highlight over the enabled rows (starting at
     /// `selected`), Enter or a click on an enabled row picks it (`picked`); a disabled row has no

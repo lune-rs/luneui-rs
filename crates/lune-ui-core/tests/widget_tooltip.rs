@@ -14,6 +14,7 @@ use lune_ui_core::text::{Spec, Style, TextSystem};
 use lune_ui_core::theme::DARK;
 use lune_ui_core::ui::{Sense, Ui, WidgetId};
 use lune_ui_core::widgets::popover::PopoverOptions;
+use lune_ui_core::widgets::scroll_area::{Extent, ScrollOptions};
 use lune_ui_core::widgets::tooltip::LAZY_HOVER_DWELL;
 
 const WIN: (f32, f32) = (800.0, 600.0);
@@ -497,4 +498,59 @@ fn hover_dwell_counts_from_the_frame_it_turned_on_and_resets_when_off() {
     assert!(probe(&mut h, 360, true).0);
     assert_eq!(LAZY_HOVER_DWELL, ms(150));
     assert_eq!(DARK.motion.tooltip_delay, ms(800));
+}
+
+/// One frame of a page scrolled by `offset`, with an anchor at content `y` in a 200 px area.
+fn scrolled_tip(h: &mut UiHarness, ms: u64, y: f32) -> Out {
+    let area = Rect::new(0.0, 0.0, 400.0, 200.0);
+    let opts = ScrollOptions {
+        extent: Some((400.0, 1000.0)),
+        ..ScrollOptions::default()
+    };
+    let (scene, fo) = h.at_ms(ms).frame(|ui| {
+        ui.painter().on(LayerId::Page);
+        ui.scroll_area("s", area, &opts, |ui, _| {
+            let rect = Rect::new(10.0, y, 100.0, 32.0);
+            let r = ui.interact(id("a"), rect, Sense::CLICK_FOCUS);
+            ui.node(Node::new(id("a"), Role::Button, "", rect));
+            ui.tooltip(&r, TEXT);
+            ((), Extent::default())
+        });
+    });
+    Out {
+        scene,
+        repaint: fo.repaint,
+        tree: fo.tree,
+        focused: fo.focused,
+        under_clicked: false,
+    }
+}
+
+/// A harness whose scroll area sits at offset 100, the pointer at `at`, past the anchor's delay.
+fn scrolled_and_waited(y: f32, at: (f32, f32)) -> Out {
+    let mut h = UiHarness::new(WIN);
+    h.input.pointer_to(390.0, 190.0);
+    scrolled_tip(&mut h, 0, y);
+    h.input.scroll_pixels(0.0, -100.0);
+    scrolled_tip(&mut h, 5, y);
+    scrolled_tip(&mut h, 10, y);
+    h.input.pointer_to(at.0, at.1);
+    scrolled_tip(&mut h, 20, y);
+    scrolled_tip(&mut h, 30, y);
+    scrolled_tip(&mut h, 2000, y)
+}
+
+#[test]
+fn a_tooltip_in_a_scrolled_area_shows_for_the_anchor_on_screen() {
+    // Content y 150 at offset 100 is screen y 50.
+    let out = scrolled_and_waited(150.0, (50.0, 66.0));
+    assert!(out.shown());
+    let tip = out.tree.nodes.iter().find(|n| n.role == Role::Tooltip);
+    assert_eq!(tip.expect("the tooltip's node").bounds.y, 86.0);
+}
+
+#[test]
+fn a_tooltip_in_a_scrolled_area_ignores_a_point_one_offset_away_from_its_anchor() {
+    // Content y 250 at offset 100 is screen y 150; screen y 66 is what a second translate gives.
+    assert!(!scrolled_and_waited(250.0, (50.0, 66.0)).shown());
 }

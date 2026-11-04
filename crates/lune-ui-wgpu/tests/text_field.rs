@@ -7,7 +7,7 @@
 
 use std::time::Duration;
 
-use lune_ui_core::input::{ImeEvent, Key, Keymap, NamedKey};
+use lune_ui_core::input::{FrameOutput, ImeEvent, Key, Keymap, NamedKey, PointerButton};
 use lune_ui_core::motion::{MotionTier, Time};
 use lune_ui_core::paint::{Painter, Rect};
 use lune_ui_core::scene::Scene;
@@ -17,8 +17,9 @@ use lune_ui_core::testing::ScriptedInput;
 use lune_ui_core::text::{Spec, Style, TextSystem};
 use lune_ui_core::text_edit::{EditCommand, EditFlags, Motion, SpecLayout, TextEdit};
 use lune_ui_core::theme::DARK;
-use lune_ui_core::ui::{FrameConfig, Ui, UiStore};
+use lune_ui_core::ui::{FrameConfig, Ui, UiStore, WidgetId};
 use lune_ui_core::widgets::field::{FieldOptions, field};
+use lune_ui_core::widgets::text_area::AreaOptions;
 use lune_ui_wgpu::dump;
 use lune_ui_wgpu::frame::{FrameParams, FrameRenderer};
 use lune_ui_wgpu::gpu::{self, Gpu};
@@ -90,7 +91,11 @@ struct Window {
 
 impl Window {
     fn new() -> Self {
-        let mut input = ScriptedInput::new(WIN, SCALE);
+        Self::sized(WIN)
+    }
+
+    fn sized(size: (f32, f32)) -> Self {
+        let mut input = ScriptedInput::new(size, SCALE);
         input.focus(true);
         Self {
             store: UiStore::default(),
@@ -103,6 +108,13 @@ impl Window {
     }
 
     fn frame(&mut self, field_text: &mut String) -> Scene {
+        self.run(|ui| {
+            ui.text_field_with("f", RECT, field_text, &FieldOptions::default());
+        })
+        .0
+    }
+
+    fn run(&mut self, draw: impl FnOnce(&mut Ui<'_>)) -> (Scene, FrameOutput) {
         // Far enough apart that every transition has settled.
         self.ms += 1000;
         self.input.set_time(Duration::from_millis(self.ms));
@@ -116,8 +128,8 @@ impl Window {
             shortcuts: &self.shortcuts,
         };
         let mut ui = Ui::begin(&mut self.store, &raw, config, &mut self.text);
-        ui.text_field_with("f", RECT, field_text, &FieldOptions::default());
-        ui.finish().0
+        draw(&mut ui);
+        ui.finish()
     }
 
     /// A field focused and settled over `text`, the caret `back` graphemes from its end.
@@ -433,4 +445,76 @@ fn the_text_after_the_caret_shifts_by_the_preedits_measured_width() {
         (a1 as f32 - b1 as f32 - device).abs() <= 1.5,
         "{a1} {b1} {device}"
     );
+}
+
+/// The field's selection in chars, after a frame of `text`.
+fn selection(w: &mut Window, text: &mut String) -> (usize, usize) {
+    let (_, out) = w.run(|ui| {
+        ui.text_field_with("f", RECT, text, &FieldOptions::default());
+    });
+    let node = out.tree.get(WidgetId::ROOT.with("f")).expect("node");
+    node.text.as_ref().expect("text").selection
+}
+
+#[test]
+fn a_press_anywhere_in_the_box_keeps_its_column() {
+    // The box runs y 10 to 42 and its one line y 10 to 27 from the box's top, so the lower half of
+    // the box is below the line.
+    let mut text = String::from("Hello world");
+    let mut w = Window::new();
+    w.frame(&mut text);
+    for y in [11.0, 12.0, 20.0, 26.9, 27.0, 34.0, 40.0, 41.5] {
+        w.input.pointer_to(30.0, y);
+        w.frame(&mut text);
+        w.input.press(PointerButton::Primary);
+        assert_eq!(selection(&mut w, &mut text), (1, 1), "press at y {y}");
+        w.input.release(PointerButton::Primary);
+        w.frame(&mut text);
+    }
+}
+
+#[test]
+fn a_drag_along_the_boxs_lower_edge_selects_by_column() {
+    let mut text = String::from("Hello world");
+    let mut w = Window::new();
+    w.frame(&mut text);
+    w.input.pointer_to(30.0, 40.0);
+    w.frame(&mut text);
+    w.input.press(PointerButton::Primary);
+    w.frame(&mut text);
+    let spec = Spec::plain(text.as_str(), style());
+    let x = w.text.caret(&spec, SCALE, 5).x;
+    w.input.pointer_to(TX + x, 40.0);
+    w.frame(&mut text);
+    assert_eq!(selection(&mut w, &mut text), (1, 5));
+}
+
+#[test]
+fn enter_at_the_bottom_of_a_full_text_area_keeps_the_whole_caret_in_view() {
+    let rect = Rect::new(10.0, 10.0, 180.0, 100.0);
+    let mut text: String = (0..10).map(|i| format!("line {i}\n")).collect();
+    text.pop();
+    let mut w = Window::sized((200.0, 140.0));
+    let mut area = None;
+    let mut frame = |w: &mut Window, text: &mut String| {
+        w.run(|ui| {
+            area = ui
+                .text_area("a", rect, text, &AreaOptions::default())
+                .ime_area;
+        });
+        area
+    };
+    frame(&mut w, &mut text);
+    w.input.key_down(Key::Named(NamedKey::Tab), None);
+    frame(&mut w, &mut text);
+    w.input.key_down(Key::Named(NamedKey::End), None);
+    frame(&mut w, &mut text);
+    frame(&mut w, &mut text);
+    let line = style().line;
+    assert_eq!(frame(&mut w, &mut text).expect("focused").h, line);
+    w.input.key_down(Key::Named(NamedKey::Enter), None);
+    frame(&mut w, &mut text);
+    frame(&mut w, &mut text);
+    assert!(text.ends_with('\n'));
+    assert_eq!(frame(&mut w, &mut text).expect("focused").h, line);
 }

@@ -128,3 +128,39 @@ fn right_to_left_and_mixed_text_answer_without_panicking() {
     }
     assert!(text.hit(&spec, 1.0, (30.0, 5.0)) <= len);
 }
+
+#[test]
+fn the_height_counts_the_line_a_final_terminator_opens() {
+    use lune_ui_core::text::{Spec, Style, TextSystem};
+    let mut text = with_fonts();
+    let style = Style::ui(13.0, [255; 4]);
+    for (spec, rows) in [
+        ("a\nb", 2.0),
+        ("a\nb\n", 3.0),
+        ("a\nb\n\n", 4.0),
+        ("a\r\n", 2.0),
+    ] {
+        let s = Spec::plain(spec, style);
+        for scale in [1.0, 2.0] {
+            assert_eq!(text.measure(&s, scale).1, rows * style.line, "{spec:?}");
+            let end = text.caret(&s, scale, spec.len());
+            assert_eq!(end.y, (rows - 1.0) * style.line, "{spec:?}");
+        }
+    }
+}
+
+#[test]
+fn a_point_below_the_text_keeps_its_column_and_the_open_line_is_the_end() {
+    use lune_ui_core::text::{Spec, Style, TextSystem};
+    let mut text = with_fonts();
+    let style = Style::ui(13.0, [255; 4]);
+    let spec = Spec::plain("Hello\nworld", style);
+    let x = text.caret(&spec, 2.0, 2).x;
+    let bottom = text.measure(&spec, 2.0).1;
+    assert_eq!(text.hit(&spec, 2.0, (x, bottom + 30.0)), 8);
+    assert_eq!(text.hit(&spec, 2.0, (x, -30.0)), 2);
+    let open = Spec::plain("Hello\n", style);
+    let bottom = text.measure(&open, 2.0).1;
+    assert_eq!(text.hit(&open, 2.0, (x, bottom - 1.0)), 6);
+    assert_eq!(text.hit(&open, 2.0, (x, bottom + 30.0)), 6);
+}

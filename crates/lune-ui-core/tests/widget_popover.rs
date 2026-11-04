@@ -15,6 +15,7 @@ use lune_ui_core::widgets::menu::{CLOSE, OPEN};
 use lune_ui_core::widgets::popover::{
     PlaceAlign, PlaceRequest, Placement, PopoverOptions, Side, Surface, place,
 };
+use lune_ui_core::widgets::scroll_area::{Extent, ScrollOptions};
 
 const WIN: (f32, f32) = (800.0, 600.0);
 const ANCHOR: Rect = Rect::new(100.0, 100.0, 200.0, 32.0);
@@ -458,4 +459,33 @@ fn the_content_node_appears_while_open_and_an_access_dismiss_closes_it() {
         out.tree.expect("tree").get(list).is_none(),
         "hidden once closed"
     );
+}
+
+#[test]
+fn a_popover_anchored_on_a_response_in_a_scrolled_area_opens_at_it_on_screen() {
+    let opts = ScrollOptions {
+        extent: Some((400.0, 1000.0)),
+        ..ScrollOptions::default()
+    };
+    let frame = |h: &mut UiHarness, ms: u64| {
+        let mut placed = None;
+        h.at_ms(ms).frame(|ui| {
+            ui.scroll_area("s", Rect::new(0.0, 0.0, 400.0, 200.0), &opts, |ui, _| {
+                let rect = Rect::new(10.0, 150.0, 100.0, 32.0);
+                let r = ui.interact(anchor_id(), rect, Sense::CLICK_FOCUS);
+                let o = PopoverOptions::new(r.rect, (120.0, 60.0));
+                placed = Some(ui.popover("p", &o, |_, _| ()).1);
+                ((), Extent::default())
+            });
+        });
+        placed.expect("ran")
+    };
+    let mut h = UiHarness::new(WIN);
+    h.input.pointer_to(390.0, 190.0);
+    frame(&mut h, 0);
+    h.input.scroll_pixels(0.0, -100.0);
+    frame(&mut h, 5);
+    let placed = frame(&mut h, 10);
+    // Content y 150 at offset 100 is screen y 50; 32 high, gap 4.
+    assert_eq!((placed.rect.x, placed.rect.y), (10.0, 86.0));
 }

@@ -9,13 +9,15 @@ use crate::text::{
 /// - key: `TextKey(spec.cache_key(scale))`, so it matches any real system's identity rule;
 /// - width: the sum over runs of char count × size × 0.5 (logical px), so every char is half its
 ///   run's size wide;
-/// - lines break at `\n` and `\r\n` (the ending is not part of a line); with no ending in the
-///   text, `wrap: Some(w)`, `w > 0` and a width above `w` give `ceil(width / w)` lines and width
-///   `w`; otherwise one line per ending-separated line, as wide as the widest;
-/// - height: lines × the first run's line height, or 17.0 with no runs (as the shaping cache
-///   gives an empty spec);
-/// - queries: the caret and hit follow the half-size chars; `lines` splits at the endings only
-///   (it does not wrap); `segments` groups combining marks U+0300 to U+036F, U+FE0F, U+200D and
+/// - lines break at `\n` and `\r\n` (the ending is not part of a line); with `wrap: Some(w)`,
+///   `w > 0` and a widest line above `w`, each line above `w` shows as `ceil(line width / w)` rows
+///   (at most one per char, the chars spread evenly over them) and the width is `w`; otherwise the
+///   width is the widest line's;
+/// - height: rows × the first run's line height, or 17.0 with no runs (as the shaping cache gives
+///   an empty spec);
+/// - queries: the caret and hit follow the half-size chars and the rows `prepare` counts, as
+///   `lines` lists them (a row's end is the next one's start, where the caret belongs to the later
+///   row); `segments` groups combining marks U+0300 to U+036F, U+FE0F, U+200D and
 ///   the skin tones U+1F3FB to U+1F3FF onto the char before them, a U+200D also joins the
 ///   pictographic char after it, and `\r\n` is one cluster; a word is a run of clusters led by an
 ///   alphanumeric char, a run of clusters led by whitespace, or any other single cluster.
@@ -31,10 +33,39 @@ struct Glyph {
     w: f32,
 }
 
-/// The fake's layout: chars per line, each line's byte range, and the line height.
+/// The fake's layout: chars per row, each row's byte range, the line height and the width.
 struct Layout {
     lines: Vec<(usize, usize, Vec<Glyph>)>,
     line_h: f32,
+    width: f32,
+}
+
+/// Pushes the ending-separated line `start..end`, cut into rows when it is wider than `wrap`.
+fn push_line(
+    out: &mut Vec<(usize, usize, Vec<Glyph>)>,
+    wrap: Option<f32>,
+    start: usize,
+    end: usize,
+    glyphs: Vec<Glyph>,
+) {
+    let width: f32 = glyphs.iter().map(|g| g.w).sum();
+    let count = glyphs.len();
+    let rows = match wrap {
+        Some(w) if w > 0.0 && width > w => ((width / w).ceil() as usize).min(count),
+        _ => 1,
+    };
+    if rows <= 1 {
+        out.push((start, end, glyphs));
+        return;
+    }
+    let mut cut: Vec<Vec<Glyph>> = (0..rows).map(|_| Vec::new()).collect();
+    for (i, g) in glyphs.into_iter().enumerate() {
+        cut[i * rows / count].push(g);
+    }
+    let starts: Vec<usize> = cut.iter().map(|r| r[0].at).collect();
+    for (i, row) in cut.into_iter().enumerate() {
+        out.push((starts[i], starts.get(i + 1).copied().unwrap_or(end), row));
+    }
 }
 
 impl FakeText {
@@ -54,6 +85,7 @@ impl FakeText {
         let len = at;
         let mut lines = Vec::new();
         let (mut start, mut cur) = (0, Vec::new());
+        let mut widest: f32 = 0.0;
         let mut i = 0;
         while i < chars.len() {
             let g = &chars[i];
@@ -72,13 +104,24 @@ impl FakeText {
                 continue;
             }
             let end = g.at;
-            lines.push((start, end, std::mem::take(&mut cur)));
+            let line = std::mem::take(&mut cur);
+            widest = widest.max(line.iter().map(|g| g.w).sum());
+            push_line(&mut lines, spec.wrap, start, end, line);
             i += ending;
             start = chars.get(i).map_or(len, |n| n.at);
         }
-        lines.push((start, len, cur));
+        widest = widest.max(cur.iter().map(|g| g.w).sum());
+        push_line(&mut lines, spec.wrap, start, len, cur);
         let line_h = spec.runs.first().map_or(17.0, |(_, st)| st.line);
-        Layout { lines, line_h }
+        let width = match spec.wrap {
+            Some(w) if w > 0.0 && widest > w => w,
+            _ => widest,
+        };
+        Layout {
+            lines,
+            line_h,
+            width,
+        }
     }
 }
 
@@ -125,22 +168,10 @@ impl TextSystem for FakeText {
     fn prepare(&mut self, spec: &Spec, scale: f32) -> (TextKey, (f32, f32)) {
         let key = TextKey(spec.cache_key(scale));
         let layout = Self::layout(spec);
-        let widths: Vec<f32> = layout
-            .lines
-            .iter()
-            .map(|l| l.2.iter().map(|g| g.w).sum())
-            .collect();
-        let mut width: f32 = widths.iter().copied().fold(0.0, f32::max);
-        let mut lines = layout.lines.len() as f32;
-        if let Some(w) = spec.wrap
-            && w > 0.0
-            && width > w
-        {
-            lines = widths.iter().map(|lw| (lw / w).ceil().max(1.0)).sum();
-            width = w;
-        }
-        let height = spec.runs.first().map_or(17.0, |(_, st)| lines * st.line);
-        (key, (width, height))
+        (
+            key,
+            (layout.width, layout.lines.len() as f32 * layout.line_h),
+        )
     }
 
     fn caret(&mut self, spec: &Spec, _scale: f32, offset: usize) -> CaretPos {
@@ -262,7 +293,14 @@ fn finite_size(property: &str, size: (f32, f32)) -> Result<(), String> {
 /// - P12: on a three-line spec joined with `\n` and `\r\n` the lines start at the joined offsets, in
 ///   order, top to bottom, and the caret of each start is on its line at the line's top; a final
 ///   terminator opens one more, empty line;
-/// - P13: `segments` of every [`SEGMENT_TABLE`] text is the table's boundaries, for both units.
+/// - P13: `segments` of every [`SEGMENT_TABLE`] text is the table's boundaries, for both units;
+/// - P14: `hit` keeps the column outside the lines: a point above the first line answers as that
+///   line at the same `x`, a point below the last answers as the last, left and right of a line
+///   are its first and last offset;
+/// - P15: the queries and `prepare` agree on the lines, for hard and soft breaks and a final
+///   terminator: `measure`'s height is the last row's bottom, the rows stack with no gap, the caret
+///   of each row's start is on that row, the caret at the end is on the last row, and `hit` at each
+///   row's left edge is its start.
 pub fn text_system_contract(ts: &mut dyn TextSystem) -> Result<(), String> {
     let white = [255; 4];
     let samples = [
@@ -531,6 +569,8 @@ fn query_contract(ts: &mut dyn TextSystem) -> Result<(), String> {
             "P12 caret after a trailing terminator",
             || format!("{c:?}"),
         )?;
+        hit_contract(ts, style)?;
+        line_contract(ts, style)?;
     } else {
         check(
             !lines.is_empty()
@@ -540,6 +580,109 @@ fn query_contract(ts: &mut dyn TextSystem) -> Result<(), String> {
             "P12 lines without layout",
             || format!("{lines:?}"),
         )?;
+    }
+    Ok(())
+}
+
+/// The texts of P14 and P15: hard breaks of each kind, with and without a final terminator.
+const LINE_TEXTS: &[&str] = &[
+    "a",
+    "a\nb",
+    "a\nb\n",
+    "a\nb\n\n",
+    "\n",
+    "\n\n",
+    "a\n\nb",
+    "a\r\n",
+    "a\r\nb\r\n",
+    "Hello world\nsecond",
+];
+
+/// The specs of P14 and P15.
+fn line_specs(style: Style) -> Vec<Spec> {
+    let mut specs: Vec<Spec> = LINE_TEXTS.iter().map(|t| Spec::plain(*t, style)).collect();
+    specs.push(Spec::plain("aa bb cc dd ee ff gg", style).wrapped(40.0));
+    specs.push(Spec::plain("aa bb cc dd ee ff gg\n", style).wrapped(40.0));
+    specs
+}
+
+fn hit_contract(ts: &mut dyn TextSystem, style: Style) -> Result<(), String> {
+    for spec in line_specs(style) {
+        let text = joined_text(&spec);
+        for scale in [1.0, 2.0] {
+            let lines = ts.lines(&spec, scale);
+            let width = ts.prepare(&spec, scale).1.0;
+            let (first, last) = (lines[0], lines[lines.len() - 1]);
+            for x in [0.0, width / 3.0, width / 2.0, width + 40.0] {
+                let inside = ts.hit(&spec, scale, (x, first.y + first.height / 2.0));
+                let above = ts.hit(&spec, scale, (x, first.y - 40.0));
+                check(above == inside, "P14 hit above the first line", || {
+                    format!("{text:?} at {scale}, x {x}: {above}, on the line {inside}")
+                })?;
+                let inside = ts.hit(&spec, scale, (x, last.y + last.height / 2.0));
+                for y in [last.y + last.height, last.y + last.height + 40.0] {
+                    let below = ts.hit(&spec, scale, (x, y));
+                    check(below == inside, "P14 hit below the last line", || {
+                        format!("{text:?} at {scale}, ({x}, {y}): {below}, on the line {inside}")
+                    })?;
+                }
+            }
+            if spec.wrap.is_none() {
+                for l in &lines {
+                    let mid = l.y + l.height / 2.0;
+                    let (left, right) = (
+                        ts.hit(&spec, scale, (-40.0, mid)),
+                        ts.hit(&spec, scale, (width + 40.0, mid)),
+                    );
+                    check(left == l.start, "P14 hit left of a line", || {
+                        format!("{text:?} at {scale}, {l:?}: {left}")
+                    })?;
+                    check(right == l.end, "P14 hit right of a line", || {
+                        format!("{text:?} at {scale}, {l:?}: {right}")
+                    })?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn line_contract(ts: &mut dyn TextSystem, style: Style) -> Result<(), String> {
+    for spec in line_specs(style) {
+        let text = joined_text(&spec);
+        for scale in [1.0, 2.0] {
+            let lines = ts.lines(&spec, scale);
+            let last = lines[lines.len() - 1];
+            let height = ts.measure(&spec, scale).1;
+            check(
+                (height - (last.y + last.height)).abs() < 1e-3,
+                "P15 measure and lines",
+                || format!("{text:?} at {scale}: height {height}, {lines:?}"),
+            )?;
+            check(
+                lines
+                    .windows(2)
+                    .all(|w| (w[0].y + w[0].height - w[1].y).abs() < 1e-3),
+                "P15 rows stack",
+                || format!("{text:?} at {scale}: {lines:?}"),
+            )?;
+            let end = ts.caret(&spec, scale, text.len());
+            check(
+                end.line == lines.len() - 1 && end.y == last.y,
+                "P15 caret at the end",
+                || format!("{text:?} at {scale}: {end:?}, {lines:?}"),
+            )?;
+            for (i, l) in lines.iter().enumerate() {
+                let c = ts.caret(&spec, scale, l.start);
+                check(c.line == i && c.y == l.y, "P15 caret at a row", || {
+                    format!("{text:?} at {scale}, row {i} {l:?}: {c:?}")
+                })?;
+                let got = ts.hit(&spec, scale, (0.0, l.y + l.height / 2.0));
+                check(got == l.start, "P15 hit at a row's left edge", || {
+                    format!("{text:?} at {scale}, row {i} {l:?}: {got}")
+                })?;
+            }
+        }
     }
     Ok(())
 }
@@ -617,6 +760,69 @@ mod tests {
         fn segments(&self, text: &str, unit: Unit) -> Vec<usize> {
             self.0.segments(text, unit)
         }
+    }
+
+    /// What a shaping system does if nobody pins it: it forgets the line a final terminator opens,
+    /// or answers the end of the text for a point below the last line.
+    struct Drifting {
+        short_extent: bool,
+    }
+
+    impl TextSystem for Drifting {
+        fn prepare(&mut self, spec: &Spec, scale: f32) -> (TextKey, (f32, f32)) {
+            let (key, (w, h)) = FakeText.prepare(spec, scale);
+            let open = joined_text(spec).ends_with('\n');
+            let short = self.short_extent && open;
+            (key, (w, if short { h - spec.runs[0].1.line } else { h }))
+        }
+        fn caret(&mut self, spec: &Spec, scale: f32, offset: usize) -> CaretPos {
+            FakeText.caret(spec, scale, offset)
+        }
+        fn hit(&mut self, spec: &Spec, scale: f32, pos: (f32, f32)) -> usize {
+            let bottom = FakeText.measure(spec, scale).1;
+            if !self.short_extent && pos.0.is_finite() && pos.1 >= bottom {
+                return joined_text(spec).len();
+            }
+            FakeText.hit(spec, scale, pos)
+        }
+        fn lines(&mut self, spec: &Spec, scale: f32) -> Vec<LineSpan> {
+            FakeText.lines(spec, scale)
+        }
+        fn segments(&self, text: &str, unit: Unit) -> Vec<usize> {
+            FakeText.segments(text, unit)
+        }
+    }
+
+    #[test]
+    fn the_contract_catches_a_hit_that_loses_the_column() {
+        let mut t = Drifting {
+            short_extent: false,
+        };
+        let err = text_system_contract(&mut t).expect_err("caught");
+        assert!(err.starts_with("P14 hit below the last line"), "{err}");
+    }
+
+    #[test]
+    fn the_contract_catches_a_height_without_the_open_line() {
+        let mut t = Drifting { short_extent: true };
+        let err = text_system_contract(&mut t).expect_err("caught");
+        assert!(err.starts_with("P15 measure and lines"), "{err}");
+    }
+
+    #[test]
+    fn fake_text_rows_agree_with_its_height() {
+        let style = Style::ui(10.0, [255; 4]);
+        let mut t = FakeText;
+        let spec = Spec::plain("abcd", style).wrapped(8.0);
+        let rows: Vec<(usize, usize)> = t
+            .lines(&spec, 1.0)
+            .iter()
+            .map(|l| (l.start, l.end))
+            .collect();
+        assert_eq!(rows, [(0, 2), (2, 3), (3, 4)]);
+        // The offset where a row breaks belongs to the later row.
+        assert_eq!(t.caret(&spec, 1.0, 2).line, 1);
+        assert_eq!(t.hit(&spec, 1.0, (0.0, 14.0)), 2);
     }
 
     #[test]

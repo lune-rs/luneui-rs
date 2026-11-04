@@ -2,16 +2,18 @@
 //! focus and the node. The last acceptance line, real typing with an input method, is unverified
 //! here (no hands-on run).
 
+use lune_ui_core::access::{Node, Role, State};
 use lune_ui_core::color::premul;
 use lune_ui_core::input::{FrameOutput, ImeEvent, Key, NamedKey, PointerButton, Repaint};
-use lune_ui_core::paint::Rect;
+use lune_ui_core::paint::{LayerId, Rect};
 use lune_ui_core::scene::{Scene, Shape};
 use lune_ui_core::shortcuts::{Binding, Chord, Scope};
 use lune_ui_core::testing::{FakeText, UiHarness};
 use lune_ui_core::text::{Spec, Style, TextSystem};
 use lune_ui_core::theme::DARK;
-use lune_ui_core::ui::WidgetId;
+use lune_ui_core::ui::{Dismissal, OverlayOptions, Sense, WidgetId};
 use lune_ui_core::widgets::field::{FieldOptions, FieldResponse, Variant};
+use lune_ui_core::widgets::menu::{CLOSE, OPEN};
 
 const WIN: (f32, f32) = (400.0, 300.0);
 const RECT: Rect = Rect::new(20.0, 20.0, 140.0, 32.0);
@@ -456,4 +458,114 @@ fn a_settled_composition_is_idle() {
     run(&mut h, &mut text);
     let (_, _, out) = run(&mut h, &mut text);
     assert_eq!(out.repaint, Repaint::Idle);
+}
+
+/// One frame of a keep-alive page holding the field, shown or not, beside a button, with an
+/// overlay that Escape dismisses when `overlay` is set. Returns the focus and the dismissal.
+fn page(
+    h: &mut UiHarness,
+    text: &mut String,
+    shown: bool,
+    overlay: bool,
+) -> (FrameOutput, Option<Dismissal>) {
+    let button = WidgetId::ROOT.with("b");
+    let mut dismissed = None;
+    let (_, out) = h.frame(|ui| {
+        ui.keep_alive("page", |ui| {
+            if shown {
+                ui.text_field_with("f", RECT, text, &FieldOptions::default());
+            }
+        });
+        ui.interact(button, OTHER, Sense::CLICK_FOCUS);
+        let mut node = Node::new(button, Role::Button, "b", OTHER);
+        node.states.insert(State::Focusable);
+        ui.node(node);
+        if overlay {
+            let opts = OverlayOptions {
+                layer: LayerId::Popup,
+                modal: false,
+                dismiss_on_escape: true,
+                dismiss_on_outside_press: false,
+                dismiss_on_focus_loss: false,
+                anchor: None,
+                initial_focus: None,
+                open: OPEN,
+                close: CLOSE,
+            };
+            dismissed = ui.overlay("o", &opts, |_, _, _| {}, |_, _| ()).0.dismissed;
+        }
+    });
+    (out, dismissed)
+}
+
+/// A field focused and composing in a keep-alive page.
+fn composing_page(text: &mut String) -> UiHarness {
+    let mut h = UiHarness::new(WIN);
+    page(&mut h, text, true, false);
+    h.input.key_down(Key::Named(NamedKey::Tab), None);
+    page(&mut h, text, true, false);
+    preedit(&mut h, "か", Some((3, 3)));
+    let (out, _) = page(&mut h, text, true, false);
+    assert_ne!(out.focused, Some(WidgetId::ROOT.with("b")));
+    assert!(out.focused.is_some());
+    h
+}
+
+#[test]
+fn tab_moves_on_from_a_composition_in_a_hidden_page() {
+    let mut text = String::from("lune");
+    let mut h = composing_page(&mut text);
+    page(&mut h, &mut text, false, false);
+    h.input.key_down(Key::Named(NamedKey::Tab), None);
+    let (out, _) = page(&mut h, &mut text, false, false);
+    assert_eq!(out.focused, Some(WidgetId::ROOT.with("b")));
+}
+
+#[test]
+fn escape_dismisses_past_a_composition_in_a_hidden_page() {
+    let mut text = String::from("lune");
+    let mut h = composing_page(&mut text);
+    page(&mut h, &mut text, false, true);
+    h.input.key_down(Key::Named(NamedKey::Escape), None);
+    let (_, dismissed) = page(&mut h, &mut text, false, true);
+    assert_eq!(dismissed, Some(Dismissal::Escape));
+}
+
+#[test]
+fn a_shortcut_fires_past_a_composition_in_a_hidden_page() {
+    let mut text = String::from("lune");
+    for preempt in [false, true] {
+        let mut h = composing_page(&mut text);
+        let chord = Chord::key(Key::Named(NamedKey::F2));
+        let binding = Binding::new(Scope::Global, chord, "go");
+        h.shortcuts
+            .add(if preempt { binding.preempt() } else { binding });
+        page(&mut h, &mut text, false, false);
+        h.input.key_down(Key::Named(NamedKey::F2), None);
+        let (out, _) = page(&mut h, &mut text, false, false);
+        assert_eq!(out.fired.len(), 1, "preempt {preempt}");
+    }
+}
+
+#[test]
+fn a_press_in_the_frame_the_page_hides_bubbles_past_the_composition() {
+    let mut text = String::from("lune");
+    let mut h = composing_page(&mut text);
+    let chord = Chord::key(Key::Named(NamedKey::F2));
+    h.shortcuts.add(Binding::new(Scope::Global, chord, "go"));
+    h.input.key_down(Key::Named(NamedKey::F2), None);
+    let (out, _) = page(&mut h, &mut text, false, false);
+    assert_eq!(out.fired.len(), 1);
+}
+
+#[test]
+fn a_page_shown_again_has_no_composition_and_leaves_tab_to_the_frame() {
+    let mut text = String::from("lune");
+    let mut h = composing_page(&mut text);
+    page(&mut h, &mut text, false, false);
+    page(&mut h, &mut text, true, false);
+    h.input.key_down(Key::Named(NamedKey::Tab), None);
+    let (out, _) = page(&mut h, &mut text, true, false);
+    assert_eq!(out.focused, Some(WidgetId::ROOT.with("b")));
+    assert_eq!(text, "lune");
 }

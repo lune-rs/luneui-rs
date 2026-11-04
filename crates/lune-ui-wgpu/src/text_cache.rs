@@ -260,6 +260,8 @@ impl TextSystem for TextCache {
             w = w.max(run.line_w);
             lines += 1;
         }
+        // `caret` and `lines` count the empty line a final terminator opens, so the height does.
+        lines += usize::from(line_bases(&buffer, &joined_text(spec)).1);
         let size = (w / s, lines.max(1) as f32 * first.line);
         self.entries.insert(
             key,
@@ -337,13 +339,20 @@ impl TextSystem for TextCache {
         };
         let (bases, open) = line_bases(buffer, &text);
         let (x, y) = (pos.0 * scale, pos.1 * scale);
-        let below = buffer
-            .layout_runs()
-            .last()
-            .map_or(f32::INFINITY, |r| r.line_top + r.line_height);
+        let mut runs = buffer.layout_runs();
+        let Some(first) = runs.next() else {
+            return 0;
+        };
+        let top = first.line_top;
+        let (last_top, below) = runs.last().map_or((top, top + first.line_height), |r| {
+            (r.line_top, r.line_top + r.line_height)
+        });
         if open && y >= below {
             return text.len();
         }
+        // `Buffer::hit` drops `x` outside the runs (offset 0 above them, the end of the text below
+        // them); the trait keeps the column on the first or last line.
+        let y = if y >= below { last_top } else { y.max(top) };
         let Some(cursor) = buffer.hit(x, y) else {
             return 0;
         };

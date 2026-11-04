@@ -148,6 +148,8 @@ pub enum Surface {
 /// Where a popover goes and how it looks.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PopoverOptions {
+    /// In window coordinates, like every placement: [`Response::rect`](crate::ui::Response::rect),
+    /// or a rect through [`Painter::transformed`] for one drawn in a scrolled parent.
     pub anchor: Rect,
     /// The widget focus returns to when the popover closes, if the one focused at open is gone.
     pub anchor_id: Option<WidgetId>,

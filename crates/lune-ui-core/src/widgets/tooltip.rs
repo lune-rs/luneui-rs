@@ -149,7 +149,8 @@ impl<'a> Ui<'a> {
                 }
             });
         }
-        let hover = self.pointer_in(anchor.rect);
+        // `anchor.rect` is a `Response`'s: already in window coordinates.
+        let hover = self.pointer_over(anchor.rect);
         let active = hover || anchor.focus_visible;
         let hidden_id = anchor.id.with("tooltip-hidden");
         let hidden = {

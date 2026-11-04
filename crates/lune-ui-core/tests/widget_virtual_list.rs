@@ -14,6 +14,7 @@ use lune_ui_core::testing::UiHarness;
 use lune_ui_core::theme::DARK;
 use lune_ui_core::ui::{Ui, WidgetId};
 use lune_ui_core::widgets::button::ButtonKind;
+use lune_ui_core::widgets::scroll_area::{Extent, ScrollOptions};
 use lune_ui_core::widgets::virtual_list::{
     HOVER, Heights, ListOptions, ListResponse, ListState, MARGIN, RowCtx, RowHeights, RowKey,
     SELECTION, SelectionMode, row_fill,
@@ -1647,4 +1648,46 @@ fn the_list_sits_on_a_scroll_region_so_the_wheel_works_over_a_row() {
     h.input.scroll_pixels(0.0, -30.0);
     h.at_ms(16);
     assert_eq!(run(&mut h, &o).r.offset, 30.0);
+}
+
+#[test]
+fn a_drag_selects_by_screen_position_in_a_list_inside_a_scrolled_parent() {
+    const R: f32 = 20.0;
+    let outer = Rect::new(0.0, 0.0, 400.0, 400.0);
+    // Content y 300 at offset 200 is screen y 100.
+    let list = Rect::new(0.0, 300.0, 300.0, 200.0);
+    let o = ListOptions {
+        heights: Heights::Fixed(R),
+        ..opts(100)
+    };
+    let frame = |h: &mut UiHarness, ms: u64| {
+        let mut sel = BTreeSet::new();
+        h.at_ms(ms).frame(|ui| {
+            let area = ScrollOptions {
+                extent: Some((400.0, 1000.0)),
+                ..ScrollOptions::default()
+            };
+            ui.scroll_area("o", outer, &area, |ui, _| {
+                ui.virtual_list("l", list, &o, key, |_, _| R);
+                sel = ui.list_state("l").selection.clone();
+                ((), Extent::default())
+            });
+        });
+        sel
+    };
+    let mut h = harness();
+    h.input.pointer_to(350.0, 350.0);
+    frame(&mut h, 0);
+    h.input.scroll_pixels(0.0, -200.0);
+    frame(&mut h, 5);
+    frame(&mut h, 10);
+    frame(&mut h, 20);
+    // Row 1 is at screen y 120 to 140, row 5 at 200 to 220.
+    h.input.pointer_to(50.0, 130.0);
+    frame(&mut h, 30);
+    h.input.press(P);
+    assert_eq!(frame(&mut h, 40), keys(&[1]));
+    h.input.pointer_to(50.0, 210.0);
+    frame(&mut h, 50);
+    assert_eq!(frame(&mut h, 60), keys(&[1, 2, 3, 4, 5]));
 }

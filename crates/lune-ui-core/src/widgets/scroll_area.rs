@@ -302,6 +302,40 @@ struct Requests {
     reveals: Vec<(Target, Reveal)>,
     shift_x: f64,
     shift_y: f64,
+    /// What the area left behind when it last ran.
+    ran: Option<Ran>,
+}
+
+/// One area's axes as its last call ended, so a request made later in the same frame can tell
+/// whether it changes the target.
+#[derive(Debug, Clone, Copy)]
+struct Ran {
+    frame: u64,
+    live: [bool; 2],
+    wanted: [f64; 2],
+    ext: [f64; 2],
+    vp: [f64; 2],
+}
+
+impl Ran {
+    /// Whether `target` moves either axis from where the area is heading.
+    fn moved_by(&self, target: &Target, how: Reveal) -> bool {
+        [target.x, target.y].iter().enumerate().any(|(ax, span)| {
+            let cur = clamp_offset(self.wanted[ax], self.ext[ax], self.vp[ax]);
+            self.live[ax] && reveal_axis(*span, cur, self.ext[ax], self.vp[ax], how).is_some()
+        })
+    }
+}
+
+/// The offset a reveal of `span` (start and length, in content coordinates) sends an axis to from
+/// `cur`, or `None` when it changes nothing: no span, one outside the content, or already showing.
+fn reveal_axis(span: Option<(f64, f64)>, cur: f64, ext: f64, vp: f64, how: Reveal) -> Option<f64> {
+    let (start, len) = span?;
+    if !start.is_finite() || !len.is_finite() || len < 0.0 || start >= ext || start + len < 0.0 {
+        return None;
+    }
+    let to = clamp_offset(reveal_offset(start, len, vp, cur, how), ext, vp);
+    (to != cur).then_some(to)
 }
 
 /// `r`, drawn in the area's space, as a box in content coordinates: the content's origin is the
@@ -344,10 +378,21 @@ impl Ui<'_> {
 
     /// Asks the scroll area under `key` (of the current scope) to bring `target`, a box in its
     /// content coordinates, into view. Applied when the area is next called (this frame if it
-    /// comes later). A target outside the content changes nothing.
+    /// comes later, or from inside its content). A target outside the content changes nothing.
+    ///
+    /// Made after the area in the frame, it asks for the frame that applies it, unless the target
+    /// already shows, so an app may call this every frame and still settle to `Repaint::Idle`.
     pub fn scroll_to(&mut self, key: impl Hash, target: Target, how: Reveal) {
         let id = self.id(key);
-        self.transient::<Requests>(id).reveals.push((target, how));
+        let frame = self.frame_number();
+        let requests = self.transient::<Requests>(id);
+        requests.reveals.push((target, how));
+        let late = requests
+            .ran
+            .is_some_and(|r| r.frame == frame && r.moved_by(&target, how));
+        if late {
+            self.request_catch_up();
+        }
     }
 
     /// Asks the area under `key` (of the current scope) to move its vertical offset by `by` when
@@ -391,6 +436,7 @@ impl Ui<'_> {
             mut reveals,
             shift_x,
             shift_y,
+            ran: _,
         } = std::mem::take(self.transient::<Requests>(id));
 
         // Identity: a new key starts at the top; the same key keeps `wanted` through short frames.
@@ -482,6 +528,8 @@ impl Ui<'_> {
         });
         let focusable_child = self.focusable_since(reg_mark);
         let watched = self.watched_since(watch_mark);
+        // Requests the content made: nothing else would run them on a quiet frame.
+        reveals.append(&mut self.transient::<Requests>(id).reveals);
 
         // The measured extent: follow-tail, then the clamp (a preserved document keeps `wanted`).
         let ext = known.unwrap_or([clean(measured.width), clean(measured.height)]);
@@ -518,24 +566,13 @@ impl Ui<'_> {
         st.last_focus = inside.map(|(f, _)| f);
         for (target, how) in reveals {
             for ax in 0..2 {
-                let Some((start, len)) = [target.x, target.y][ax] else {
-                    continue;
-                };
-                if !live[ax]
-                    || !start.is_finite()
-                    || !len.is_finite()
-                    || len < 0.0
-                    || start >= ext[ax]
-                    || start + len < 0.0
-                {
-                    continue;
-                }
                 let a = &mut st.a[ax];
                 let cur = clamp_offset(a.wanted, ext[ax], vp[ax]);
-                let to = clamp_offset(reveal_offset(start, len, vp[ax], cur, how), ext[ax], vp[ax]);
-                if to == cur {
+                let span = [target.x, target.y][ax];
+                let Some(to) = reveal_axis(span, cur, ext[ax], vp[ax], how).filter(|_| live[ax])
+                else {
                     continue;
-                }
+                };
                 if (to - cur).abs() > SNAP_DISTANCE * vp[ax] {
                     a.jump(to);
                 } else {
@@ -635,6 +672,14 @@ impl Ui<'_> {
         let keep: Vec<(WidgetId, Rect)> = watched.iter().map(|(w, _)| (*w, rect)).collect();
         self.watch_replace(watch_mark, keep);
 
+        let ran = Ran {
+            frame: self.frame_number(),
+            live,
+            wanted: [st.a[0].wanted, st.a[1].wanted],
+            ext,
+            vp,
+        };
+        self.transient::<Requests>(id).ran = Some(ran);
         *self.persistent::<ScrollState>(id) = st;
         ScrollResponse {
             value,

@@ -3,14 +3,17 @@
 
 use lune_ui_core::access::{AccessAction, AccessValue, Action, Role, State, Value};
 use lune_ui_core::color::premul;
-use lune_ui_core::input::{Key, NamedKey, PointerButton, Repaint};
+use lune_ui_core::input::{FrameOutput, Key, NamedKey, PointerButton, Repaint};
 use lune_ui_core::motion::{MotionTier, conformance};
 use lune_ui_core::paint::{Painter, Rect};
 use lune_ui_core::scene::Scene;
 use lune_ui_core::testing::{FakeText, UiHarness};
+use lune_ui_core::text::Style;
 use lune_ui_core::theme::DARK;
 use lune_ui_core::ui::{Response, WidgetId};
-use lune_ui_core::widgets::field::{ERROR, FOCUS, FieldState, HOVER, field};
+use lune_ui_core::widgets::field::{ERROR, FOCUS, FieldOptions, FieldState, HOVER, field};
+use lune_ui_core::widgets::scroll_area::{Extent, ScrollOptions};
+use lune_ui_core::widgets::text_area::AreaOptions;
 
 const WIN: (f32, f32) = (400.0, 300.0);
 const RECT: Rect = Rect::new(20.0, 20.0, 140.0, 32.0);
@@ -1068,4 +1071,81 @@ mod edit {
             "a new field: the caret after the text"
         );
     }
+}
+
+/// One frame of `draw` inside a parent that scrolls over 1000 px on both axes.
+fn in_parent(
+    h: &mut UiHarness,
+    ms: u64,
+    draw: impl FnOnce(&mut lune_ui_core::ui::Ui<'_>),
+) -> FrameOutput {
+    let opts = ScrollOptions {
+        extent: Some((1000.0, 1000.0)),
+        ..ScrollOptions::default()
+    };
+    let area = Rect::new(0.0, 0.0, 380.0, 280.0);
+    h.at_ms(ms)
+        .frame(|ui| {
+            ui.scroll_area("o", area, &opts, |ui, _| {
+                draw(ui);
+                ((), Extent::default())
+            });
+        })
+        .1
+}
+
+fn selection_of(out: &FrameOutput, key: &str) -> (usize, usize) {
+    let node = out.tree.get(WidgetId::ROOT.with(key)).expect("node");
+    node.text.as_ref().expect("text").selection
+}
+
+#[test]
+fn a_press_and_a_drag_place_the_caret_in_a_field_inside_a_scrolled_parent() {
+    let glyph = DARK.font_base * 0.5;
+    let mut text = String::from("abcdefghij");
+    // Content (35, 300) at offset (15, 200) is screen (20, 100); the text starts 10 px in.
+    let rect = Rect::new(35.0, 300.0, 140.0, 32.0);
+    let mut h = UiHarness::new(WIN);
+    let draw = |ui: &mut lune_ui_core::ui::Ui<'_>, text: &mut String| {
+        ui.text_field_with("f", rect, text, &FieldOptions::default());
+    };
+    h.input.pointer_to(370.0, 270.0);
+    in_parent(&mut h, 0, |ui| draw(ui, &mut text));
+    h.input.scroll_pixels(-15.0, -200.0);
+    in_parent(&mut h, 5, |ui| draw(ui, &mut text));
+    in_parent(&mut h, 10, |ui| draw(ui, &mut text));
+    in_parent(&mut h, 20, |ui| draw(ui, &mut text));
+    h.input.pointer_to(30.0 + 3.0 * glyph, 116.0);
+    in_parent(&mut h, 30, |ui| draw(ui, &mut text));
+    h.input.press(PointerButton::Primary);
+    let out = in_parent(&mut h, 40, |ui| draw(ui, &mut text));
+    assert_eq!(selection_of(&out, "f"), (3, 3));
+    h.input.pointer_to(30.0 + 6.0 * glyph, 116.0);
+    in_parent(&mut h, 50, |ui| draw(ui, &mut text));
+    let out = in_parent(&mut h, 60, |ui| draw(ui, &mut text));
+    assert_eq!(selection_of(&out, "f"), (3, 6));
+}
+
+#[test]
+fn a_press_picks_the_line_in_a_text_area_inside_a_scrolled_parent() {
+    let glyph = DARK.font_base * 0.5;
+    let line = Style::ui(DARK.font_base, DARK.fg_primary).line;
+    let mut text = String::from("aaaa\nbbbb\ncccc");
+    // Content (35, 300) at offset (15, 200) is screen (20, 100); the text starts (10, 7) in.
+    let rect = Rect::new(35.0, 300.0, 200.0, 100.0);
+    let mut h = UiHarness::new(WIN);
+    let draw = |ui: &mut lune_ui_core::ui::Ui<'_>, text: &mut String| {
+        ui.text_area("a", rect, text, &AreaOptions::default());
+    };
+    h.input.pointer_to(370.0, 270.0);
+    in_parent(&mut h, 0, |ui| draw(ui, &mut text));
+    h.input.scroll_pixels(-15.0, -200.0);
+    in_parent(&mut h, 5, |ui| draw(ui, &mut text));
+    in_parent(&mut h, 10, |ui| draw(ui, &mut text));
+    in_parent(&mut h, 20, |ui| draw(ui, &mut text));
+    h.input.pointer_to(30.0 + 2.0 * glyph, 107.0 + 1.5 * line);
+    in_parent(&mut h, 30, |ui| draw(ui, &mut text));
+    h.input.press(PointerButton::Primary);
+    let out = in_parent(&mut h, 40, |ui| draw(ui, &mut text));
+    assert_eq!(selection_of(&out, "a"), (7, 7));
 }

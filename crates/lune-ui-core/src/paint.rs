@@ -828,12 +828,17 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         self.text.segments(text, unit)
     }
 
-    pub fn hit(&mut self, r: Rect, h: H) {
+    /// `r` as a hit region of it would be: cut to the current clip, then transformed.
+    pub(crate) fn hit_rect(&self, r: Rect) -> Rect {
         let r = match self.clip {
             Some(c) => r.intersect(&c),
             None => r,
         };
-        let r = self.tr(r);
+        self.tr(r)
+    }
+
+    pub fn hit(&mut self, r: Rect, h: H) {
+        let r = self.hit_rect(r);
         self.hits.push((r, h));
         self.hit_meta.push((self.layer, self.hit_tag));
     }

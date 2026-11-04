@@ -554,6 +554,11 @@ impl<'a> Ui<'a> {
             &config.theme.motion,
             config.tier,
         );
+        // A composition ends with its widget's last drawn frame. Nothing else clears it under a live
+        // keep-alive scope, where D15 keeps the focus and the widget's own `end_edit` does not run.
+        if store.focus.composing.is_some_and(|c| !ids.contains_key(&c)) {
+            store.focus.composing = None;
+        }
         let mut input_acted = input_acted;
         {
             // The bubble phase: presses nobody took go through the registry.
@@ -761,14 +766,20 @@ impl<'a> Ui<'a> {
         self.store.pointer.pos()
     }
 
-    /// Whether the pointer is inside `rect` (through the transform stack) with nothing of a later
-    /// overlay or a higher layer than the current painter context under it. Ignores `enabled` and
-    /// `Sense`, so it reads true over a disabled anchor, and reads the previous frame's regions.
+    /// Whether the pointer is inside `rect`, given in the current drawing space (it goes through
+    /// the clip and the transform stack, as a hit region does), with nothing of a later overlay or
+    /// a higher layer than the current painter context under it. Ignores `enabled` and `Sense`, so
+    /// it reads true over a disabled anchor, and reads the previous frame's regions.
     pub fn pointer_in(&self, rect: Rect) -> bool {
+        self.pointer_over(self.painter.hit_rect(rect))
+    }
+
+    /// [`Self::pointer_in`] for a rect already in window coordinates, such as [`Response::rect`].
+    pub(crate) fn pointer_over(&self, rect: Rect) -> bool {
         let Some(pos) = self.store.pointer.pos() else {
             return false;
         };
-        if !self.painter.transformed(rect).contains(pos) {
+        if !rect.contains(pos) {
             return false;
         }
         let (layer, tag) = self.painter.hit_context();
@@ -934,6 +945,11 @@ impl<'a> Ui<'a> {
     /// Whether an accessibility action asked to scroll `id` into view this frame.
     pub(crate) fn is_scroll_target(&self, id: WidgetId) -> bool {
         self.scroll_into_view.contains(&id)
+    }
+
+    /// The running frame's number, which two frames never share.
+    pub(crate) fn frame_number(&self) -> u64 {
+        self.store.frame
     }
 
     /// Asks for a frame after this one: the picture just drawn is one a state change this frame

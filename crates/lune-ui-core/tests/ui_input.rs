@@ -715,3 +715,32 @@ fn the_time_a_frame_runs_at_still_orders_press_counts() {
     h.frame(|ui| t = ui.time());
     assert_eq!(t, Duration::from_millis(250));
 }
+
+#[test]
+fn pointer_in_takes_a_rect_in_the_drawing_space_and_stops_at_its_clip() {
+    let (local_on_screen, translated_away, clipped) = {
+        let mut h = UiHarness::new((400.0, 300.0));
+        let mut read = |pos: (f32, f32), rect: Rect| {
+            h.input.pointer_to(pos.0, pos.1);
+            let mut got = false;
+            h.frame(|ui| {
+                ui.painter().push_clip(Rect::new(0.0, 0.0, 100.0, 100.0));
+                ui.painter().push_translate(0.0, -50.0);
+                got = ui.pointer_in(rect);
+                ui.painter().pop_translate();
+                ui.painter().pop_clip();
+            });
+            got
+        };
+        (
+            // Local y 60 is screen y 10.
+            read((15.0, 15.0), Rect::new(10.0, 60.0, 20.0, 20.0)),
+            read((15.0, 65.0), Rect::new(10.0, 60.0, 20.0, 20.0)),
+            // Local y 160 is screen y 110, past the clip's bottom edge.
+            read((15.0, 115.0), Rect::new(10.0, 160.0, 20.0, 20.0)),
+        )
+    };
+    assert!(local_on_screen);
+    assert!(!translated_away);
+    assert!(!clipped);
+}
