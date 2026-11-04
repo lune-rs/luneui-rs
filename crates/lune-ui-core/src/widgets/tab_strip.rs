@@ -449,9 +449,11 @@ impl Ui<'_> {
             events.push(TabEvent::New);
         }
 
-        // No tooltip under a gesture: the pointer crosses the other tabs and rests on them.
-        if !st.drag.is_active() {
-            for (tab, resp) in tabs.iter().zip(&laid.responses) {
+        // No tooltip under a gesture: the pointer crosses the other tabs and rests on them. The
+        // pressed tab keeps its call, which is what hides its tooltip until the pointer leaves.
+        let gesture = st.drag.is_active();
+        for (tab, resp) in tabs.iter().zip(&laid.responses) {
+            if !gesture || resp.pressed {
                 self.tooltip(resp, tab.title);
             }
         }

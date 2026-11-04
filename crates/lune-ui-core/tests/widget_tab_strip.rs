@@ -1315,6 +1315,25 @@ fn no_tooltip_waits_or_shows_during_a_drag() {
     assert!(nodes(&r.out.tree, Role::Tooltip).is_empty());
 }
 
+#[test]
+fn a_press_hides_the_tooltip_until_the_pointer_leaves() {
+    let mut app = App::of(3, Some(0));
+    let mut h = bench(&mut app);
+    let tree = run(&mut h, &mut app).out.tree;
+    press_at(&mut h, mid(&tree, "t1"));
+    run(&mut h, &mut app);
+    h.at_ms(100);
+    run(&mut h, &mut app);
+    h.input.release(PRIMARY);
+    h.at_ms(200);
+    run(&mut h, &mut app);
+    h.at_ms(300);
+    run(&mut h, &mut app);
+    h.at_ms(2000);
+    let r = run(&mut h, &mut app);
+    assert!(nodes(&r.out.tree, Role::Tooltip).is_empty());
+}
+
 // Motion rows.
 
 #[test]
