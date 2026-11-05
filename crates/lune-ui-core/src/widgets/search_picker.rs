@@ -396,6 +396,7 @@ fn popup<S: AsRef<str>>(
         let filter = FilterOptions {
             placeholder: opts.placeholder,
             label: opts.placeholder.is_empty().then_some(opts.name),
+            clear_unfocusable: false,
         };
         let edit = ui.filter_bar("search", bar, search, &filter);
         if edit.response.changed {

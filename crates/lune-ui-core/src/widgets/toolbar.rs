@@ -148,9 +148,7 @@ impl Ui<'_> {
     ) -> Response {
         let id = self.id(key);
         let mut r = self.interact(id, rect, Sense::CLICK_FOCUS);
-        if r.enabled
-            && (self.consume_key(id, NamedKey::Enter) || self.consume_key(id, NamedKey::Space))
-        {
+        if self.activation_keys(id, r.enabled, &[NamedKey::Enter, NamedKey::Space]) {
             r.clicked = true;
         }
         let theme = *self.theme();

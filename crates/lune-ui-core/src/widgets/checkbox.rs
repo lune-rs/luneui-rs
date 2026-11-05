@@ -146,7 +146,7 @@ impl Ui<'_> {
         let w = self.painter().measure(&label(&t, text, t.fg_secondary)).0;
         let hit = hit_rect(rect, w);
         let mut r = self.interact(id, hit, Sense::CLICK_FOCUS);
-        if r.enabled && (r.clicked || self.consume_key(id, NamedKey::Space)) {
+        if (r.clicked || self.activation_keys(id, r.enabled, &[NamedKey::Space])) && r.enabled {
             *checked = !*checked;
             r.mark_changed();
         }

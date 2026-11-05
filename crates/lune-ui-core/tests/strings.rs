@@ -196,3 +196,31 @@ fn defaults_cover_every_key_literal_in_src() {
         "the scan found no key literal (instrument check)"
     );
 }
+
+/// The keys M7's widgets draw, with their English text.
+#[test]
+fn the_m7_defaults_hold_their_text() {
+    let expected = [
+        ("luneui.menu.name", "Menu"),
+        ("luneui.toast-notifications.clear-all", "Clear all"),
+        ("luneui.toast-notifications.history-header", "NOTIFICATIONS"),
+        ("luneui.toast-notifications.dismiss", "Dismiss"),
+        ("luneui.command-palette.show-more", "Show more results"),
+        (
+            "luneui.command-palette.footer-right",
+            "Enter open    Esc close",
+        ),
+        (
+            "luneui.command-palette.destructive-tooltip",
+            "Destructive action \u{2014} requires confirmation",
+        ),
+        (
+            "luneui.settings-page.restart-message",
+            "Some changes require a restart to take effect.",
+        ),
+        ("luneui.settings-page.restart-action", "Restart now"),
+    ];
+    for (key, text) in expected {
+        assert_eq!(default_text(key), Some(text), "{key}");
+    }
+}

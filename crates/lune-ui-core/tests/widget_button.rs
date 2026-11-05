@@ -4,18 +4,20 @@
 use lune_ui_core::access::{Action, Role, State};
 use lune_ui_core::color::premul;
 use lune_ui_core::icon;
-use lune_ui_core::input::{Key, NamedKey, PointerButton, Repaint};
+use lune_ui_core::input::{Key, Modifiers, NamedKey, PointerButton, Repaint};
 use lune_ui_core::motion::{MotionTier, conformance};
 use lune_ui_core::paint::{Painter, Rect};
 use lune_ui_core::scene::Scene;
+use lune_ui_core::shortcuts::{Binding, Chord, CommandId, Scope};
 use lune_ui_core::testing::{FakeText, UiHarness};
 use lune_ui_core::text::{Spec, Style, TextSystem};
 use lune_ui_core::theme::DARK;
-use lune_ui_core::ui::{Response, WidgetId};
+use lune_ui_core::ui::{Response, Ui, WidgetId};
 use lune_ui_core::widgets::button::{
     ButtonKind, ButtonLook, ButtonOptions, ButtonState, FOCUS, HOVER, ICON_GAP, ICON_SIZE,
     IconButton, PRESS, SMALL_HEIGHT, SMALL_RADIUS, button, button_width, button_width_with,
 };
+use lune_ui_core::widgets::radio_group::RadioOption;
 
 const WIN: (f32, f32) = (400.0, 300.0);
 const RECT: Rect = Rect::new(20.0, 20.0, 120.0, 32.0);
@@ -535,4 +537,194 @@ fn a_disabled_icon_button_reports_nothing_and_is_marked_disabled() {
             .states
             .contains(State::Disabled)
     );
+}
+
+/// A widget drawn in `RECT`, for the disabled key rule.
+type Draw = fn(&mut Ui<'_>);
+
+fn a_button(ui: &mut Ui<'_>) {
+    ui.button("w", RECT, "Label", ButtonKind::Secondary);
+}
+
+fn an_icon_button(ui: &mut Ui<'_>) {
+    let glyph = IconButton {
+        glyph: icon::ADD,
+        glyph_size: ICON_SIZE,
+        color: None,
+        radius: 6.0,
+        name: "Add",
+    };
+    ui.icon_button("w", RECT, &glyph);
+}
+
+fn a_toolbar_label(ui: &mut Ui<'_>) {
+    ui.toolbar_label("w", RECT, "", "Label", "Label");
+}
+
+fn a_checkbox(ui: &mut Ui<'_>) {
+    ui.checkbox("w", RECT, &mut false, "Label");
+}
+
+fn a_toggle(ui: &mut Ui<'_>) {
+    ui.toggle("w", RECT, &mut false, "Label");
+}
+
+fn a_radio_group(ui: &mut Ui<'_>) {
+    let option = |key, label| RadioOption {
+        key,
+        label,
+        enabled: true,
+    };
+    ui.radio_group(
+        "w",
+        RECT,
+        &[option(0, "a"), option(1, "b")],
+        &mut 0,
+        "Label",
+    );
+}
+
+/// A held modifier and the same modifier on a binding's chord.
+type Held = (Modifiers, fn(Chord) -> Chord);
+
+/// The three modifiers that make a key a chord.
+fn chords() -> [Held; 3] {
+    let held = |control, alt, logo| Modifiers {
+        control,
+        alt,
+        logo,
+        ..Modifiers::default()
+    };
+    [
+        (held(true, false, false), Chord::ctrl),
+        (held(false, true, false), Chord::alt),
+        (held(false, false, true), Chord::logo),
+    ]
+}
+
+#[test]
+fn a_chord_on_enter_or_space_is_a_shortcut_and_clicks_nothing() {
+    for (m, chord) in chords() {
+        for k in [NamedKey::Enter, NamedKey::Space] {
+            let mut h = UiHarness::new(WIN);
+            h.shortcuts.add(Binding::new(
+                Scope::Global,
+                chord(Chord::key(Key::Named(k))),
+                "chord",
+            ));
+            let at = Rect::new(10.0, 10.0, 100.0, 30.0);
+            let mut clicked = false;
+            let mut run = |h: &mut UiHarness| {
+                h.frame(|ui| clicked = ui.button("b", at, "B", ButtonKind::Secondary).clicked)
+                    .1
+            };
+            run(&mut h);
+            h.input.key_down(Key::Named(NamedKey::Tab), None);
+            assert!(run(&mut h).focused.is_some());
+            h.input.set_modifiers(m);
+            h.input.key_down(Key::Named(k), None);
+            let out = run(&mut h);
+            assert!(!clicked, "{m:?} {k:?}");
+            assert_eq!(out.fired.len(), 1, "{m:?} {k:?}");
+        }
+    }
+}
+
+#[test]
+fn a_disabled_button_leaves_a_chord_to_the_shortcuts_as_an_enabled_one_does() {
+    for (m, chord) in chords() {
+        for k in [NamedKey::Enter, NamedKey::Space] {
+            let mut h = UiHarness::new(WIN);
+            h.shortcuts.add(Binding::new(
+                Scope::Global,
+                chord(Chord::key(Key::Named(k))),
+                "chord",
+            ));
+            h.frame(a_button);
+            h.input.key_down(Key::Named(NamedKey::Tab), None);
+            let (_, out) = h.frame(a_button);
+            let held = out.focused;
+            assert!(held.is_some(), "tab reached it");
+            let disabled = |ui: &mut Ui<'_>| ui.with_enabled(false, a_button);
+            h.frame(disabled);
+            h.input.set_modifiers(m);
+            h.input.key_down(Key::Named(k), None);
+            let (_, out) = h.frame(disabled);
+            assert_eq!(out.focused, held, "still its key");
+            assert_eq!(out.fired.len(), 1, "{m:?} {k:?}");
+        }
+    }
+}
+
+/// Focuses the widget, disables it, presses `keys` in one frame and returns what fired.
+fn keys_on_disabled(draw: Draw, keys: &[NamedKey]) -> Vec<CommandId> {
+    let mut h = UiHarness::new(WIN);
+    for k in keys {
+        h.shortcuts.add(Binding::new(
+            Scope::Global,
+            Chord::key(Key::Named(*k)),
+            "go",
+        ));
+    }
+    h.frame(draw);
+    h.input.key_down(Key::Named(NamedKey::Tab), None);
+    let (_, out) = h.frame(draw);
+    assert!(out.focused.is_some(), "tab reached it");
+    let disabled = |ui: &mut Ui<'_>| ui.with_enabled(false, draw);
+    h.frame(disabled);
+    h.frame(disabled);
+    for k in keys {
+        h.input.key_down(Key::Named(*k), None);
+    }
+    let (_, out) = h.frame(disabled);
+    out.fired
+}
+
+#[test]
+fn a_disabled_widget_keeps_the_keys_it_handles_from_the_shortcuts() {
+    use NamedKey::{ArrowDown, ArrowLeft, ArrowRight, ArrowUp, End, Enter, Home, Space};
+    let cases: [(&str, Draw, &[NamedKey]); 6] = [
+        ("button", a_button, &[Enter, Space]),
+        ("icon button", an_icon_button, &[Enter, Space]),
+        ("toolbar label", a_toolbar_label, &[Enter, Space]),
+        ("checkbox", a_checkbox, &[Space]),
+        ("toggle", a_toggle, &[Space]),
+        (
+            "radio group",
+            a_radio_group,
+            &[Space, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Home, End],
+        ),
+    ];
+    for (name, draw, keys) in cases {
+        for k in keys {
+            assert!(keys_on_disabled(draw, &[*k]).is_empty(), "{name}: {k:?}");
+            let twice = keys_on_disabled(draw, &[*k, *k]);
+            assert!(twice.is_empty(), "{name}: {k:?} twice in a frame");
+        }
+        assert!(
+            keys_on_disabled(draw, keys).is_empty(),
+            "{name}: all at once"
+        );
+    }
+}
+
+#[test]
+fn an_enabled_button_takes_one_activation_key_and_leaves_the_other() {
+    let mut h = UiHarness::new(WIN);
+    h.shortcuts.add(Binding::new(
+        Scope::Global,
+        Chord::key(Key::Named(NamedKey::Space)),
+        "go",
+    ));
+    let mut clicked = false;
+    h.frame(a_button);
+    h.input.key_down(Key::Named(NamedKey::Tab), None);
+    h.frame(a_button);
+    h.input.key_down(Key::Named(NamedKey::Enter), None);
+    h.input.key_down(Key::Named(NamedKey::Space), None);
+    let (_, out) = h.frame(|ui| {
+        clicked = ui.button("w", RECT, "Label", ButtonKind::Secondary).clicked;
+    });
+    assert!(clicked);
+    assert_eq!(out.fired.len(), 1, "as before: Enter won, Space went on");
 }

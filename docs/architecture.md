@@ -1,6 +1,6 @@
 # Architecture
 
-State after M5 (foundations): the toolkit is five crates. A pure core (`lune-ui-core`, no
+State after M7 (overlays and containers): the toolkit is five crates. A pure core (`lune-ui-core`, no
 dependencies) holds the painter, the display list, the per-window `Ui` frame, the motion system,
 the string table, the semantic tree, widgets, the theme and the four seam types; three adapter
 crates implement the seams on wgpu/glyphon, winit and the OS glass; the facade `lune-ui` re-exports
@@ -8,7 +8,10 @@ all of them under the module paths the toolkit has always had (D9, D24 to D38). 
 Luneterm 296cfdc's `crates/lune-ui` in M1 (D10), was cut along its seams in M2, and gained the `Ui`,
 motion, strings and accessibility data in M4 (D59 to D80), and in M5 gained the shared pieces every later component
 reuses: layout helpers, the scroll area and virtualized list, popover and tooltip, the text editing engine with IME,
-in-window drag and drop, the shortcut registry, seven painter primitives and the `ImageStore` seam (D91 to D109).
+in-window drag and drop, the shortcut registry, seven painter primitives and the `ImageStore` seam (D91 to D109). M6 added the
+controls and chrome (D113 to D136); M7 the overlays and containers: a sixth layer for an overlay above a dialog, the
+flyout, toasts, the command palette, the page, panel, sidebar, side panel, icon rail, split panes, tree view and settings
+page (D137 to D154).
 
 ## Workspace layout
 
@@ -41,8 +44,8 @@ app passes time, sizes, fonts, theme, scale and hit values in), so frames are de
 | `color` (`color.rs`) | Straight-alpha colour and blend helpers | `Rgba = [u8; 4]`, `premul`, `over`, `with_alpha` |
 | `theme` (`theme.rs`) | Theme tokens widgets read; the dark preset with its glass layers | `Theme`, `DARK`, `lunegit_dark::{THEME, WINDOW, PANEL, CARD, ...}` |
 | `acrylic` (`acrylic.rs`) | Avalonia acrylic colour math and the noise opacity | `AcrylicColors`, `NOISE_OPACITY` |
-| `paint` (`paint.rs`, `paint/path.rs`) | Immediate-mode painter: five layers, clip and rounded clip (`push_clip_rounded`), a transform stack (D66) and `push_translate`, the seven M5 primitives (image, rotate, dash, rounded clip, sector, path fill, arc; D105), hit regions generic over the app's hit type `H` and tagged with the overlay they belong to, an op recorder (`start_recording`, `take_recording`, replayed by exit painters), faded acrylic, `stroke_sweep` and `stroke_comet` over `StrokeStyle.mode` (the busy cue's conic arc and dash, D122), `Painter::elide` (see `text`); builds a `Scene`; holds `&mut dyn TextSystem` | `Painter<H>`, `Rect`, `StrokeStyle`, `Xform`, `Ops` |
-| `scene` (`scene.rs`) | The display list: plain data plus the draw-order contract | `Scene`, `Layer`, `LayerGeometry`, `Shape`, `Acrylic` (a shape and its opacity, D61), `StrokeVertex`, `TextItem`, `CustomItem`, `BackdropRequest`, `ImageItem`, `RoundClip`, `LayerId` (Base, Page, Popup, Modal, Toast; D54), `LAYER_COUNT` (5), `SCENE_LAYERS`, `FrameParams` |
+| `paint` (`paint.rs`, `paint/path.rs`) | Immediate-mode painter: six layers, clip and rounded clip (`push_clip_rounded`), a transform stack (D66) and `push_translate`, the seven M5 primitives (image, rotate, dash, rounded clip, sector, path fill, arc; D105), hit regions generic over the app's hit type `H` and tagged with the overlay they belong to, an op recorder (`start_recording`, `take_recording`, replayed by exit painters), faded acrylic, `acrylic_radii` (one radius per corner) and `backdrop_with` (the glass's own layer, sigma and saturation; D137, D138), `stroke_sweep` and `stroke_comet` over `StrokeStyle.mode` (the busy cue's conic arc and dash, D122), `Painter::elide` (see `text`); builds a `Scene`; holds `&mut dyn TextSystem` | `Painter<H>`, `Rect`, `StrokeStyle`, `Xform`, `Ops` |
+| `scene` (`scene.rs`) | The display list: plain data plus the draw-order contract | `Scene`, `Layer`, `LayerGeometry`, `Shape`, `Acrylic` (a shape and its opacity, D61), `StrokeVertex`, `TextItem`, `CustomItem`, `BackdropRequest` (rect, radius, alpha, `layer`, `sigma`, `saturation`), `ImageItem`, `RoundClip`, `LayerId` (Base, Page, Popup, Modal, Raised, Toast; D54, D137), `LAYER_COUNT` (6), `SCENE_LAYERS`, `Scene::split`, `FrameParams` |
 | `text` (`text.rs`) | Text specs and the text seam, with the caret, hit, line and segment queries (D86, D94) | `TextSystem` (`prepare`, `measure`, `caret`, `hit`, `lines`, `segments`), `TextKey`, `Spec`, `Style`, `Font`, `CaretPos`, `LineSpan`, `Unit`, `elide` (D114: one line cut on a grapheme boundary, U+2026 in the last kept run's style, found by binary search over `caret`; a spec that fits comes back unchanged) |
 | `input` (`input.rs`) | The input seam: what the app hands in, what the toolkit asks back | `RawInput`, `Event` (with `Access`, `ClipboardText`, `ClipboardUnavailable`), `Key`, `NamedKey`, `Modifiers`, `ImeEvent`, `FocusEvent`, `Keymap` (`MAC`, `PC`; D92), `FrameOutput` (with `repaint`, `clipboard`, `tree`, `focused`, `cursor`, `ime_area`, `fired`), `Repaint`, `ClipboardRequest`, `WindowCommand`, `CursorIcon` (with `ALL`), `printable` |
 | `image` (`image.rs`) | The picture seam: the app decodes, registers by id, releases explicitly; fit geometry | `ImageStore`, `ImageData`, `ImageId`, `ImageError`, `Fit`, `ImageAlign`, `image_rect` |
@@ -54,17 +57,17 @@ app passes time, sizes, fonts, theme, scale and hit values in), so frames are de
 | `window` (`window.rs`) | Edge resize, double click, caption buttons (no windowing type) | `ResizeEdge`, `edge_at`, `DoubleClick`, `caption_buttons` |
 | `icon` (`icon.rs`) | Codicon codepoints as Nerd Font glyphs; no font file bundled | `glyph`, `ADD`, `GEAR`, `CHECK`, ... |
 | `ui` (`ui.rs`, `ui/{access,animate,focus,id,keys,overlay,pointer,response,store}.rs`) | The per-window frame (see "The `Ui` frame" below) | `Ui`, `UiStore`, `FrameConfig`, `WidgetId`, `Response`, `Sense`, `OverlayOptions`, `OverlayFrame`, `OverlayPhase`, `Dismissal` |
-| `access` (`access.rs`) | The semantic tree and the actions that come back; plain data the `Ui` fills and routes | `Node`, `SemanticTree`, `Role` (36), `State` (15), `Action` (10), `Value`, `AccessAction` |
+| `access` (`access.rs`) | The semantic tree and the actions that come back; plain data the `Ui` fills and routes | `Node`, `SemanticTree`, `Role` (36), `State` (15), `Action` (10), `Value`, `AccessAction`; `Node.level` (a tree row's depth + 1) |
 | `motion` (`motion.rs`, `motion/{easing,tween,transition,tokens,conformance}.rs`) | Closed-form motion: every value is a function of the app's `Time` and stored parameters; the 60 Hz conformance harness | `Time`, `Easing`, `Tween`, `Spring`, `Keyframes`, `Transition`, `Token`, `Kind`, `Motion`, `MotionTier`, `MOTION`, `conformance` |
 | `strings` (`strings.rs`) | The string table: keys, `{n}` and `{n:spec}` placeholders, the toolkit's defaults | `StringTable`, `DEFAULTS`, `ArgFormat`, `DisplayFormat`, `format_template` |
-| `widgets` (`widgets/<name>.rs`, `widgets/mod.rs`) | One file per control, generic over `H` for the Painter API; each has a `Look`, a `paint` function, the old function as a wrapper and a `Ui` method (D60) | `button`, `toggle`, `checkbox`, `label`, `combo`, `stepper`, `field` (text field with its variants), `text_area`, `input_box` (shared look), `focus_ring`, `popup_panel`, `scroll_area`, `scrollbar`, `virtual_list`, `popover`, `tooltip`; M6 added `badge`, `status_dot`, `verdict_row`, `progress`, `spinner`, `callout`, `stat`, `kv_list` (with `selectable`, the read-only selectable text of D125), `row`, `list_row`, `form_field`, `steps`, `nav_item` (`Ui::nav_list`), `radio_group`, `star_rating`, `slider`, `filter_bar`, `search_picker`, `tab_strip`, `toolbar`, `banner` (with the empty state) and `tone` (the one tone recipe, D129); `button` gained `Ghost`, `ButtonOptions` (`Ui::button_with`) and `IconButton` (`Ui::icon_button`, D116) |
-| `widgets::menu`, `dropdown`, `dialog` | The overlays: the old Painter functions and `Ui::menu`, `Ui::dropdown`, `Ui::dialog` on the overlay stack | `menu`, `MenuRow`, `menu_open_anim`; `dropdown`; `dialog`, `Dialog`, `DialogGlass`, `Cancel` |
+| `widgets` (`widgets/<name>.rs`, `widgets/mod.rs`) | One file per control, generic over `H` for the Painter API; each has a `Look`, a `paint` function, the old function as a wrapper and a `Ui` method (D60) | `button`, `toggle`, `checkbox`, `label`, `combo`, `stepper`, `field` (text field with its variants), `text_area`, `input_box` (shared look), `focus_ring`, `popup_panel`, `scroll_area`, `scrollbar`, `virtual_list`, `popover`, `tooltip`; M6 added `badge`, `status_dot`, `verdict_row`, `progress`, `spinner`, `callout`, `stat`, `kv_list` (with `selectable`, the read-only selectable text of D125), `row`, `list_row`, `form_field`, `steps`, `nav_item` (`Ui::nav_list`), `radio_group`, `star_rating`, `slider`, `filter_bar`, `search_picker`, `tab_strip`, `toolbar`, `banner` (with the empty state) and `tone` (the one tone recipe, D129); `button` gained `Ghost`, `ButtonOptions` (`Ui::button_with`) and `IconButton` (`Ui::icon_button`, D116); M7 added `flyout` (`Ui::flyout`), `toast` (the `Toasts` model, `Ui::toasts`, `Ui::toast_history`), `command_palette` (`Ui::command_palette`), `page` and `panel` (`Ui::page`, `Ui::panel`: one closure called per slot), `sidebar`, `side_panel` and `icon_rail` (`Ui::sidebar`, `Ui::side_panel`, `Ui::icon_rail`), `split_panes` (`Ui::split_panes`, `Ui::split_state`), `tree_view` (`Ui::tree_view`, `Ui::tree_state`) and `settings_page` (`Ui::settings_page`) |
+| `widgets::menu`, `dropdown`, `dialog` | The overlays: the old Painter functions and `Ui::menu`, `Ui::dropdown`, `Ui::dialog` on the overlay stack; M7 added `menu_with` (`MenuOptions`, `MenuPlace`: anchored menus and the node name; rows `MenuRow::Entry` and `Header`; one highlight), `dropdown_with` (`DropdownOptions`: glass, `max_rows`), `dialog_with` (`DialogOptions`: `DialogWidth::{Confirm, Form}`, scrim blur, disabled confirm) and `dialog::modal_host`, which the palette shares | `menu`, `MenuRow`, `MenuItem`, `menu_open_anim`; `dropdown`; `dialog`, `Dialog`, `DialogGlass`, `Cancel` |
 | `chrome` (`chrome.rs`) | Tab chrome outline geometry | `outline`, `TabSpan` |
 | `testing` (`testing/`) | Fakes and contract suites of the seams, public so apps can use them | `RecordingRenderer`, `FakeText`, `text_system_contract`, `FakeImages`, `image_store_contract`, `ScriptedInput`, `NullMaterial`, `backdrop_contract`, `UiHarness` |
 
 `lib.rs` re-exports `Backdrop`, `BackdropKind`, `GlassLayer` and `theme::lunegit_dark`. Tests: unit
 tests in the modules and the files under `tests/` (`window`, `painter`, `motion`, `strings`, `ui_*`,
-one `widget_*` file per control, and `c4`, the cross-widget contract suite, with a section for the M6 set: roles, names and states of every interactive M6 widget in one frame, accessibility actions, one tab stop per composite, idle at rest); none needs a
+one `widget_*` file per control, and `c4`, the cross-widget contract suite, with a section for the M6 set and one for the M7 set: roles, names and states of every interactive widget in one frame, accessibility actions, one tab stop per composite, the disabled walk, idle at rest, and the overlays over a dialog); none needs a
 GPU or a window.
 
 ### The `Ui` frame
@@ -95,6 +98,20 @@ tree, focused widget and the shortcut commands that fired. `FrameConfig` also ca
   stops calling it. Each called frame an overlay hands the Ui an exit painter built from owned inputs
   (with the app's content recorded as painter ops), and the Ui keeps drawing it through the close
   motion (D65).
+- The `Raised` layer (D137): `Ui::overlay` chooses an overlay's layer once, when it opens or reopens, and holds it to
+  its close. A `Popup` or `Modal` overlay that opens while a modal is active is promoted to `LayerId::Raised`
+  (between `Modal` and `Toast`), so a popover, tooltip, combo list, search picker, menu or nested dialog over a dialog
+  draws and takes input on top; no widget asks for it. The rule is one level deep: overlays stacked further share
+  `Raised`, and a layer draws by kind, so a third level that overlaps its parent interleaves with it (fills under
+  text). A toast is not an overlay record: `Ui::toasts` draws on `Toast` directly and a press on a `Toast` hit is
+  never an outside press, moves no focus, and an accessibility action on one dismisses no overlay and takes no focus
+  out of a modal (D146). `Ui::overlay` also pauses any enclosing `record`, so a dialog's exit replay does not
+  draw the overlays opened in its body (D139).
+- Disabled scope (D140): `Ui::node` inside a disabled scope (`with_enabled(false, ..)`) sets `State::Disabled` and
+  clears `Focusable` and the actions, so a group node cannot be forgotten; a widget consumes its keys first and gates
+  after (`Ui::activation_keys`), so a disabled widget keeps its keys from the shortcuts. Not every reader does yet:
+  "Disabled keys" below is the one list.
+  `testing::disabled_violations(tree, root)` walks a subtree for a node that broke the rule.
 - Focus: scopes with a tab trap, initial focus, and restore on close (D72); keys are consumed by id
   (`consume_key`); a focused widget that is not registered for a frame loses focus unless a live
   keep-alive scope covers it.
@@ -139,13 +156,90 @@ tree, focused widget and the shortcut commands that fired. `FrameConfig` also ca
 
 Frames stay deterministic: time, input, theme, tier and strings all come from the caller.
 
+### Disabled keys
+
+The one list of which key readers hold D140's rule (D159). STATE, `CLAUDE.md` and DECISIONS point here and restate
+none of it. The rule: a widget that holds the key focus when its scope turns disabled (`with_enabled(false, ..)`) takes
+every key it takes when enabled and acts on none, so none reaches a shortcut. Focus stays on it. A widget disabled before
+it had focus gets no key, so a test that never focuses it proves nothing here.
+
+How it was made, at 406f780. The readers are every call in `crates/lune-ui-core/src` of `consume_key`,
+`consume_plain_key`, `consume_key_while_pressed`, `focus_events`, `activation_keys` and `rove_keys`; no other library crate
+calls them, and Tab and Escape are the frame's, at begin, so they are not in the table. Each reader then ran one probe in a
+scratch copy: focus it, disable it, press one of 27 keys with one binding on that key (14 named, 7 with Shift, a letter,
+Command with A, C, V, X, Z), against the same run enabled. A key that fires nothing enabled is a key the reader takes;
+a Shift form counts as its key below. Each run needs F5, which nothing takes, to fire: a `Global` binding is never
+offered under a modal, so it cannot fail there, and the dialog and the palette run on `Scope::Overlay`.
+
+A new reader, or a change to one, gets its row here. **Test** means a named test fails when that reader is made to leak
+(a mutant of it, run at 406f780). **Probe** means only the scratch probe showed it: nothing in the repo holds it.
+
+Holds, for the keys listed:
+
+| Reader | Keys | Evidence |
+|---|---|---|
+| `button`, `icon_button`, `toolbar_label` | Enter, Space | Test: `widget_button::a_disabled_widget_keeps_the_keys_it_handles_from_the_shortcuts` |
+| `checkbox`, `toggle` | Space | Test: the same |
+| `radio_group` | Space, arrows, Home, End | Test: the same |
+| Hosts of `Ui::button` or `icon_button`: `dialog`'s confirm and cancel, `toolbar_action`, the filter bar's clear, the tab strip's new tab | Enter, Space | Probe. `widget_dialog`'s `enter_and_space_on_a_disabled_confirm_...` binds `Global`, so it cannot fail (review F19) |
+| `star_rating` | Enter, Space, arrows, Home, End | Probe; no test failed under a mutant of its keys or of its `rove_keys` |
+| `nav_list`, so `sidebar` | Enter, Space, Up, Down, Home, End | Test: `widget_sidebar::a_focused_row_turned_disabled_keeps_its_keys_and_leaves_its_chords` (Enter, Space), `c4::m7::a_disabled_page_takes_every_key_a_focused_composite_takes_and_fires_no_global_binding` (the rest) |
+| `icon_rail` | Enter, Space, Up, Down, Home, End | Test: `c4`, the same |
+| `split_panes` | arrows, Home, End | Test: `c4`, the same, and `widget_split_panes::a_strip_that_was_focused_and_is_then_disabled_still_takes_its_keys_and_acts_on_none` |
+| `tab_strip`, its own keys (see `scroll_area` below for PageUp and PageDown) | Enter, Space, Left, Right, Home, End | Test: `widget_tab_strip::a_disabled_strip_activates_nothing_from_enter_or_space_and_still_does_after_enabling`, `a_disabled_strip_keeps_the_arrows_home_and_end_from_the_shortcuts` |
+| `menu` | Enter, Space, Up, Down, Home, End | Test: `widget_menu::a_disabled_scope_takes_the_keys_picks_nothing_and_marks_every_node` |
+| `flyout`, its rows (`menu_rows`) | Enter, Space, Up, Down, Home, End | Test: `widget_flyout::a_disabled_flyout_closes_on_escape_picks_nothing_and_marks_every_node` |
+| `dropdown`, with and without `max_rows` | Enter, Up, Down | Test: `widget_dropdown::a_disabled_dropdown_takes_the_keys_picks_nothing_and_marks_every_node` |
+| `tree_view` | Enter, Space, arrows, Home, End, PageUp, PageDown | Test: `widget_tree_view::a_disabled_tree_toggles_and_selects_nothing_takes_its_keys_and_passes_the_walk` |
+| `toasts`, the action buttons | Enter, Space | Probe (`toast.rs:954`: no test failed under a mutant) |
+| `toasts`, Cancel and Dismiss (`icon_button`, the `button` row's reader) | Enter, Space | Test: `widget_toast::the_toast_is_called_in_a_disabled_scope_and_every_node_says_so` holds Cancel; probe (Dismiss) |
+| `settings_page`, the restart action | Enter, Space | Probe. `widget_settings_page::a_disabled_page_reports_nothing_and_leaves_the_keys_to_shortcuts` never focuses it |
+| `command_palette`, its own keys | Up, Down, Enter | Test: `widget_command_palette::a_disabled_palette_takes_its_keys_activates_nothing_and_passes_the_walk` (`Scope::Overlay`) |
+
+Does not hold: each key listed fired nothing enabled and fired its binding disabled, with focus kept. All by probe;
+nothing acted. Each gates on `enabled` or a focus that is false in a disabled scope before it takes the key.
+
+| Reader | Keys that reach the shortcut |
+|---|---|
+| `stepper` | Up, Down |
+| `slider` | arrows |
+| `combo` | Enter, Space, Down |
+| `search_picker`, the trigger | Enter, Space. An open picker closes when disabled and focus returns to the trigger, so this row is what is left of its box |
+| `virtual_list` | Up, Down, Home, End, PageUp, PageDown; Command+C with a selection |
+| `text_field`, and the filter bar's box | Enter, Space, Backspace, Delete, Left, Right, Home, End, a typed character, Command+A, V, Z; Command+C, X with a selection (run on the field) |
+| `text_area` | those, and Up, Down, PageUp, PageDown |
+| `command_palette`, its search box (a filter bar) | Space, Backspace, Delete, Left, Right, Home, End, a typed character, Command+A, V, Z; Command+C, X with a selection. Only Up, Down and Enter hold, by the palette's own keys |
+| `selectable_text`, so `kv_list` values and the flyout's routes (each run) | Enter, Left, Right, Home, End, Command+A; Command+C with a selection. Elided text (`spec` differs from `full`): Command+A, C |
+| `scroll_area`, a focused child the keys passed | PageUp, PageDown, Home, End, in an area that overflows. Run with a button, a slider and an overflowing tab strip (PageUp, PageDown; the strip takes the others first). So a child that holds its own keys above still loses these. Hosts: the page body and the settings content. |
+| `scroll_area`, itself focused (only by an app or assistive tool, STATE's limit from review F18) | Up, Down |
+
+Not a leak: Escape in a pointer drag (`consume_key_while_pressed`: the splitter, `drag_gesture`) fired nothing enabled
+and fired its binding once the scope turned disabled mid-drag (probe, splitter and tab strip). From reading: `Ui::interact`
+reports no press in a disabled scope, so the drag has ended and Escape has nothing to cancel, which `drag.rs` leaves to
+the shortcuts by design.
+
+One item disabled in a live group holds too, by probe: a nav row, a rail button, a menu row, a `toolbar_action`, the
+dialog's disabled confirm. A disabled radio option takes its keys, and the arrows move on to a live sibling.
+
+Not checked, from reading only:
+
+- `Ui::empty_state`'s and `Ui::callout`'s actions (`Ui::button`), not run. `Ui::toast_history`'s clear (`icon_button`) holds Enter and Space by probe, with no test.
+- The tab strip's menu (`menu`), not run.
+- `free_drag_gesture`: no library caller, not run.
+- Keys outside the 27, such as Alt word moves in a text field and Control chords. D157 leaves chords to the shortcuts where it applies.
+- A closure host (`dialog` body, `popover`, `panel`, `page`, `side_panel`, `form_field`, `setting_row`) reads no key: what it
+  hosts has the row of that widget.
+
 ### Draw order
 
 Inside one layer, back to front (the contract in `scene.rs`): the acrylic shapes, the under shapes, the
 path fills (their own list, `LayerGeometry::fills`, drawn with the stroke pipeline so the order is
 explicit, D105), the custom items in record order, the images in record order (`Layer::images`), the
-text, the over shapes and the strokes. Layers run back to front; those below `SCENE_LAYERS` render into
-the offscreen scene a backdrop blurs. Consequences a widget author meets: text draws above every fill
+text, the over shapes and the strokes. Layers run back to front, six of them (`Base`, `Page`, `Popup`, `Modal`,
+`Raised`, `Toast`); those below `Scene::split` render into the offscreen scene a backdrop blurs. The split moves: it
+is `SCENE_LAYERS` (2), or the backdrop request's own layer when that is higher, so a glass surface blurs everything
+under it (a glass menu in a dialog blurs the dialog; D138). A frame has one blur: of two requests the lower layer
+keeps it, and on one layer the last wins, so a glass menu over a dialog whose scrim is blurred has none of its own. Consequences a widget author meets: text draws above every fill
 of its layer (a label shows through a fill drawn "over" it on the same layer), and a rounded clip
 (`push_clip_rounded`) cuts shapes, strokes, fills and images but gives text and custom items only its
 bounding rect.
@@ -284,8 +378,10 @@ functions; mid-transition and interaction scenes are live scripted `Ui` frames. 
 `ui`, `focus`, `a11y`, `locale`, and from M5 `stack`, `image`, `shortcuts`, `primitives`, `scroll_area`,
 `scrollbar`, `virtual_list`, `popover`, `tooltip`, `text_edit`, `ime` and `drag_drop`, and from M6 `badge`, `status_dot`,
 `verdict_row`, `progress`, `spinner`, `callout`, `stat`, `kv_list`, `row`, `list_row`, `form_field`, `steps`,
-`nav_item`, `radio_group`, `star_rating`, `slider`, `filter_bar`, `search_picker`, `tab_strip`, `toolbar` and `banner`
-(50 pages in all, 231 scene names; every page of the same pattern: a live state, scripted scenes, a bench timeline); `apps/gallery/src/pages/controls_ui.rs` is the shared composition of every M4 widget that the
+`nav_item`, `radio_group`, `star_rating`, `slider`, `filter_bar`, `search_picker`, `tab_strip`, `toolbar` and `banner`, and from M7
+`flyout`, `toast-notifications`, `command-palette`, `page`, `panel`, `sidebar`, `side-panel`, `icon-rail`, `split-panes`,
+`tree-view` and `settings-page`
+(61 pages in all, 305 scene names; every page of the same pattern: a live state, scripted scenes, a bench timeline); `apps/gallery/src/pages/controls_ui.rs` is the shared composition of every M4 widget that the
 core pages draw. Window mode builds a `Ui` per frame over the page's live state; dump and bench
 drive the same state through a `Player` (a scripted input, the retained store and the page state). A scene's `Expect` is `Settled` (`Idle`),
 `Moving` (`Now`) or, for a pending tooltip, `Waiting` (`At`). `Ev` scripts pointer, scroll, typed text, keys
@@ -358,6 +454,27 @@ facade keeps those paths):
 - `theme::DARK`, a neutral alias of `lunegit_dark::THEME`;
 - new: `RawInput`, `FrameOutput`, `Translator`, `OutputState`, `Backdrop::apply`, `WindowBackdrop`,
   the `testing` module.
+
+Since M7 (D137 to D154):
+
+- `LayerId::Raised` is a sixth layer between `Modal` and `Toast` (`Toast` is 5 now, `LAYER_COUNT` 6, `SCENE_LAYERS`
+  unchanged); code that indexes `Scene::layers` by number moves with it. `Scene::split()` is the one place the
+  renderer and the fake read the offscreen split; `BackdropRequest` gains `layer`, `sigma` and `saturation` (0 means
+  the frame's) and `Painter::backdrop_with` sets them; `Painter::acrylic_radii` cuts one corner;
+- `Node` gains `level` (every `Node` literal says `level: None`); `Ui::node` marks a disabled scope's nodes;
+  `Ui::icon_button_sensed`; `testing::disabled_violations`;
+- `MenuRow::Entry(MenuItem)` and `MenuRow::Header` join `MenuRow::Item` (kept); `Ui::menu_with`, `dropdown_with`,
+  `dialog_with` and `Surface::Glass` on the popover; `Ui::menu` calls `menu_with`;
+- new widgets with a `Ui` method each: `flyout`, `toasts` and `toast_history`, `command_palette`, `page`, `panel`,
+  `sidebar`, `side_panel`, `icon_rail`, `split_panes`, `tree_view`, `settings_page`; `stat` and `kv_list` gain the
+  measures the flyout needs;
+- `Theme` gains `menu_item_pressed`, `menu_text_disabled`, `toast_bg`, `toast_border`, `toast_info`, `toast_success`,
+  `toast_warning`, `toast_error`, `toast_log_bg`, `toast_log_fg`, `dirty_indicator`, `count_badge` and `status_error`;
+  `strings` gains `luneui.menu.name`, the `luneui.toast-notifications.*`, `luneui.command-palette.*` and
+  `luneui.settings-page.*` keys; `icon` gains `CHEVRON_RIGHT`, `WARNING`, `ERROR`, `CLEAR_ALL` and `CIRCLE_SLASH`;
+- `FilterOptions` gains `clear_unfocusable`; `Ui::activation_keys` and `Ui::nav_list` leave chords to the shortcuts (D157, D158);
+- no scene that existed before M7 changed: each step passed the pixel gate at zero delta against its base, and the
+  new scenes are the only ones the visual batches (steps 13 and 14) moved.
 
 Since M6 (D113 to D136):
 

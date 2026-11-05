@@ -92,6 +92,24 @@ A transition that is interrupted retargets from the current value and velocity i
 a user clicking quickly never waits on an animation [L .claude/docs/animation-rules.md:11],
 [motion.transitions].
 
+## M7 rows: toasts, menu rows, the tree's expand
+
+Lunegit has no toast motion (no toast selector in `Animations.axaml`), so the toast rows are D40's
+kinds at their defaults [D146]. The menu row hover and the tree's expand are answered here so the
+catalogue tables cite one place.
+
+| component | kind | property | duration | easing | reduced | cite |
+|---|---|---|---|---|---|---|
+| toast appear | appear | opacity 0 to 1, y 8 to 0 | base | quad-out | fade | [D40], [D146] |
+| toast leave | dismiss | opacity 1 to 0 | fast | quad-in | fade | [D40], [D146] |
+| toast neighbours | move | y of the toasts above a leaving or arriving one | fast | sine-in-out | snap | [D40], [D146] |
+| toast expand | expand | the toast's height to show its log; text wrapped once at the target width | base | sine-in-out | snap | [D40], [D146] |
+| menu row hover | hover | the row's fill | instant | linear | keep | [D40], [D141] |
+| tree expand | expand | the child block's clip height; one block in motion, another toggle snaps it | base | sine-in-out | snap | [D40], [D151] |
+
+The expand duration is the kind's default, `base` (the entry's question on it is answered: no
+separate token). Off snaps every row above.
+
 ## Tiers
 
 The app chooses the tier; the toolkit reads no OS setting (hard rule 2). Lunegit's three tiers are

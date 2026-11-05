@@ -10,7 +10,7 @@ use lune_ui::motion::MotionTier;
 use lune_ui::paint::Rect;
 use lune_ui::ui::Ui;
 use lune_ui::widgets::button::ButtonKind;
-use lune_ui::widgets::popover::PopoverOptions;
+use lune_ui::widgets::popover::{PopoverOptions, Surface};
 
 use super::{caption, card, heading};
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
@@ -42,6 +42,7 @@ fn base() -> Live {
         size: SIZE,
         open: true,
         stop_at: None,
+        surface: Surface::Panel,
     }
 }
 
@@ -71,6 +72,13 @@ fn clamped() -> Box<dyn PageState> {
     })
 }
 
+fn glass() -> Box<dyn PageState> {
+    Box::new(Live {
+        surface: Surface::Glass,
+        ..base()
+    })
+}
+
 fn closing() -> Box<dyn PageState> {
     Box::new(Live {
         stop_at: Some(STOP_AT),
@@ -85,6 +93,7 @@ struct Live {
     open: bool,
     /// The app stops calling the popover from this time on.
     stop_at: Option<Duration>,
+    surface: Surface,
 }
 
 impl PageState for Live {
@@ -98,6 +107,7 @@ impl PageState for Live {
         if self.open && self.stop_at.is_none_or(|t| ui.time() < t) {
             let options = PopoverOptions {
                 anchor_id: Some(button.id),
+                surface: self.surface,
                 ..PopoverOptions::new(self.anchor, self.size)
             };
             let (frame, _placement, ()) = ui.popover("popover", &options, |ui, at| {
@@ -167,6 +177,8 @@ const SCENES: &[UiScene] = &[
     ),
     // The open is `fast` (180 ms): half way at 90 ms.
     scene("popover-opening", 2, below, &[], 90, Expect::Moving),
+    // The glass surface of the menu: the blurred page under a translucent fill.
+    scene("popover-glass", 2, glass, &[], 500, Expect::Settled),
 ];
 
 /// What the bench replays: open from the button, Escape, reopen, press outside.

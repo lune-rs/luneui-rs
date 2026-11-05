@@ -5,13 +5,13 @@ area: overlay
 status: in-progress
 consumers: luneterm, wane
 source: crates/lune-ui-core/src/widgets/dialog.rs
-owner: orch/toolkit-v1
+owner: toolkit-v1 M7
 summary: Modal dialog card: dim backdrop, 448 px acrylic card, darker footer, app-supplied body
 ---
 
 ## What it is
 
-`dialog` with `DialogSpec`, `DialogGlass` and `DialogHits`: dim backdrop, 448 px acrylic card, 24 px padding, darker footer; a `body` closure draws the app content [R crates/lune-ui-core/src/widgets/dialog.rs:1,39-48]. Variants: confirm (title, message, Cancel and one action) [W docs/ui/components.md:557-570]. The form variant is not in the moved code (Open questions).
+`dialog` with `DialogSpec`, `DialogGlass` and `DialogHits`: dim backdrop, 448 px acrylic card, 24 px padding, darker footer; a `body` closure draws the app content [R crates/lune-ui-core/src/widgets/dialog.rs:1,39-48]. Variants: confirm (title, message, Cancel and one action) [W docs/ui/components.md:557-570]. `Ui::dialog_with` takes `DialogOptions { width, scrim_blur, confirm_enabled }`: the 600 px form width, a blurred scrim and a disabled confirm [D144]. The shell (scrim, the card's open and close motion, exit retention, the node) is `dialog::modal_host`, which the command palette shares.
 
 ## Needs
 
@@ -42,8 +42,8 @@ Conflicts (winner):
 
 ### Anatomy
 
-- Scrim: whole window rect, `dialog_backdrop` #00000080 [R crates/lune-ui-core/src/widgets/dialog.rs:53, crates/lune-ui-core/src/theme.rs:69]; on the Modal layer and hit-blocked so clicks do not reach content below [R crates/lune-ui-core/src/widgets/dialog.rs:50-52].
-- Card: width 448 [R crates/lune-ui-core/src/widgets/dialog.rs:55]; horizontally centred [R crates/lune-ui-core/src/widgets/dialog.rs:66]; top at `(window h − body − footer) / 2`, at least 20 [R crates/lune-ui-core/src/widgets/dialog.rs:67]; radius 8 [R crates/lune-ui-core/src/widgets/dialog.rs:73-74]; acrylic fill from `DialogGlass.fill` over the panel layer [R crates/lune-ui-core/src/widgets/dialog.rs:72-73]; 1 px ring `border_subtle` #FFFFFF1A [R crates/lune-ui-core/src/widgets/dialog.rs:74, crates/lune-ui-core/src/theme.rs:63].
+- Scrim: whole window rect; with `scrim_blur`, `backdrop_with(window, 0, 8.0, 1.0)` on the Modal layer under it (the window content blurs, faded with the scrim, in the exit painter too); `dialog_backdrop` #00000080 [R crates/lune-ui-core/src/widgets/dialog.rs:53, crates/lune-ui-core/src/theme.rs:69]; on the Modal layer and hit-blocked so clicks do not reach content below [R crates/lune-ui-core/src/widgets/dialog.rs:50-52].
+- Card: width 448, or 600 with `DialogWidth::Form` (the body is then 552 wide; its columns are the app's) [R crates/lune-ui-core/src/widgets/dialog.rs, W docs/ui/components.md:557-570]; horizontally centred [R crates/lune-ui-core/src/widgets/dialog.rs:66]; top at `(window h − body − footer) / 2`, at least 20 [R crates/lune-ui-core/src/widgets/dialog.rs:67]; radius 8 [R crates/lune-ui-core/src/widgets/dialog.rs:73-74]; acrylic fill from `DialogGlass.fill` over the panel layer [R crates/lune-ui-core/src/widgets/dialog.rs:72-73]; 1 px ring `border_subtle` #FFFFFF1A [R crates/lune-ui-core/src/widgets/dialog.rs:74, crates/lune-ui-core/src/theme.rs:63].
 - Body: 24 px inset on all sides [R crates/lune-ui-core/src/widgets/dialog.rs:63,77-78,82]; content width 400 (448 − 48) [R crates/lune-ui-core/src/widgets/dialog.rs:56]; title 14 px Medium, `fg_primary` [R crates/lune-ui-core/src/widgets/dialog.rs:57, crates/lune-ui-core/src/theme.rs:84]; message wrapped to 400, 13 px, `fg_secondary` [R crates/lune-ui-core/src/widgets/dialog.rs:58,60, crates/lune-ui-core/src/theme.rs:83]; title-to-message gap 10 [R crates/lune-ui-core/src/widgets/dialog.rs:79]; app body slot of height `extra_h` directly below the message [R crates/lune-ui-core/src/widgets/dialog.rs:63,81-82].
 - Footer: 68 high (18 + 32 + 18), full card width, fill `dialog_footer` #00000024, bottom radii 8 [R crates/lune-ui-core/src/widgets/dialog.rs:64,84-85, crates/lune-ui-core/src/theme.rs:70].
 - Buttons: 32 high; confirm right edge 24 in from the card right, 18 down from the footer top [R crates/lune-ui-core/src/widgets/dialog.rs:87]; cancel 8 px left of confirm [R crates/lune-ui-core/src/widgets/dialog.rs:91]; confirm is the primary button, cancel is not [R crates/lune-ui-core/src/widgets/dialog.rs:88,92]. Button width from `button_width` [R crates/lune-ui-core/src/widgets/dialog.rs:86,90].
@@ -56,7 +56,7 @@ Conflicts (winner):
 | open, confirm only | card, one primary button (`cancel: None`) | [R crates/lune-ui-core/src/widgets/dialog.rs:89-93] |
 | open, confirm and cancel | card, cancel (plain) left of confirm (primary) | [R crates/lune-ui-core/src/widgets/dialog.rs:88-92] |
 | focus-visible on a button | the button's own state (widget.button) | [R crates/lune-ui-core/src/widgets/dialog.rs:88,92] |
-| disabled button | not in the dialog code: the button's own state (widget.button) | open question |
+| disabled confirm (`confirm_enabled: false`) | the button's own disabled look (opacity 0.4, `with_enabled(false)`), same place; Enter, Space, a click and the default action do nothing and are consumed; the dialog node offers no Default; open focus on Cancel, or none | [D144] |
 
 ### Transitions
 
@@ -104,11 +104,15 @@ size and the content inside it (laid out once per open, [R crates/lune-ui-core/s
 - `dialog-closed`: no dialog drawn over the controls scene, settled (new).
 - `dialog-opening`: confirm and Cancel, t = 125 ms (half of base) (new).
 - `dialog-closing`: confirm and Cancel, t = 90 ms (half of fast) (new).
+- `dialog-form`: 600 px card, two columns of fields in the body, settled.
+- `dialog-scrim-blur`: the confirm dialog over a blurred window, settled.
+- `dialog-confirm-disabled`: the confirm button disabled, settled.
+- `dialog-combo-open`, `dialog-popover`, `dialog-tooltip`, `dialog-menu-glass`, `dialog-nested`: an overlay opened by the body, settled; each draws on `Raised` above the dialog's own text (the gallery tests probe it through the tree and the layer) [D137].
 
 ### Painter primitives
 
 - Existing: fill, fill-radii, ring, acrylic, text. [R crates/lune-ui-core/src/paint.rs:215,219,231,243,274]
-- New: none.
+- New: none (`backdrop_with` lands in M7 step 1).
 
 ### Acceptance
 
@@ -116,19 +120,25 @@ size and the content inside it (laid out once per open, [R crates/lune-ui-core/s
 - Pixel probes at scale 2: card 896 px wide, footer 136 px high, buttons 64 px high, card corner radius 16 px, scrim colour #00000080. Source values in Anatomy.
 - Conformance: open reaches opacity 1 and scale 1 at 250 ms; close hides the host at 180 ms (Full), 120 ms (Reduced), 0 ms (Off).
 - Semantic node: role `dialog`, modal, name = title; default action fires confirm.
+- Variants: the form card is 600 wide and centred (1200 at scale 2); the blur request is on Modal at sigma 8, saturation 1, faded at half open and half close; a glass menu above a blurred scrim loses the arbitration (the scrim's blur stays) and draws its fill; a disabled confirm is `Disabled`, not focusable, offers no action, draws at 0.4 open and closing, and Enter and Space on it reach no Global binding; a confirm, cancel, Escape or scrim click inside a nested dialog reaches only the top (`widget_dialog`, gallery `dialog` tests).
 
 ### Build
 
-- Milestone: M4 (retrofit), M7 (variants, keyboard, anchored menus).
+- Milestone: M4 (retrofit), M7 (variants, overlays above the dialog).
 - Depends on: core.ui, core.focus, infra.accessibility, motion.transitions, widget.button.
 
 ## Open questions
 
-- Form variant (600 wide, two-column fields) is not drawn by the moved code [W docs/ui/components.md:557-570]; whether the toolkit owns the form width or the app does is open.
-- Scrim blur (Wane 8 px) is not drawn: the moved code fills the scrim solid (dialog.rs:53). The existing `backdrop` primitive (paint.rs:189) is the candidate; open.
 - Resolved [D75]: initial focus is Confirm, Cancel's tab stop comes first, Enter activates the focused button.
-- Exit easing: `animation-rules.md:83,106` (QuadraticEaseIn) vs the shipped QuadraticEaseOut (Animations.axaml:430-431); open.
-- Disabled button look inside the dialog: none in the moved code; open.
+- Resolved [D144]: the toolkit owns the form width (`DialogWidth::Form`, 600); the columns stay the app's body.
+- Resolved [D144]: the scrim blur is `DialogOptions::scrim_blur` (sigma 8, saturation 1), off by default.
+- Resolved [D144]: exit easing stays quad-out, the shipped Lunegit value (the doc's quad-in is a doc conflict, not a source of the look).
+- Resolved [D144]: a disabled confirm uses the button's own disabled look; the dialog's open focus goes to Cancel, or none.
+
+## Limits
+
+- Replaces the carried limit that an overlay opened inside a dialog drew and took input under it: an overlay opened above an active modal draws and takes input on `Raised`, one level [D137]. Overlays that stack further share `Raised`, so a third level that overlaps its parent interleaves (fills under text).
+- One blur per frame [D138]: a glass menu over a dialog with a blurred scrim has no blur of its own (the scrim's keeps), and draws its fill.
 
 ## Notes for the planner
 

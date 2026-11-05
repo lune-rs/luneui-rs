@@ -3,15 +3,34 @@
 
 use std::time::Duration;
 
+use crate::access::{Actions, Role, SemanticTree, State};
 use crate::input::{FrameOutput, Keymap};
 use crate::motion::MotionTier;
 use crate::scene::Scene;
 use crate::shortcuts::Shortcuts;
 use crate::strings::{DisplayFormat, StringTable};
 use crate::theme::{DARK, Theme};
-use crate::ui::{FrameConfig, Ui, UiStore};
+use crate::ui::{FrameConfig, Ui, UiStore, WidgetId};
 
 use super::{FakeText, ScriptedInput};
+
+/// Every node at `root` or below it in `tree` that a disabled scope should have marked but did not:
+/// one that is not `Disabled`, is `Focusable`, or offers an action.
+pub fn disabled_violations(tree: &SemanticTree, root: WidgetId) -> Vec<(WidgetId, Role)> {
+    let mut bad = Vec::new();
+    let mut open = vec![root];
+    while let Some(id) = open.pop() {
+        let Some(n) = tree.get(id) else { continue };
+        let good = n.states.contains(State::Disabled)
+            && !n.states.contains(State::Focusable)
+            && n.actions == Actions::default();
+        if !good {
+            bad.push((n.id, n.role));
+        }
+        open.extend(n.children.iter().rev());
+    }
+    bad
+}
 
 /// One scripted window for `Ui` tests. Script input on [`UiHarness::input`], then run
 /// [`UiHarness::frame`]; the frame's input is everything scripted since the previous frame.
@@ -67,5 +86,44 @@ impl UiHarness {
         let mut ui = Ui::begin(&mut self.store, &raw, config, &mut self.text);
         f(&mut ui);
         ui.finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::access::{Action, Node};
+    use crate::paint::Rect;
+
+    #[test]
+    fn disabled_violations_names_the_bad_nodes_under_the_root_only() {
+        let mut h = UiHarness::new((100.0, 100.0));
+        let (root, good, bad, acts, outside) = (
+            WidgetId::ROOT.with("root"),
+            WidgetId::ROOT.with("good"),
+            WidgetId::ROOT.with("bad"),
+            WidgetId::ROOT.with("acts"),
+            WidgetId::ROOT.with("outside"),
+        );
+        let at = Rect::new(0.0, 0.0, 10.0, 10.0);
+        let (_, out) = h.frame(|ui| {
+            let disabled = |id, role| {
+                let mut n = Node::new(id, role, "n", at);
+                n.states.insert(State::Disabled);
+                n
+            };
+            ui.node_container(disabled(root, Role::Group), |ui| {
+                ui.node(disabled(good, Role::Button));
+                ui.node(Node::new(bad, Role::Checkbox, "n", at));
+                let mut n = disabled(acts, Role::Switch);
+                n.actions.insert(Action::Default);
+                ui.node(n);
+            });
+            ui.node(Node::new(outside, Role::Button, "n", at));
+        });
+        assert_eq!(
+            disabled_violations(&out.tree, root),
+            [(bad, Role::Checkbox), (acts, Role::Switch)]
+        );
     }
 }

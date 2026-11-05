@@ -2,12 +2,13 @@
 //! renderer consumes. Std only; the GPU records are mirrored field by field, in physical pixels.
 //!
 //! Draw-order contract, which every renderer follows:
-//! - layers back to front, `layers[0]` first, five of them (see [`LayerId`]);
+//! - layers back to front, `layers[0]` first, six of them (see [`LayerId`]);
 //! - inside a layer: the acrylic shapes, the under shapes, the path fills, the custom items (in
 //!   record order), the images (in record order), the text, the over shapes, the strokes;
-//! - layers below [`SCENE_LAYERS`] render into an offscreen scene, the one a backdrop blurs; that
-//!   scene is then copied to the target, the [`BackdropRequest`] (if any) is drawn over it, and
-//!   the remaining layers follow.
+//! - the layers below [`Scene::split`] render into an offscreen scene, the one a backdrop blurs;
+//!   that scene is then copied to the target, the [`BackdropRequest`] (if any) is drawn over it,
+//!   and the remaining layers follow. The split is [`SCENE_LAYERS`], or the backdrop's own layer
+//!   when that is higher, so a glass surface blurs everything under it.
 
 use crate::image::{Fit, ImageAlign, ImageId};
 use crate::paint::Rect;
@@ -16,17 +17,26 @@ use crate::text::TextKey;
 /// Draw order, back to front. Each layer interleaves shapes and text correctly.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LayerId {
+    /// The window's own surface: the backdrop of everything else.
     Base = 0,
+    /// The app's content.
     Page = 1,
+    /// Menus, popovers, dropdowns and tooltips over the page.
     Popup = 2,
+    /// Modal dialogs and their scrim.
     Modal = 3,
+    /// An overlay opened above an active modal: a popup inside a dialog, or a dialog over a dialog.
+    /// The `Ui` picks it at open; nothing asks for it by name. Overlays stacked further share it,
+    /// and a layer draws by kind, so a third level that overlaps its parent interleaves with it.
+    Raised = 4,
     /// Toasts: above modal dialogs, so a toast raised by a dialog stays visible.
-    Toast = 4,
+    Toast = 5,
 }
 
-pub const LAYER_COUNT: usize = 5;
+pub const LAYER_COUNT: usize = 6;
 
-/// Layers under popups go to an offscreen scene, so a glass menu can blur them.
+/// The layers always drawn to the offscreen scene (see [`Scene::split`]): those under popups, so a
+/// glass menu can blur them.
 pub const SCENE_LAYERS: usize = 2;
 
 /// One rounded-rect instance (fill, ring or acrylic).
@@ -154,14 +164,30 @@ pub struct BackdropRequest {
     pub rect: [f32; 4],
     pub radius: f32,
     pub alpha: f32,
+    /// The index of the layer the region sits under: everything below it is blurred.
+    pub layer: usize,
+    /// Gaussian σ of this blur, as [`FrameParams::blur_sigma`]; 0 means the frame's.
+    pub sigma: f32,
+    /// Saturation boost of this blur, as [`FrameParams::saturation`]; 0 means the frame's.
+    pub saturation: f32,
 }
 
 /// One painted frame: every layer, back to front, and the glass backdrop request.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Scene {
     pub layers: [Layer; LAYER_COUNT],
-    /// Blurred-backdrop region requested by a glass menu (physical px).
+    /// Blurred-backdrop region requested by a glass surface (physical px). One per frame: of two
+    /// requests the lower layer keeps it, and on one layer the last wins.
     pub backdrop: Option<BackdropRequest>,
+}
+
+impl Scene {
+    /// How many layers draw to the offscreen scene, before the backdrop: [`SCENE_LAYERS`], or the
+    /// backdrop's layer when that is higher.
+    pub fn split(&self) -> usize {
+        self.backdrop
+            .map_or(SCENE_LAYERS, |b| b.layer.max(SCENE_LAYERS))
+    }
 }
 
 /// What one frame is drawn at, and how its glass backdrop is blurred.

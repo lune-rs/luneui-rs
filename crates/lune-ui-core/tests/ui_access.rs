@@ -8,7 +8,7 @@ use lune_ui_core::access::{
 use lune_ui_core::input::{FrameOutput, NamedKey, PointerButton};
 use lune_ui_core::motion::{Kind, Motion};
 use lune_ui_core::paint::{LayerId, Rect, Xform};
-use lune_ui_core::testing::UiHarness;
+use lune_ui_core::testing::{UiHarness, disabled_violations};
 use lune_ui_core::ui::{Dismissal, OverlayOptions, Response, Sense, Ui, WidgetId};
 
 fn harness() -> UiHarness {
@@ -30,6 +30,7 @@ fn node(id: WidgetId, role: Role, bounds: Rect, states: States) -> Node {
         states,
         actions: Actions::default(),
         sort: None,
+        level: None,
     }
 }
 
@@ -370,4 +371,35 @@ fn tr_falls_back_from_the_table_to_the_default_to_the_key() {
         .insert("luneui.dialog.cancel", "Abbrechen")
         .expect("a default key");
     h.frame(|ui| assert_eq!(ui.tr("luneui.dialog.cancel"), "Abbrechen"));
+}
+
+#[test]
+fn a_node_in_a_disabled_scope_is_disabled_whatever_it_asked_for() {
+    let mut h = harness();
+    let (group, kid, free) = (
+        WidgetId::ROOT.with("group"),
+        WidgetId::ROOT.with("kid"),
+        WidgetId::ROOT.with("free"),
+    );
+    let asks = |id, role| {
+        let mut states = States::default();
+        states.insert(State::Focusable);
+        let mut n = node(id, role, BOX, states);
+        n.actions.insert(Action::Default);
+        n
+    };
+    let (_, out) = h.frame(|ui| {
+        ui.with_enabled(false, |ui| {
+            ui.node_container(asks(group, Role::Group), |ui| {
+                ui.node(asks(kid, Role::Button));
+            });
+        });
+        ui.node(asks(free, Role::Button));
+    });
+    assert_eq!(disabled_violations(&out.tree, group), []);
+    let g = out.tree.get(group).expect("group");
+    assert!(g.states.contains(State::Disabled));
+    let n = out.tree.get(free).expect("outside the scope");
+    assert!(n.states.contains(State::Focusable) && n.actions.contains(Action::Default));
+    assert!(!n.states.contains(State::Disabled));
 }

@@ -2,10 +2,10 @@
 id: layout.icon-rail
 title: Icon rail
 area: layout
-status: planned
+status: in-progress
 consumers: lunegit
 source: Lunegit: src/Lunegit.Desktop/Views/IconRailView.axaml
-owner: —
+owner: toolkit-v1 M7
 summary: Narrow icon column of 40 px toolbar buttons that switch the side panels and toggle the terminal, with a notification badge
 ---
 
@@ -38,7 +38,7 @@ Conflicts: none. Wane and this repo have no icon rail.
 - Button: 40 × 40, transparent background, class `toolbar-action` [L src/Lunegit.Desktop/Views/IconRailView.axaml:24,31,85].
 - Icon: 20 × 20, `ForegroundMuted` [L src/Lunegit.Desktop/Views/IconRailView.axaml:28,35,90].
 - Top stack: spacing 4, five buttons in order: repository, branches, commit, files, scratchpad [L src/Lunegit.Desktop/Views/IconRailView.axaml:83-134].
-- Bottom dock: settings, help, notifications, terminal, AI projects, docked bottom [L src/Lunegit.Desktop/Views/IconRailView.axaml:24-80].
+- Bottom dock: settings, help, notifications, terminal, AI projects, docked bottom [L src/Lunegit.Desktop/Views/IconRailView.axaml:24-80]; no spacing, so its buttons touch at a pitch of 40 (the `DockPanel` has none: `:22-24,83`), and the toolkit follows it (C19).
 - Commit dot: a `Border` shown when there are uncommitted changes [L src/Lunegit.Desktop/Views/IconRailView.axaml:109]; its size is not read (Open questions).
 - Notification badge: a `Border` 16 high, min width 16, padding 2 0, margin 0 0 −4 −4 [L src/Lunegit.Desktop/Views/IconRailView.axaml:46-53]; hidden by default (`IsVisible="False"`), shown when there are unread items (binding in code-behind, not read).
 
@@ -68,7 +68,7 @@ Never animated: the badge count and the commit dot (high-frequency content, [L .
 
 - Pointer: a click toggles one side panel (`ToggleSidePanelCommand` with the panel key as the parameter) or the terminal (`ToggleTerminalPanelCommand`) [L src/Lunegit.Desktop/Views/IconRailView.axaml:26,33,41,67,77,87,95,103,121,129].
 - Keyboard: none in the markup; open question.
-- Tab stop: each button, top then bottom [core.focus] (derived: buttons in markup order).
+- Tab stop: the rail once, on the active item (else the first enabled one); Up and Down move through the top group then the bottom, wrapping, Home and End go to the ends, a disabled item is skipped [core.focus] [D149] (Lunegit has a stop per button).
 - Layer: Base [R crates/lune-ui-core/src/scene.rs:17-22] [derived].
 - Focus scope: none.
 - Pointer capture while pressed: none in the markup.
@@ -84,10 +84,12 @@ Never animated: the badge count and the commit dot (high-frequency content, [L .
 
 - Rail: role `toolbar`.
 - Each button: `button` named by its tooltip (the English string) [infra.accessibility].
-- Commit dot and badge: `status` text in the button name is not in any source; `role-gap`/name for the count is an open question.
+- Active item: the button reads `Pressed`. Commit dot and badge: the item's `note` is the button's description ("3 unread"), so the count has a name; the dot and badge draw no node of their own.
 - Live region: none; the badge count change is not announced in any source.
 
 ### Strings
+
+Dropped by [D149] (app text, hard rule 1): the keys below name an app's panels; the app passes each button's name.
 
 - `luneui.icon-rail.repository`: "Repository" [L src/Lunegit.Infrastructure/Localization/en.json:225].
 - `luneui.icon-rail.branches`: "Branches" [L src/Lunegit.Infrastructure/Localization/en.json:200].
@@ -102,12 +104,12 @@ Never animated: the badge count and the commit dot (high-frequency content, [L .
 
 ### Gallery scenes
 
-- `icon-rail-top` (new): five top buttons, settled.
-- `icon-rail-bottom` (new): five bottom buttons with the notification badge shown, settled.
-- `icon-rail-hover` (new): one button hovered, settled.
-- `icon-rail-pressed` (new): one button pressed (scale 0.98), settled.
+- `icon-rail-top` (new): five top buttons, the first marked active, settled.
+- `icon-rail-bottom` (new): five bottom buttons with the count badge shown on the third, settled.
+- `icon-rail-hover` (new): one button hovered, its fill settled, the tooltip still pending.
+- `icon-rail-pressed` (new): one button held down (scale 0.98), settled.
 - `icon-rail-press-mid` (new): press at t = 90 ms (half of fast, 180 ms) [L src/Lunegit.Desktop/App.axaml:152].
-- `icon-rail-commit-dot` (new): commit button with the uncommitted dot, settled.
+- `icon-rail-commit-dot` (new): the third top button with the uncommitted dot, settled.
 
 ### Painter primitives
 
@@ -128,11 +130,7 @@ Never animated: the badge count and the commit dot (high-frequency content, [L .
 
 ## Open questions
 
-- Hover fill value and focus-visible look: the `toolbar-action` hover fill is not read; open.
-- The commit dot's size and colour: not read (line 109-117); open.
-- The badge count's accessible name: no source; open (role-gap if the count needs a node).
-- Keyboard shortcuts for the rail buttons: none in the markup; open.
-- Active-panel look: the markup has no active class; open (decide whether the toolkit adds one).
+None. Closed by [D149]: the rail is a toolkit component (`Ui::icon_rail`, `RailItem`). Hover #10 and pressed #20 are the toolbar action's (`App.axaml:469-483`); focus-visible is the button's ring. The dot is 8 x 8, radius 4, `dirty_indicator` #D98A3D at (27, 7) from the button's top left (Lunegit margin 0,-3,-5,0 on a 20 px glyph panel); the badge is at least 16 wide and 16 high, radius 8, `count_badge` #E74856, 9 px bold `on_accent` text, right edge at x 34, top at y 10, "99+" above 99; both scale with the press and neither is animated; a count of 0 shows none. The count's name is the item's `note`. No keyboard shortcuts of its own: the app's `Binding`s. Active look (the toolkit's addition, Lunegit has none): `surface_selected` fill and `fg_primary` glyph, `Pressed` in the node. The rail draws no glass: the app's layer sits behind it. Each button has a tooltip of its name.
 
 ## Notes for the planner
 

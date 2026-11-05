@@ -3,7 +3,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::access::{AccessAction, AccessValue, Action, Node, SemanticTree, State};
+use crate::access::{AccessAction, AccessValue, Action, Actions, Node, SemanticTree, State};
 use crate::input::NamedKey;
 
 use super::keys::KeyPress;
@@ -69,8 +69,14 @@ pub(crate) fn route(
 impl Ui<'_> {
     /// Appends `node` to the frame's tree: its parent is the open container, its bounds go
     /// through the transform stack, and the Ui owns its `focused` state. Ignores the node's own
-    /// `parent` and `children`.
+    /// `parent` and `children`. Inside a disabled scope ([`Ui::with_enabled`]) the node is
+    /// `Disabled`, not `Focusable`, and offers no action, whatever it asked for.
     pub fn node(&mut self, mut node: Node) {
+        if !self.is_enabled() {
+            node.states.insert(State::Disabled);
+            node.states.remove(State::Focusable);
+            node.actions = Actions::default();
+        }
         node.bounds = self.painter.transformed(node.bounds);
         node.parent = self.containers.last().map(|&i| self.tree.nodes[i].id);
         node.children.clear();

@@ -57,7 +57,7 @@ n/a — Lunegit has no motion selector for the filter bar and the clear button a
 
 - Pointer: click focuses the text box; a press on the surface outside it (the padding, the icon) focuses it too; click on the clear button clears the text [L src/Lunegit.Desktop/Controls/FilterBar.axaml:13-17].
 - Clear: empties the text, marks the response `changed` and leaves focus on the field. The button sits after the field in the Tab order, so the clear lands after the field drew: the frame reports the change and the frame the input asks for after it shows the empty field [D81]. While the field composes a clear does nothing.
-- Keyboard: typing edits the text [text.text-edit]; Tab stops: the field, then the clear button while it shows, Enter and Space clear [core.focus].
+- Keyboard: typing edits the text [text.text-edit]; Tab stops: the field, then the clear button while it shows, Enter and Space clear [core.focus]. `FilterOptions::clear_unfocusable` takes the button out of focus and the Tab order, for a composite whose keys go through the field (the command palette).
 - Layer: `Base`; no overlay, no focus scope.
 
 ### Retained state

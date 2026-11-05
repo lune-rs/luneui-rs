@@ -2,10 +2,10 @@
 id: layout.sidebar
 title: Sidebar
 area: layout
-status: planned
+status: in-progress
 consumers: wane
 source: —
-owner: —
+owner: toolkit-v1 M7
 summary: 208 px column on the window glass: nav list (or wizard steps) and a status footer
 ---
 
@@ -17,7 +17,7 @@ summary: 208 px column on the window glass: nav list (or wizard steps) and a sta
 
 - Wane — Variants: main (nav items); wizard (`widget.steps` fills the nav slot, `role=navigation`, label "Setup steps") (R-layout-1)
 - Wane — States: footer ok (ok dot, "Proxy on 127.0.0.1:4646"); footer error (err dot, "Proxy stopped", no address; the page notice carries the detail). (R-layout-1)
-- Wane — Sizes: 208 wide (`--sidebar-w`), no card or fill of its own (it sits on the window glass); nav padding 8, items 2 apart; footer padding 12 16, top hairline `--border-subtle`, text 11/16 tertiary, addresses and `~/.wane` in RznMono; 10 px bottom margin (`--gutter`). (R-layout-1)
+- Wane — Sizes: 208 wide (`--sidebar-w`), no card or fill of its own (it sits on the window glass); nav padding 8, items 2 apart (`nav_item::PITCH` 34 = 32 + 2); footer padding 12 16, top hairline `--border-subtle`, text 11/16 tertiary, addresses and `~/.wane` in RznMono; 10 px bottom margin (`--gutter`). (R-layout-1)
 - Wane — Behaviour: Nav items navigate; the footer is static text. The wizard sidebar has no nav and no links (Back and Continue only). (R-layout-1)
 
 ## Existing code
@@ -59,8 +59,8 @@ n/a — no motion in Wane or the spike. The content it switches (the page) anima
 ### Input and focus
 
 - Pointer: a click on a nav item navigates [W docs/ui/components.md:221-234]; the footer takes no pointer input.
-- Keyboard: the nav items take focus in order; Up and Down between items: open question [core.focus].
-- Tab stop: each nav item; the footer is not a stop [derived: static text, W docs/ui/components.md:221-234].
+- Keyboard: the nav list is one roving stop; Up and Down move between items without wrapping, Enter and Space navigate (keys of `widget.nav-item`, [D121]) [core.focus].
+- Tab stop: the nav list once (the selected row); the footer is not a stop [derived: static text, W docs/ui/components.md:221-234].
 - Layer: Base (the window glass) [R crates/lune-ui-core/src/scene.rs:17-22].
 - Focus scope: none.
 - Pointer capture while pressed: none.
@@ -74,9 +74,9 @@ n/a — no motion in Wane or the spike. The content it switches (the page) anima
 
 ### Accessibility
 
-- Nav: role `group` for the main variant. The wizard's nav has role `navigation` (Wane `role=navigation` [W docs/ui/components.md:221-234]) [infra.accessibility], [D55].
-- Items: `button` nodes; the selected one has the `selected` state [infra.accessibility].
-- Footer: `status` node (polite) for the ok or error text [infra.accessibility].
+- Nav: a `Group` named by the caller over the nav list (`List` of `ListItem`, the rows of `widget.nav-item`). The wizard's nav is the steps' `Navigation` named by the caller (Wane `role=navigation` [W docs/ui/components.md:221-234]) [infra.accessibility], [D55].
+- Items: `ListItem` nodes; the selected one has `Selected` and `Current` [infra.accessibility].
+- Footer: a `Status` node (polite) for the ok or error text, a sibling after the group [infra.accessibility].
 
 ### Strings
 
@@ -84,9 +84,9 @@ None: nav labels and footer text are app text (Wane mock content, [W docs/ui/com
 
 ### Gallery scenes
 
-- `sidebar-main` (new): six nav items, one selected, footer ok, settled.
+- `sidebar-main` (new): six nav items, one selected, footer ok (mono text), settled.
 - `sidebar-footer-error` (new): footer error, settled.
-- `sidebar-wizard` (new): the wizard steps in the nav slot, settled.
+- `sidebar-wizard` (new): the wizard steps in the nav slot (one done, one current, two upcoming) with the ok footer, settled.
 
 ### Painter primitives
 
@@ -107,11 +107,7 @@ None: nav labels and footer text are app text (Wane mock content, [W docs/ui/com
 
 ## Open questions
 
-- Below what window width the sidebar collapses or hides: not mocked (Wane native note, W docs/ui/components.md:221-234); the layout responds to width only; open.
-- Up and Down keyboard between nav items: not in any source; open.
-- Lunegit's side panel column width: not read; open.
-- Whether this is a toolkit component or app code composed from the painter: the planner decides (Wane needs it either way).
-- Native rendering: no blur of its own: it shows the window material.
+None. Closed by [D149]: the sidebar is a toolkit component (`Ui::sidebar` with `SidebarBody::{Nav, Steps}` and an optional `SidebarFooter`); it has no collapse width of its own (the app owns the width and the rect it passes); the arrows are the nav list's (one stop, no wrap); the footer's bottom sits 10 px above the rect's bottom, its hairline spans the rect's width. Lunegit's side panel column width is the app's (it sets the window's split, not the host). Native rendering: no blur of its own: it shows the window material. Open: Wane's footer sets the label in UI type and only the address in mono, with a second line (`~/.wane`); `SidebarFooter` is one line in one family (`mono` covers it all), so matching needs an API change (a later step). The gallery keeps `mono: true` on the address footer.
 
 ## Notes for the planner
 

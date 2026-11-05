@@ -21,7 +21,7 @@ use crate::input::NamedKey;
 use crate::motion::{Kind, Motion};
 use crate::paint::{Painter, Rect, Xform};
 use crate::theme::Theme;
-use crate::ui::{Response, Sense, Ui};
+use crate::ui::{Response, Sense, Ui, WidgetId};
 
 /// The press scale about the rect's centre.
 pub const PRESS_SCALE: f32 = 0.98;
@@ -353,6 +353,18 @@ impl Ui<'_> {
     /// A ghost button holding only a glyph, centred in `rect` (the caller's rect is its size: 28
     /// by 28, 24 by 24, ...). Role button named `button.name`; Enter and Space click.
     pub fn icon_button(&mut self, key: impl Hash, rect: Rect, button: &IconButton<'_>) -> Response {
+        self.icon_button_sensed(key, rect, button, Sense::CLICK_FOCUS)
+    }
+
+    /// [`Self::icon_button`] registered with `sense`, for a composite that decides which of its
+    /// buttons is a tab stop.
+    pub(crate) fn icon_button_sensed(
+        &mut self,
+        key: impl Hash,
+        rect: Rect,
+        button: &IconButton<'_>,
+        sense: Sense,
+    ) -> Response {
         let content = Content::Glyph {
             glyph: button.glyph,
             size: button.glyph_size,
@@ -365,7 +377,27 @@ impl Ui<'_> {
             ButtonKind::Ghost,
             button.name,
             button.color,
+            sense,
         )
+    }
+
+    /// Consumes the activation `keys` of `id` and says whether one activates it. Enabled, the
+    /// first key found is taken and the rest stay for later handlers. Disabled, every one is taken
+    /// and nothing activates, so a key the widget would handle reaches no shortcut. A Control, Alt
+    /// or Command chord on one of them is not the widget's: it stays a shortcut.
+    pub(crate) fn activation_keys(
+        &mut self,
+        id: WidgetId,
+        enabled: bool,
+        keys: &[NamedKey],
+    ) -> bool {
+        if enabled {
+            return keys.iter().any(|k| self.consume_plain_key(id, *k));
+        }
+        for k in keys {
+            while self.consume_plain_key(id, *k) {}
+        }
+        false
     }
 
     fn button_inner(
@@ -377,7 +409,16 @@ impl Ui<'_> {
         kind: ButtonKind,
         name: &str,
     ) -> Response {
-        self.button_inner_colored(key, rect, radius, content, kind, name, None)
+        self.button_inner_colored(
+            key,
+            rect,
+            radius,
+            content,
+            kind,
+            name,
+            None,
+            Sense::CLICK_FOCUS,
+        )
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -390,12 +431,11 @@ impl Ui<'_> {
         kind: ButtonKind,
         name: &str,
         color: Option<Rgba>,
+        sense: Sense,
     ) -> Response {
         let id = self.id(key);
-        let mut r = self.interact(id, rect, Sense::CLICK_FOCUS);
-        if r.enabled
-            && (self.consume_key(id, NamedKey::Enter) || self.consume_key(id, NamedKey::Space))
-        {
+        let mut r = self.interact(id, rect, sense);
+        if self.activation_keys(id, r.enabled, &[NamedKey::Enter, NamedKey::Space]) {
             r.clicked = true;
         }
 
@@ -415,7 +455,9 @@ impl Ui<'_> {
 
         let mut node = Node::new(id, Role::Button, name, rect);
         if r.enabled {
-            node.states.insert(State::Focusable);
+            if sense.focusable {
+                node.states.insert(State::Focusable);
+            }
             node.actions.insert(Action::Default);
         } else {
             node.states.insert(State::Disabled);

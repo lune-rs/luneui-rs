@@ -39,7 +39,7 @@ use crate::input::{
 };
 use crate::motion::{MotionTier, Time};
 use crate::paint::{Painter, Rect, Xform};
-use crate::scene::Scene;
+use crate::scene::{LayerId, Scene};
 use crate::shortcuts::{CommandId, Scope, Shortcuts};
 use crate::strings::{ArgFormat, StringTable};
 use crate::text::TextSystem;
@@ -51,7 +51,7 @@ use overlay::{Dismissal as D, SUPPRESSED};
 use pointer::{Ctx, HitRecord, PointerFrame, topmost};
 
 /// The opacity of a disabled subtree.
-const DISABLED_ALPHA: f32 = 0.4;
+pub(crate) const DISABLED_ALPHA: f32 = 0.4;
 
 /// What the app hands a frame besides input and text: the look, the motion tier and the strings.
 #[derive(Clone, Copy)]
@@ -293,9 +293,12 @@ impl<'a> Ui<'a> {
                         let target = topmost(&hits, *pos, &eligible);
                         store.focus.visible = false;
                         store.focus.keyboard = false;
+                        // A press on a toast is never outside: the toast layer belongs to no
+                        // overlay, and its buttons must work with a popup open.
                         if let Some(t) = top_press
                             && t.opts.dismiss_on_outside_press
-                            && target.is_none_or(|h| h.tag < t.tag)
+                            && target
+                                .is_none_or(|h| h.tag < t.tag && h.layer != LayerId::Toast as usize)
                         {
                             // D22: the press that dismisses reaches nothing.
                             dismissed.entry(t.id).or_insert(D::OutsidePress);
@@ -305,7 +308,11 @@ impl<'a> Ui<'a> {
                         store
                             .pointer
                             .button(*pos, *button, true, *modifiers, &cx, &mut pointer);
-                        if let Some(h) = target.filter(|h| h.enabled && h.sense.focusable) {
+                        // A toast is outside the focus model (D146): a press on one leaves focus
+                        // where it was, or a toast that goes would take the focus with it.
+                        if let Some(h) = target.filter(|h| {
+                            h.enabled && h.sense.focusable && h.layer != LayerId::Toast as usize
+                        }) {
                             store.focus.focused = Some(h.id);
                         }
                     }
@@ -449,7 +456,13 @@ impl<'a> Ui<'a> {
                             continue;
                         }
                         acted = true;
-                        let top_escape = top_escape.map(|t| (t.id, t.opts.dismiss_on_escape));
+                        // A toast is no overlay (D146): what targets one acts on it alone, so it
+                        // dismisses no overlay and takes no focus out of a modal.
+                        let on_toast =
+                            meta.is_some_and(|(layer, _)| layer == LayerId::Toast as usize);
+                        let top_escape = top_escape
+                            .filter(|_| !on_toast)
+                            .map(|t| (t.id, t.opts.dismiss_on_escape));
                         let focus_to = access::route(
                             a,
                             node,
@@ -458,7 +471,7 @@ impl<'a> Ui<'a> {
                             &mut routed,
                             &mut dismissed,
                         );
-                        if let Some(id) = focus_to {
+                        if let Some(id) = focus_to.filter(|_| !on_toast || modal.is_none()) {
                             store.focus.focused = Some(id);
                             store.focus.visible = false;
                             focus_loss(&active, &hits, Some(id), &mut dismissed);

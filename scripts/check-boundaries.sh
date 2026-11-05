@@ -84,7 +84,7 @@ check() {
 
 check 1 no -n -i -E 'luneterm|lunegit' crates/*/Cargo.toml
 check 2 no -rn -i luneterm crates
-check 3 yes -rn -i -E 'lunegit|mock|terminal|xterm|scrollback|glass_ui|(^|[^[:alnum:]_])(pty|shell|ansi)($|[^[:alnum:]_])' crates
+check 3 yes -rn -i -E 'lunegit|mock|terminal|xterm|scrollback|glass_ui|(^|[^[:alnum:]_])(pty|shell|ansi|wane)($|[^[:alnum:]_])' crates
 check 4 no -rn -F -e 'env::var' -e 'Instant::now' -e 'SystemTime::now' -e '.elapsed()' crates/*/src
 
 for m in crates/*/Cargo.toml; do

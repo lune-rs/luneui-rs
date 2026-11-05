@@ -48,7 +48,7 @@ The popover therefore draws no shell: the consumer passes its own, and the defau
 - Flip: when the preferred side overflows the window minus an 8 px margin (`below + h > window.h - 8`), use the opposite side at the same gap, and never above the 8 px margin (`max(anchor.y - 4 - h, 8)`) [R crates/lune-ui-core/src/widgets/dropdown.rs:19-23], [R crates/lune-ui-core/src/widgets/menu.rs:96-100].
 - Shift: the x position is clamped to `[8, window.w - w - 8]` [R crates/lune-ui-core/src/widgets/menu.rs:95]. Wane asks for the same rule: "flips or shifts a surface to stay on screen" [W docs/ui/components.md:707].
 - Size limits come from the content: Lunegit's picker popup has a minimum width 220 and a maximum height 320 [L src/Lunegit.Desktop/Controls/LinkSearchPicker.axaml:47-48]; the flyouts set a minimum content width of 220 and 240 [L src/Lunegit.Desktop/Views/DiffView.axaml:110], [L src/Lunegit.Desktop/Views/SidePanels/CommitPanelView.axaml:368].
-- Shell: the consumer's; default `popup_panel` (radius 8, fill `dropdown_bg`, 1 px `border` ring) [R crates/lune-ui-core/src/widgets/mod.rs:200-203]; Lunegit's glass shells are a layered pair of borders with 1 px and 4 px padding [L src/Lunegit.Desktop/Views/DiffView.axaml:26-40], [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:300-303].
+- Shell: `Surface::Panel` (default) is `popup_panel` (radius 8, fill `dropdown_bg`, 1 px `border` ring) [R crates/lune-ui-core/src/widgets/mod.rs:200-203]; `Surface::Glass` is the menu's glass (`glass_panel`: the backdrop, `menu_glass`, the `menu_popup_border` ring, radius 9) [D143]; `Surface::None` draws nothing. A closing popover replays what its content drew, the backdrop included, with the fade; Lunegit's glass shells are a layered pair of borders with 1 px and 4 px padding [L src/Lunegit.Desktop/Views/DiffView.axaml:26-40], [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:300-303].
 - Layer `Popup`, above `Page`; the layers beneath it go to the offscreen scene so a glass shell can blur them [R crates/lune-ui-core/src/scene.rs:17-26].
 - Not placed here: tray-anchored popovers (a separate OS window, `platform.tray-icon`, `overlay.flyout`, [D48]).
 
@@ -89,7 +89,7 @@ Never animated: the popover's position while it follows a moving anchor (it snap
 - Transient: the open animation phase, hover and press of its content [core.ui].
 - Persistent: none; the popover's content owns its own (a list inside keeps its selection) under keep-alive.
 - App-owned: whether it is open, the anchor rect, the content, the preferred side and alignment, the dismiss callback result.
-- Exit retention: yes: Full 120 / Reduced 120 / Off 0 ms; a consumer with no motion of its own (the moved dropdown, [overlay.dropdown]) snaps and retains nothing. The id stays alive after the app stops calling it, draws from retained state and reports `Repaint::Now` until it settles [core.ui], [R crates/lune-ui-core/src/widgets/menu.rs:22]; Reduced uses the shortest token as Lunegit's dialog exit does [L src/Lunegit.Desktop/Services/DialogService.cs:87-92].
+- Exit retention: yes: Full 120 / Reduced 120 / Off 0 ms (the glass blur fades with it); a consumer with no motion of its own (the moved dropdown, [overlay.dropdown]) snaps and retains nothing. The id stays alive after the app stops calling it, draws from retained state and reports `Repaint::Now` until it settles [core.ui], [R crates/lune-ui-core/src/widgets/menu.rs:22]; Reduced uses the shortest token as Lunegit's dialog exit does [L src/Lunegit.Desktop/Services/DialogService.cs:87-92].
 
 ### Accessibility
 
@@ -111,6 +111,7 @@ None: the popover has no text of its own.
 - `popover-scale-1`: the same placement at scale 1, settled.
 - `popover-closing`: the dismiss at t = 60 ms (half of `instant`).
 - `popover-opening`: the open at t = 90 ms (half of `fast`).
+- `popover-glass`: the glass surface, settled.
 
 ### Painter primitives
 
@@ -128,7 +129,7 @@ None: the popover has no text of its own.
 
 ### Build
 
-- Milestone: M5. Built in M5 (steps 9 and 10; the page is `popover`). Carried: an overlay above a modal is unsupported, so a popover inside a dialog draws under it (flagged to M7). Open for `done` (D47): M11 re-checks the whole bar on every entry; the Windows and Linux run time is unverified (the Linux and Windows lint is `scripts/check-targets.sh`).
+- Milestone: M5, M7 step 4 (`Surface::Glass`). Built in M5 (steps 9 and 10; the page is `popover`). The carried limit is settled [D137]: a popover opened above a dialog draws and takes input on the `Raised` layer, chosen once at open; a third level that overlaps its parent shares `Raised` and interleaves (fills under text). Open for `done` (D47): M11 re-checks the whole bar on every entry; the Windows and Linux run time is unverified (the Linux and Windows lint is `scripts/check-targets.sh`).
 - Depends on: core.ui, core.focus, infra.accessibility, motion.transitions, core.input
 
 ## Open questions

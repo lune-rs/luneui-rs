@@ -152,8 +152,8 @@ enum Op {
     FillRadii(Rect, [f32; 4], Rgba),
     FillOver(Rect, f32, [f32; 4]),
     Ring(Rect, f32, f32, Rgba, bool),
-    Acrylic(Rect, f32, [f32; 4], [f32; 4], bool),
-    Backdrop(Rect, f32),
+    Acrylic(Rect, [f32; 4], [f32; 4], [f32; 4], bool),
+    Backdrop(Rect, f32, f32, f32),
     Text(Spec, f32, f32),
     Stroke(Vec<[f32; 2]>, bool, StrokeStyle),
     Dash(Vec<[f32; 2]>, bool, f32, f32, f32, Rgba),
@@ -304,6 +304,17 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         inner
     }
 
+    /// Stops recording until [`Self::resume_recording`], returning what was recorded so far (if
+    /// anything was): what is drawn meanwhile belongs to no recording open now.
+    pub(crate) fn pause_recording(&mut self) -> Option<Ops> {
+        self.recording.take().map(|ops| Ops { ops })
+    }
+
+    /// Ends a [`Self::pause_recording`]: the recording it returned goes on.
+    pub(crate) fn resume_recording(&mut self, paused: Option<Ops>) {
+        self.recording = paused.map(|o| o.ops);
+    }
+
     /// Replays `ops` through this painter's own methods, so the result depends on its current
     /// state (theme, scale, text system) as if the calls were made here.
     pub fn replay(&mut self, ops: &Ops) {
@@ -322,10 +333,12 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
                 Op::FillRadii(r, radii, c) => self.fill_radii(*r, *radii, *c),
                 Op::FillOver(r, radius, c) => self.fill_over(*r, *radius, *c),
                 Op::Ring(r, radius, w, c, above) => self.ring(*r, *radius, *w, *c, *above),
-                Op::Acrylic(r, radius, c, under, noise) => {
-                    self.acrylic(*r, *radius, *c, *under, *noise);
+                Op::Acrylic(r, radii, c, under, noise) => {
+                    self.acrylic_radii(*r, *radii, *c, *under, *noise);
                 }
-                Op::Backdrop(r, radius) => self.backdrop(*r, *radius),
+                Op::Backdrop(r, radius, sigma, saturation) => {
+                    self.backdrop_with(*r, *radius, *sigma, *saturation);
+                }
                 Op::Text(spec, x, y) => {
                     self.text(spec, *x, *y);
                 }
@@ -575,14 +588,28 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         })
     }
 
-    /// Ask for the blurred scene inside `r` (drawn under this layer).
+    /// Ask for the blurred scene inside `r`, drawn under this layer, at the frame's sigma and
+    /// saturation. See [`Self::backdrop_with`].
     pub fn backdrop(&mut self, r: Rect, radius: f32) {
-        self.rec(|| Op::Backdrop(r, radius));
+        self.backdrop_with(r, radius, 0.0, 0.0);
+    }
+
+    /// [`Self::backdrop`] at its own `sigma` and `saturation` (0 means the frame's). Everything
+    /// under this layer is blurred. A frame has one blur: of two requests the lower layer keeps
+    /// it, and on one layer the last wins.
+    pub fn backdrop_with(&mut self, r: Rect, radius: f32, sigma: f32, saturation: f32) {
+        self.rec(|| Op::Backdrop(r, radius, sigma, saturation));
+        if self.scene.backdrop.is_some_and(|b| b.layer < self.layer) {
+            return;
+        }
         let k = self.scale_k();
         self.scene.backdrop = Some(BackdropRequest {
             rect: self.tr(r).phys(self.s),
             radius: radius * k * self.s,
             alpha: self.alpha_k(),
+            layer: self.layer,
+            sigma,
+            saturation,
         });
     }
 
@@ -640,12 +667,24 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
     /// stack's alpha travels as the record's `opacity`, which the renderer blends the layer in
     /// with. Nothing is recorded when that opacity is not above zero.
     pub fn acrylic(&mut self, r: Rect, radius: f32, color: [f32; 4], under: [f32; 4], noise: bool) {
-        self.rec(|| Op::Acrylic(r, radius, color, under, noise));
+        self.acrylic_radii(r, [radius; 4], color, under, noise);
+    }
+
+    /// [`Self::acrylic`] with one radius per corner, in [`Self::fill_radii`]'s order.
+    pub fn acrylic_radii(
+        &mut self,
+        r: Rect,
+        radii: [f32; 4],
+        color: [f32; 4],
+        under: [f32; 4],
+        noise: bool,
+    ) {
+        self.rec(|| Op::Acrylic(r, radii, color, under, noise));
         let opacity = self.alpha_k();
         if opacity.is_nan() || opacity <= 0.0 {
             return;
         }
-        let mut shape = self.shape(r, [radius; 4], color);
+        let mut shape = self.shape(r, radii, color);
         shape.color = color;
         shape.under = under;
         shape.params = [0.0, 0.0, 1.0, if noise { 1.0 } else { 0.0 }];

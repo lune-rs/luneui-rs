@@ -29,6 +29,24 @@ pub const DEFAULTS: &[(&str, &str)] = &[
     ("luneui.verdict-row.warn", "WARN"),
     ("luneui.verdict-row.no", "NO"),
     ("luneui.stat.no-data", "No data"),
+    ("luneui.menu.name", "Menu"),
+    ("luneui.toast-notifications.clear-all", "Clear all"),
+    ("luneui.toast-notifications.history-header", "NOTIFICATIONS"),
+    ("luneui.toast-notifications.dismiss", "Dismiss"),
+    ("luneui.command-palette.show-more", "Show more results"),
+    (
+        "luneui.command-palette.footer-right",
+        "Enter open    Esc close",
+    ),
+    (
+        "luneui.command-palette.destructive-tooltip",
+        "Destructive action \u{2014} requires confirmation",
+    ),
+    (
+        "luneui.settings-page.restart-message",
+        "Some changes require a restart to take effect.",
+    ),
+    ("luneui.settings-page.restart-action", "Restart now"),
 ];
 
 /// The default text of a toolkit key, if it is one.

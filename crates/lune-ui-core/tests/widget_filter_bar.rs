@@ -22,6 +22,7 @@ const P: PointerButton = PointerButton::Primary;
 const OPTS: FilterOptions<'static> = FilterOptions {
     placeholder: "Filter",
     label: None,
+    clear_unfocusable: false,
 };
 /// Where the search icon's centre is, on the surface and off the field.
 const ON_ICON: (f32, f32) = (115.0, 115.0);

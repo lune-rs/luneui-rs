@@ -1,10 +1,10 @@
-//! Pixel probes of the vector primitives at scale 2: dash, sector, path-fill and the rounded
-//! clip, drawn through the real renderer into an offscreen target and read back.
+//! Pixel probes of the vector primitives at scale 2: dash, sector, path-fill, the rounded clip,
+//! the backdrop at its own layer and the per-corner acrylic, drawn through the real renderer into an offscreen target and read back.
 //!
 //! GPU test: with no adapter it prints `skipped: no GPU adapter` and passes, unless
 //! `LUNEUI_REQUIRE_GPU=1`, which makes a missing adapter a failure.
 
-use lune_ui_core::paint::{Painter, Rect, StrokeStyle};
+use lune_ui_core::paint::{LayerId, Painter, Rect, StrokeStyle};
 use lune_ui_core::scene::Scene;
 use lune_ui_core::text::{Spec, Style};
 use lune_ui_core::theme::DARK;
@@ -347,4 +347,136 @@ fn a_sweep_is_brightest_at_its_phase_around_a_translated_centre() {
     assert!(right[1] > 200 && right[3] < 10, "{right:?}");
     let down = at(&mut gpu, &mut text, 0.5);
     assert!(down[2] > 200 && down[0] < 10, "{down:?}");
+}
+
+/// Logical px. Black on the left of `EDGE_X`, white on the right.
+const EDGE_X: f32 = 60.0;
+const BLACK: [u8; 4] = [0, 0, 0, 255];
+
+fn hard_edge(p: &mut Painter<'_, u8>, layer: LayerId) {
+    p.on(layer);
+    let (w, h) = (p.window.w, p.window.h);
+    p.fill(Rect::new(0.0, 0.0, EDGE_X, h), 0.0, [0, 0, 0, 255]);
+    p.fill(
+        Rect::new(EDGE_X, 0.0, w - EDGE_X, h),
+        0.0,
+        [255, 255, 255, 255],
+    );
+}
+
+/// A glass region across the edge, device px of its middle row.
+const GLASS: Rect = Rect::new(30.0, 20.0, 60.0, 40.0);
+const GLASS_ROW: usize = 80;
+/// Device px either side of the edge, inside the glass.
+const LEFT_OF_EDGE: usize = 116;
+const RIGHT_OF_EDGE: usize = 124;
+
+#[test]
+fn a_glass_panel_on_raised_blurs_the_modal_layer_under_it() {
+    let Some(mut gpu) = headless_gpu() else {
+        return;
+    };
+    let mut text = text_cache();
+    let scene = paint(&mut text, |p| {
+        hard_edge(p, LayerId::Modal);
+        p.on(LayerId::Raised);
+        p.backdrop(GLASS, 0.0);
+    });
+    let img = render(&mut gpu, &mut text, &scene);
+    let (left, right) = (
+        px(&img, LEFT_OF_EDGE, GLASS_ROW),
+        px(&img, RIGHT_OF_EDGE, GLASS_ROW),
+    );
+    assert!((30..226).contains(&left[0]), "blurred, not black: {left:?}");
+    assert!(
+        (30..226).contains(&right[0]),
+        "blurred, not white: {right:?}"
+    );
+    // Outside the panel the edge stays sharp.
+    assert_eq!(px(&img, LEFT_OF_EDGE, 20), BLACK);
+    assert_eq!(px(&img, RIGHT_OF_EDGE, 20), WHITE);
+}
+
+#[test]
+fn a_popup_backdrop_leaves_the_modal_layer_sharp_and_on_top() {
+    let Some(mut gpu) = headless_gpu() else {
+        return;
+    };
+    let mut text = text_cache();
+    let scene = paint(&mut text, |p| {
+        p.on(LayerId::Page);
+        p.fill(p.window, 0.0, [255, 0, 0, 255]);
+        p.on(LayerId::Popup);
+        p.backdrop(GLASS, 0.0);
+        hard_edge(p, LayerId::Modal);
+    });
+    let img = render(&mut gpu, &mut text, &scene);
+    assert_eq!(px(&img, LEFT_OF_EDGE, GLASS_ROW), BLACK);
+    assert_eq!(px(&img, RIGHT_OF_EDGE, GLASS_ROW), WHITE);
+}
+
+/// The row of the glass across the edge, for a backdrop asked for by `f`.
+fn blurred_row(sigma: f32, saturation: f32) -> Option<Vec<[u8; 4]>> {
+    let mut gpu = headless_gpu()?;
+    let mut text = text_cache();
+    let scene = paint(&mut text, |p| {
+        p.on(LayerId::Page);
+        p.fill(
+            Rect::new(0.0, 0.0, EDGE_X, p.window.h),
+            0.0,
+            [200, 40, 40, 255],
+        );
+        p.fill(
+            Rect::new(EDGE_X, 0.0, p.window.w, p.window.h),
+            0.0,
+            [40, 40, 200, 255],
+        );
+        p.on(LayerId::Popup);
+        p.backdrop_with(GLASS, 0.0, sigma, saturation);
+    });
+    let img = render(&mut gpu, &mut text, &scene);
+    Some((70..170).map(|x| px(&img, x, GLASS_ROW)).collect())
+}
+
+#[test]
+fn a_backdrop_with_its_own_sigma_and_saturation_differs_from_the_frames() {
+    let Some(frame) = blurred_row(0.0, 0.0) else {
+        return;
+    };
+    // `render` draws at sigma 4, saturation 1: asking for them by value is the frame's look.
+    assert_eq!(blurred_row(4.0, 1.0), Some(frame.clone()));
+    let wide = blurred_row(8.0, 0.0).expect("gpu");
+    assert_ne!(wide, frame, "sigma 8 is not the frame's");
+    // A wider blur has reached further from the edge.
+    let reach = |row: &[[u8; 4]]| row.iter().filter(|c| c[0] > 60 && c[0] < 180).count();
+    assert!(
+        reach(&wide) > reach(&frame),
+        "{} {}",
+        reach(&wide),
+        reach(&frame)
+    );
+    let vivid = blurred_row(0.0, 2.0).expect("gpu");
+    assert_ne!(vivid, frame, "saturation 2 is not the frame's");
+}
+
+#[test]
+fn acrylic_radii_cuts_only_the_corner_it_names() {
+    let Some(mut gpu) = headless_gpu() else {
+        return;
+    };
+    let mut text = text_cache();
+    let green = [0.0, 1.0, 0.0, 1.0];
+    let red = [1.0, 0.0, 0.0, 1.0];
+    let r = Rect::new(20.0, 20.0, 60.0, 40.0);
+    let scene = paint(&mut text, |p| {
+        p.acrylic_radii(r, [8.0, 0.0, 0.0, 0.0], green, red, false);
+    });
+    let img = render(&mut gpu, &mut text, &scene);
+    let (l, t, right, b) = (40, 40, 159, 119);
+    let green_px = [0, 255, 0, 255];
+    assert_eq!(px(&img, l, t), [255, 0, 0, 255], "top-left is cut");
+    assert_eq!(px(&img, right, t), green_px, "top-right is square");
+    assert_eq!(px(&img, right, b), green_px, "bottom-right is square");
+    assert_eq!(px(&img, l, b), green_px, "bottom-left is square");
+    assert_eq!(px(&img, l + 30, t + 30), green_px, "inside");
 }

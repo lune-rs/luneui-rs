@@ -141,8 +141,24 @@ pub enum Surface {
     /// [`popup_panel`]: radius 8, `dropdown_bg`, a 1 px `border` ring.
     #[default]
     Panel,
+    /// [`glass_panel`]: radius 9, the blurred scene under it (`backdrop`), `menu_glass`, a 1 px
+    /// `menu_popup_border` ring: the surface of the glass menu (D7).
+    Glass,
     /// Nothing: the content draws its own surface.
     None,
+}
+
+/// The radius of the glass surface.
+pub(crate) const GLASS_RADIUS: f32 = 9.0;
+
+/// The glass menu's surface at `r`: the backdrop under it, `menu_glass` over it, the
+/// `menu_popup_border` ring. The menu, the glass dropdown, the glass popover and the flyout draw
+/// this one function.
+pub(crate) fn glass_panel<H: Copy + PartialEq>(p: &mut Painter<'_, H>, r: Rect) {
+    let t = p.theme;
+    p.backdrop(r, GLASS_RADIUS);
+    p.fill(r, GLASS_RADIUS, t.menu_glass);
+    p.ring(r, GLASS_RADIUS, 1.0, t.menu_popup_border, false);
 }
 
 /// Where a popover goes and how it looks.
@@ -240,9 +256,13 @@ impl<'a> Ui<'a> {
             ui.painter()
                 .push_xform(xform_of(anim, origin, frame.transforms));
             let (r, ops) = ui.record(|ui| {
-                if surface == Surface::Panel {
-                    let t = *ui.theme();
-                    popup_panel(ui.painter(), rect, t.dropdown_bg, t.border);
+                match surface {
+                    Surface::Panel => {
+                        let t = *ui.theme();
+                        popup_panel(ui.painter(), rect, t.dropdown_bg, t.border);
+                    }
+                    Surface::Glass => glass_panel(ui.painter(), rect),
+                    Surface::None => {}
                 }
                 content(ui, rect)
             });
@@ -257,8 +277,32 @@ impl<'a> Ui<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testing::FakeText;
+    use crate::theme::DARK;
+    use crate::widgets::menu::{MenuLayout, menu_paint};
 
     const WIN: Rect = Rect::new(0.0, 0.0, 800.0, 600.0);
+
+    /// The glass menu and the glass surface are one function: a menu without rows draws exactly
+    /// what `glass_panel` draws, at any scale.
+    #[test]
+    fn the_menu_panel_is_the_glass_panel() {
+        let panel = Rect::new(40.0, 30.0, 200.0, 100.0);
+        for scale in [1.0, 2.0] {
+            let mut text = FakeText;
+            let mut a = Painter::<u8>::new(scale, WIN, &mut text, None, DARK);
+            glass_panel(&mut a, panel);
+            let mut text = FakeText;
+            let mut b = Painter::<u8>::new(scale, WIN, &mut text, None, DARK);
+            let layout = MenuLayout {
+                panel,
+                rows: Vec::new(),
+            };
+            menu_paint(&mut b, &[], &layout, &[]);
+            assert!(a.scene == b.scene, "scale {scale}");
+            assert!(a.scene.backdrop.is_some());
+        }
+    }
 
     fn req(anchor: Rect, size: (f32, f32)) -> PlaceRequest {
         PlaceRequest {

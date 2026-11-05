@@ -2,10 +2,10 @@
 id: overlay.flyout
 title: Tray flyout
 area: overlay
-status: planned
+status: in-progress
 consumers: wane
 source: —
-owner: —
+owner: toolkit-v1 M7
 summary: Windows tray left-click surface: header, stats, route list, action rows
 ---
 
@@ -22,7 +22,7 @@ Windows tray left-click surface: header, stats, route list, action rows. Named b
 
 ## Existing code
 
-None in luneui-rs or Luneterm's `lune-ui` (Wane: partial: the glass popup surface exists (popup_panel widgets/mod.rs:200; menu glass widgets/menu.rs:109); the stats block and the separate window are missing). Design source (not code to move): Luneterm crates/lune-ui/src/widgets/menu.rs:109-111 (backdrop, glass fill, ring); Luneium src/renderer/shell/components/Popup.css:2; docs/mockups/Tray.dc.html (content).
+`crates/lune-ui-core/src/widgets/flyout.rs` (`Flyout`, `Ui::flyout`, `flyout_size`, `flyout_body`) over `Ui::popover` with `Surface::Glass`, `menu_rows` (the menu's row frame), `Ui::stat_strip` and `Ui::kv_list` [D145]; tests in `crates/lune-ui-core/tests/widget_flyout.rs`. The separate window and the tray anchoring wait for M10. Before M7 there was none in luneui-rs or Luneterm's `lune-ui` (Wane: partial: the glass popup surface exists (popup_panel widgets/mod.rs:200; menu glass widgets/menu.rs:109); the stats block and the separate window are missing). Design source (not code to move): Luneterm crates/lune-ui/src/widgets/menu.rs:109-111 (backdrop, glass fill, ring); Luneium src/renderer/shell/components/Popup.css:2; docs/mockups/Tray.dc.html (content).
 
 ## Spec
 
@@ -43,7 +43,8 @@ Conflicts: none between sources. Wane `--popup-border` (flyout, 1 px) differs in
 - Stats strip: margin 8 0; the `data.stat` compact cells [W docs/ui/components.md:571-584].
 - Routes: padding 0 8; `data.kv-list` rows [W docs/ui/components.md:571-584].
 - Action rows: `overlay.menu` items [overlay.menu].
-- Placement on Windows: 12 px above the taskbar, 12 px from the right edge [W docs/ui/components.md:571-584]; the window is placed from the tray icon's rect and kept on screen [W docs/ui/components.md:571-584].
+- Placement on Windows: 12 px above the taskbar, 12 px from the right edge [W docs/ui/components.md:571-584]; the window is placed from the tray icon's rect and kept on screen [W docs/ui/components.md:571-584]. M7 places the card from the app's anchor rect with `place`: gap 12 from the anchor, margin 12 from the window's edges, shifted inside them; M10 passes the tray rect.
+- Built geometry (card width 340, content 328 wide at 6 px in: the 5 px padding and the 1 px ring): the header is 32 high (6 + a 20 px line + 6), its text 8 px in; the mark is a 16 px glyph of the icon font in `fg_primary`, 8 px before the wordmark (14 px bold `gold`); the state is 11 px on a 16 px line in `fg_secondary`, right-aligned 8 px in, with its dot 6 px before it. The stats strip (compact cells) is the content width, 50 high: a 1 px `border_subtle` outline at radius 8 (Wane's `c-panel c-panel--strip`) drawn after the cells, which sit 1 px inside it, with 8 px above and below; the routes are `Ui::kv_list` mono, inset 8 more, with 8 px above and below, their keys at `font_s` 11 (`.c-flyout__routes .c-kv dt`) and the values at 13; neighbouring margins collapse into one 8 px, as in the mock. Empty `stats` or `routes` draw nothing and take no height. A separator (the menu's 11 px row) and the rows follow when there are rows. All text is at least 14 px from the card's edge.
 
 ### States
 
@@ -54,7 +55,7 @@ Conflicts: none between sources. Wane `--popup-border` (flyout, 1 px) differs in
 | open, degraded | header state text "degraded" | [W docs/ui/components.md:571-584] |
 | open, paused | header state text "paused" | [W docs/ui/components.md:571-584] |
 | item hover, pressed, disabled | the `overlay.menu` item states | [overlay.menu] |
-| focus-visible | not in the source; open question | open question |
+| focus-visible | the highlight: the hover fill on the lit row, no ring | [D145], [overlay.menu] |
 
 ### Transitions
 
@@ -68,8 +69,8 @@ Never animated: the stats and routes content (values change, [motion] list: high
 ### Input and focus
 
 - Pointer: left click on the tray icon toggles the flyout (the icon is `platform.tray-icon`); an outside click closes [W docs/ui/components.md:571-584].
-- Keyboard: none in the source; Esc and arrow keys are open questions.
-- Tab stop: no (open question).
+- Keyboard: the menu's [D145]: Up and Down wrap over the enabled rows, Home and End go to the ends, Enter and Space pick, Escape closes. Focus lands on the first enabled row at open.
+- Tab stop: one, the rows' (roving), as the menu's; the route values are selectable but not tab stops.
 - Layer: Popup, in its own borderless, always-on-top, non-activating window [W docs/ui/components.md:571-584]; the in-app blur draws over the real desktop (platform work).
 - Focus scope: losing focus closes the flyout [W docs/ui/components.md:571-584] [core.focus]; push on open and pop on close restore the previous focus owner [core.focus].
 - Pointer capture while pressed: none in the source.
@@ -83,14 +84,14 @@ Never animated: the stats and routes content (values change, [motion] list: high
 
 ### Accessibility
 
-- Role `menu` for the action rows (`menu-item`, actions default and dismiss) [overlay.menu] [infra.accessibility].
+- Role `menu` for the action rows (`menu-item`, actions default and dismiss) [overlay.menu] [infra.accessibility], named by `Flyout.name` (empty uses `luneui.menu.name`).
 - The state text is a `status` node with a polite live region [infra.accessibility].
-- Stats and routes: `group` nodes with `static-text` children; no actions [infra.accessibility].
-- Name of the flyout: the app name and state, supplied by the app [infra.accessibility].
+- Stats and routes: `group` nodes (named by their labels and keys) with the cells' and pairs' own nodes under them; no actions [infra.accessibility].
+- Name of the flyout's rows: the app name and state, supplied by the app [infra.accessibility]. In a disabled scope every node is disabled and the rows' keys are taken, but a focused route value's are not (`docs/architecture.md`, "Disabled keys"); Escape still closes.
 
 ### Strings
 
-None: the header, stats, route and action labels are app text (Wane mock content, [W docs/ui/components.md:571-584]).
+None of its own: the header, stats, route and action labels are app text (Wane mock content, [W docs/ui/components.md:571-584]). The rows' name falls back to the menu's `luneui.menu.name`.
 
 ### Gallery scenes
 
@@ -104,27 +105,27 @@ None: the header, stats, route and action labels are app text (Wane mock content
 ### Painter primitives
 
 - Existing: backdrop, fill, ring, text, icon (glyph in the header mark; the menu's primitives, [overlay.menu]).
-- New: none.
-- The saturate 1.8 of the glass has no painter parameter: an Open question (see Open questions).
+- New: none. `popover::glass_panel` is the one function that draws the menu's glass, the glass dropdown, the glass popover and this card [D143].
+- The saturate 1.8 of the glass is the frame's `FrameParams.saturation`: no painter parameter [D145].
 
 ### Acceptance
 
-- Behaviour (scripted input, injected time): a tray click toggles; an outside click and a focus loss close; the action rows fire once and close. None exists.
+- Behaviour (scripted input, injected time): an outside click, Escape and a focus loss close; a click, Enter and Space pick a row once; arrows wrap and skip a disabled row; the size equals the drawn card at the three states; empty stats or routes take no height (`tests/widget_flyout.rs`). The tray click that toggles it is the app's (M10).
 - Pixel probes at scale 2: window width 680 px; radius 18 px; header padding 12 px vertical and 16 px horizontal.
 - Conformance: the open and close curves match `overlay.menu`.
 - Semantic node: role `menu` for the actions; the status node polite; the state text follows the tray state.
 
 ### Build
 
-- Milestone: M7 (the surface: header, stats strip, routes, action rows, open and close motion, drawn from the app's anchor point) and M10 (placement from the tray icon's rect and the separate glass window, with `platform.tray-icon`). M7 uses `data.stat` and `data.kv-list` (both M6) and `overlay.menu` (M7).
+- Milestone: M7 step 4 built the surface (header, stats strip, routes, action rows, open and close motion, drawn from the app's anchor point; `flyout_body` is the body M10 runs in its own window) and M10 (placement from the tray icon's rect and the separate glass window, with `platform.tray-icon`). M7 uses `data.stat` and `data.kv-list` (both M6) and `overlay.menu` (M7).
 - Depends on: overlay.popup-panel, overlay.menu, data.stat, data.kv-list, platform.tray-icon, platform.window, render.blur.
 
 ## Open questions
 
-- Whether this is a toolkit component or app code composed from the painter: the planner decides (Wane needs it either way).
+- Open (API, a later step): a route's state note ("loaded", Wane's `.c-flyout__note`, sans 11 tertiary after the id) has no place in `routes: &[(&str, &str)]`.
+- Resolved [D145]: a toolkit component, so every consumer gets the surface and the keys.
 - Native rendering: needs a separate borderless, always-on-top, non-activating glass window anchored to the tray rect, with the in-app blur over the real desktop (platform work, section 5). The mock fixes its position; the real window must be placed from the tray icon's rect and kept on screen.
-- Keyboard: Esc and arrow-key navigation are not in any source; role-gap for the action rows if the menu's keys do not carry over.
-- Focus-visible on a row: not in any source.
+- Resolved [D145]: the menu's keys carry over, and focus-visible is the highlight.
 
 ## Notes for the planner
 

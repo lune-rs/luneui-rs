@@ -112,9 +112,11 @@ standard in `docs/motion.md`. Numbers appear where a source states one.
 ### Overlays
 
 - R-overlay-1 [existing] Popup panel, modal dialog, dropdown (flips above its anchor near the window
-  bottom) and glass context menu (`widgets/`).
-- R-overlay-2 [new] Toasts, with a history list (Lunegit has both).
-- R-overlay-3 [new] Tooltips and flyouts.
+  bottom) and glass context menu (`widgets/`). M7 upgraded them: menu keys, variants and anchored menus, the
+  dropdown's glass and scrolling list, dialog variants, and an overlay above a dialog (the `Raised` layer, D137).
+- R-overlay-2 [new] Toasts, with a history list (Lunegit has both). Built in M7.
+- R-overlay-3 [new] Tooltips and flyouts. The tooltip is M5; the flyout's surface and the command palette are M7
+  (the tray window and its placement are M10).
 - R-overlay-4 [new] Anchored popover placement and dismiss: an anchor rect placed with flip and shift
   inside the window, dismissed on outside click, Escape and focus loss, opening and closing with
   motion tokens (`overlay.popover`).
@@ -122,10 +124,11 @@ standard in `docs/motion.md`. Numbers appear where a source states one.
 ### Layout and data views
 
 - R-layout-1 [new] Layout containers. No layout module exists in `lune-ui` today; widgets take a
-  `Rect` the app computed.
-- R-layout-2 [new] Resizable split panes and scrolling regions that preserve offset.
+  `Rect` the app computed. Built in M7: page, panel, sidebar, side panel, icon rail and settings page (each takes
+  its rect).
+- R-layout-2 [new] Resizable split panes and scrolling regions that preserve offset. Split panes are M7.
 - R-layout-3 [new] Virtualized lists and tree views with tree guide lines, for long lists (Lunegit
-  uses virtualizing panels in several views).
+  uses virtualizing panels in several views). The tree view is M7.
 - R-data-1 [new] Domain views Lunegit draws itself: commit graph rows, diff views (unified and
   split) with hunk actions and conflict strips, pie chart, kanban board with drag-and-drop.
   Resolved by D42: toolkit components `data.lane-graph`, `text.diff-view`, `data.pie-chart` and
