@@ -191,7 +191,8 @@ Holds, for the keys listed:
 | `flyout`, its rows (`menu_rows`) | Enter, Space, Up, Down, Home, End | Test: `widget_flyout::a_disabled_flyout_closes_on_escape_picks_nothing_and_marks_every_node` |
 | `dropdown`, with and without `max_rows` | Enter, Up, Down | Test: `widget_dropdown::a_disabled_dropdown_takes_the_keys_picks_nothing_and_marks_every_node` |
 | `tree_view` | Enter, Space, arrows, Home, End, PageUp, PageDown | Test: `widget_tree_view::a_disabled_tree_toggles_and_selects_nothing_takes_its_keys_and_passes_the_walk` |
-| `toasts`, the action and dismiss buttons | Enter, Space | Test: `widget_toast::the_toast_is_called_in_a_disabled_scope_and_every_node_says_so` (one stop); probe (both) |
+| `toasts`, the action buttons | Enter, Space | Probe (`toast.rs:954`: no test failed under a mutant) |
+| `toasts`, Cancel and Dismiss (`icon_button`, the `button` row's reader) | Enter, Space | Test: `widget_toast::the_toast_is_called_in_a_disabled_scope_and_every_node_says_so` holds Cancel; probe (Dismiss) |
 | `settings_page`, the restart action | Enter, Space | Probe. `widget_settings_page::a_disabled_page_reports_nothing_and_leaves_the_keys_to_shortcuts` never focuses it |
 | `command_palette`, its own keys | Up, Down, Enter | Test: `widget_command_palette::a_disabled_palette_takes_its_keys_activates_nothing_and_passes_the_walk` (`Scope::Overlay`) |
 
@@ -207,9 +208,9 @@ nothing acted. Each gates on `enabled` or a focus that is false in a disabled sc
 | `virtual_list` | Up, Down, Home, End, PageUp, PageDown; Command+C with a selection |
 | `text_field`, and the filter bar's box | Enter, Space, Backspace, Delete, Left, Right, Home, End, a typed character, Command+A, V, Z; Command+C, X with a selection (run on the field) |
 | `text_area` | those, and Up, Down, PageUp, PageDown |
-| `command_palette`, its search box (a filter bar) | Space, Backspace, Delete, Left, Right, Home, End, a typed character, Command+A, V, Z. Only Up, Down and Enter hold, by the palette's own keys |
+| `command_palette`, its search box (a filter bar) | Space, Backspace, Delete, Left, Right, Home, End, a typed character, Command+A, V, Z; Command+C, X with a selection. Only Up, Down and Enter hold, by the palette's own keys |
 | `selectable_text`, so `kv_list` values and the flyout's routes (each run) | Enter, Left, Right, Home, End, Command+A; Command+C with a selection. Elided text (`spec` differs from `full`): Command+A, C |
-| `scroll_area`, a focused child the keys passed | PageUp, PageDown, Home, End, in an area that overflows. Run with a button, a slider and an overflowing tab strip (PageUp, PageDown; the strip takes the others first). So a child that holds its own keys above still loses these. Hosts: the page body, the settings content, the toast log and history |
+| `scroll_area`, a focused child the keys passed | PageUp, PageDown, Home, End, in an area that overflows. Run with a button, a slider and an overflowing tab strip (PageUp, PageDown; the strip takes the others first). So a child that holds its own keys above still loses these. Hosts: the page body and the settings content. |
 | `scroll_area`, itself focused (only by an app or assistive tool, STATE's limit from review F18) | Up, Down |
 
 Not a leak: Escape in a pointer drag (`consume_key_while_pressed`: the splitter, `drag_gesture`) fired nothing enabled
@@ -222,7 +223,7 @@ dialog's disabled confirm. A disabled radio option takes its keys, and the arrow
 
 Not checked, from reading only:
 
-- `Ui::empty_state`'s and `Ui::callout`'s actions (`Ui::button`) and `Ui::toast_history`'s clear (`icon_button`), not run.
+- `Ui::empty_state`'s and `Ui::callout`'s actions (`Ui::button`), not run. `Ui::toast_history`'s clear (`icon_button`) holds Enter and Space by probe, with no test.
 - The tab strip's menu (`menu`), not run.
 - `free_drag_gesture`: no library caller, not run.
 - Keys outside the 27, such as Alt word moves in a text field and Control chords. D157 leaves chords to the shortcuts where it applies.
