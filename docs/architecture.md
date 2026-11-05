@@ -469,7 +469,7 @@ facade keeps those paths):
 - new: `RawInput`, `FrameOutput`, `Translator`, `OutputState`, `Backdrop::apply`, `WindowBackdrop`,
   the `testing` module.
 
-Since M8 (D160 to D174; nothing public was removed or changed in signature):
+Since M8 (D160 to D176; nothing public was removed or changed in signature):
 
 - new widgets with a `Ui` method each: `table` (`Ui::table`, `table_state`, `table_selection`; `columns`, `Cell`,
   `CellTone`, `TableColumn`, `ColumnWidth`, `SortKey`), `bar_chart` (`Ui::bar_chart`, `bar_chart::height`),

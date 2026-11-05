@@ -1,13 +1,13 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-05 (M8 built on `orch/toolkit-v1`, step 7 closed, review rounds 1 and 2 fixed (F1 to F3, D175; F7 to F10, D176); awaiting re-review and merge; M7 is merged to main at 662d310)
+Last updated: 2026-11-05 (M8 merged to main at 2474248, review rounds 1 to 3 closed; a pause point, M9 waits for the user)
 
 ## Now
 
-M8 (data views: table, bar chart, pie chart, kanban board, lane graph) is built on `orch/toolkit-v1` (7 steps, DECISIONS
-D160 to D174) and closed: the cross-widget suite, the disabled-keys rows, the catalogue audit, the architecture notes and the
-bench are in. It waits for review and the merge. `docs/architecture.md` has the module map, the pages and "API changes since M1".
+M8 (data views: table, bar chart, pie chart, kanban board, lane graph) is merged to main at 2474248 (7 steps, DECISIONS
+D160 to D176) and closed: the cross-widget suite, the disabled-keys rows, the catalogue audit, the architecture notes and the
+bench are in. `docs/architecture.md` has the module map, the pages and "API changes since M1".
 
 What M8 added:
 - Carried limits paid first (D160): a real arrow on a focused scroll area no longer scrolls (F18); the area's Page, Home and
@@ -48,16 +48,16 @@ reaches the area around it (the board and its columns, list, table, tree, tab st
 `nested_wheel`); an Escape in the frame a gesture ends, after the release or the capture's loss, is the overlay's; the armed-press
 rule has its test on `free_drag_gesture`; the Escape routing entries say D175. Gate: `cargo test --workspace` 1,954 passed, 0 failed.
 
-The bench below is from before the fixes (nothing they touch is on a
-frame path the bench measures beyond one store flag).
+Review round 3 passed at 208608b with two nits left open: a wheel over a fit composite in a top popover reaches a list in a popover under it
+(`pointer.rs:258`, two non-modal overlays on one layer; `&& h.tag >= tag` fixed both probes in a scratch copy, F11), and F5, F6 (a ghost's step on a
+press mid-slide or a second Shift move during a landing).
 
-Final gate at 7147e31: fmt, clippy `-D warnings`, `cargo test --workspace` 1,918 passed and 0 failed, boundaries clean, component
-index up to date; `LUNEUI_REQUIRE_GPU=1 cargo test -p lune-ui-wgpu` 62 passed (the lane dot probe included); `--list` 332;
-pixel gate against 662d310 (the M7 merge) 305 identical, 27 new, nothing allowed; Windows and Linux (Docker) pass. Bench
-(`cargo run --release -p gallery -- --bench`, verdict per D85, 66 pages, 2080 x 1320, 5 runs, M1 Pro; load 7.53 at the start,
-4.4 to 6.4 across the pages, 5.00 at the end; self-test in range, cpu p50 4.22, spread p99 +3.95): 0 pages over, every page 0 of
-5 runs over; highest page p99 11.87 ms (`dialog`) and worst frame 15.68 ms (`flyout`); the five M8 pages `table`, `bar-chart`,
-`pie-chart`, `kanban-board`, `lane-graph` read p99 7.97, 7.31, 6.07, 6.68, 6.11 ms and worst 13.10, 15.59, 10.83, 11.83, 8.57 ms.
+Final gate at 208608b: fmt, clippy `-D warnings`, `cargo test --workspace` 1,954 passed and 0 failed, boundaries clean, component
+index up to date; `LUNEUI_REQUIRE_GPU=1 cargo test -p lune-ui-wgpu` 62 passed; `--list` 332; pixel gate against 662d310 (the M7
+merge) 305 identical, nothing allowed; Windows and Linux (Docker) pass. Bench (`cargo run --release -p gallery -- --bench`, verdict
+per D85, 2080 x 1320, 5 runs, M1 Pro; load 6.46 at the start, 4.14 at the end; self-test in range, cpu p50 4.2, spread p99 about +7.6;
+a second bench overlapped its first two minutes): 0 over, every page 0 of 5 runs over; highest page p99 12.08 ms (`dialog`), worst
+frame 19.01 ms (`radio-group`).
 
 ## Carried limits
 
@@ -113,7 +113,7 @@ pixel gate against 662d310 (the M7 merge) 305 identical, 27 new, nothing allowed
 
 ## Next
 
-1. Review and merge M8 (`orch/toolkit-v1`), then M9 (text views).
+1. M8 is a pause point: M9 (text views) waits for the user.
 2. CI (fmt, clippy `-D warnings`, tests on macOS, Windows and Linux) now that there is code to run.
 3. An export script for Luneterm's vendored snapshot, before Luneterm M9. The migration
    map for M11 is "API changes since M1" in `docs/architecture.md`.
