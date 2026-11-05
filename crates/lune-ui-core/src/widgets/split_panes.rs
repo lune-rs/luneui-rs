@@ -18,8 +18,8 @@
 //! Right for [`Axis::Horizontal`], Up and Down for [`Axis::Vertical`]); Home and End set the sized
 //! pane to its smallest and largest size; Escape during a drag restores the size at the press and
 //! is consumed. For [`Axis::Horizontal`], Up and Down grow and shrink the sized pane by 16. A
-//! Control, Alt or Command chord on any of these stays a shortcut. An accessibility increment and
-//! decrement raise and lower the value, the sized pane, by 16 on both axes and both sides,
+//! Control, Alt or Command chord on the arrows, Home and End stays a shortcut. An accessibility
+//! increment and decrement raise and lower the value, the sized pane, by 16 on both axes and both sides,
 //! whichever way that moves the strip.
 
 use std::hash::Hash;

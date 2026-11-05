@@ -3,7 +3,8 @@
 //! and bright text for the current screen, no accent bar.
 //!
 //! [`Ui::nav_list`] owns the group: one roving stop, Up and Down move focus without wrapping,
-//! Enter, Space and a click navigate (once each). Focus alone navigates nothing.
+//! Enter, Space and a click navigate (once each). A Control, Alt or Command chord on Enter or Space
+//! stays a shortcut. Focus alone navigates nothing.
 
 use std::hash::Hash;
 
@@ -197,8 +198,8 @@ impl Ui<'_> {
             let kid = items[i].0;
             let r = self.with_enabled(e.enabled, |ui| {
                 let r = ui.interact(kid, rows[i], sense);
-                let enter = ui.consume_key(kid, NamedKey::Enter);
-                let space = ui.consume_key(kid, NamedKey::Space);
+                let enter = ui.consume_plain_key(kid, NamedKey::Enter);
+                let space = ui.consume_plain_key(kid, NamedKey::Space);
                 if r.enabled && (r.clicked || enter || space) {
                     activated = Some(e.key);
                 }

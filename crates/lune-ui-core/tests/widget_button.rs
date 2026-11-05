@@ -584,32 +584,75 @@ fn a_radio_group(ui: &mut Ui<'_>) {
     );
 }
 
+/// A held modifier and the same modifier on a binding's chord.
+type Held = (Modifiers, fn(Chord) -> Chord);
+
+/// The three modifiers that make a key a chord.
+fn chords() -> [Held; 3] {
+    let held = |control, alt, logo| Modifiers {
+        control,
+        alt,
+        logo,
+        ..Modifiers::default()
+    };
+    [
+        (held(true, false, false), Chord::ctrl),
+        (held(false, true, false), Chord::alt),
+        (held(false, false, true), Chord::logo),
+    ]
+}
+
 #[test]
 fn a_chord_on_enter_or_space_is_a_shortcut_and_clicks_nothing() {
-    for k in [NamedKey::Enter, NamedKey::Space] {
-        let mut h = UiHarness::new(WIN);
-        h.shortcuts.add(Binding::new(
-            Scope::Global,
-            Chord::key(Key::Named(k)).ctrl(),
-            "chord",
-        ));
-        let at = Rect::new(10.0, 10.0, 100.0, 30.0);
-        let mut clicked = false;
-        let mut run = |h: &mut UiHarness| {
-            h.frame(|ui| clicked = ui.button("b", at, "B", ButtonKind::Secondary).clicked)
-                .1
-        };
-        run(&mut h);
-        h.input.key_down(Key::Named(NamedKey::Tab), None);
-        assert!(run(&mut h).focused.is_some());
-        h.input.set_modifiers(Modifiers {
-            control: true,
-            ..Modifiers::default()
-        });
-        h.input.key_down(Key::Named(k), None);
-        let out = run(&mut h);
-        assert!(!clicked, "{k:?}");
-        assert_eq!(out.fired.len(), 1, "{k:?}");
+    for (m, chord) in chords() {
+        for k in [NamedKey::Enter, NamedKey::Space] {
+            let mut h = UiHarness::new(WIN);
+            h.shortcuts.add(Binding::new(
+                Scope::Global,
+                chord(Chord::key(Key::Named(k))),
+                "chord",
+            ));
+            let at = Rect::new(10.0, 10.0, 100.0, 30.0);
+            let mut clicked = false;
+            let mut run = |h: &mut UiHarness| {
+                h.frame(|ui| clicked = ui.button("b", at, "B", ButtonKind::Secondary).clicked)
+                    .1
+            };
+            run(&mut h);
+            h.input.key_down(Key::Named(NamedKey::Tab), None);
+            assert!(run(&mut h).focused.is_some());
+            h.input.set_modifiers(m);
+            h.input.key_down(Key::Named(k), None);
+            let out = run(&mut h);
+            assert!(!clicked, "{m:?} {k:?}");
+            assert_eq!(out.fired.len(), 1, "{m:?} {k:?}");
+        }
+    }
+}
+
+#[test]
+fn a_disabled_button_leaves_a_chord_to_the_shortcuts_as_an_enabled_one_does() {
+    for (m, chord) in chords() {
+        for k in [NamedKey::Enter, NamedKey::Space] {
+            let mut h = UiHarness::new(WIN);
+            h.shortcuts.add(Binding::new(
+                Scope::Global,
+                chord(Chord::key(Key::Named(k))),
+                "chord",
+            ));
+            h.frame(a_button);
+            h.input.key_down(Key::Named(NamedKey::Tab), None);
+            let (_, out) = h.frame(a_button);
+            let held = out.focused;
+            assert!(held.is_some(), "tab reached it");
+            let disabled = |ui: &mut Ui<'_>| ui.with_enabled(false, a_button);
+            h.frame(disabled);
+            h.input.set_modifiers(m);
+            h.input.key_down(Key::Named(k), None);
+            let (_, out) = h.frame(disabled);
+            assert_eq!(out.focused, held, "still its key");
+            assert_eq!(out.fired.len(), 1, "{m:?} {k:?}");
+        }
     }
 }
 

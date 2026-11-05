@@ -4,7 +4,7 @@
 
 use lune_ui_core::access::{Live, Role, SemanticTree, State, Value};
 use lune_ui_core::color::premul;
-use lune_ui_core::input::{Key, NamedKey, PointerButton, Repaint};
+use lune_ui_core::input::{Key, Modifiers, NamedKey, PointerButton, Repaint};
 use lune_ui_core::paint::Rect;
 use lune_ui_core::scene::{Scene, TextItem};
 use lune_ui_core::shortcuts::{Binding, Chord, Scope};
@@ -498,6 +498,89 @@ fn a_disabled_sidebar_consumes_no_key_a_binding_wants() {
         h.input.key_down(Key::Named(k), None);
         h.at_ms(5100);
         assert_eq!(frame(&mut h, &mut c).fired, 1, "{k:?}");
+    }
+}
+
+/// A held modifier and the same modifier on a binding's chord.
+type Held = (Modifiers, fn(Chord) -> Chord);
+
+/// The three modifiers that make a key a chord.
+fn chords() -> [Held; 3] {
+    let held = |control, alt, logo| Modifiers {
+        control,
+        alt,
+        logo,
+        ..Modifiers::default()
+    };
+    [
+        (held(true, false, false), Chord::ctrl),
+        (held(false, true, false), Chord::alt),
+        (held(false, false, true), Chord::logo),
+    ]
+}
+
+#[test]
+fn a_chord_on_a_nav_row_is_a_shortcut_and_navigates_nothing() {
+    for (m, chord) in chords() {
+        for k in [NamedKey::Enter, NamedKey::Space] {
+            let mut h = UiHarness::new(WIN);
+            h.shortcuts.add(Binding::new(
+                Scope::Global,
+                chord(Chord::key(Key::Named(k))),
+                "chord",
+            ));
+            let mut c = case();
+            settled(&mut h, &mut c);
+            h.at_ms(5020);
+            h.input.key_down(Key::Named(NamedKey::Tab), None);
+            assert_eq!(frame(&mut h, &mut c).focused, Some(row_id(1)));
+            h.input.set_modifiers(m);
+            h.input.key_down(Key::Named(k), None);
+            h.at_ms(5040);
+            let out = frame(&mut h, &mut c);
+            assert_eq!(out.activated, None, "{m:?} {k:?}");
+            assert_eq!(out.fired, 1, "{m:?} {k:?}");
+            // The bare key on the same row is still the row's.
+            h.input.set_modifiers(Modifiers::default());
+            h.input.key_down(Key::Named(k), None);
+            h.at_ms(5060);
+            let out = frame(&mut h, &mut c);
+            assert_eq!(out.activated, Some(1), "{m:?} {k:?}");
+            assert_eq!(out.fired, 0, "{m:?} {k:?}");
+        }
+    }
+}
+
+#[test]
+fn a_focused_row_turned_disabled_keeps_its_keys_and_leaves_its_chords() {
+    for (m, chord) in chords() {
+        for k in [NamedKey::Enter, NamedKey::Space] {
+            let mut h = UiHarness::new(WIN);
+            let bare = Chord::key(Key::Named(k));
+            h.shortcuts
+                .add(Binding::new(Scope::Global, bare.clone(), "bare"));
+            h.shortcuts
+                .add(Binding::new(Scope::Global, chord(bare), "chord"));
+            let mut c = case();
+            settled(&mut h, &mut c);
+            h.at_ms(5020);
+            h.input.key_down(Key::Named(NamedKey::Tab), None);
+            assert_eq!(frame(&mut h, &mut c).focused, Some(row_id(1)));
+            c.enabled = false;
+            h.at_ms(5040);
+            frame(&mut h, &mut c);
+            h.input.key_down(Key::Named(k), None);
+            h.at_ms(5060);
+            let out = frame(&mut h, &mut c);
+            assert_eq!(out.focused, Some(row_id(1)), "still its key");
+            assert_eq!(out.fired, 0, "{k:?}: a bare key stops at the row");
+            h.input.set_modifiers(m);
+            h.input.key_down(Key::Named(k), None);
+            h.at_ms(5080);
+            let out = frame(&mut h, &mut c);
+            assert_eq!(out.activated, None, "{m:?} {k:?}");
+            assert_eq!(out.fired, 1, "{m:?} {k:?}");
+        }
     }
 }
 

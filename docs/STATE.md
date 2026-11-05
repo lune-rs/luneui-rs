@@ -1,14 +1,14 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-05 (M7 done on `orch/toolkit-v1`, all 15 steps, review round 1 fixed; a pause point, M8 waits for the user)
+Last updated: 2026-11-05 (M7 done on `orch/toolkit-v1`, all 15 steps, review rounds 1 and 2 fixed; a pause point, M8 waits for the user)
 
 ## Now
 
 M7 (overlays and containers) is built and closed on `orch/toolkit-v1`. Review, the final gate and the merge to main are
-the orchestrator's; this file's bench and pixel lines are for it to fill.
+the orchestrator's.
 
-What M7 added (DECISIONS D137 to D156; `docs/architecture.md` has the module map and "API changes since M1"):
+What M7 added (DECISIONS D137 to D158; `docs/architecture.md` has the module map and "API changes since M1"):
 - Plumbing: a sixth layer `LayerId::Raised` between `Modal` and `Toast` (`LAYER_COUNT` 6), chosen once in `Ui::overlay`
   when a popup or modal opens above an active modal and held to its close, so a popover, tooltip, combo list, menu or
   nested dialog over a dialog draws and takes input on top with no widget change; overlay content is out of any
@@ -33,14 +33,18 @@ Review round 1 fixed F1 to F8 and F10 (D157): an accessibility action on a toast
 one moves no focus; accessibility Increment raises the splitter's value on all four configurations; a popup reopened under
 a newer modal is a true open on `Raised`; Tab stays in the palette's box (`FilterOptions::clear_unfocusable`); toasts
 clone no spec per frame; `wane` is in boundary rule 3; chords stay shortcuts on the splitter and `activation_keys`.
+Round 2 (D158): chords stay shortcuts on the nav list, so the sidebar's rows too; the rule is tested on all three
+modifiers and in a disabled scope; the carried limits below are corrected from probes.
 
-Counts at the tip: gallery 61 pages, 305 scene names in `--list`; `cargo test --workspace` 1,740 passed, 0 failed.
+Counts at the tip: gallery 61 pages, 305 scene names in `--list`; `cargo test --workspace` 1,743 passed, 0 failed.
 
-Pixel gate (`scripts/pixel-gate.sh --base a75a708`, expected: 231 identical, 74 new, nothing allowed): the orchestrator's
-final gate fills this in. Each step passed it at zero delta against its own base.
+Pixel gate (`scripts/pixel-gate.sh --base a75a708`) at 8dd4e41: 231 identical, 74 new, nothing allowed. Each step passed
+it at zero delta against its own base.
 
-Bench (`cargo run --release -p gallery -- --bench`, verdict per D85 at 61 pages, self-test and load quoted): the
-orchestrator's final gate fills this in. A page over only while the machine is loaded is reported, not refused.
+Bench (`cargo run --release -p gallery -- --bench`, verdict per D85 at 61 pages) at 8dd4e41: 0 of 61 over at load 5 to
+10.5, highest page p99 15.83 ms (`banner`); at 53d673e, load 1.5 to 4.3: 0 over, highest p99 12.75 ms (`dialog`).
+
+Neither was re-measured at the round 2 commit, which draws nothing new; the orchestrator's final gate re-runs both.
 
 M6 (widgets) is merged to main at a75a708: 21 catalogue entries, roving focus, `text::elide`, the button variants
 (DECISIONS D113 to D136). Earlier: M5 (foundations, 1aeaf1b), M4 (interaction and motion, d9fe71f), M3 (catalogue specs),
@@ -54,10 +58,16 @@ no dependency). The gallery has a page registry (two legacy pages, 59 Ui pages),
   parent interleaves (fills under text). Two edges of that rule (step 1): a child held on `Raised` after its parent
   closed sits above, and is eligible over, a dialog opened in that window; on `Raised` a child opened in a nested dialog's
   body registers before that dialog's footer buttons, so where they overlap the buttons win the hit.
-- Disabled keys (M7 review F9): the stepper, slider, virtual list, combo, search picker and scroll area still gate key handling on
-  `enabled` before they take the key, so one focused when its scope turns disabled passes its keys to the shortcuts
-  (`Ui::setting_row` hosts steppers). D140's consume-then-gate holds for the button, toolbar, checkbox, toggle, radio
-  group, tab strip and the M7 widgets, not for these six (the last three from reading the code, not run).
+- Disabled keys (M7 review F9, F14): the stepper, slider, virtual list, combo, search picker, text field, text area and
+  scroll area still gate key handling on `enabled` before they take the key, so one focused when its scope turns disabled
+  passes its keys to the shortcuts (`Ui::setting_row` hosts steppers). D140's consume-then-gate holds for the button,
+  toolbar, checkbox, toggle, radio group, tab strip, star rating, nav list and the M7 widgets, not for these eight (all
+  by probe but the scroll area, which is from reading the code, not run).
+- Chords (M7 review F13): the tab strip and star rating (Enter, Space), combo (Enter, Space, Down), search picker (Enter,
+  Space), stepper (Up, Down) and slider (the arrows) take a Control, Alt or Command chord, so a shortcut on it dies on
+  one of them while it works on a button (by probe). The scroll area's Up and Down read the same (`consume_key`, from
+  reading, not run). D157's rule holds for `activation_keys`, the splitter's keys but Escape in a drag, the nav list,
+  `rove_keys`, the tree and the menu.
 - One blur per frame: a glass menu over a dialog with a blurred scrim has none of its own.
 - Text cannot be cut by a rounded clip (it gets the clip's bounding rect). The toolkit keeps text out of the corners: the
   page and panel inset every text and padded body by the radius (8); a flush panel body is rounded-clipped for fills and

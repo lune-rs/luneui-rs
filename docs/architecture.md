@@ -110,7 +110,7 @@ tree, focused widget and the shortcut commands that fired. `FrameConfig` also ca
 - Disabled scope (D140): `Ui::node` inside a disabled scope (`with_enabled(false, ..)`) sets `State::Disabled` and
   clears `Focusable` and the actions, so a group node cannot be forgotten; a widget consumes its keys first and gates
   after (`Ui::activation_keys`), so a disabled widget keeps its keys from the shortcuts. The stepper, slider, virtual
-  list, combo, search picker and scroll area do not yet (STATE's carried limits).
+  list, combo, search picker, text field, text area and scroll area do not yet (STATE's carried limits).
   `testing::disabled_violations(tree, root)` walks a subtree for a node that broke the rule.
 - Focus: scopes with a tab trap, initial focus, and restore on close (D72); keys are consumed by id
   (`consume_key`); a focused widget that is not registered for a frame loses focus unless a live
@@ -398,7 +398,7 @@ Since M7 (D137 to D154):
   `toast_warning`, `toast_error`, `toast_log_bg`, `toast_log_fg`, `dirty_indicator`, `count_badge` and `status_error`;
   `strings` gains `luneui.menu.name`, the `luneui.toast-notifications.*`, `luneui.command-palette.*` and
   `luneui.settings-page.*` keys; `icon` gains `CHEVRON_RIGHT`, `WARNING`, `ERROR`, `CLEAR_ALL` and `CIRCLE_SLASH`;
-- `FilterOptions` gains `clear_unfocusable`; `Ui::activation_keys` leaves chords to the shortcuts (D157);
+- `FilterOptions` gains `clear_unfocusable`; `Ui::activation_keys` and `Ui::nav_list` leave chords to the shortcuts (D157, D158);
 - no scene that existed before M7 changed: each step passed the pixel gate at zero delta against its base, and the
   new scenes are the only ones the visual batches (steps 13 and 14) moved.
 

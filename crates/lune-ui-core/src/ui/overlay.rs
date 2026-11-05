@@ -277,8 +277,8 @@ impl<'a> Ui<'a> {
             }
         };
         let reopened = !self.store.overlays[index].active();
-        // A modal that opened during the close is under a reopen as it is under any open: the
-        // overlay goes last in the stack with a new tag, so it is above the modal and not below it.
+        // A newer modal is under a reopen as it is under any open: the overlay goes last in the
+        // stack with a new tag, so it is above the modal and not below it.
         if reopened && modal_above(&self.store.overlays, self.store.overlays[index].tag) {
             let mut rec = self.store.overlays.remove(index);
             rec.tag = next_tag(self.store);

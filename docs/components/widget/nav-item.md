@@ -61,7 +61,7 @@ Lunegit's tween is on the Border side-panel item; the Button variant has none, s
 ### Input and focus
 
 - Pointer: click navigates [W docs/ui/components.md:423]; hover over the row.
-- Keyboard: Up and Down move focus between items [W docs/ui/components.md:423], stopping at the first and the last (no wrap) and skipping disabled items; Enter and Space activate [D121]. Focus alone navigates nothing.
+- Keyboard: Up and Down move focus between items [W docs/ui/components.md:423], stopping at the first and the last (no wrap) and skipping disabled items; Enter and Space activate [D121]; a Control, Alt or Command chord on them stays a shortcut [D158]. Focus alone navigates nothing.
 - Tab stop: the nav list is one stop; the active item takes it [core.focus].
 - Layer: `Base`; no overlay, no focus scope.
 - Pointer capture while pressed [core.input].
