@@ -22,7 +22,7 @@ summary: 28 px rows with hairlines, numeric columns in mono, sortable header loo
 
 ## Existing code
 
-None in luneui-rs or Luneterm's `lune-ui` (Wane: missing). Design source (not code to move): Wane `docs/ui/mocks/css/components.css` (data.table); no lune-ui source. Density from Luneterm glass-ui dump 06 row rhythm.
+Built in M8: `crates/lune-ui-core/src/widgets/table.rs` (`Ui::table`) on the list frame of `virtual_list.rs` (D161, D162); page `table`. Design source (not code to move): Wane `docs/ui/mocks/css/components.css` (data.table); no lune-ui source. Density from Luneterm glass-ui dump 06 row rhythm.
 
 ## Spec
 
@@ -45,38 +45,45 @@ Conflicts: none between sources. Wane's header 11/16 and body 13 are the only va
 
 | state | look | cite |
 |---|---|---|
-| row rest | no fill; text `fg_primary` | [W docs/ui/components.md:599-612], [R crates/lune-ui-core/src/theme.rs:55-56] |
-| row hover | fill `surface_hover` #FFFFFF10 | [W docs/ui/components.md:599-612], [R crates/lune-ui-core/src/theme.rs:60] |
-| row selected | fill `surface_selected` #FFFFFF18; `fg_bright` text ([D58]) | [W docs/ui/components.md:599-612], [R crates/lune-ui-core/src/theme.rs:61] |
-| header sorted | secondary text; 12 px arrow | [W docs/ui/components.md:599-612], [R crates/lune-ui-core/src/theme.rs:57] |
-| cell tone warn, err, dim, strong | the cell's colour; the values are not in the source | open question |
-| focus-visible row | not in the source | open question |
+| row rest | no fill; text `fg_primary` | [W docs/ui/mocks/css/components.css:538-563], [R crates/lune-ui-core/src/theme.rs:55-56] |
+| row hover | fill `surface_hover` across the slot at radius 0; the row stays lit while the pointer is over a control in it, and not under a dialog (`pointer_in`, [D127], [D161]) | [W components.css:538-563] |
+| row selected | fill `surface_selected`; all text `fg_bright` whatever the tone (the selector outranks the tone class) | [W components.css:538-563] |
+| row selected and hovered | `surface_active` ([D58]) | [derived: the list frame's fill] |
+| header sorted | text `fg_secondary`, a 12 px arrow 4 px after the text (at the right end of a `num` column, the text before it); up for ascending, down for descending | [W components.css:538-563] |
+| header sortable, rest | text `fg_tertiary`; no hover look | [W components.css:538-563] |
+| cell tone | `fg_primary`, muted `fg_secondary`, warn `warn`, err `err`, dim `fg_tertiary`, strong `fg_bright` | [W components.css:538-563], [D162] |
+| focus-visible, body | the list frame's ring on the cursor row, inside the slot | [D161] |
+| focus-visible, header | a 1 px `fg_secondary` outline on the focused header cell | [D162] |
+| disabled | inert, drawn at opacity 0.4, every node `disabled` | [derived: the list frame] |
 
 ### Transitions
 
-n/a — no motion in Wane or Lunegit for a table; rows are a virtualized list and never animate per row
-([L .claude/docs/animation-rules.md:145]). A selected-row change snaps.
+The sorted header's text colour and arrow opacity fade over `selection` (`table::HEADER_FADE`); a change of direction snaps the glyph. Rows animate only what the list frame does while it is still: hover and selection fills (`hover`, `selection`). Rows never animate on a sort or a scroll ([L .claude/docs/animation-rules.md:145]). A deviation from the earlier "n/a" ([D40], [D164]).
+
+| change | property | kind | duration | easing | reduced | cite |
+|---|---|---|---|---|---|---|
+| sorted header on or off | header text colour, arrow opacity | selection | fast | linear | keep | [D40], [D162] |
+| row hover, selection (still) | row fill | hover, selection | instant, fast | linear | keep | [D40], [D161] |
 
 ### Input and focus
 
-- Pointer: a click on a row selects it (master-detail) [W docs/ui/components.md:599-612]; a click on a header sorts (look only, the behaviour is a requirement) [W docs/ui/components.md:599-612]. Hover fills the row.
-- Keyboard: arrow keys move the row; not mocked (requirement) [W docs/ui/components.md:599-612].
-- Tab stop: the table is one stop; the controls inside are stops [core.focus].
-- Layer: Base or Page, whatever the owner draws it on [derived: a container].
-- Focus scope: none.
-- Pointer capture while pressed: none in the sources.
+- Pointer: a click on a row selects it, as the list frame (Meta toggles, Shift ranges and a drag ranges under `Multi`); a press on a control in a cell reaches the control and not the row. A click on a sortable header reports a sort: ascending on a new column, flipped on the sorted one; there is no unsorted third click (the app may clear `TableState.sort`) [D162].
+- Keys: the body is the list frame's one stop (Up, Down, Home, End, PageUp, PageDown, Shift extends, Command+C copies). The sortable headers are one roving stop (Left, Right, Home, End move over the sortable ones without wrapping; Enter and Space sort), so a table with a sortable column has two stops, and one with none has one. A Control, Alt or Command chord on any of these stays a shortcut; focused and then disabled, the keys are taken and act on nothing.
+- No cell focus: a control in a cell is its own tab stop and has its own keys; one that is not yet hardened for disabled keys or chords (stepper, slider, search picker, text fields) inherits the limit listed in `docs/architecture.md`, "Disabled keys".
+- Layer: Base or Page, whatever the owner draws it on. Pointer capture: the list frame's drag selection.
 
 ### Retained state
 
-- Transient: row hover.
-- Persistent: the selection as a set of row keys; the sort key and direction; owned by the table; survives under `ui.keep_alive` [core.ui].
-- App-owned: the rows, the column definitions, the cell values and tones [W docs/ui/components.md:599-612].
+- Transient: row hover, the header fades, the arrow's last direction.
+- Persistent: the selection as a set of row keys (`Ui::table_selection`, the body list's `ListState`), the anchor and cursor, the scroll offset, and the sort (`Ui::table_state`, `TableState.sort`); all survive under `ui.keep_alive`. A sort keeps the selection because it is by key.
+- App-owned: the rows and their order (the app sorts when `TableResponse.sort` is `Some`), the columns and their widths and order, the cell values and tones, `ListState::retain` for rows that left the data.
 - Exit retention: no.
 
 ### Accessibility
 
-- Role `table`, rows `row`, cells `cell`, headers `column-header` [infra.accessibility].
-- Selected row: `selected` state; a sorted header carries the `sort` field (ascending, descending or none) [infra.accessibility], [D55].
+- `Table` (name: `TableOptions.label`) holds a header `Row` of `ColumnHeader`s and, in the body's scroll area, a `Group` (the list frame's focusable node, the same name) of `Row`s of `Cell`s. A text cell's name is its full text, so an elided cell loses nothing; a control cell's children are the widget's nodes.
+- A selected row has `selected`. `ColumnHeader.sort` is `Ascending` or `Descending` on the sorted column, `None` on a sortable one and absent otherwise; a sortable header has `Default` (sorts) and is focusable. A row has `Default` (selects), `Focus`, `ScrollIntoView` and `ShowMenu`.
+- The semantic tree holds only the built rows. The `Group` between `Table` and `Row` follows from the list frame; AccessKit mapping waits for M10.
 - Live region: none.
 
 ### Strings
@@ -85,34 +92,37 @@ None: column titles and cell values are app text.
 
 ### Gallery scenes
 
-- `table-rows` (new): five rows, one selected, one hovered, settled.
-- `table-sorted` (new): a sorted header with the arrow, settled.
-- `table-tones` (new): cells in muted, warn, err, dim and strong tones, settled.
+All at scale 2 on the `table` page (100,000 rows live; six rows or fewer in the scenes):
+
+- `table-rows`: six rows, one selected, the pointer on another, settled.
+- `table-sorted`: Tab, Right and Enter sort by Requests: the sorted header with its arrow and its focus outline, settled.
+- `table-tones`: one column a tone, default, muted, warn, err, dim and strong, settled.
+- `table-focus`: the body focused by Tab and two Down keys, the cursor row selected and ringed, settled. One focus exists per window, so the header's ring is in `table-sorted`.
+- `table-controls`: a combo, a toggle, a badge and a button in cells, settled.
+- `table-wrap`: wrapping route and note cells over a mono path that ellipsizes, settled.
+- `table-disabled`: the table disabled with a selected row, settled.
 
 ### Painter primitives
 
-- Existing: fill (row fills and hairlines), text, icon (sort arrow), clip-rect (ellipsis clip). [R crates/lune-ui-core/src/paint.rs:215,274,167]
-- New: none.
+- Existing: fill (row fills and hairlines), text, elide, glyph (the sort arrow), ring (the focus outlines). New: none.
 
 ### Acceptance
 
-- Behaviour (scripted input, injected time): a click selects one row; a header click reports the sort request; arrow keys move the selection (requirement). None exists.
-- Pixel probes at scale 2: row 56 px; header 56 px; hairline 2 px; cell padding 16 px; first and last cell 32 px.
-- Conformance: none (no motion).
-- Semantic node: `table` with `row`, `cell` and `column-header`; selected row `selected`.
+- Behaviour (`crates/lune-ui-core/tests/widget_table.rs`, scripted input, injected time): a click selects one row; the list keys move it; a press on a control cell reaches the control; the row stays lit over a control and is not lit under a dialog; header clicks, Enter and Space report ascending, descending, and a new column ascending; the headers rove over the sortable ones; two stops, or one with nothing sortable; the selection survives a re-sort and scrolling out of view; 100,000 rows build only the window; an access `Default` sorts a header and selects a row.
+- Pixel probes at scale 2: row 56 px; header 56 px; hairline 2 px (none under the last row); the first cell inset 32 px, a middle cell 16 px; the `num` text ends at the cell's padded edge; the flat fill spans the slot at radius 0 while a plain list keeps its inset; tone colours by text key.
+- Conformance: `HEADER_FADE` on the Full, Reduced and Off tiers; the table is idle at rest.
+- Semantic node: as Accessibility, checked through the tree; the disabled and chord rules for the header keys and through the body.
 
 ### Build
 
-- Milestone: M8.
-- Depends on: layout.virtualized-list, core.painter, core.focus, core.ui, infra.accessibility, widget.combo, widget.button, widget.toggle, widget.badge.
+- Milestone: M8 (steps 1 and 2, D160 to D163). Open for `done` (D47): M11 re-checks the whole bar on every entry.
+- Depends on: layout.virtualized-list, core.painter, core.focus, core.ui, infra.accessibility, widget.combo, widget.button, widget.toggle, widget.badge
 
 ## Open questions
 
-- Tone colours for warn, err, dim and strong cells: no values in the sources; open.
-- Keyboard row navigation: a requirement, not mocked; open.
-- Column resize and reorder: requirements, not mocked; open.
-- Whether this is a toolkit component or app code composed from the painter: the planner decides (Wane needs it either way).
-- Native rendering: plain drawing; the cost is scale: the Requests log needs a virtualised list.
+- Answered (D162): tone colours: Wane's, muted `fg_secondary`, warn, err, dim `fg_tertiary`, strong `fg_bright`; keyboard row navigation: the list frame's keys, with the header as a second roving stop; toolkit or app: a toolkit component, the app passing columns and a cell closure.
+- Still open (D163, needs the user, reversible): column resize and reorder. Wane calls them requirements, not mocked, and no screen shows them; `TableColumn.width` and the column order are the app's arguments, so both gestures are additive later with no API break.
+- Native rendering: plain drawing; the page's bench runs scroll, select and sort over 100,000 rows.
 
 ## Notes for the planner
 
