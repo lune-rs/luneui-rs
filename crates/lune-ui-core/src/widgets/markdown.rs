@@ -357,7 +357,7 @@ fn draw_built(ui: &mut Ui<'_>, cx: &mut Cx, id: WidgetId, b: &Built, at: Rect, l
     let t = *ui.theme();
     for pill in &b.pills {
         for r in range_boxes(ui, &b.spec, pill) {
-            let r = Rect::new(at.x + r.x, at.y + r.y + 1.0, r.w, (r.h - 2.0).max(0.0));
+            let r = Rect::new(at.x + r.x, at.y + r.y + 1.0, r.w, (r.h - 1.0).max(0.0));
             ui.painter().fill(r, 4.0, t.code_inline);
         }
     }
@@ -367,7 +367,7 @@ fn draw_built(ui: &mut Ui<'_>, cx: &mut Cx, id: WidgetId, b: &Built, at: Rect, l
     }
     for (range, color) in &b.strikes {
         for r in range_boxes(ui, &b.spec, range) {
-            bar(ui, at.x, at.y, r, r.h * 0.55, *color);
+            bar(ui, at.x, at.y, r, (r.h * 0.6).round(), *color);
         }
     }
     for (i, link) in b.links.iter().enumerate() {
@@ -375,7 +375,7 @@ fn draw_built(ui: &mut Ui<'_>, cx: &mut Cx, id: WidgetId, b: &Built, at: Rect, l
         let boxes = range_boxes(ui, &b.spec, &link.range);
         if actionable {
             for r in &boxes {
-                bar(ui, at.x, at.y, *r, r.h - 3.0, t.link);
+                bar(ui, at.x, at.y, *r, (r.h * 0.87).round(), t.link);
             }
         }
         if actionable {
@@ -424,10 +424,7 @@ fn link_regions(
             ui.set_cursor(CursorIcon::Pointer);
         }
         if r.focus_visible {
-            let kind = RingKind::Edge {
-                radius: 2.0,
-                on_accent: false,
-            };
+            let kind = RingKind::Offset { radius: 3.0 };
             focus_ring::paint(ui.painter(), at, kind, 1.0);
         }
         if j == 0 {

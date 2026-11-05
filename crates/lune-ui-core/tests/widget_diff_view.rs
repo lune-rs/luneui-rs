@@ -1033,10 +1033,10 @@ fn rows_take_their_fills_text_colours_prefixes_and_numbers() {
     }
     let faint = |n: &str| find(&r.scene, &Spec::plain(n, code_style(DARK.fg_faint)), 2.0);
     let old = faint("21").expect("an old number");
-    let hunk = Style::mono(9.0, 12.0, DARK.link);
+    let hunk = Style::mono(9.0, 12.0, DARK.fg_quaternary);
     assert!(
         find(&r.scene, &Spec::plain("@@ -1,4 +1,4 @@", hunk), 2.0).is_some(),
-        "the hunk's text is the link colour"
+        "the hunk's text is the quaternary colour, the pill's (D198)"
     );
     // Numbers are right-aligned in a 48 column with 8 to the right: "21" is 13 wide.
     assert_eq!(old.x, DIFF.x + 48.0 - 8.0 - 13.0);

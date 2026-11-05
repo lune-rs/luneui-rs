@@ -160,6 +160,10 @@ pub(super) struct Look {
     pub skip_tab: bool,
     /// Where the keyboard focus ring of a read-only view goes; the viewport when `None`.
     pub ring: Option<Rect>,
+    /// The scroll area's rect when it is larger than the viewport the text is clipped to: the
+    /// pointer's reach, the wheel's and the bar's place. The viewport lies inside it; the extent
+    /// is made so that the last column ends at the viewport's right edge when scrolled fully.
+    pub frame: Option<Rect>,
 }
 
 impl Look {
@@ -171,6 +175,7 @@ impl Look {
             scroll_y: true,
             skip_tab: false,
             ring: None,
+            frame: None,
         }
     }
 }
@@ -809,6 +814,10 @@ impl Ui<'_> {
         let id = self.scope_id();
         let viewport = Rect::new(rect.x, rect.y, usable(rect.w), usable(rect.h));
         let (vw, vh) = (f64::from(viewport.w), f64::from(viewport.h));
+        let area_rect = look
+            .frame
+            .map_or(viewport, |f| Rect::new(f.x, f.y, usable(f.w), usable(f.h)));
+        let (aw, ah) = (f64::from(area_rect.w), f64::from(area_rect.h));
         let style = Style::mono(look.size, look.line, opts.color.unwrap_or(t.fg_primary));
         let advance = self.painter().measure(&Spec::plain("0", style)).0;
 
@@ -920,14 +929,15 @@ impl Ui<'_> {
         let text_w = line_w.max(f64::from(mem.seen_w));
         let extent = (
             if opts.wrap {
-                vw
+                aw
             } else {
-                f64::from(cols.text + CARET_ROOM + TEXT_PAD) + text_w
+                // Past the viewport's own width, the frame's room round it.
+                f64::from(cols.text + CARET_ROOM + TEXT_PAD) + text_w + (aw - vw)
             },
             if look.scroll_y {
                 host.tops.heights.total()
             } else {
-                vh
+                ah
             },
         );
         let scroll = ScrollOptions {
@@ -935,10 +945,10 @@ impl Ui<'_> {
                 if opts.wrap {
                     Bars::Disabled
                 } else {
-                    Bars::Auto.unless_fits(extent.0, vw)
+                    Bars::Auto.unless_fits(extent.0, aw)
                 },
                 if look.scroll_y {
-                    Bars::Auto.unless_fits(extent.1, vh)
+                    Bars::Auto.unless_fits(extent.1, ah)
                 } else {
                     Bars::Disabled
                 },
@@ -951,7 +961,7 @@ impl Ui<'_> {
         let mut response = None;
         let mut area = None;
         let mut seen = 0.0;
-        let out = self.scroll_area_untranslated(AREA, viewport, &scroll, |ui, view| {
+        let out = self.scroll_area_untranslated(AREA, area_rect, &scroll, |ui, view| {
             // The region registers inside the content, because the area's own would block one
             // under it.
             let sense = Sense {

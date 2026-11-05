@@ -497,11 +497,18 @@ const SCENES: &[UiScene] = &[
         390,
         Expect::Moving,
     ),
-    // Tab to the diff body, Tab to the first action: its ring.
+    // The header's three stops (two modes, the wrap toggle), the diff body, then the first
+    // action: its ring.
     scene(
         "diff-view-hunk-focus",
         hunk_actions,
-        &[key(0, &[Ev::Tab]), key(50, &[Ev::Tab])],
+        &[
+            key(0, &[Ev::Tab]),
+            key(50, &[Ev::Tab]),
+            key(100, &[Ev::Tab]),
+            key(150, &[Ev::Tab]),
+            key(200, &[Ev::Tab]),
+        ],
         600,
         Expect::Settled,
     ),

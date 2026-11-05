@@ -28,6 +28,8 @@ const BUTTON_RADIUS: f32 = 4.0;
 /// Where the button sits from a bordered block's inner edge; an unbordered block puts it at the
 /// padding.
 const BORDERED_INSET: f32 = 6.0;
+/// Between the text's clip and the button's left edge.
+const BUTTON_GAP: f32 = 4.0;
 /// The ring of a bordered box.
 const BORDER: f32 = 1.0;
 
@@ -185,7 +187,26 @@ impl Ui<'_> {
             0.0
         };
         let (px, py) = (opts.pad.0 + edge, opts.pad.1 + edge);
-        let body = rect.inset((px - TEXT_PAD).max(0.0), py);
+
+        // The corner button's place, then the text's clip, which ends `BUTTON_GAP` before it: one
+        // straight right margin for every line, so no text runs through the icon. The scroll area
+        // is the whole box inside the ring: the pointer anywhere over the block reveals the bar,
+        // and the bar lies in the bottom padding at the box's edge.
+        let side = ICON + 2.0 * BUTTON_PAD;
+        let (ix, iy) = if opts.border {
+            (BORDER + BORDERED_INSET, BORDER + BORDERED_INSET)
+        } else {
+            opts.pad
+        };
+        let at = Rect::new(rect.right() - ix - side, rect.y + iy, side, side);
+        let left = rect.x + (px - TEXT_PAD).max(0.0);
+        let body = Rect::new(
+            left,
+            rect.y + py,
+            (at.x - BUTTON_GAP - left).max(0.0),
+            (rect.h - 2.0 * py).max(0.0),
+        );
+        let frame = rect.inset(edge, edge);
         let spans = BlockSpans(opts.spans);
         let code = CodeOptions {
             read_only: true,
@@ -200,19 +221,13 @@ impl Ui<'_> {
             scroll_y: false,
             skip_tab: !opts.tab_stop,
             ring: Some(rect),
+            frame: Some(frame),
         };
         let text_view = self.scope("body", |ui| {
             ui.code_frame(body, &mut mem.doc, &code, None, &look)
         });
 
-        // The corner button, over the text. Its icon fades out as the check mark fades in.
-        let side = ICON + 2.0 * BUTTON_PAD;
-        let (ix, iy) = if opts.border {
-            (BORDER + BORDERED_INSET, BORDER + BORDERED_INSET)
-        } else {
-            opts.pad
-        };
-        let at = Rect::new(rect.right() - ix - side, rect.y + iy, side, side);
+        // The corner button. Its icon fades out as the check mark fades in.
         let fade_id = id.with("fade");
         let showing = mem.copied_at.is_some();
         let mut mark = self.animate_f32(fade_id, f32::from(u8::from(showing)), &COPY_FADE);

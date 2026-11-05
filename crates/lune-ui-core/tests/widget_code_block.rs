@@ -647,6 +647,122 @@ fn a_block_with_more_lines_than_its_rect_never_scrolls_vertically() {
     assert_eq!(page, (0.0, 50.0));
 }
 
+// The text's right margin and the bar.
+
+/// `wide` settled at the far right: where its last character ends.
+fn scrolled_right_end(o: &CodeBlockOptions<'_>, wide: &str) -> f32 {
+    let mut h = UiHarness::new(WIN);
+    run(&mut h, wide, o);
+    h.input
+        .pointer_to(100.0, 60.0)
+        .scroll_pixels(-100_000.0, 0.0);
+    let mut r = at(&mut h, 20, wide, o);
+    for k in 2..6 {
+        r = at(&mut h, k * 20, wide, o);
+    }
+    let x = text_x(&r.scene, wide).expect("the line is drawn");
+    let mut t = FakeText;
+    x + t.measure(&Spec::plain(wide, mono()), 1.0).0
+}
+
+#[test]
+fn scrolled_fully_right_the_last_character_ends_clear_of_the_copy_button() {
+    let wide = "z".repeat(300);
+    let end = scrolled_right_end(&opts(), &wide);
+    let clip = button_at().0 - 10.5 - 4.0;
+    assert!(end <= clip, "text ends at {end}, the clip at {clip}");
+    assert!(
+        end > clip - 8.0,
+        "no more scrolled than the last column needs: {end}"
+    );
+}
+
+#[test]
+fn a_line_that_fits_the_padding_but_reaches_under_the_button_scrolls() {
+    // 10 + text + 10 would fit the 300 px box; the 25 px margin makes it overflow.
+    let line = "z".repeat(48);
+    let mut t = FakeText;
+    let w = t.measure(&Spec::plain(&line, mono()), 1.0).0;
+    assert!(w > 300.0 - 20.0 - 25.0 && w < 300.0 - 20.0, "fixture: {w}");
+    let at_rest = scrolled_right_end(&opts(), &line);
+    assert!(
+        at_rest < RECT.x + 10.0 + w,
+        "it moved left to clear the button"
+    );
+}
+
+#[test]
+fn a_bordered_block_keeps_the_same_margin_from_the_button() {
+    let wide = "z".repeat(300);
+    let o = CodeBlockOptions {
+        border: true,
+        ..opts()
+    };
+    let end = scrolled_right_end(&o, &wide);
+    let clip = RECT.right() - 1.0 - 6.0 - 21.0 - 4.0;
+    assert!(
+        end <= clip && end > clip - 8.0,
+        "ends at {end}, the clip at {clip}"
+    );
+}
+
+/// The thumb fills of a scene.
+fn thumbs(scene: &Scene) -> Vec<lune_ui_core::scene::Shape> {
+    scene.layers[0].geometry.over.clone()
+}
+
+fn thumbs_after(o: &CodeBlockOptions<'_>, pointer: (f32, f32)) -> Vec<lune_ui_core::scene::Shape> {
+    let wide = "z".repeat(300);
+    let mut h = UiHarness::new(WIN);
+    run(&mut h, &wide, o);
+    h.input.pointer_to(pointer.0, pointer.1);
+    let mut r = at(&mut h, 20, &wide, o);
+    for k in 2..16 {
+        r = at(&mut h, k * 20, &wide, o);
+    }
+    thumbs(&r.scene)
+}
+
+#[test]
+fn the_pointer_anywhere_over_the_block_shows_the_bar_in_the_bottom_padding() {
+    // The bottom padding, the left padding, the top padding, the text.
+    for p in [
+        (100.0, RECT.bottom() - 3.0),
+        (RECT.x + 3.0, 60.0),
+        (100.0, RECT.y + 3.0),
+        (100.0, 40.0),
+    ] {
+        let t = thumbs_after(&opts(), p);
+        assert_eq!(t.len(), 1, "pointer {p:?}");
+        let [_, y, _, h] = t[0].rect;
+        // 6 px thumb, 1 px from the box's bottom edge, below the text's 10 px padding line.
+        assert_eq!(y + h, RECT.bottom() - 1.0, "pointer {p:?}");
+        assert!(y >= RECT.bottom() - 10.0, "inside the padding: {y}");
+    }
+    assert!(
+        thumbs_after(&opts(), (RECT.right() + 20.0, 60.0)).is_empty(),
+        "no bar with the pointer away"
+    );
+}
+
+#[test]
+fn a_ring_holds_the_bar_inside_it() {
+    let o = CodeBlockOptions {
+        border: true,
+        pad: (12.0, 10.0),
+        ..opts()
+    };
+    let t = thumbs_after(&o, (100.0, RECT.bottom() - 4.0));
+    assert_eq!(t.len(), 1);
+    let [x, y, w, h] = t[0].rect;
+    assert_eq!(y + h, RECT.bottom() - 2.0, "1 px ring, 1 px gap");
+    assert!(x >= RECT.x + 1.0 && x + w <= RECT.right() - 1.0);
+    assert!(
+        y >= RECT.bottom() - 11.0,
+        "within the 10 px padding and the ring: {y}"
+    );
+}
+
 // Nodes, focus and idle.
 
 #[test]

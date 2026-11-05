@@ -365,6 +365,13 @@ fn a_code_run_draws_a_pill_a_strike_a_bar_and_an_actionable_link_an_underline() 
     let underlines = overs(&r.scene, DARK.link);
     assert_eq!(underlines.len(), 1, "the actionable link only");
     assert_eq!(underlines[0].rect[3], 1.0);
+    // Whole pixels, so the 1 px bars are two clean rows at 2x; the pill ends on the row box, 2 px (at the body size)
+    // below the underline's row.
+    let strike = overs(&r.scene, DARK.fg_primary)[0].rect;
+    assert_eq!(strike[1].fract(), 0.0, "the strike sits on a whole pixel");
+    assert_eq!(underlines[0].rect[1].fract(), 0.0, "so does the underline");
+    let pill = fills(&r.scene, DARK.code_inline)[0].rect;
+    assert_eq!(pill[1] + pill[3] - underlines[0].rect[1], 2.0);
 }
 
 #[test]

@@ -286,7 +286,7 @@ fn kind_color(theme: &Theme, kind: LineKind) -> Rgba {
         LineKind::Added => theme.ok,
         LineKind::Removed => theme.err,
         LineKind::Context => theme.fg_primary,
-        LineKind::Hunk => theme.link,
+        LineKind::Hunk => theme.fg_quaternary,
     }
 }
 
@@ -720,7 +720,7 @@ impl Ui<'_> {
         } else {
             RULE_GAP + n * BUTTON + (n - 1.0) * ACTION_GAP
         };
-        let style = Style::mono(HUNK_SIZE, HUNK_LINE, theme.link);
+        let style = Style::mono(HUNK_SIZE, HUNK_LINE, theme.fg_quaternary);
         let room = (area.w - 2.0 * (RULE_EDGE + RULE_GAP) - buttons - 2.0 * PILL_PAD.0).max(0.0);
         let p = self.painter();
         let spec = p.elide(&Spec::plain(line.text, style), room);

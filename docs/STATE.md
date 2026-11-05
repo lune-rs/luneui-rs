@@ -1,7 +1,7 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-06 (M9 in progress, steps 1 to 7 of 9 done; M8 merged to main at 2474248)
+Last updated: 2026-11-06 (M9 in progress, steps 1 to 8 of 9 done; M8 merged to main at 2474248)
 
 ## Now
 
@@ -20,7 +20,7 @@ through `tab_taker`, 15 scenes (361 listed), a live document of 1,000,000 lines.
 `code_block::height`, `CodeBlockOptions`, on the code view's frame (read-only, sideways only), a copy button with the check-mark
 feedback, 12 scenes (373 listed). Step 7 is in (D197): `Ui::markdown` and the model (`MdBlock`, `MdInline`, `MdItem`, `MdRow`),
 `is_actionable`, blocks as virtual rows, inline code pills with pads left out of Copy (`selectable_padded`), links as Tab stops, task
-boxes, tables, images, 16 scenes (389 listed). Steps 8 and 9 follow the plan.
+boxes, tables, images, 16 scenes (389 listed). Step 8 (visual, both batches accepted by the director, D198): the code block's text clip ends 4 px before the copy button, its bar lies in the bottom padding and shows with the pointer anywhere over the block (crate-private `Look.frame`); the diff's hunk text is `fg_quaternary`, `diff-view-hunk-focus` reaches the first action; markdown's underline `(h * 0.87).round()`, strike `(h * 0.6).round()`, pill to the row's bottom, link ring `Offset { radius: 3 }`. Step 9 (close) follows the plan.
 
 M8 (data views: table, bar chart, pie chart, kanban board, lane graph) is merged to main at 2474248 (7 steps, DECISIONS
 D160 to D176) and closed: the cross-widget suite, the disabled-keys rows, the catalogue audit, the architecture notes and the
