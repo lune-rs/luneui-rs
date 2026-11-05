@@ -10,9 +10,9 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | status | count |
 | --- | --- |
 | in-luneterm | 0 |
-| planned | 12 |
+| planned | 7 |
 | stub | 0 |
-| in-progress | 81 |
+| in-progress | 86 |
 | done | 0 |
 | external | 4 |
 | **total** | **97** |
@@ -120,14 +120,14 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
-| [data.bar-chart](data/bar-chart.md) | Stacked bar chart | planned | wane | Hourly stacked columns, two series, three grid lines |
-| [data.kanban-board](data/kanban-board.md) | Kanban board | planned | lunegit | Horizontal board of columns with card lists, card drag between columns by manual pointer capture, and an error state for a corrupt board |
+| [data.bar-chart](data/bar-chart.md) | Stacked bar chart | in-progress | wane | Hourly stacked columns, two series, three grid lines |
+| [data.kanban-board](data/kanban-board.md) | Kanban board | in-progress | lunegit | Horizontal board of columns with card lists, card drag between columns by manual pointer capture, and an error state for a corrupt board |
 | [data.kv-list](data/kv-list.md) | Key-value list | in-progress | wane | Aligned key and value pairs: facts, paths, ids, figures |
-| [data.lane-graph](data/lane-graph.md) | Lane graph (row) | planned | lunegit | One row of a lane graph: connection curves between lanes, vertical lane lines, and a node dot in its lane; generalised from commits to app data |
-| [data.pie-chart](data/pie-chart.md) | Pie chart | planned | lunegit | 160 px pie of slices sized by value, drawn from the top clockwise, with a glass highlight over the top half |
+| [data.lane-graph](data/lane-graph.md) | Lane graph (row) | in-progress | lunegit | One row of a lane graph: connection curves between lanes, vertical lane lines, and a node dot in its lane; generalised from commits to app data |
+| [data.pie-chart](data/pie-chart.md) | Pie chart | in-progress | lunegit | 160 px pie of slices sized by value, drawn from the top clockwise, with a glass highlight over the top half |
 | [data.progress](data/progress.md) | Progress bar | in-progress | wane | 4 px track with an accent fill; warn and err only for meaning |
 | [data.stat](data/stat.md) | Stat cell | in-progress | wane | A labelled figure in a strip: label, mono value, sub-line, optional meter |
-| [data.table](data/table.md) | Data table | planned | wane | 28 px rows with hairlines, numeric columns in mono, sortable header look, selectable rows |
+| [data.table](data/table.md) | Data table | in-progress | wane | 28 px rows with hairlines, numeric columns in mono, sortable header look, selectable rows |
 
 ## text
 

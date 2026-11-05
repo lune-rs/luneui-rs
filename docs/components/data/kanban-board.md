@@ -2,10 +2,10 @@
 id: data.kanban-board
 title: Kanban board
 area: data
-status: planned
+status: in-progress
 consumers: lunegit
-source: Lunegit: src/Lunegit.Desktop/Views/Scratchpad/ScratchpadBoardView.axaml
-owner: —
+source: crates/lune-ui-core/src/widgets/kanban_board.rs
+owner: toolkit-v1 M8
 summary: Horizontal board of columns with card lists, card drag between columns by manual pointer capture, and an error state for a corrupt board
 ---
 

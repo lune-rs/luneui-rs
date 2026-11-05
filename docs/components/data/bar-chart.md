@@ -2,10 +2,10 @@
 id: data.bar-chart
 title: Stacked bar chart
 area: data
-status: planned
+status: in-progress
 consumers: wane
-source: —
-owner: —
+source: crates/lune-ui-core/src/widgets/bar_chart.rs
+owner: toolkit-v1 M8
 summary: Hourly stacked columns, two series, three grid lines
 ---
 

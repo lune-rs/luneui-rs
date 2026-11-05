@@ -13,6 +13,7 @@ use crate::scenes::background;
 mod a11y;
 mod badge;
 mod banner;
+mod bar_chart;
 mod button;
 mod callout;
 mod checkbox;
@@ -30,8 +31,10 @@ mod form_field;
 mod icon_rail;
 mod image;
 mod ime;
+mod kanban_board;
 mod kv_list;
 mod label;
+mod lane_graph;
 mod layout_page;
 mod list_row;
 mod locale;
@@ -39,6 +42,7 @@ mod menu;
 mod motion;
 mod nav_item;
 mod panel;
+mod pie_chart;
 mod popover;
 mod primitives;
 mod progress;
@@ -62,6 +66,7 @@ mod status_dot;
 mod stepper;
 mod steps;
 mod tab_strip;
+mod table;
 mod text_edit;
 mod text_field;
 mod toast_notifications;
@@ -136,6 +141,11 @@ pub(crate) static PAGES: &[&Page] = &[
     &split_panes::PAGE,
     &tree_view::PAGE,
     &settings_page::PAGE,
+    &table::PAGE,
+    &bar_chart::PAGE,
+    &pie_chart::PAGE,
+    &kanban_board::PAGE,
+    &lane_graph::PAGE,
 ];
 
 /// The window background of a Ui page (glass, focused) and its card. Returns the card.

@@ -28,6 +28,10 @@ pub const WARNING: &str = "\u{ea6c}";
 pub const ERROR: &str = "\u{ea87}";
 pub const CLEAR_ALL: &str = "\u{eabf}";
 pub const CIRCLE_SLASH: &str = "\u{eabd}";
+pub const ARROW_UP: &str = "\u{eaa1}";
+pub const ARROW_DOWN: &str = "\u{ea9a}";
+pub const ACCOUNT: &str = "\u{eb99}";
+pub const NOTE: &str = "\u{eb26}";
 
 /// Text spec for one icon glyph at `size`.
 pub fn glyph(glyph: &str, size: f32, color: Rgba) -> Spec {

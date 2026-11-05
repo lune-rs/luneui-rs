@@ -2,10 +2,10 @@
 id: data.table
 title: Data table
 area: data
-status: planned
+status: in-progress
 consumers: wane
-source: —
-owner: —
+source: crates/lune-ui-core/src/widgets/table.rs
+owner: toolkit-v1 M8
 summary: 28 px rows with hairlines, numeric columns in mono, sortable header look, selectable rows
 ---
 

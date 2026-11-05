@@ -69,6 +69,32 @@ impl Ui<'_> {
         self.take_key(id, key, false)
     }
 
+    /// Takes this frame's next synthetic press of `key` aimed at `id` (an accessibility
+    /// increment or decrement) and no real key: a real key on a focused widget is its own to
+    /// read, and a chord or a disabled widget leaves it to the shortcuts.
+    pub(crate) fn consume_synthetic_key(&mut self, id: WidgetId, key: NamedKey) -> bool {
+        let Some(k) = self
+            .keys
+            .iter_mut()
+            .find(|k| !k.consumed && k.named() == Some(key) && k.target == Some(id))
+        else {
+            return false;
+        };
+        k.consumed = true;
+        self.input_acted = true;
+        true
+    }
+
+    /// Whether `id` registered a region through `interact` since `mark` in a disabled scope: a
+    /// focused widget a scroll area cannot see through its watch list.
+    pub(crate) fn disabled_registered_since(&self, mark: usize, id: WidgetId) -> bool {
+        self.registered
+            .get(mark..)
+            .unwrap_or_default()
+            .iter()
+            .any(|r| !r.enabled && self.painter.hits.get(r.index).is_some_and(|h| h.1 == id))
+    }
+
     fn take_key(&mut self, id: WidgetId, key: NamedKey, chords: bool) -> bool {
         let focus = self.key_focus;
         let Some(k) = self.keys.iter_mut().find(|k| {

@@ -2,10 +2,10 @@
 id: data.pie-chart
 title: Pie chart
 area: data
-status: planned
+status: in-progress
 consumers: lunegit
-source: Lunegit: src/Lunegit.Desktop/Controls/StoragePieChartControl.cs
-owner: —
+source: crates/lune-ui-core/src/widgets/pie_chart.rs
+owner: toolkit-v1 M8
 summary: 160 px pie of slices sized by value, drawn from the top clockwise, with a glass highlight over the top half
 ---
 

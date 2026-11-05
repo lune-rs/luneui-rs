@@ -110,6 +110,26 @@ catalogue tables cite one place.
 The expand duration is the kind's default, `base` (the entry's question on it is answered: no
 separate token). Off snaps every row above.
 
+## M8 rows: chart values, the table header, the board
+
+Lunegit has no chart, table or board motion beyond the drag the tab strip already has, so the rows are D40's kinds
+at their defaults [D162, D164, D165, D166, D168]. The charts' quantity is the normalised one (a bar segment's share of
+the plot, a slice's share of the turn), so a scale change animates with no special case.
+
+| component | kind | property | duration | easing | reduced | cite |
+|---|---|---|---|---|---|---|
+| bar segment | value | a segment's extent as a share of the plot; `live: true` snaps | fast | quad-out | snap | [D40], [D164] |
+| pie slice | value | a slice's sweep as a share of the turn; shares are divided by their sum each frame; from empty to data snaps; `live: true` snaps | fast | quad-out | snap | [D40], [D164] |
+| table sorted header | selection | the sorted header's text colour and the arrow's opacity | fast | linear | keep | [D40], [D162] |
+| table row hover and selection | hover, selection | the row fill, while the rows are still; rows never animate on a sort or a scroll | instant, fast | linear | keep | [D40], [D161] |
+| board card dim | selection | the dragged card's source at `DIM_ALPHA` | fast | linear | fade | [D40], [D168] |
+| board drop line | move | the line's y inside one column; across columns it snaps | fast | sine-in-out | snap | [D40], [D168] |
+| board neighbours | settle | the cards that make room or close a gap, one slot | fast | sine-in-out | snap | [D40], [D168] |
+| board landing | settle | the ghost into the card's slot after a release, wherever the model now puts it (accepted, refused, cancelled and keyboard moves are one path) | fast | sine-in-out | snap | [D40], [D168] |
+
+The board's ghost tracks the pointer 1:1 and never transitions (`settle`). Off snaps every row above. The lane graph
+never animates (a self-painting surface, below).
+
 ## Tiers
 
 The app chooses the tier; the toolkit reads no OS setting (hard rule 2). Lunegit's three tiers are
@@ -158,6 +178,8 @@ From Lunegit's rules plus D40's performance rules:
   [L .claude/docs/animation-rules.md:146-147].
 - High-frequency or continuously updating content: progress text, counters, anything that changes
   many times per second [L .claude/docs/animation-rules.md:148].
+  A chart value escapes it with `live: true`: the app says the quantity changes often, and the bars and slices
+  follow it directly, as the stat's `live` does [D126, D164].
 - Layout properties on large or virtualized surfaces; prefer transforms
   [L .claude/docs/animation-rules.md:149].
 - Anything longer than `slow` (500 ms), except the flash cue and the indicator loops

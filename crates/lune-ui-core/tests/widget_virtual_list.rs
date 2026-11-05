@@ -10,6 +10,7 @@ use lune_ui_core::input::{FrameOutput, Key, Keymap, Modifiers, NamedKey, Pointer
 use lune_ui_core::motion::{MotionTier, conformance};
 use lune_ui_core::paint::Rect;
 use lune_ui_core::scene::{Scene, Shape};
+use lune_ui_core::shortcuts::{Binding, Chord, CommandId, Scope};
 use lune_ui_core::testing::UiHarness;
 use lune_ui_core::theme::DARK;
 use lune_ui_core::ui::{Ui, WidgetId};
@@ -1690,4 +1691,129 @@ fn a_drag_selects_by_screen_position_in_a_list_inside_a_scrolled_parent() {
     h.input.pointer_to(50.0, 210.0);
     frame(&mut h, 50);
     assert_eq!(frame(&mut h, 60), keys(&[1, 2, 3, 4, 5]));
+}
+
+// Disabled keys and chords.
+
+/// One frame of the list, disabled; what fired, the list's response and its state.
+/// What a disabled frame reports: the commands fired, the response and the state.
+type Off = (Vec<CommandId>, ListResponse, ListState);
+
+fn run_off(h: &mut UiHarness, o: &ListOptions<'_>) -> Off {
+    let mut r = None;
+    let mut state = ListState::default();
+    let (_, out) = h.frame(|ui| {
+        ui.with_enabled(false, |ui| {
+            r = Some(ui.virtual_list("l", LIST, o, key, |_, _| ROW));
+            state = ui.list_state("l").clone();
+        });
+    });
+    (out.fired, r.expect("the frame ran"), state)
+}
+
+/// A held modifier and the same modifier on a binding's chord.
+type Held = (Modifiers, fn(Chord) -> Chord);
+
+const SIX: [NamedKey; 6] = [
+    NamedKey::ArrowUp,
+    NamedKey::ArrowDown,
+    NamedKey::Home,
+    NamedKey::End,
+    NamedKey::PageUp,
+    NamedKey::PageDown,
+];
+
+#[test]
+fn a_list_focused_then_disabled_takes_its_keys_and_changes_nothing() {
+    let o = opts(100);
+    for k in SIX {
+        let mut h = harness();
+        h.shortcuts
+            .add(Binding::new(Scope::Global, Chord::key(Key::Named(k)), "go"));
+        h.shortcuts.add(Binding::new(
+            Scope::Global,
+            Chord::key(Key::Named(NamedKey::F5)),
+            "f5",
+        ));
+        focused(&mut h, &o);
+        click_row(&mut h, &o, 3, NONE);
+        run(&mut h, &o);
+        let before = run(&mut h, &o).state;
+        run_off(&mut h, &o);
+        h.input.key_down(Key::Named(k), None);
+        let (fired, r, state) = run_off(&mut h, &o);
+        assert!(fired.is_empty(), "{k:?} fired a binding");
+        assert_eq!(state.selection, before.selection, "{k:?}");
+        assert_eq!(state.cursor, before.cursor, "{k:?}");
+        assert!(!r.response.changed, "{k:?}");
+        h.input.key_down(Key::Named(NamedKey::F5), None);
+        assert_eq!(run_off(&mut h, &o).0.len(), 1, "F5 still fires after {k:?}");
+    }
+}
+
+#[test]
+fn command_c_on_a_list_focused_then_disabled_copies_nothing_and_fires_no_binding() {
+    let o = opts(100);
+    let mut h = harness();
+    h.shortcuts.add(Binding::new(
+        Scope::Global,
+        Chord::key(Key::Character("c".into())).logo(),
+        "copy",
+    ));
+    focused(&mut h, &o);
+    click_row(&mut h, &o, 2, NONE);
+    run(&mut h, &o);
+    run_off(&mut h, &o);
+    h.input
+        .set_modifiers(META)
+        .key_down(Key::Character("c".into()), Some("c"));
+    let (fired, r, _) = run_off(&mut h, &o);
+    h.input.set_modifiers(NONE);
+    assert!(fired.is_empty(), "the copy key is the list's");
+    assert_eq!(r.copy, None);
+}
+
+#[test]
+fn a_chord_on_the_lists_keys_stays_a_shortcut() {
+    let o = opts(100);
+    let held = |control, alt, logo| Modifiers {
+        shift: false,
+        control,
+        alt,
+        logo,
+    };
+    let chords: [Held; 3] = [
+        (held(true, false, false), Chord::ctrl),
+        (held(false, true, false), Chord::alt),
+        (held(false, false, true), Chord::logo),
+    ];
+    for (m, chord) in chords {
+        for k in SIX {
+            for disabled in [false, true] {
+                let mut h = harness();
+                h.shortcuts.add(Binding::new(
+                    Scope::Global,
+                    chord(Chord::key(Key::Named(k))),
+                    "chord",
+                ));
+                focused(&mut h, &o);
+                click_row(&mut h, &o, 3, NONE);
+                run(&mut h, &o);
+                let before = run(&mut h, &o).state;
+                let (fired, state) = if disabled {
+                    run_off(&mut h, &o);
+                    h.input.set_modifiers(m).key_down(Key::Named(k), None);
+                    let (fired, _, state) = run_off(&mut h, &o);
+                    (fired, state)
+                } else {
+                    let r = press_key(&mut h, &o, k, m);
+                    (r.out.fired, r.state)
+                };
+                h.input.set_modifiers(NONE);
+                assert_eq!(fired.len(), 1, "{m:?} {k:?} disabled={disabled}");
+                assert_eq!(state.cursor, before.cursor, "{m:?} {k:?}");
+                assert_eq!(state.selection, before.selection, "{m:?} {k:?}");
+            }
+        }
+    }
 }

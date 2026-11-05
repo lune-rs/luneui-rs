@@ -1,9 +1,17 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-05 (M7 merged to main at 662d310; paused, M8 waits for the user)
+Last updated: 2026-11-05 (M8 in progress: step 1 of 7 done; M7 is merged to main at 662d310)
 
 ## Now
+
+M8 (data views: table, bar chart, pie chart, kanban board, lane graph) is in progress on `orch/toolkit-v1`. Step 1 is done
+(DECISIONS D160 to D171): the carried limits it stands on are paid (a real arrow on a focused scroll area no longer scrolls;
+the area's Page, Home and End keys serve a focused child in a disabled scope; `virtual_list` and the combo hold the disabled
+keys and the chord rule, each with tests and a mutant), the list frame takes a crate-private `ListStyle` for the table, and
+the five modules, page stubs (66 pages), glyphs, strings, motion rows and catalogue flips are in, so the three tracks touch
+no shared file. Steps 2 to 5 build the widgets, step 6 is the visual pass, step 7 closes. Column resize and reorder are not
+built in M8 (D163, assumed; additive later).
 
 M7 (overlays and containers) is merged to main at 662d310 (15 steps; review passed at round 5, after three fix rounds and
 one docs pass).
@@ -61,18 +69,13 @@ no dependency). The gallery has a page registry (two legacy pages, 59 Ui pages),
   parent interleaves (fills under text). Two edges of that rule (step 1): a child held on `Raised` after its parent
   closed sits above, and is eligible over, a dialog opened in that window; on `Raised` a child opened in a nested dialog's
   body registers before that dialog's footer buttons, so where they overlap the buttons win the hit.
-- Disabled keys (M7 review F9, F14, F17; D159): not every key reader holds D140's consume-then-gate.
+- Disabled keys (M7 review F9, F14, F17; D159, D160): not every key reader holds D140's consume-then-gate.
   `docs/architecture.md`, "Disabled keys", is the one list of what holds, by which test or probe, what does not and what
   was not checked; it is not restated here. Making the rest hold is open.
-- Chords (M7 review F13): the tab strip and star rating (Enter, Space), combo (Enter, Space, Down), search picker (Enter,
-  Space), stepper (Up, Down) and slider (the arrows) take a Control, Alt or Command chord, so a shortcut on it dies on
-  one of them while it works on a button (by probe). The scroll area's Up and Down do too (`consume_key`, by the
-  review's probe, on the path of the next limit). D157's rule holds for `activation_keys`, the splitter's keys but
-  Escape in a drag, the nav list, `rove_keys`, the tree and the menu.
-- A real arrow on a focused scroll area scrolls, and the wrong way (M7 review F18): the loop at `scroll_area.rs:485` is
-  for `Increment` and `Decrement`, sent as synthetic keys, but reads through `consume_key`, so real ArrowUp moves the
-  offset 0 to 48 and real ArrowDown back, against D99. Only an app or assistive tool that focuses the area itself reaches
-  it (by the review's probe); no toolkit code does.
+- Chords (M7 review F13): the tab strip and star rating (Enter, Space), search picker (Enter, Space), stepper (Up, Down)
+  and slider (the arrows) take a Control, Alt or Command chord, so a shortcut on it dies on one of them while it works on
+  a button (by probe). D157's rule holds for `activation_keys` (so the combo since D160), the splitter's keys but Escape
+  in a drag, the nav list, `rove_keys`, the tree, the menu, the list and the scroll area.
 - One blur per frame: a glass menu over a dialog with a blurred scrim has none of its own.
 - Text cannot be cut by a rounded clip (it gets the clip's bounding rect). The toolkit keeps text out of the corners: the
   page and panel inset every text and padded body by the radius (8); a flush panel body is rounded-clipped for fills and
@@ -82,7 +85,7 @@ no dependency). The gallery has a page registry (two legacy pages, 59 Ui pages),
 - Inside a cluster of several glyphs a click lands on either edge non-monotonically: `Buffer::hit` halves
   each glyph, not the cluster. A drag stopped right of a row cut inside a word leaves one grapheme out until the
   pointer reaches the next row (P20; the seam has no caret affinity, D112).
-- API gaps, marked in the entries, each an API change: the callout has no title line and no inline figure and the empty
+- API gaps, marked in the entries, each an API change: the table has no column resize or reorder (D163); the callout has no title line and no inline figure and the empty
   state's actions have no glyph (D136); the sidebar footer is one line in one family; the flyout's route state note has
   no place in `routes`; `Ui::combo` has no path to D143's glass list; toast history rows have no hover or expand;
   `Ui::filter_bar` has no option for the palette's 16 px glyph, 14 px text or radius 6; `PaletteRow` has no icon tone; the
@@ -104,7 +107,8 @@ no dependency). The gallery has a page registry (two legacy pages, 59 Ui pages),
 
 ## Next
 
-1. M8 waits for the user (paused after M7). Decide first whether the disabled-keys and chord limits above are fixed before M8.
+1. M8 steps 2 to 7 (table; bar and pie charts; lane graph; kanban board; visual; close). Step 7 closes the cross-widget
+   contract, the disabled-keys rows, the catalogue audit, the architecture notes, the bench and this file.
 2. CI (fmt, clippy `-D warnings`, tests on macOS, Windows and Linux) now that there is code to run.
 3. An export script for Luneterm's vendored snapshot, before Luneterm M9. The migration
    map for M11 is "API changes since M1" in `docs/architecture.md`.

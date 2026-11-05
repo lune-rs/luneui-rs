@@ -2,10 +2,10 @@
 id: data.lane-graph
 title: Lane graph (row)
 area: data
-status: planned
+status: in-progress
 consumers: lunegit
-source: Lunegit: src/Lunegit.Desktop/Controls/GraphRowControl.cs
-owner: —
+source: crates/lune-ui-core/src/widgets/lane_graph.rs
+owner: toolkit-v1 M8
 summary: One row of a lane graph: connection curves between lanes, vertical lane lines, and a node dot in its lane; generalised from commits to app data
 ---
 

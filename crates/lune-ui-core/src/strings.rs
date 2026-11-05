@@ -47,6 +47,12 @@ pub const DEFAULTS: &[(&str, &str)] = &[
         "Some changes require a restart to take effect.",
     ),
     ("luneui.settings-page.restart-action", "Restart now"),
+    ("luneui.bar-chart.name", "Bar chart"),
+    ("luneui.pie-chart.name", "Pie chart"),
+    ("luneui.kanban-board.add-column", "Add column"),
+    ("luneui.kanban-board.add-card", "Add card"),
+    ("luneui.kanban-board.column-actions", "Column actions"),
+    ("luneui.kanban-board.empty-column", "No cards yet."),
 ];
 
 /// The default text of a toolkit key, if it is one.

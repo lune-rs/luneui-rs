@@ -186,7 +186,7 @@ Holds, for the keys listed:
 | `nav_list`, so `sidebar` | Enter, Space, Up, Down, Home, End | Test: `widget_sidebar::a_focused_row_turned_disabled_keeps_its_keys_and_leaves_its_chords` (Enter, Space), `c4::m7::a_disabled_page_takes_every_key_a_focused_composite_takes_and_fires_no_global_binding` (the rest) |
 | `icon_rail` | Enter, Space, Up, Down, Home, End | Test: `c4`, the same |
 | `split_panes` | arrows, Home, End | Test: `c4`, the same, and `widget_split_panes::a_strip_that_was_focused_and_is_then_disabled_still_takes_its_keys_and_acts_on_none` |
-| `tab_strip`, its own keys (see `scroll_area` below for PageUp and PageDown) | Enter, Space, Left, Right, Home, End | Test: `widget_tab_strip::a_disabled_strip_activates_nothing_from_enter_or_space_and_still_does_after_enabling`, `a_disabled_strip_keeps_the_arrows_home_and_end_from_the_shortcuts` |
+| `tab_strip`, its own keys (see `scroll_area` for PageUp and PageDown) | Enter, Space, Left, Right, Home, End | Test: `widget_tab_strip::a_disabled_strip_activates_nothing_from_enter_or_space_and_still_does_after_enabling`, `a_disabled_strip_keeps_the_arrows_home_and_end_from_the_shortcuts` |
 | `menu` | Enter, Space, Up, Down, Home, End | Test: `widget_menu::a_disabled_scope_takes_the_keys_picks_nothing_and_marks_every_node` |
 | `flyout`, its rows (`menu_rows`) | Enter, Space, Up, Down, Home, End | Test: `widget_flyout::a_disabled_flyout_closes_on_escape_picks_nothing_and_marks_every_node` |
 | `dropdown`, with and without `max_rows` | Enter, Up, Down | Test: `widget_dropdown::a_disabled_dropdown_takes_the_keys_picks_nothing_and_marks_every_node` |
@@ -195,6 +195,9 @@ Holds, for the keys listed:
 | `toasts`, Cancel and Dismiss (`icon_button`, the `button` row's reader) | Enter, Space | Test: `widget_toast::the_toast_is_called_in_a_disabled_scope_and_every_node_says_so` holds Cancel; probe (Dismiss) |
 | `settings_page`, the restart action | Enter, Space | Probe. `widget_settings_page::a_disabled_page_reports_nothing_and_leaves_the_keys_to_shortcuts` never focuses it |
 | `command_palette`, its own keys | Up, Down, Enter | Test: `widget_command_palette::a_disabled_palette_takes_its_keys_activates_nothing_and_passes_the_walk` (`Scope::Overlay`) |
+| `combo` | Enter, Space, Down | Test (D160): `widget_combo::a_combo_focused_then_disabled_keeps_its_keys_from_the_shortcuts`; a chord on them stays a shortcut, enabled and disabled: `a_chord_on_the_combos_keys_is_a_shortcut_and_opens_nothing` |
+| `virtual_list`, so the list frame the table runs on | Up, Down, Home, End, PageUp, PageDown; Command+C with a selection | Test (D160): `widget_virtual_list::a_list_focused_then_disabled_takes_its_keys_and_changes_nothing`, `command_c_on_a_list_focused_then_disabled_copies_nothing_and_fires_no_binding`; chords: `a_chord_on_the_lists_keys_stays_a_shortcut` |
+| `scroll_area`, a focused child the keys passed (including one in a disabled scope) | PageUp, PageDown, Home, End, in an area that overflows. Hosts: the page body and the settings content | Test (D160): `widget_scroll_area::a_focused_child_that_is_disabled_keeps_the_page_keys_from_the_shortcuts_and_scrolls_nothing`, `a_disabled_focused_child_leaves_f5_and_the_page_key_chords_to_the_shortcuts`, `nested_areas_take_a_page_key_of_a_disabled_child_once` |
 
 Does not hold: each key listed fired nothing enabled and fired its binding disabled, with focus kept. All by probe;
 nothing acted. Each gates on `enabled` or a focus that is false in a disabled scope before it takes the key.
@@ -203,15 +206,11 @@ nothing acted. Each gates on `enabled` or a focus that is false in a disabled sc
 |---|---|
 | `stepper` | Up, Down |
 | `slider` | arrows |
-| `combo` | Enter, Space, Down |
 | `search_picker`, the trigger | Enter, Space. An open picker closes when disabled and focus returns to the trigger, so this row is what is left of its box |
-| `virtual_list` | Up, Down, Home, End, PageUp, PageDown; Command+C with a selection |
 | `text_field`, and the filter bar's box | Enter, Space, Backspace, Delete, Left, Right, Home, End, a typed character, Command+A, V, Z; Command+C, X with a selection (run on the field) |
 | `text_area` | those, and Up, Down, PageUp, PageDown |
 | `command_palette`, its search box (a filter bar) | Space, Backspace, Delete, Left, Right, Home, End, a typed character, Command+A, V, Z; Command+C, X with a selection. Only Up, Down and Enter hold, by the palette's own keys |
 | `selectable_text`, so `kv_list` values and the flyout's routes (each run) | Enter, Left, Right, Home, End, Command+A; Command+C with a selection. Elided text (`spec` differs from `full`): Command+A, C |
-| `scroll_area`, a focused child the keys passed | PageUp, PageDown, Home, End, in an area that overflows. Run with a button, a slider and an overflowing tab strip (PageUp, PageDown; the strip takes the others first). So a child that holds its own keys above still loses these. Hosts: the page body and the settings content. |
-| `scroll_area`, itself focused (only by an app or assistive tool, STATE's limit from review F18) | Up, Down |
 
 Not a leak: Escape in a pointer drag (`consume_key_while_pressed`: the splitter, `drag_gesture`) fired nothing enabled
 and fired its binding once the scope turned disabled mid-drag (probe, splitter and tab strip). From reading: `Ui::interact`

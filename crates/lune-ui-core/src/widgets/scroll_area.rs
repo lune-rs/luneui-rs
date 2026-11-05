@@ -483,7 +483,7 @@ impl Ui<'_> {
             }
             let pax = primary_axis(&live, &ext_pre, &vp);
             for (nk, dir) in [(NamedKey::ArrowUp, 1.0), (NamedKey::ArrowDown, -1.0)] {
-                if live[pax] && self.consume_key(id, nk) {
+                if live[pax] && self.consume_synthetic_key(id, nk) {
                     let a = &mut st.a[pax];
                     let cur = clamp_offset(a.wanted, ext_pre[pax], vp[pax]);
                     let to = clamp_offset(cur + dir * LINE, ext_pre[pax], vp[pax]);
@@ -590,7 +590,14 @@ impl Ui<'_> {
 
         // Page keys and Home and End, when the focused child inside the area declined them;
         // while it composes they are the input method's.
-        if let Some((f, _)) = inside.filter(|_| !self.composing()) {
+        // A focused child in a disabled scope is not watched (it registered inert), but its keys
+        // are still the area's to take: they are consumed and nothing scrolls.
+        let keyed = inside.map(|(f, _)| (f, true)).or_else(|| {
+            focused
+                .filter(|f| self.disabled_registered_since(reg_mark, *f))
+                .map(|f| (f, false))
+        });
+        if let Some((f, acts)) = keyed.filter(|_| !self.composing()) {
             let pax = primary_axis(&live, &ext, &vp);
             if live[pax] && ext[pax] > vp[pax] {
                 for (index, ev) in self.focus_events(f) {
@@ -614,7 +621,9 @@ impl Ui<'_> {
                         NamedKey::End => max_offset(ext[pax], vp[pax]),
                         _ => continue,
                     };
-                    a.jump(clamp_offset(to, ext[pax], vp[pax]));
+                    if acts {
+                        a.jump(clamp_offset(to, ext[pax], vp[pax]));
+                    }
                     self.consume_focus_event(index);
                 }
             }
