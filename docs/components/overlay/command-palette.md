@@ -2,10 +2,10 @@
 id: overlay.command-palette
 title: Command palette
 area: overlay
-status: planned
+status: in-progress
 consumers: lunegit
 source: Lunegit: src/Lunegit.Desktop/Views/Dialogs/GlobalSearchDialogView.axaml
-owner: —
+owner: toolkit-v1 M7
 summary: 640 px search dialog over commits, branches, tags, stash, reflog, repos, settings and commands, with prefix filters
 ---
 

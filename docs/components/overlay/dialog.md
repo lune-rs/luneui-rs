@@ -5,7 +5,7 @@ area: overlay
 status: in-progress
 consumers: luneterm, wane
 source: crates/lune-ui-core/src/widgets/dialog.rs
-owner: orch/toolkit-v1
+owner: toolkit-v1 M7
 summary: Modal dialog card: dim backdrop, 448 px acrylic card, darker footer, app-supplied body
 ---
 

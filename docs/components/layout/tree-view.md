@@ -2,10 +2,10 @@
 id: layout.tree-view
 title: Tree view and tree guides
 area: layout
-status: planned
+status: in-progress
 consumers: lunegit, wane
 source: Lunegit: src/Lunegit.Desktop/Controls/TreeGuideControl.cs
-owner: —
+owner: toolkit-v1 M7
 summary: Tree rows with guide lines (trunk and rounded elbow) per depth; expansion is a set of node keys, animated on the container
 ---
 

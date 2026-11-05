@@ -23,6 +23,11 @@ pub const SYNC: &str = "\u{ea77}";
 pub const STAR_FULL: &str = "\u{eb59}";
 pub const STAR_EMPTY: &str = "\u{ea6a}";
 pub const CLOSE: &str = "\u{ea76}";
+pub const CHEVRON_RIGHT: &str = "\u{eab6}";
+pub const WARNING: &str = "\u{ea6c}";
+pub const ERROR: &str = "\u{ea87}";
+pub const CLEAR_ALL: &str = "\u{eabf}";
+pub const CIRCLE_SLASH: &str = "\u{eabd}";
 
 /// Text spec for one icon glyph at `size`.
 pub fn glyph(glyph: &str, size: f32, color: Rgba) -> Spec {

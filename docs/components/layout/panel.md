@@ -2,10 +2,10 @@
 id: layout.panel
 title: Panel (group box)
 area: layout
-status: planned
+status: in-progress
 consumers: wane
 source: —
-owner: —
+owner: toolkit-v1 M7
 summary: Outline-only group box with title, meta, body and action footer
 ---
 

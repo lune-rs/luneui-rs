@@ -2,10 +2,10 @@
 id: layout.settings-page
 title: Settings page layout
 area: layout
-status: planned
+status: in-progress
 consumers: luneterm
 source: —
-owner: —
+owner: toolkit-v1 M7
 summary: Settings page shell: a 20 px content host for the current section, a restart banner that reveals on demand, and the rows and sections built from toolkit widgets
 ---
 

@@ -2,10 +2,10 @@
 id: layout.split-panes
 title: Resizable split panes
 area: layout
-status: planned
+status: in-progress
 consumers: lunegit
 source: Lunegit: src/Lunegit.Desktop/MainWindow.axaml
-owner: —
+owner: toolkit-v1 M7
 summary: Resizable columns and rows between panels and content, with a 4 px splitter that snaps columns shown or hidden
 ---
 

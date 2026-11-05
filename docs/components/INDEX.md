@@ -10,9 +10,9 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | status | count |
 | --- | --- |
 | in-luneterm | 0 |
-| planned | 23 |
+| planned | 12 |
 | stub | 0 |
-| in-progress | 70 |
+| in-progress | 81 |
 | done | 0 |
 | external | 4 |
 | **total** | **97** |
@@ -90,30 +90,30 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
-| [overlay.command-palette](overlay/command-palette.md) | Command palette | planned | lunegit | 640 px search dialog over commits, branches, tags, stash, reflog, repos, settings and commands, with prefix filters |
+| [overlay.command-palette](overlay/command-palette.md) | Command palette | in-progress | lunegit | 640 px search dialog over commits, branches, tags, stash, reflog, repos, settings and commands, with prefix filters |
 | [overlay.dialog](overlay/dialog.md) | Modal dialog | in-progress | luneterm, wane | Modal dialog card: dim backdrop, 448 px acrylic card, darker footer, app-supplied body |
 | [overlay.dropdown](overlay/dropdown.md) | Drop-down list | in-progress | luneterm, wane | Combo drop-down option list that flips above its anchor near the window bottom |
-| [overlay.flyout](overlay/flyout.md) | Tray flyout | planned | wane | Windows tray left-click surface: header, stats, route list, action rows |
+| [overlay.flyout](overlay/flyout.md) | Tray flyout | in-progress | wane | Windows tray left-click surface: header, stats, route list, action rows |
 | [overlay.menu](overlay/menu.md) | Glass context menu | in-progress | luneterm, wane | Glass context menu with open and close motion |
 | [overlay.popover](overlay/popover.md) | Anchored popover | in-progress | any | Anchored overlay placement and lifecycle: flip and shift inside the window, dismiss on outside click, Escape and focus loss, Popup layer, focus scope |
 | [overlay.popup-panel](overlay/popup-panel.md) | Popup panel surface | in-progress | luneterm | Shared popup surface: radius-8 fill and 1 px ring, colours passed by the caller (used by the drop-down list) |
-| [overlay.toast-notifications](overlay/toast-notifications.md) | Toasts and notification history | planned | lunegit | Bottom-right toast stack (max 3, timed dismissal, loading and prompt toasts) and a 50-item notification history |
+| [overlay.toast-notifications](overlay/toast-notifications.md) | Toasts and notification history | in-progress | lunegit | Bottom-right toast stack (max 3, timed dismissal, loading and prompt toasts) and a 50-item notification history |
 | [overlay.tooltip](overlay/tooltip.md) | Tooltips | in-progress | lunegit, wane | Hover tooltip: glass shell radius 8, padding 10 by 8, one 800 ms show delay, text or small rich content, also on disabled controls |
 
 ## layout
 
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
-| [layout.icon-rail](layout/icon-rail.md) | Icon rail | planned | lunegit | Narrow icon column of 40 px toolbar buttons that switch the side panels and toggle the terminal, with a notification badge |
-| [layout.page](layout/page.md) | Page card (header, scroll body, footer) | planned | wane | The card that holds a screen: header with title and actions, scrolling body, optional pinned footer |
-| [layout.panel](layout/panel.md) | Panel (group box) | planned | wane | Outline-only group box with title, meta, body and action footer |
+| [layout.icon-rail](layout/icon-rail.md) | Icon rail | in-progress | lunegit | Narrow icon column of 40 px toolbar buttons that switch the side panels and toggle the terminal, with a notification badge |
+| [layout.page](layout/page.md) | Page card (header, scroll body, footer) | in-progress | wane | The card that holds a screen: header with title and actions, scrolling body, optional pinned footer |
+| [layout.panel](layout/panel.md) | Panel (group box) | in-progress | wane | Outline-only group box with title, meta, body and action footer |
 | [layout.scroll-area](layout/scroll-area.md) | Scroll area | in-progress | any | Scrolling region: per-id offset, wheel and trackpad scrolling, scroll-into-view, follow-tail, offset kept across content replacement |
-| [layout.settings-page](layout/settings-page.md) | Settings page layout | planned | luneterm | Settings page shell: a 20 px content host for the current section, a restart banner that reveals on demand, and the rows and sections built from toolkit widgets |
-| [layout.side-panel](layout/side-panel.md) | Side panel host and panels | planned | lunegit | Side panel host that shows one of nine panels by key, with a fade and 6 px slide on show |
-| [layout.sidebar](layout/sidebar.md) | Sidebar | planned | wane | 208 px column on the window glass: nav list (or wizard steps) and a status footer |
-| [layout.split-panes](layout/split-panes.md) | Resizable split panes | planned | lunegit | Resizable columns and rows between panels and content, with a 4 px splitter that snaps columns shown or hidden |
+| [layout.settings-page](layout/settings-page.md) | Settings page layout | in-progress | luneterm | Settings page shell: a 20 px content host for the current section, a restart banner that reveals on demand, and the rows and sections built from toolkit widgets |
+| [layout.side-panel](layout/side-panel.md) | Side panel host and panels | in-progress | lunegit | Side panel host that shows one of nine panels by key, with a fade and 6 px slide on show |
+| [layout.sidebar](layout/sidebar.md) | Sidebar | in-progress | wane | 208 px column on the window glass: nav list (or wizard steps) and a status footer |
+| [layout.split-panes](layout/split-panes.md) | Resizable split panes | in-progress | lunegit | Resizable columns and rows between panels and content, with a 4 px splitter that snaps columns shown or hidden |
 | [layout.stack](layout/stack.md) | Stack, row, column and grid layout | in-progress | any | Pure layout helpers: stack, row, column and grid with gaps, alignment, insets and fixed, fill and hug sizing |
-| [layout.tree-view](layout/tree-view.md) | Tree view and tree guides | planned | lunegit, wane | Tree rows with guide lines (trunk and rounded elbow) per depth; expansion is a set of node keys, animated on the container |
+| [layout.tree-view](layout/tree-view.md) | Tree view and tree guides | in-progress | lunegit, wane | Tree rows with guide lines (trunk and rounded elbow) per depth; expansion is a set of node keys, animated on the container |
 | [layout.virtualized-list](layout/virtualized-list.md) | Virtualized list | in-progress | lunegit, wane | Builds only the visible rows; selection as a set of row keys (single, multi, range); keyboard navigation; no row animation while scrolling |
 
 ## data

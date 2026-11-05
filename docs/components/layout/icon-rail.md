@@ -2,10 +2,10 @@
 id: layout.icon-rail
 title: Icon rail
 area: layout
-status: planned
+status: in-progress
 consumers: lunegit
 source: Lunegit: src/Lunegit.Desktop/Views/IconRailView.axaml
-owner: —
+owner: toolkit-v1 M7
 summary: Narrow icon column of 40 px toolbar buttons that switch the side panels and toggle the terminal, with a notification badge
 ---
 

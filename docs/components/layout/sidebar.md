@@ -2,10 +2,10 @@
 id: layout.sidebar
 title: Sidebar
 area: layout
-status: planned
+status: in-progress
 consumers: wane
 source: —
-owner: —
+owner: toolkit-v1 M7
 summary: 208 px column on the window glass: nav list (or wizard steps) and a status footer
 ---
 

@@ -5,7 +5,7 @@ area: overlay
 status: in-progress
 consumers: luneterm, wane
 source: crates/lune-ui-core/src/widgets/dropdown.rs
-owner: orch/toolkit-v1
+owner: toolkit-v1 M7
 summary: Combo drop-down option list that flips above its anchor near the window bottom
 ---
 

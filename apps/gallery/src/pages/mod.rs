@@ -17,23 +17,28 @@ mod button;
 mod callout;
 mod checkbox;
 mod combo;
+mod command_palette;
 mod controls_ui;
 mod dialog;
 mod drag_drop;
 mod dropdown;
 pub(crate) mod effects;
 mod filter_bar;
+mod flyout;
 mod focus;
 mod form_field;
+mod icon_rail;
 mod image;
 mod ime;
 mod kv_list;
 mod label;
+mod layout_page;
 mod list_row;
 mod locale;
 mod menu;
 mod motion;
 mod nav_item;
+mod panel;
 mod popover;
 mod primitives;
 mod progress;
@@ -43,9 +48,13 @@ mod row;
 mod scroll_area;
 mod scrollbar;
 mod search_picker;
+mod settings_page;
 mod shortcuts;
+mod side_panel;
+mod sidebar;
 mod slider;
 mod spinner;
+mod split_panes;
 mod stack;
 mod star_rating;
 mod stat;
@@ -55,9 +64,11 @@ mod steps;
 mod tab_strip;
 mod text_edit;
 mod text_field;
+mod toast_notifications;
 mod toggle;
 mod toolbar;
 mod tooltip;
+mod tree_view;
 mod ui;
 mod verdict_row;
 mod virtual_list;
@@ -114,6 +125,17 @@ pub(crate) static PAGES: &[&Page] = &[
     &tab_strip::PAGE,
     &toolbar::PAGE,
     &banner::PAGE,
+    &flyout::PAGE,
+    &toast_notifications::PAGE,
+    &command_palette::PAGE,
+    &layout_page::PAGE,
+    &panel::PAGE,
+    &sidebar::PAGE,
+    &side_panel::PAGE,
+    &icon_rail::PAGE,
+    &split_panes::PAGE,
+    &tree_view::PAGE,
+    &settings_page::PAGE,
 ];
 
 /// The window background of a Ui page (glass, focused) and its card. Returns the card.

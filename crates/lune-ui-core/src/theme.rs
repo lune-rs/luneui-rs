@@ -41,6 +41,24 @@ pub struct Theme {
     pub menu_item_hover: Rgba,
     pub menu_separator: Rgba,
     pub menu_glass: Rgba,
+    /// The menu row while pressed: Lunegit `DarkTheme.axaml:305` (#FFFFFF23).
+    pub menu_item_pressed: Rgba,
+    /// A disabled menu row's text: Lunegit `DarkTheme.axaml:307` (#FFFFFF58).
+    pub menu_text_disabled: Rgba,
+    /// Toast fill, border and the four tone colours, and the expanded log's fill and text:
+    /// Lunegit `DarkTheme.axaml:333-341`. `toast_info` also tints a loading toast.
+    pub toast_bg: Rgba,
+    pub toast_border: Rgba,
+    pub toast_info: Rgba,
+    pub toast_success: Rgba,
+    pub toast_warning: Rgba,
+    pub toast_error: Rgba,
+    pub toast_log_bg: Rgba,
+    pub toast_log_fg: Rgba,
+    /// The icon rail's dirty dot: Lunegit `DarkTheme.axaml:68` (#D98A3D).
+    pub dirty_indicator: Rgba,
+    /// The icon rail's count badge: Lunegit `DarkTheme.axaml:57` (#E74856).
+    pub count_badge: Rgba,
     /// Caption close button fill while hovered, and its glyph colour.
     pub caption_close_hover: Rgba,
     pub caption_close_fg: Rgba,
@@ -123,6 +141,21 @@ pub mod lunegit_dark {
         menu_separator: [0xFF, 0xFF, 0xFF, 0x22],
         // `linear-gradient(rgba(0,0,0,.45)), rgba(165,165,165,.3)` flattened: alpha .615, grey 44.
         menu_glass: [44, 44, 44, 157],
+        // Lunegit `DarkTheme.axaml:305,307`.
+        menu_item_pressed: [0xFF, 0xFF, 0xFF, 0x23],
+        menu_text_disabled: [0xFF, 0xFF, 0xFF, 0x58],
+        // Lunegit `DarkTheme.axaml:333-341`.
+        toast_bg: [0x18, 0x18, 0x18, 0xE6],
+        toast_border: [0xFF, 0xFF, 0xFF, 0x33],
+        toast_info: [0x61, 0xAF, 0xEF, 0xFF],
+        toast_success: [0x4C, 0xAF, 0x50, 0xFF],
+        toast_warning: [0xE2, 0xB9, 0x3D, 0xFF],
+        toast_error: [0xE0, 0x6C, 0x75, 0xFF],
+        toast_log_bg: [0x0D, 0x0D, 0x0D, 0xFF],
+        toast_log_fg: [0xCC, 0xCC, 0xCC, 0xFF],
+        // Lunegit `DarkTheme.axaml:68` and `:57`.
+        dirty_indicator: [0xD9, 0x8A, 0x3D, 0xFF],
+        count_badge: [0xE7, 0x48, 0x56, 0xFF],
         caption_close_hover: [0xC4, 0x2B, 0x1C, 0xFF],
         caption_close_fg: [0xFF, 0xFF, 0xFF, 0xFF],
         fg_muted: [0xB0, 0xB0, 0xB0, 0xFF],
@@ -218,8 +251,20 @@ mod tests {
             (THEME.gold, [0xE9, 0xC4, 0x6A, 0xFF]),
             (THEME.paused, [0x8A, 0x90, 0x99, 0xFF]),
             (THEME.window_fallback, [0x33, 0x33, 0x33, 0xFF]),
+            (THEME.menu_item_pressed, [0xFF, 0xFF, 0xFF, 0x23]),
+            (THEME.menu_text_disabled, [0xFF, 0xFF, 0xFF, 0x58]),
+            (THEME.toast_bg, [0x18, 0x18, 0x18, 0xE6]),
+            (THEME.toast_border, [0xFF, 0xFF, 0xFF, 0x33]),
+            (THEME.toast_info, [0x61, 0xAF, 0xEF, 0xFF]),
+            (THEME.toast_success, [0x4C, 0xAF, 0x50, 0xFF]),
+            (THEME.toast_warning, [0xE2, 0xB9, 0x3D, 0xFF]),
+            (THEME.toast_error, [0xE0, 0x6C, 0x75, 0xFF]),
+            (THEME.toast_log_bg, [0x0D, 0x0D, 0x0D, 0xFF]),
+            (THEME.toast_log_fg, [0xCC, 0xCC, 0xCC, 0xFF]),
+            (THEME.dirty_indicator, [0xD9, 0x8A, 0x3D, 0xFF]),
+            (THEME.count_badge, [0xE7, 0x48, 0x56, 0xFF]),
         ];
-        assert_eq!(expected.len(), 22);
+        assert_eq!(expected.len(), 34);
         for (got, want) in expected {
             assert_eq!(got, want);
         }

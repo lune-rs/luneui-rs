@@ -2,10 +2,10 @@
 id: layout.side-panel
 title: Side panel host and panels
 area: layout
-status: planned
+status: in-progress
 consumers: lunegit
 source: Lunegit: src/Lunegit.Desktop/Views/SidePanelView.axaml
-owner: —
+owner: toolkit-v1 M7
 summary: Side panel host that shows one of nine panels by key, with a fade and 6 px slide on show
 ---
 

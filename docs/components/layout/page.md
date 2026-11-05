@@ -2,10 +2,10 @@
 id: layout.page
 title: Page card (header, scroll body, footer)
 area: layout
-status: planned
+status: in-progress
 consumers: wane
 source: —
-owner: —
+owner: toolkit-v1 M7
 summary: The card that holds a screen: header with title and actions, scrolling body, optional pinned footer
 ---
 

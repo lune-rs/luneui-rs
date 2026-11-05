@@ -2,10 +2,10 @@
 id: overlay.flyout
 title: Tray flyout
 area: overlay
-status: planned
+status: in-progress
 consumers: wane
 source: —
-owner: —
+owner: toolkit-v1 M7
 summary: Windows tray left-click surface: header, stats, route list, action rows
 ---
 

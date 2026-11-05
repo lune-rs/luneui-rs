@@ -1,7 +1,7 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-05 (M7 in progress: step 1, overlay plumbing, done)
+Last updated: 2026-11-05 (M7 in progress: steps 1 and 2 done)
 
 ## Now
 
@@ -11,8 +11,14 @@ an active modal and held to its close, so no widget changed; overlay content is 
 `BackdropRequest` carries `layer`, `sigma` and `saturation`, the offscreen split follows it (`Scene::split`), of two
 requests the lower layer keeps it, and `Painter::backdrop_with` sets the numbers; `Painter::acrylic_radii`; `Node.level`;
 `Ui::node` marks every node in a disabled scope; `Ui::activation_keys` consumes before it gates (button, toolbar label,
-checkbox, toggle, radio group); `icon_button_sensed`; `testing::disabled_violations`. No drawing changed. Next: step 2,
-the scaffolding, then the three tracks.
+checkbox, toggle, radio group); `icon_button_sensed`; `testing::disabled_violations`. No drawing changed.
+
+Step 2 (scaffolding) is done, so the three tracks (A: steps 3 to 5, B: 6 to 8, C: 9 to 12) touch no shared file: 11 empty
+widget modules, 11 page stubs (`flyout`, `toast-notifications`, `command-palette`, `page`, `panel`, `sidebar`,
+`side-panel`, `icon-rail`, `split-panes`, `tree-view`, `settings-page`) registered in `PAGES` (61 pages, `--list` still
+231 names until the scenes land), 12 `Theme` tokens (`menu_item_pressed`, `menu_text_disabled`, `toast_*`,
+`dirty_indicator`, `count_badge`), 5 glyphs, 9 string defaults, the M7 motion rows, DECISIONS D137 to D153 and the 14
+entries `in-progress`. Next: the tracks (steps 3 to 12), then visual batches 13 and 14 and the close.
 
 M6 (widgets) is merged to main at a75a708 (14 steps, review passed in 3 rounds): roving focus (`Sense.skip_tab`,
 `Sense::CLICK_ROVE`, `RoveAxis`, `Ui::rove_stop`, `rove_keys`, `rove_focus`), `text::elide` and `Painter::elide`,
@@ -73,7 +79,7 @@ still has no dependency). The gallery has a page registry (two legacy pages, 48 
 
 ## Next
 
-1. M7 steps 2 to 15 (`m07-overlays/plan.md`): scaffolding, then tracks A, B and C, two visual batches, close.
+1. M7 steps 3 to 15 (`m07-overlays/plan.md`): tracks A, B and C, two visual batches, close.
 2. CI (fmt, clippy `-D warnings`, tests on macOS, Windows and Linux) now that there is code to run.
 3. An export script for Luneterm's vendored snapshot, before Luneterm M9. The migration
    map for M11 is "API changes since M1" in `docs/architecture.md`.

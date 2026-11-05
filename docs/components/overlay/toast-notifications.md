@@ -2,10 +2,10 @@
 id: overlay.toast-notifications
 title: Toasts and notification history
 area: overlay
-status: planned
+status: in-progress
 consumers: lunegit
 source: Lunegit: src/Lunegit.Desktop/MainWindow.axaml
-owner: —
+owner: toolkit-v1 M7
 summary: Bottom-right toast stack (max 3, timed dismissal, loading and prompt toasts) and a 50-item notification history
 ---
 
