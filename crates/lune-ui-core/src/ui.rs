@@ -39,7 +39,7 @@ use crate::input::{
 };
 use crate::motion::{MotionTier, Time};
 use crate::paint::{Painter, Rect, Xform};
-use crate::scene::Scene;
+use crate::scene::{LayerId, Scene};
 use crate::shortcuts::{CommandId, Scope, Shortcuts};
 use crate::strings::{ArgFormat, StringTable};
 use crate::text::TextSystem;
@@ -51,7 +51,7 @@ use overlay::{Dismissal as D, SUPPRESSED};
 use pointer::{Ctx, HitRecord, PointerFrame, topmost};
 
 /// The opacity of a disabled subtree.
-const DISABLED_ALPHA: f32 = 0.4;
+pub(crate) const DISABLED_ALPHA: f32 = 0.4;
 
 /// What the app hands a frame besides input and text: the look, the motion tier and the strings.
 #[derive(Clone, Copy)]
@@ -293,9 +293,12 @@ impl<'a> Ui<'a> {
                         let target = topmost(&hits, *pos, &eligible);
                         store.focus.visible = false;
                         store.focus.keyboard = false;
+                        // A press on a toast is never outside: the toast layer belongs to no
+                        // overlay, and its buttons must work with a popup open.
                         if let Some(t) = top_press
                             && t.opts.dismiss_on_outside_press
-                            && target.is_none_or(|h| h.tag < t.tag)
+                            && target
+                                .is_none_or(|h| h.tag < t.tag && h.layer != LayerId::Toast as usize)
                         {
                             // D22: the press that dismisses reaches nothing.
                             dismissed.entry(t.id).or_insert(D::OutsidePress);
