@@ -1,7 +1,7 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-05 (M8 built on `orch/toolkit-v1`, step 7 closed; awaiting review and merge; M7 is merged to main at 662d310)
+Last updated: 2026-11-05 (M8 built on `orch/toolkit-v1`, step 7 closed, review round 1 fixed (F1 to F3, D175); awaiting re-review and merge; M7 is merged to main at 662d310)
 
 ## Now
 
@@ -35,7 +35,14 @@ per-window `Ui` frame, the closed-form motion system, `layout`, `shortcuts`, `te
 `lune-ui-wgpu` takes `unicode-segmentation` (the core still has no dependency). The gallery has a page registry (two legacy
 pages, 64 Ui pages), `--dump`, `--list` and `--bench`.
 
-Counts at the tip: gallery 66 pages, 332 scene names in `--list`; `cargo test --workspace` 1,918 passed, 0 failed.
+Counts at the tip: gallery 66 pages, 332 scene names in `--list`; `cargo test --workspace` 1,940 passed, 0 failed.
+
+Review round 1 (D175): Escape cancels a live pointer drag before the overlay around it dismisses, for `drag_gesture`, `free_drag_gesture`
+and the splitter (a test in a dialog and a mutant each); a board column whose cards fit registers no scroll sense, so the wheel
+reaches the board; 19 contract lines the review's mutants left standing now have tests that kill them. Gate after the fixes:
+fmt, clippy, `cargo test --workspace` 1,940 passed and 0 failed, boundaries, component index; GPU tests 62 passed; `--list` 332;
+pixel gate against 662d310 305 identical and 27 new. The bench below is from before the fixes (nothing they touch is on a
+frame path the bench measures beyond one store flag).
 
 Final gate at 7147e31: fmt, clippy `-D warnings`, `cargo test --workspace` 1,918 passed and 0 failed, boundaries clean, component
 index up to date; `LUNEUI_REQUIRE_GPU=1 cargo test -p lune-ui-wgpu` 62 passed (the lane dot probe included); `--list` 332;
@@ -77,7 +84,8 @@ pixel gate against 662d310 (the M7 merge) 305 identical, 27 new, nothing allowed
   `CHEVRON_GAP` and `GLYPH_GAP` have no source (the director accepted them). Split panes: the panes draw with the size the
   frame began with, so a size a frame's input changed shows in the panes on the catch-up frame.
 - M8 limits (entries and D173, D174): the table has no horizontal scroll (`Fill` columns shrink, then the last columns clip),
-  a `Measured` row height after a sort takes effect on the next frame, a control in a row scrolled out of view loses the
+  a sideways swipe over a board column that overflows moves nothing (the topmost scroll area takes the delta; a vertical wheel over
+  the cards of a column that fits scrolls the board, D175), a `Measured` row height after a sort takes effect on the next frame, a control in a row scrolled out of view loses the
   focus (rows out of view are not built; by construction, not probed), a wrapping cell ignores `num`, and the sorted header's
   focus ring snaps. Bars are keyed by column index, so a rolling window morphs in place with no slide. The board moves one
   card a frame by Shift and arrow, takes no landing in a disabled scope, and an app that applies a move later than the next
