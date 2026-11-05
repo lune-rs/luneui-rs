@@ -167,7 +167,9 @@ pub struct MdOptions<'a> {
     pub label: &'a str,
     /// A click on a task box reports its id. Off, the boxes only show the model.
     pub tasks_live: bool,
-    /// The app's "same document" key: a new one starts at the top and forgets the measured heights.
+    /// The app's "same document" key. A new one is another document: it starts at the top, the
+    /// measured heights go, and so does everything its blocks kept: a selection, the focus, a table's
+    /// or code block's sideways offset. Going back to a key is a new document too.
     pub identity: Option<u64>,
 }
 
@@ -1010,6 +1012,9 @@ fn focus_block(
 struct MdMem {
     heights: RowHeights,
     identity: Option<u64>,
+    /// How many documents this host has opened. Every block's id holds it, so a block's state goes
+    /// with its document, and a live keep-alive scope that keeps the old ids hands none of it back.
+    epoch: u64,
     /// The block that holds the focus: it stays built when it leaves the window, or its child
     /// would lose the focus, and the Page keys with it.
     held: Option<usize>,
@@ -1058,11 +1063,14 @@ impl Ui<'_> {
         let mut mem = std::mem::take(self.persistent::<MdMem>(id));
         // A new width keeps the heights, so the reader's place stays: what is built re-measures.
         if mem.identity != opts.identity {
+            self.scroll_forget_shift(AREA);
             mem = MdMem {
                 identity: opts.identity,
+                epoch: mem.epoch + 1,
                 ..MdMem::default()
             };
         }
+        let doc_id = id.with(mem.epoch);
         mem.heights
             .sync(blocks.len(), Heights::Measured { estimate: ESTIMATE });
         let content_w = (vp.w - 2.0 * MARGIN).max(1.0);
@@ -1115,7 +1123,7 @@ impl Ui<'_> {
                     let spot = at(heights, k);
                     let b = &blocks[k];
                     let (h, holds) = ui.off_tab_order(true, |ui| {
-                        focus_block(ui, &mut cx, id.with(k), b, spot, content_w)
+                        focus_block(ui, &mut cx, doc_id.with(k), b, spot, content_w)
                     });
                     tops.note(heights, k, first, h);
                     held = holds.then_some(k);
@@ -1124,7 +1132,7 @@ impl Ui<'_> {
                     let y = vp.y + (top - offset) as f32;
                     let spot = (vp.x + MARGIN, y);
                     let (h, holds) =
-                        focus_block(ui, &mut cx, id.with(i), &blocks[i], spot, content_w);
+                        focus_block(ui, &mut cx, doc_id.with(i), &blocks[i], spot, content_w);
                     tops.note(heights, i, first, h);
                     if holds {
                         held = Some(i);
@@ -1136,7 +1144,7 @@ impl Ui<'_> {
                     let spot = at(heights, k);
                     let b = &blocks[k];
                     let (h, holds) = ui.off_tab_order(true, |ui| {
-                        focus_block(ui, &mut cx, id.with(k), b, spot, content_w)
+                        focus_block(ui, &mut cx, doc_id.with(k), b, spot, content_w)
                     });
                     tops.note(heights, k, first, h);
                     held = held.or(holds.then_some(k));
@@ -1148,7 +1156,14 @@ impl Ui<'_> {
                 let drawing = std::mem::replace(&mut cx.draw, false);
                 for n in heights.window(near, f64::from(vp.h)) {
                     if n < first || n >= i {
-                        let h = block(ui, &mut cx, id.with(n), &blocks[n], (0.0, 0.0), content_w);
+                        let h = block(
+                            ui,
+                            &mut cx,
+                            doc_id.with(n),
+                            &blocks[n],
+                            (0.0, 0.0),
+                            content_w,
+                        );
                         tops.note(heights, n, first, h);
                     }
                 }

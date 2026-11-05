@@ -826,6 +826,7 @@ impl Ui<'_> {
         // paste included. The offset it left is what a linked pane has to hear about.
         let mut left_at = None;
         if mem.identity != opts.identity {
+            self.scroll_forget_shift(AREA);
             mem = CodeMem {
                 identity: opts.identity,
                 ..CodeMem::default()

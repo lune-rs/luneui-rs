@@ -465,6 +465,15 @@ impl Ui<'_> {
         self.transient::<Requests>(id).shift_y
     }
 
+    /// Drops the shifts queued for the area under `key`. A host calls it on a new identity, before
+    /// it queues anything of its own: what the last frame left there measured the last document.
+    pub(crate) fn scroll_forget_shift(&mut self, key: impl Hash) {
+        let id = self.id(key);
+        let requests = self.transient::<Requests>(id);
+        requests.shift_x = 0.0;
+        requests.shift_y = 0.0;
+    }
+
     /// [`Self::scroll_shift`] on the horizontal axis: an edit moves its caret into view at once,
     /// since typing and caret motion never animate.
     pub(crate) fn scroll_shift_x(&mut self, key: impl Hash, by: f64) {

@@ -1762,3 +1762,121 @@ fn a_new_identity_leaves_no_group_value_behind() {
         .collect();
     assert_eq!(shown, [DIFF.y, DIFF.y], "row 15 tops both panes");
 }
+
+// A new identity: another document.
+
+fn hunk_at_two() -> Vec<DiffLine<'static>> {
+    let mut lines = big(60);
+    lines[2] = hunk(0, "@@ -1 +1 @@");
+    lines
+}
+
+/// One frame in a live keep-alive scope, which keeps ids nothing draws; what it focused.
+fn alive(h: &mut UiHarness, lines: &[DiffLine<'_>], s: &Setup) -> Option<WidgetId> {
+    let rows = pair_rows(lines);
+    let opts = DiffOptions {
+        mode: if s.split {
+            DiffMode::Split(&rows)
+        } else {
+            DiffMode::Unified
+        },
+        wrap: s.wrap,
+        label: "Changes",
+        actions: &ACTIONS[..s.actions],
+        identity: s.identity,
+        widest_chars: widest_chars(lines),
+    };
+    let (_, out) = h.frame(|ui| {
+        ui.keep_alive("tab", |ui| {
+            ui.diff_view("d", DIFF, lines, &opts);
+        });
+    });
+    out.focused
+}
+
+#[test]
+fn a_focused_hunk_button_goes_with_its_document_though_the_next_has_one_in_its_place() {
+    let lines = hunk_at_two();
+    for mode in [setup(), split()] {
+        let s = Setup { actions: 1, ..mode };
+        let mut h = harness();
+        run(&mut h, &lines, &s);
+        run(&mut h, &lines, &s);
+        let mut ms = 0;
+        tab(&mut h, &lines, &s, &mut ms);
+        let (button, _) = tab(&mut h, &lines, &s, &mut ms);
+        assert!(button != pane("u") && button != pane("l"), "on the button");
+
+        let next = Setup { identity: 2, ..s };
+        run(&mut h, &lines, &next);
+        assert_eq!(run(&mut h, &lines, &next).out.focused, None);
+    }
+}
+
+#[test]
+fn a_focused_pane_keeps_the_focus_on_a_new_identity() {
+    let lines = hunk_at_two();
+    let s = setup();
+    let mut h = harness();
+    run(&mut h, &lines, &s);
+    run(&mut h, &lines, &s);
+    let mut ms = 0;
+    assert_eq!(tab(&mut h, &lines, &s, &mut ms).0, pane("u"));
+    let next = Setup { identity: 2, ..s };
+    run(&mut h, &lines, &next);
+    assert_eq!(run(&mut h, &lines, &next).out.focused, Some(pane("u")));
+}
+
+#[test]
+fn a_hunk_button_reopened_under_a_keep_alive_scope_has_no_focus() {
+    let lines = hunk_at_two();
+    let s = Setup {
+        actions: 1,
+        ..setup()
+    };
+    let mut h = harness();
+    alive(&mut h, &lines, &s);
+    alive(&mut h, &lines, &s);
+    h.input.key_down(Key::Named(NamedKey::Tab), None);
+    alive(&mut h, &lines, &s);
+    let list = alive(&mut h, &lines, &s);
+    h.input.key_down(Key::Named(NamedKey::Tab), None);
+    alive(&mut h, &lines, &s);
+    let button = alive(&mut h, &lines, &s);
+    assert!(button.is_some() && button != list, "on the button");
+
+    let next = Setup { identity: 2, ..s };
+    alive(&mut h, &lines, &next);
+    assert_eq!(alive(&mut h, &lines, &next), None);
+    alive(&mut h, &lines, &s);
+    assert_eq!(alive(&mut h, &lines, &s), None);
+}
+
+#[test]
+fn a_new_identity_takes_no_shift_the_last_document_measured() {
+    let long: &'static str = "word ".repeat(120).leak();
+    let lines: Vec<DiffLine<'static>> = (0..300)
+        .map(|i| line(LineKind::Context, Some(i + 1), Some(i + 1), long))
+        .collect();
+    let s = Setup {
+        wrap: true,
+        ..setup()
+    };
+    let mut h = harness();
+    run(&mut h, &lines, &s);
+    run(&mut h, &lines, &s);
+    h.input
+        .pointer_to(DIFF.x + 100.0, DIFF.y + 50.0)
+        .scroll_pixels(0.0, -4_000.0);
+    run(&mut h, &lines, &s);
+    run(&mut h, &lines, &s);
+    // Up onto rows never measured: this frame queues their growth for the area.
+    h.input.scroll_pixels(0.0, 300.0);
+    run(&mut h, &lines, &s);
+    let r = run(&mut h, &lines, &Setup { identity: 2, ..s });
+    let top = tree_nodes(&r.out.tree, Role::Row)
+        .into_iter()
+        .map(|n| n.bounds.y)
+        .fold(f32::MAX, f32::min);
+    assert_eq!(top, DIFF.y);
+}

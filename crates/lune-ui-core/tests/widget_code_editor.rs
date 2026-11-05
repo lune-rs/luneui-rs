@@ -1836,6 +1836,32 @@ fn a_new_identity_ends_a_composition_and_drops_a_pending_paste() {
 }
 
 #[test]
+fn a_new_identity_takes_no_shift_the_last_document_measured() {
+    let mut doc = long_lines(400, 200);
+    let one = CodeOptions {
+        identity: Some(1),
+        ..wrapped()
+    };
+    let mut h = UiHarness::new(WIN);
+    run(&mut h, &mut doc, &one);
+    run(&mut h, &mut doc, &one);
+    h.input
+        .pointer_to(100.0, 100.0)
+        .scroll_pixels(0.0, -4_000.0);
+    run(&mut h, &mut doc, &one);
+    run(&mut h, &mut doc, &one);
+    // Up onto lines never measured: this frame queues their growth for the area.
+    h.input.scroll_pixels(0.0, 300.0);
+    run(&mut h, &mut doc, &one);
+    let two = CodeOptions {
+        identity: Some(2),
+        ..wrapped()
+    };
+    assert_eq!(offset(&run(&mut h, &mut doc, &two)), 0.0);
+    assert_eq!(offset(&run(&mut h, &mut doc, &two)), 0.0);
+}
+
+#[test]
 fn the_same_identity_keeps_the_caret() {
     let mut doc = numbered(20);
     let mut h = focused(&mut doc, &other(1));

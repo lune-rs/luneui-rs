@@ -19,7 +19,7 @@
 //! that row stays where it is on screen.
 
 use std::collections::BTreeSet;
-use std::hash::Hash;
+use std::hash::{Hash, Hasher};
 
 use crate::access::{Action, Node, Role, State};
 use crate::color::{Rgba, with_alpha};
@@ -511,6 +511,26 @@ struct ListMem {
     drag_end: Option<usize>,
     /// The identity the rows belong to.
     identity: Option<u64>,
+    /// How many identities followed the first this list drew: a row's id holds it, so what a row
+    /// and its children kept (a focused button) goes with the document.
+    epoch: u64,
+}
+
+/// What a row's id and its children's scope are keyed by: the key alone until a new identity, so a
+/// list's ids do not depend on it having one.
+#[derive(Clone, Copy)]
+struct RowScope {
+    epoch: u64,
+    key: RowKey,
+}
+
+impl Hash for RowScope {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        if self.epoch != 0 {
+            self.epoch.hash(state);
+        }
+        self.key.hash(state);
+    }
 }
 
 impl ListMem {
@@ -611,8 +631,10 @@ impl Ui<'_> {
         if style.identity != mem.identity {
             // Another document: nothing of the last one carries over.
             left_at = Some(mem.offset);
+            self.scroll_forget_shift(AREA);
             mem = ListMem {
                 identity: style.identity,
+                epoch: mem.epoch + u64::from(mem.rect.is_some()),
                 ..ListMem::default()
             };
             mem.heights.sync(opts.count, opts.heights);
@@ -786,7 +808,10 @@ impl Ui<'_> {
         let mut pressing = false;
         for index in window {
             let key = (rows.key)(index);
-            let row_id = self.id(key);
+            let row_id = self.id(RowScope {
+                epoch: mem.epoch,
+                key,
+            });
             let y = (mem.heights.top(index) - offset) as f32 + rect.y;
             let slot = Rect::new(rect.x, y, rect.w, mem.heights.height(index) as f32);
             let r = self.interact(row_id, slot, Sense::DRAG);
@@ -908,10 +933,14 @@ impl Ui<'_> {
             } else {
                 node.states.insert(State::Disabled);
             }
+            let scope = RowScope {
+                epoch: mem.epoch,
+                key: ctx.key,
+            };
             // A margin row is built and clipped: nothing on it is a Tab stop.
             let hidden = ctx.rect.bottom() <= rect.y || ctx.rect.y >= rect.bottom();
             let height = self.off_tab_order(hidden, |ui| {
-                ui.node_container(node, |ui| ui.scope(ctx.key, |ui| draw(ui, &ctx)))
+                ui.node_container(node, |ui| ui.scope(scope, |ui| draw(ui, &ctx)))
             });
             if ctx.focus_visible {
                 focus_ring::paint(self.painter(), highlight, RingKind::Button, 1.0);
@@ -1130,6 +1159,57 @@ mod tests {
             "a new key starts at the top"
         );
         assert_eq!(selected(&mut h), 0, "and unselected");
+    }
+
+    #[test]
+    fn tab_onto_a_child_past_the_right_edge_moves_the_list_sideways() {
+        let style = ListStyle {
+            content_w: Some(800.0),
+            ..ListStyle::LIST
+        };
+        let mut child = None;
+        let mut frame = |h: &mut UiHarness| {
+            let mut x = 0.0;
+            let (_, out) = h.frame(|ui| {
+                ui.list_styled(
+                    "l",
+                    RECT,
+                    &opts(COUNT),
+                    style,
+                    |i| RowKey(i as u64),
+                    |ui, row| {
+                        x = row.scroll_x;
+                        if row.index == 1 {
+                            let id = ui.id("child");
+                            child = Some(id);
+                            let left = row.rect.x + 600.0 - row.scroll_x;
+                            let at = Rect::new(left, row.rect.y, 40.0, ROW);
+                            ui.interact(id, at, Sense::CLICK_FOCUS);
+                            ui.node(Node::new(id, Role::Button, "child", at));
+                        }
+                        ROW
+                    },
+                );
+            });
+            (x, out)
+        };
+        let mut h = UiHarness::new(WIN);
+        frame(&mut h);
+        frame(&mut h);
+        for _ in 0..2 {
+            h.input.key_down(Key::Named(NamedKey::Tab), None);
+            frame(&mut h);
+        }
+        let (mut x, mut out) = frame(&mut h);
+        for ms in 1..30 {
+            if out.repaint == Repaint::Idle {
+                break;
+            }
+            h.at_ms(ms * 100);
+            (x, out) = frame(&mut h);
+        }
+        assert_eq!(out.focused, child, "the child took the focus");
+        assert_eq!(x, 640.0 - RECT.w, "its right edge at the view's");
     }
 
     fn linked() -> ListStyle {

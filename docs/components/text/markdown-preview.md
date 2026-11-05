@@ -92,7 +92,7 @@ n/a — the preview is document content: no change in it animates (a document re
 ### Retained state
 
 - Transient: link hover, selection while dragging, image load state [core.ui].
-- Persistent: the scroll offset of the document and of each table, kept under `ui.keep_alive` for a hidden tab (Lunegit keeps blocks attached across loads [L src/Lunegit.Desktop/Views/MarkdownPreviewView.axaml.cs:463-473]) [core.ui], [layout.scroll-area].
+- Persistent: the scroll offset of the document and of each table, kept under `ui.keep_alive` for a hidden tab (Lunegit keeps blocks attached across loads [L src/Lunegit.Desktop/Views/MarkdownPreviewView.axaml.cs:463-473]) [core.ui], [layout.scroll-area]. A new `identity` is another document: the offset, the measured heights and everything its blocks kept (a selection, the focus, a table's or code block's sideways offset) go, and going back to a key finds none of it (D202).
 - App-owned: the block model, images (decoded RGBA by target), whether task boxes are live, the link handler.
 - Exit retention: no.
 

@@ -1668,3 +1668,266 @@ fn a_block_measured_above_the_window_shifts_the_area_so_what_shows_stays() {
     }
     assert!(grown, "new blocks came into view");
 }
+
+// ---- a new identity: another document ------------------------------------------------
+
+fn doc(identity: u64) -> MdOptions<'static> {
+    MdOptions {
+        identity: Some(identity),
+        ..live()
+    }
+}
+
+/// One frame with the document in a live keep-alive scope, which keeps ids nothing draws.
+fn alive(h: &mut UiHarness, blocks: &[MdBlock<'_>], opts: &MdOptions<'_>) -> Run {
+    let mut r = None;
+    let (scene, out) = h.frame(|ui| {
+        ui.keep_alive("tab", |ui| r = Some(ui.markdown("m", RECT, blocks, opts)));
+    });
+    Run {
+        scene,
+        r: r.expect("ran"),
+        out,
+    }
+}
+
+fn selection(out: &FrameOutput) -> (usize, usize) {
+    let first = nodes(out, Role::StaticText);
+    first[0].text.as_ref().expect("text").selection
+}
+
+/// The x of the leftmost text drawn.
+fn leftmost(scene: &Scene) -> f32 {
+    let texts = &scene.layers[0].texts;
+    texts.iter().map(|t| t.x).fold(f32::MAX, f32::min)
+}
+
+#[test]
+fn a_new_identity_leaves_no_selection_no_focus_and_nothing_to_copy() {
+    let (a, b) = ([t("alpha alpha")], [t("bravo bravo bravo bravo")]);
+    let (one, two) = ([MdBlock::Paragraph(&a)], [MdBlock::Paragraph(&b)]);
+    let mut h = UiHarness::new(WIN);
+    run(&mut h, &one, &doc(1));
+    run(&mut h, &one, &doc(1));
+    h.input.pointer_to(X + 5.0, RECT.y + MARGIN + 8.0).click(P);
+    run(&mut h, &one, &doc(1));
+    chord(&mut h, "a");
+    run(&mut h, &one, &doc(1));
+    let r = run(&mut h, &one, &doc(1));
+    assert_eq!(
+        selection(&r.out),
+        (0, 11),
+        "the instrument sees a selection"
+    );
+    assert!(r.out.focused.is_some());
+
+    run(&mut h, &two, &doc(2));
+    chord(&mut h, "c");
+    let r = run(&mut h, &two, &doc(2));
+    let (start, end) = selection(&r.out);
+    assert_eq!(start, end, "doc B shows no selection");
+    assert_eq!(r.out.focused, None, "the block's focus went with doc A");
+    assert!(r.out.clipboard.is_empty(), "{:?}", r.out.clipboard);
+}
+
+#[test]
+fn no_identity_keeps_a_blocks_selection_across_frames() {
+    let a = [t("alpha alpha")];
+    let one = [MdBlock::Paragraph(&a)];
+    let mut h = drawn(&one, &live());
+    h.input.pointer_to(X + 5.0, RECT.y + MARGIN + 8.0).click(P);
+    run(&mut h, &one, &live());
+    chord(&mut h, "a");
+    run(&mut h, &one, &live());
+    run(&mut h, &one, &live());
+    let r = run(&mut h, &one, &live());
+    assert_eq!(selection(&r.out), (0, 11));
+    assert!(r.out.focused.is_some());
+}
+
+/// A sideways wheel at `on` moves the block; a new identity puts it back.
+fn a_new_identity_resets_the_block_sideways(blocks: &[MdBlock<'_>], on: (f32, f32)) {
+    let mut h = UiHarness::new(WIN);
+    run(&mut h, blocks, &doc(1));
+    let home = leftmost(&run(&mut h, blocks, &doc(1)).scene);
+    h.input.pointer_to(on.0, on.1).scroll_pixels(-40.0, 0.0);
+    run(&mut h, blocks, &doc(1));
+    let moved = leftmost(&run(&mut h, blocks, &doc(1)).scene);
+    assert_eq!(moved, home - 40.0, "the instrument sees the offset");
+    assert_eq!(leftmost(&run(&mut h, blocks, &doc(2)).scene), home);
+}
+
+#[test]
+fn a_new_identity_resets_a_tables_sideways_offset() {
+    let wide = "w".repeat(120);
+    let (a, b) = ([t("h")], [t(&wide)]);
+    let cells = [[&a[..], &a[..], &a[..]], [&b[..], &a[..], &a[..]]];
+    let rows = table_doc(&cells);
+    let blocks = [MdBlock::Table {
+        rows: &rows,
+        align: &[],
+    }];
+    a_new_identity_resets_the_block_sideways(&blocks, (100.0, RECT.y + MARGIN + 40.0));
+}
+
+#[test]
+fn a_new_identity_resets_a_code_blocks_sideways_offset() {
+    let wide = "z".repeat(300);
+    let blocks = [MdBlock::Code {
+        text: &wide,
+        spans: &[],
+    }];
+    a_new_identity_resets_the_block_sideways(&blocks, (60.0, RECT.y + MARGIN + 20.0));
+}
+
+#[test]
+fn a_document_reopened_under_a_keep_alive_scope_finds_nothing_of_its_last_showing() {
+    let wide = "w".repeat(120);
+    let (a, b, text) = ([t("h")], [t(&wide)], [t("alpha alpha")]);
+    let cells = [[&a[..], &a[..], &a[..]], [&b[..], &a[..], &a[..]]];
+    let rows = table_doc(&cells);
+    let blocks = [
+        MdBlock::Paragraph(&text),
+        MdBlock::Table {
+            rows: &rows,
+            align: &[],
+        },
+    ];
+    let mut h = UiHarness::new(WIN);
+    alive(&mut h, &blocks, &doc(1));
+    let home = alive(&mut h, &blocks, &doc(1));
+    let table = RECT.y + MARGIN + 28.0 + 40.0;
+    h.input.pointer_to(100.0, table).scroll_pixels(-40.0, 0.0);
+    alive(&mut h, &blocks, &doc(1));
+    h.input.pointer_to(X + 5.0, RECT.y + MARGIN + 8.0).click(P);
+    alive(&mut h, &blocks, &doc(1));
+    chord(&mut h, "a");
+    alive(&mut h, &blocks, &doc(1));
+    let r = alive(&mut h, &blocks, &doc(1));
+    assert_eq!(
+        selection(&r.out),
+        (0, 11),
+        "the instrument sees a selection"
+    );
+    assert!(r.out.focused.is_some());
+    let key = key_of(&Spec::plain(&*wide, ui_style(13.0, DARK.fg_primary)));
+    let at = text_at(&home.scene, key).expect("the wide cell").0;
+    assert_eq!(text_at(&r.scene, key).expect("drawn").0, at - 40.0);
+
+    alive(&mut h, &blocks, &doc(2));
+    assert_eq!(alive(&mut h, &blocks, &doc(2)).out.focused, None);
+    alive(&mut h, &blocks, &doc(1));
+    let r = alive(&mut h, &blocks, &doc(1));
+    let (start, end) = selection(&r.out);
+    assert_eq!(start, end, "the last showing's selection stayed behind");
+    assert_eq!(r.out.focused, None);
+    assert_eq!(text_at(&r.scene, key).expect("drawn").0, at);
+}
+
+#[test]
+fn a_focused_link_in_a_table_goes_with_its_document_under_a_keep_alive_scope() {
+    let (a, b) = ([link("go", "https://x.dev")], [t("h")]);
+    let cells = [[&b[..], &b[..], &b[..]], [&a[..], &b[..], &b[..]]];
+    let rows = table_doc(&cells);
+    let blocks = [MdBlock::Table {
+        rows: &rows,
+        align: &[],
+    }];
+    let mut h = UiHarness::new(WIN);
+    alive(&mut h, &blocks, &doc(1));
+    alive(&mut h, &blocks, &doc(1));
+    press(&mut h, NamedKey::Tab);
+    alive(&mut h, &blocks, &doc(1));
+    let r = alive(&mut h, &blocks, &doc(1));
+    assert!(r.out.focused.is_some(), "the link took the focus");
+    alive(&mut h, &blocks, &doc(2));
+    assert_eq!(alive(&mut h, &blocks, &doc(2)).out.focused, None);
+}
+
+#[test]
+fn a_new_identity_takes_no_shift_the_last_document_measured() {
+    let texts = long_paras(300);
+    let items: Vec<[MdInline<'_>; 1]> = texts.iter().map(|s| [t(s)]).collect();
+    let blocks: Vec<MdBlock<'_>> = items.iter().map(|i| MdBlock::Paragraph(i)).collect();
+    let mut h = drawn(&blocks, &doc(1));
+    h.input
+        .pointer_to(100.0, 100.0)
+        .scroll_pixels(0.0, -6_000.0);
+    run(&mut h, &blocks, &doc(1));
+    run(&mut h, &blocks, &doc(1));
+    // Up onto blocks never measured: this frame queues their growth for the area.
+    h.input.scroll_pixels(0.0, 400.0);
+    run(&mut h, &blocks, &doc(1));
+    let r = run(&mut h, &blocks, &doc(2));
+    let top = nodes(&r.out, Role::StaticText)[0].bounds.y;
+    assert_eq!(top, RECT.y + MARGIN);
+}
+
+// ---- the focus outside the window, and a press that shows in part ---------------------
+
+#[test]
+fn a_focused_link_left_below_the_window_keeps_the_focus_and_its_sibling_is_no_stop() {
+    let urls: Vec<String> = (0..80).map(|i| format!("https://x.dev/{i}")).collect();
+    // Two links a paragraph: the second must not be a stop while its block is out of the window.
+    let items: Vec<[MdInline<'_>; 3]> = urls
+        .iter()
+        .map(|u| [link("go", u), t(" and "), link("on", u)])
+        .collect();
+    let blocks: Vec<MdBlock<'_>> = items.iter().map(|i| MdBlock::Paragraph(i)).collect();
+    let mut h = drawn(&blocks, &live());
+    let mut ms = 0;
+    h.input.pointer_to(100.0, 100.0).scroll_pixels(0.0, -600.0);
+    run(&mut h, &blocks, &live());
+    run(&mut h, &blocks, &live());
+    let (id, _) = tab_to(&mut h, &blocks, &mut ms);
+    let r = run(&mut h, &blocks, &live());
+    let url = r.out.tree.get(id).expect("drew").description.clone();
+
+    press(&mut h, NamedKey::Home);
+    run(&mut h, &blocks, &live());
+    ms += 2_000;
+    let r = at(&mut h, ms, &blocks, &live());
+    assert_eq!(r.out.focused, Some(id), "the focus stayed through Home");
+    let b = r
+        .out
+        .tree
+        .get(id)
+        .expect("the focused link stays built")
+        .bounds;
+    assert!(b.y > RECT.bottom(), "{b:?}");
+
+    // The next stop is in the view, not the other link of the block left behind.
+    let (next, n) = tab_to(&mut h, &blocks, &mut ms);
+    assert!(n.y >= RECT.y && n.bottom() <= RECT.bottom(), "{n:?}");
+    let r = run(&mut h, &blocks, &live());
+    let node = r.out.tree.get(next).expect("drew");
+    assert_ne!(node.description, url);
+}
+
+#[test]
+fn a_press_on_a_link_that_shows_in_part_leaves_the_document_still() {
+    // Eleven paragraphs of 25 from a margin of 12: the link starts 13 px above the view's end.
+    let (text, go) = ([t("para")], [link("go", "https://x.dev")]);
+    let mut blocks: Vec<MdBlock<'_>> = vec![MdBlock::Paragraph(&text); 11];
+    blocks.push(MdBlock::Paragraph(&go));
+    blocks.extend(vec![MdBlock::Paragraph(&text); 20]);
+    let mut h = drawn(&blocks, &live());
+    let home = text_at(&run(&mut h, &blocks, &live()).scene, body("para"));
+    assert!(home.is_some(), "the instrument sees the first paragraph");
+
+    let r = run(&mut h, &blocks, &live());
+    let b = nodes(&r.out, Role::Link)[0].bounds;
+    assert!(b.y < RECT.bottom() && b.bottom() > RECT.bottom(), "{b:?}");
+    h.input.pointer_to(b.x + 5.0, RECT.bottom() - 3.0).press(P);
+    let r = run(&mut h, &blocks, &live());
+    assert_eq!(r.r.link.as_deref(), Some("https://x.dev"));
+    h.input.release(P);
+    run(&mut h, &blocks, &live());
+    let mut ms = 0;
+    for _ in 0..6 {
+        ms += 400;
+        let r = at(&mut h, ms, &blocks, &live());
+        assert!(r.out.focused.is_some(), "the press focused the link");
+        assert_eq!(text_at(&r.scene, body("para")), home);
+    }
+}

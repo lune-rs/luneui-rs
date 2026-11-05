@@ -1,12 +1,12 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-06 (M9 built and closed on the program branch, steps 1 to 9 done, review round 1 fixed; M8 merged to main at 2474248)
+Last updated: 2026-11-06 (M9 built and closed on the program branch, steps 1 to 9 done, review rounds 1 and 2 fixed; M8 merged to main at 2474248)
 
 ## Now
 
 M9 (text views: code block, code editor view, markdown preview, diff view) is built, visually accepted and closed on the program
-branch (steps 1 to 9; DECISIONS D177 to D201), review round 1 fixed (D200, D201), waiting on re-review and the merge to main. `docs/architecture.md` has the module map,
+branch (steps 1 to 9; DECISIONS D177 to D202), review rounds 1 and 2 fixed (D200 to D202), waiting on re-review and the merge to main. `docs/architecture.md` has the module map,
 the pages, "Disabled keys" and "API changes since M1" (the M9 block).
 
 What M9 added:
