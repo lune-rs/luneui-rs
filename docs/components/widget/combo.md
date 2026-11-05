@@ -109,7 +109,7 @@ None: the value and option text are app data.
 
 ### Build
 
-- Milestone: M4 (retrofit: transitions, focus, semantic node); done by M11.
+- Milestone: M4 (retrofit: transitions, focus, semantic node); done by M11. The list it opens is `Ui::dropdown` [overlay.dropdown]; opened above a dialog it draws and takes input on the `Raised` layer, chosen once at open [D137]. A third level that overlaps its parent shares that layer and interleaves (fills under text). The list can be glass and scroll [D143].
 - Depends on: core.ui, core.focus, infra.accessibility, motion.transitions, overlay.dropdown.
 
 ## Open questions

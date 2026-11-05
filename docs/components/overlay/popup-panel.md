@@ -91,7 +91,7 @@ None: the surface draws no text.
 
 ## Open questions
 
-- Blur under the surface for the flyout (Wane `--menu-glass` blur 30, saturate 1.8, W docs/ui/components.md:571-584): the moved surface has none; open for M7 (tray flyout).
+- Resolved [D143, D145]: blur under the surface for the flyout (Wane `--menu-glass` blur 30, saturate 1.8, W docs/ui/components.md:571-584). `popup_panel` stays opaque and caller-coloured; the glass surface is `popover::glass_panel` (`Surface::Glass`, the glass dropdown, the flyout), and saturate 1.8 is the frame's `FrameParams.saturation`.
 - Reuse by the tooltip: decided with overlay.tooltip (step 5); open here until that entry lands.
 - Whether the flyout's own window uses this surface as-is (Wane section 5 needs a separate borderless window): open, platform work.
 

@@ -3,7 +3,8 @@
 
 use std::hash::Hash;
 
-use super::popover::{PlaceAlign, PlaceRequest, Side, place};
+use super::popover::{PlaceAlign, PlaceRequest, Side, glass_panel, place};
+use super::scroll_area::{Bars, Extent, Reveal, ScrollOptions, Target, centre_target};
 use super::{label, popup_panel};
 use crate::access::{Action, Node, Role, State};
 use crate::icon;
@@ -40,9 +41,18 @@ pub fn row_rect(panel: Rect, i: usize) -> Rect {
     )
 }
 
-/// Draws the panel and its rows, without hit regions. `hot[i]` is the hover (or keyboard
-/// highlight) fill of option `i`; it applies to an enabled row that is not the selected one.
-pub fn paint<H: Copy + PartialEq, S: AsRef<str>>(
+/// Draws the panel: the default surface, or the glass menu's (`glass`).
+fn paint_panel<H: Copy + PartialEq>(p: &mut Painter<'_, H>, panel: Rect, glass: bool) {
+    if glass {
+        glass_panel(p, panel);
+    } else {
+        let t = p.theme;
+        popup_panel(p, panel, t.dropdown_bg, t.border);
+    }
+}
+
+/// Draws the rows of a list whose panel is `panel`.
+fn paint_rows<H: Copy + PartialEq, S: AsRef<str>>(
     p: &mut Painter<'_, H>,
     panel: Rect,
     options: &[(S, bool)],
@@ -50,7 +60,6 @@ pub fn paint<H: Copy + PartialEq, S: AsRef<str>>(
     hot: &[bool],
 ) {
     let t = p.theme;
-    popup_panel(p, panel, t.dropdown_bg, t.border);
     for (i, (text, enabled)) in options.iter().enumerate() {
         let r = row_rect(panel, i);
         if i == selected {
@@ -69,6 +78,19 @@ pub fn paint<H: Copy + PartialEq, S: AsRef<str>>(
             p.text_centered(&icon::glyph(icon::CHECK, 12.0, t.fg_secondary), check);
         }
     }
+}
+
+/// Draws the panel and its rows, without hit regions. `hot[i]` is the hover (or keyboard
+/// highlight) fill of option `i`; it applies to an enabled row that is not the selected one.
+pub fn paint<H: Copy + PartialEq, S: AsRef<str>>(
+    p: &mut Painter<'_, H>,
+    panel: Rect,
+    options: &[(S, bool)],
+    selected: usize,
+    hot: &[bool],
+) {
+    paint_panel(p, panel, false);
+    paint_rows(p, panel, options, selected, hot);
 }
 
 /// A list of options under (or, near the window's bottom edge, over) `anchor`. `options` pairs
@@ -142,6 +164,16 @@ fn step(options: &[bool], from: usize, down: bool) -> usize {
     }
 }
 
+/// How [`Ui::dropdown_with`] differs from [`Ui::dropdown`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct DropdownOptions {
+    /// The panel is the glass menu's surface (radius 9, `menu_glass`, the blurred scene under it)
+    /// instead of the opaque `dropdown_bg`.
+    pub glass: bool,
+    /// At most this many rows show (at least one); a longer list scrolls. `None` shows them all.
+    pub max_rows: Option<usize>,
+}
+
 impl<'a> Ui<'a> {
     /// The options list of the combo `anchor_id` (at `anchor`, in window coordinates, as
     /// [`Response::rect`](crate::ui::Response::rect) is), on the popup layer: non-modal,
@@ -157,15 +189,43 @@ impl<'a> Ui<'a> {
         options: &[(S, bool)],
         selected: usize,
     ) -> DropdownResponse {
+        self.dropdown_with(
+            key,
+            anchor,
+            anchor_id,
+            options,
+            selected,
+            &DropdownOptions::default(),
+        )
+    }
+
+    /// [`Self::dropdown`] with the glass surface and the row cap `opts` ask for. A list longer
+    /// than `max_rows` scrolls (the wheel, the thumb and the keys): it opens with the selected row
+    /// in view, and a key that moves the highlight brings that row into view.
+    pub fn dropdown_with<S: AsRef<str>>(
+        &mut self,
+        key: impl Hash,
+        anchor: Rect,
+        anchor_id: WidgetId,
+        options: &[(S, bool)],
+        selected: usize,
+        opts: &DropdownOptions,
+    ) -> DropdownResponse {
         let id = self.id(key);
         let list_id = id.with("list");
-        let panel = panel_rect(self.painter(), anchor, options.len());
+        let n = options.len();
+        let shown = opts.max_rows.map_or(n, |m| n.min(m.max(1)));
+        let scrolls = shown < n;
+        let panel = panel_rect(self.painter(), anchor, shown);
+        let viewport = Rect::new(panel.x, panel.y + 4.0, panel.w, shown as f32 * ITEM_H);
+        let scroll_key = id.with("scroll");
+        let glass = opts.glass;
         let name = self
             .previous_tree()
             .get(anchor_id)
             .map(|n| n.name.clone())
             .unwrap_or_default();
-        let opts = OverlayOptions {
+        let overlay = OverlayOptions {
             layer: LayerId::Popup,
             modal: false,
             dismiss_on_escape: true,
@@ -178,58 +238,57 @@ impl<'a> Ui<'a> {
         };
         let (frame, picked) = self.overlay(
             id,
-            &opts,
+            &overlay,
             |_, _, _| {},
             |ui, _| {
                 // The list takes focus (and the keys); the rows are click targets above it.
                 let list = ui.interact(list_id, panel, Sense::CLICK_FOCUS);
-                let enabled: Vec<bool> = options.iter().map(|(_, e)| *e).collect();
-                let mut rows = Vec::with_capacity(options.len());
-                for (i, on) in enabled.iter().enumerate() {
-                    rows.push(on.then(|| {
-                        ui.interact(
-                            list_id.with(i.to_string()),
-                            row_rect(panel, i),
-                            Sense::CLICK,
-                        )
-                    }));
-                }
-                let hovered = rows
-                    .iter()
-                    .position(|r| r.as_ref().is_some_and(|r| r.hovered));
-                let clicked = rows
-                    .iter()
-                    .position(|r| r.as_ref().is_some_and(|r| r.clicked));
-                let (down, up, enter) = if list.enabled {
-                    (
-                        ui.consume_key(list_id, NamedKey::ArrowDown),
-                        ui.consume_key(list_id, NamedKey::ArrowUp),
-                        ui.consume_key(list_id, NamedKey::Enter),
-                    )
-                } else {
-                    (false, false, false)
-                };
-                let h = ui.transient::<Highlight>(list_id);
-                let mut row = h.row.unwrap_or(selected);
-                if h.pointer != hovered {
-                    h.pointer = hovered;
-                    if let Some(i) = hovered {
-                        row = i;
+                paint_panel(ui.painter(), panel, glass);
+                let rows_body = |ui: &mut Ui<'a>| {
+                    let enabled: Vec<bool> = options.iter().map(|(_, e)| *e).collect();
+                    let mut rows = Vec::with_capacity(n);
+                    for (i, on) in enabled.iter().enumerate() {
+                        rows.push(on.then(|| {
+                            ui.interact(
+                                list_id.with(i.to_string()),
+                                row_rect(panel, i),
+                                Sense::CLICK,
+                            )
+                        }));
                     }
-                }
-                if down {
-                    row = step(&enabled, row, true);
-                }
-                if up {
-                    row = step(&enabled, row, false);
-                }
-                h.row = Some(row);
-                let hot: Vec<bool> = (0..options.len()).map(|i| i == row).collect();
-                paint(ui.painter(), panel, options, selected, &hot);
-
-                let mut list_node = Node::new(list_id, Role::List, &name, panel);
-                list_node.states.insert(State::Focusable);
-                ui.node_container(list_node, |ui| {
+                    let hovered = rows
+                        .iter()
+                        .position(|r| r.as_ref().is_some_and(|r| r.hovered));
+                    let clicked = rows
+                        .iter()
+                        .position(|r| r.as_ref().is_some_and(|r| r.clicked));
+                    // Taken in a disabled scope too, so no shortcut gets them; they pick nothing.
+                    let down = ui.activation_keys(list_id, list.enabled, &[NamedKey::ArrowDown]);
+                    let up = ui.activation_keys(list_id, list.enabled, &[NamedKey::ArrowUp]);
+                    let enter = ui.activation_keys(list_id, list.enabled, &[NamedKey::Enter]);
+                    let h = ui.transient::<Highlight>(list_id);
+                    let before = h.row.unwrap_or(selected);
+                    let mut row = before;
+                    if h.pointer != hovered {
+                        h.pointer = hovered;
+                        if let Some(i) = hovered {
+                            row = i;
+                        }
+                    }
+                    if down {
+                        row = step(&enabled, row, true);
+                    }
+                    if up {
+                        row = step(&enabled, row, false);
+                    }
+                    h.row = Some(row);
+                    if scrolls && (down || up) && row != before {
+                        let target =
+                            Target::span_y(row as f64 * f64::from(ITEM_H), f64::from(ITEM_H));
+                        ui.scroll_to(scroll_key, target, Reveal::Nearest);
+                    }
+                    let hot: Vec<bool> = (0..n).map(|i| i == row).collect();
+                    paint_rows(ui.painter(), panel, options, selected, &hot);
                     for (i, (text, on)) in options.iter().enumerate() {
                         let mut node = Node::new(
                             list_id.with(i.to_string()),
@@ -247,10 +306,41 @@ impl<'a> Ui<'a> {
                         }
                         ui.node(node);
                     }
-                });
-                clicked.or(enter
-                    .then_some(row)
-                    .filter(|r| enabled.get(*r) == Some(&true)))
+                    clicked.or(enter
+                        .then_some(row)
+                        .filter(|r| enabled.get(*r) == Some(&true)))
+                };
+                let mut list_node = Node::new(list_id, Role::List, &name, panel);
+                list_node.states.insert(State::Focusable);
+                ui.node_container(list_node, |ui| {
+                    if !scrolls {
+                        return rows_body(ui);
+                    }
+                    // Opening: the selected row is in view, centred when it was below the fold.
+                    if ui.transient::<Highlight>(list_id).row.is_none() {
+                        let at = selected.min(n - 1);
+                        let (row, view, all) = (
+                            f64::from(ITEM_H),
+                            f64::from(viewport.h),
+                            n as f64 * f64::from(ITEM_H),
+                        );
+                        if (at + 1) as f64 * row > view {
+                            ui.scroll_shift(scroll_key, centre_target(at, row, view, all));
+                        }
+                    }
+                    let area = ScrollOptions {
+                        bars: (Bars::Disabled, Bars::Auto),
+                        extent: Some((f64::from(panel.w), n as f64 * f64::from(ITEM_H))),
+                        ..ScrollOptions::default()
+                    };
+                    ui.scroll_area(scroll_key, viewport, &area, |ui, _| {
+                        (
+                            rows_body(ui),
+                            Extent::new(f64::from(panel.w), n as f64 * f64::from(ITEM_H)),
+                        )
+                    })
+                    .value
+                })
             },
         );
         DropdownResponse {
