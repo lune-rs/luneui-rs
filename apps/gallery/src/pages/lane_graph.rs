@@ -179,7 +179,7 @@ fn linear_rows() -> Vec<RowData> {
 /// and bends in at the end.
 fn merge_rows() -> Vec<RowData> {
     vec![
-        (1, vec![line(0, false, true)], vec![edge(1, 0, 2)]),
+        (1, vec![line(0, true, true)], vec![edge(1, 0, 2)]),
         (0, vec![line(0, true, true)], vec![]),
         (0, vec![line(0, true, true)], vec![]),
         (0, vec![line(0, true, false)], vec![]),

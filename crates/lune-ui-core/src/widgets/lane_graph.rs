@@ -28,6 +28,8 @@ pub const EDGE_W: f32 = 2.5;
 pub const CORNER_R: f32 = 10.0;
 /// The segments a quadratic corner is flattened to.
 pub const CORNER_STEPS: usize = 8;
+/// The points the dot's circle is flattened to.
+const DOT_SEGMENTS: usize = 32;
 
 /// A lane line through the row.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -150,15 +152,17 @@ pub fn paint<H: Copy + PartialEq>(p: &mut Painter<'_, H>, origin: (f32, f32), ro
             );
         }
     }
-    // A stroked circle of centre radius 2 and width 6 is a disc of radius 5 that, being a stroke,
-    // is drawn above the lines.
-    p.arc(
-        [ox + lane_x(row.dot_lane), centre],
-        DOT_R - 3.0,
-        0.0,
-        TAU,
-        StrokeStyle::solid(row.dot_color, 6.0),
-    );
+    // A closed stroke on the circle of radius 2, 6 wide, is a disc of radius 5 that, being a stroke,
+    // is drawn above the lines. It is flattened here on the outer radius (`Painter::arc` flattens on
+    // the centre radius, which leaves visible flats on a disc this size).
+    let (cx, cy) = (ox + lane_x(row.dot_lane), centre);
+    let pts: Vec<[f32; 2]> = (0..DOT_SEGMENTS)
+        .map(|i| {
+            let a = TAU * i as f32 / DOT_SEGMENTS as f32;
+            [cx + (DOT_R - 3.0) * a.cos(), cy + (DOT_R - 3.0) * a.sin()]
+        })
+        .collect();
+    p.stroke(&pts, true, StrokeStyle::solid(row.dot_color, 6.0));
 }
 
 impl Ui<'_> {
