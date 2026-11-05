@@ -2282,3 +2282,641 @@ mod m7 {
         assert_eq!(b.cancelled, 1, "then the dialog");
     }
 }
+
+/// M8's data views together: the table, the bar and pie charts, a lane graph row and the kanban
+/// board in one frame, with the table and the board scripted through their composites.
+mod m8 {
+    use super::*;
+
+    use lune_ui_core::GlassLayer;
+    use lune_ui_core::access::Sort;
+    use lune_ui_core::shortcuts::{Binding, Chord, Scope};
+    use lune_ui_core::testing::disabled_violations;
+    use lune_ui_core::widgets::bar_chart::{BarChartOptions, BarColumn, BarSeries};
+    use lune_ui_core::widgets::kanban_board::{
+        BoardOptions, CardMove, KanbanCard, KanbanColumn, landed_index,
+    };
+    use lune_ui_core::widgets::lane_graph::{LaneLine, LaneRow};
+    use lune_ui_core::widgets::pie_chart::{PieOptions, PieSlice};
+    use lune_ui_core::widgets::table::{Cell, ColumnWidth, SortKey, TableColumn, TableOptions};
+    use lune_ui_core::widgets::virtual_list::{RowKey, SelectionMode};
+
+    const M8_WIN: (f32, f32) = (1240.0, 900.0);
+    const TABLE: Rect = Rect::new(10.0, 10.0, 500.0, 200.0);
+    const BAR: Rect = Rect::new(10.0, 230.0, 500.0, 0.0);
+    const PIE: Rect = Rect::new(10.0, 470.0, 160.0, 160.0);
+    const LANE: Rect = Rect::new(240.0, 480.0, 65.0, 45.0);
+    const BOARD: Rect = Rect::new(530.0, 10.0, 700.0, 500.0);
+    const GLASS: GlassLayer = GlassLayer {
+        tint: [10, 20, 30, 255],
+        tint_opacity: 0.8,
+        material_opacity: 0.7,
+    };
+
+    const ROUTE: u64 = 1;
+    const STATUS: u64 = 2;
+    const REQUESTS: u64 = 3;
+    const COLUMNS: [TableColumn<'static>; 3] = [
+        TableColumn {
+            key: ROUTE,
+            title: "Route",
+            width: ColumnWidth::Fill(1.0),
+            num: false,
+            sortable: true,
+        },
+        TableColumn {
+            key: STATUS,
+            title: "Status",
+            width: ColumnWidth::Fixed(90.0),
+            num: false,
+            sortable: false,
+        },
+        TableColumn {
+            key: REQUESTS,
+            title: "Requests",
+            width: ColumnWidth::Fixed(110.0),
+            num: true,
+            sortable: true,
+        },
+    ];
+
+    /// The keys a focused composite uses.
+    const KEYS: [NamedKey; 10] = [
+        NamedKey::ArrowUp,
+        NamedKey::ArrowDown,
+        NamedKey::ArrowLeft,
+        NamedKey::ArrowRight,
+        NamedKey::Home,
+        NamedKey::End,
+        NamedKey::PageUp,
+        NamedKey::PageDown,
+        NamedKey::Enter,
+        NamedKey::Space,
+    ];
+
+    /// The app side of the page: the board's model, and what the frames reported.
+    #[derive(Debug, Clone)]
+    struct Page {
+        enabled: bool,
+        cols: Vec<(u64, Vec<u64>)>,
+        // Reported.
+        sorted: Vec<SortKey>,
+        selected: Vec<u64>,
+        moved: Vec<CardMove>,
+        opened: Vec<u64>,
+        context: Vec<u64>,
+        added: u32,
+    }
+
+    impl Page {
+        fn new() -> Self {
+            Page {
+                enabled: true,
+                cols: vec![(1, vec![11, 12, 13]), (2, vec![21, 22]), (3, vec![])],
+                sorted: Vec::new(),
+                selected: Vec::new(),
+                moved: Vec::new(),
+                opened: Vec::new(),
+                context: Vec::new(),
+                added: 0,
+            }
+        }
+
+        /// Everything the keys of a composite could change.
+        fn state(&self) -> impl PartialEq + std::fmt::Debug + use<> {
+            (
+                self.sorted.clone(),
+                self.selected.clone(),
+                self.moved.clone(),
+                self.opened.clone(),
+                self.context.clone(),
+                self.added,
+                self.cols.clone(),
+            )
+        }
+    }
+
+    fn apply(cols: &mut [(u64, Vec<u64>)], mv: CardMove) {
+        let (from, at) = cols
+            .iter()
+            .enumerate()
+            .find_map(|(c, col)| Some((c, col.1.iter().position(|k| *k == mv.card)?)))
+            .expect("the moved card");
+        let to = cols
+            .iter()
+            .position(|c| c.0 == mv.column)
+            .expect("the target column");
+        let index = landed_index((from == to).then_some(at), mv.index);
+        let card = cols[from].1.remove(at);
+        cols[to].1.insert(index, card);
+    }
+
+    fn page_frame(h: &mut UiHarness, p: &mut Page) -> FrameOutput {
+        let enabled = p.enabled;
+        let mut moved = None;
+        let (_, out) = h.frame(|ui: &mut Ui<'_>| {
+            ui.painter().on(LayerId::Page);
+            ui.with_enabled(enabled, |ui| {
+                // The table: thirty rows, sortable on Route and Requests.
+                let opts = TableOptions {
+                    columns: &COLUMNS,
+                    count: 30,
+                    selection: SelectionMode::Multi,
+                    wrap: false,
+                    index_of: None,
+                    label: "Routes",
+                };
+                let t = ui.table(
+                    "table",
+                    TABLE,
+                    &opts,
+                    |i| RowKey(i as u64),
+                    |_, c| match c.column {
+                        0 => Cell::text(format!("/v1/route/{}", c.key.0)),
+                        1 => Cell::text("ok"),
+                        _ => Cell::text(format!("{}", c.key.0 * 10)),
+                    },
+                );
+                p.sorted.extend(t.sort);
+                p.selected = ui
+                    .table_selection("table")
+                    .selection
+                    .iter()
+                    .map(|k| k.0)
+                    .collect();
+
+                // The bar chart: two series over four columns.
+                let series = [
+                    BarSeries {
+                        name: "Cache read",
+                        color: [90, 160, 250, 255],
+                    },
+                    BarSeries {
+                        name: "Uncached",
+                        color: [240, 170, 80, 255],
+                    },
+                ];
+                let v = [[4.0, 2.0], [6.0, 1.0], [0.0, 0.0], [8.0, 2.0]];
+                let columns: Vec<BarColumn<'_>> =
+                    v.iter().map(|v| BarColumn { values: v, tip: "" }).collect();
+                ui.bar_chart(
+                    "bars",
+                    BAR,
+                    &BarChartOptions {
+                        series: &series,
+                        columns: &columns,
+                        max: 10.0,
+                        y_labels: ["10", "5", "0"],
+                        x_labels: &[(0, "00"), (3, "03")],
+                        label: "Hourly tokens",
+                        description: "Four hours, two series",
+                        live: false,
+                    },
+                );
+
+                // The pie chart and one lane graph row.
+                let slices = [
+                    PieSlice {
+                        key: 1,
+                        value: 3.0,
+                        color: [90, 160, 250, 255],
+                    },
+                    PieSlice {
+                        key: 2,
+                        value: 1.0,
+                        color: [240, 170, 80, 255],
+                    },
+                ];
+                ui.pie_chart(
+                    "pie",
+                    PIE,
+                    &PieOptions {
+                        slices: &slices,
+                        label: "Storage",
+                        description: "Cache 75 percent, other 25 percent",
+                        live: false,
+                    },
+                );
+                let line = [LaneLine {
+                    lane: 0,
+                    color: [90, 160, 250, 255],
+                    above: true,
+                    below: true,
+                }];
+                ui.lane_graph_row(
+                    LANE,
+                    &LaneRow {
+                        dot_lane: 1,
+                        dot_color: [240, 170, 80, 255],
+                        lanes: &line,
+                        edges: &[],
+                    },
+                );
+
+                // The board over the model.
+                let titles: Vec<(u64, String)> = p
+                    .cols
+                    .iter()
+                    .flat_map(|c| c.1.iter().map(|k| (*k, format!("card {k}"))))
+                    .collect();
+                let cards: Vec<Vec<KanbanCard<'_>>> = p
+                    .cols
+                    .iter()
+                    .map(|c| {
+                        c.1.iter()
+                            .map(|k| KanbanCard {
+                                key: *k,
+                                title: &titles.iter().find(|t| t.0 == *k).expect("a title").1,
+                                tags: &[],
+                                assignee: None,
+                                note: false,
+                            })
+                            .collect()
+                    })
+                    .collect();
+                let names: Vec<String> = p.cols.iter().map(|c| format!("col {}", c.0)).collect();
+                let columns: Vec<KanbanColumn<'_>> = p
+                    .cols
+                    .iter()
+                    .zip(&cards)
+                    .zip(&names)
+                    .map(|((c, cards), title)| KanbanColumn {
+                        key: c.0,
+                        title,
+                        cards,
+                    })
+                    .collect();
+                let b = ui.kanban_board(
+                    "board",
+                    BOARD,
+                    &BoardOptions {
+                        title: "Roadmap",
+                        columns: &columns,
+                        error: None,
+                        active: true,
+                        glass: GLASS,
+                        under: [0.05, 0.06, 0.07, 1.0],
+                        name: "",
+                    },
+                );
+                moved = b.moved;
+                p.opened.extend(b.opened);
+                p.context.extend(b.context.map(|c| c.0));
+                p.added += u32::from(b.add_column) + u32::from(b.add_card.is_some());
+            });
+        });
+        // The app applies a move after the frame that reported it.
+        if let Some(mv) = moved {
+            p.moved.push(mv);
+            apply(&mut p.cols, mv);
+        }
+        out
+    }
+
+    fn run(h: &mut UiHarness, p: &mut Page, at: u64) -> FrameOutput {
+        h.at_ms(at);
+        page_frame(h, p)
+    }
+
+    fn settled_with(mut p: Page) -> (UiHarness, Page) {
+        let mut h = UiHarness::new(M8_WIN);
+        for at in [0, 500, 1000] {
+            run(&mut h, &mut p, at);
+        }
+        (h, p)
+    }
+
+    fn by_name<'a>(out: &'a FrameOutput, role: Role, name: &str) -> &'a Node {
+        out.tree
+            .nodes
+            .iter()
+            .find(|n| n.role == role && n.name == name)
+            .unwrap_or_else(|| panic!("no {role:?} named {name:?}"))
+    }
+
+    fn inject(h: &mut UiHarness, target: WidgetId, action: Action) {
+        h.input.access(AccessAction {
+            target,
+            action,
+            value: None,
+        });
+    }
+
+    fn table_id() -> WidgetId {
+        id("table")
+    }
+
+    fn header(col: u64) -> WidgetId {
+        table_id().with("head").with(col)
+    }
+
+    fn body() -> WidgetId {
+        table_id().with("body")
+    }
+
+    fn card(k: u64) -> WidgetId {
+        id("board").with(("card", k))
+    }
+
+    #[test]
+    fn a_frame_of_every_m8_widget_yields_the_expected_roles_names_and_states() {
+        let (mut h, mut p) = settled_with(Page::new());
+        let out = run(&mut h, &mut p, 1100);
+
+        // The table: a table node over a header row of column headers and the body's group of
+        // rows. A sortable header reads Sort::None until it is the sort.
+        let table = by_name(&out, Role::Table, "Routes");
+        assert_eq!(table.id, table_id());
+        let head = out.tree.get(table_id().with("head")).expect("header row");
+        assert_eq!(head.role, Role::Row);
+        let sorts: Vec<Option<Sort>> = head
+            .children
+            .iter()
+            .map(|c| out.tree.get(*c).expect("a header").sort)
+            .collect();
+        assert_eq!(sorts, [Some(Sort::None), None, Some(Sort::None)]);
+        let titles: Vec<&str> = head
+            .children
+            .iter()
+            .map(|c| out.tree.get(*c).expect("a header").name.as_str())
+            .collect();
+        assert_eq!(titles, ["Route", "Status", "Requests"]);
+        let group = out.tree.get(body()).expect("the body");
+        assert_eq!(group.role, Role::Group);
+        assert_eq!(group.name, "Routes");
+        assert!(group.states.contains(State::Focusable));
+        let rows = out
+            .tree
+            .nodes
+            .iter()
+            .filter(|n| n.role == Role::Row && n.id != head.id)
+            .count();
+        assert!(rows >= 6 && rows < 30, "only the window is built: {rows}");
+
+        // The bar chart: an image with the app's name, its legend as static text.
+        let bars = by_name(&out, Role::Image, "Hourly tokens");
+        assert_eq!(bars.description.as_deref(), Some("Four hours, two series"));
+        for name in ["Cache read", "Uncached"] {
+            by_name(&out, Role::StaticText, name);
+        }
+        // The pie chart: an image.
+        let pie = by_name(&out, Role::Image, "Storage");
+        assert_eq!(
+            pie.description.as_deref(),
+            Some("Cache 75 percent, other 25 percent")
+        );
+        // The lane graph row is decorative: nothing in its rect.
+        assert!(
+            !out.tree
+                .nodes
+                .iter()
+                .any(|n| LANE.contains(centre(n.bounds))),
+            "a lane graph row has no node"
+        );
+
+        // The board: a list named by its title, a group per column with its card count, a
+        // list item per card; the buttons named.
+        let board = by_name(&out, Role::List, "Roadmap");
+        assert_eq!(board.id, id("board"));
+        let col = by_name(&out, Role::Group, "col 1");
+        assert_eq!(col.description.as_deref(), Some("3"));
+        assert_eq!(
+            by_name(&out, Role::Group, "col 3").description.as_deref(),
+            Some("0")
+        );
+        let c = by_name(&out, Role::ListItem, "card 21");
+        assert_eq!(c.id, card(21));
+        assert!(c.states.contains(State::Focusable));
+        for a in [Action::Default, Action::Focus, Action::ShowMenu] {
+            assert!(c.actions.contains(a), "{a:?}");
+        }
+        by_name(&out, Role::Button, "Add column");
+    }
+
+    #[test]
+    fn injected_actions_work_on_a_table_header_and_row_and_on_a_card() {
+        let (mut h, mut p) = settled_with(Page::new());
+        run(&mut h, &mut p, 1100);
+        // A header sorts and a row selects, in one frame.
+        inject(&mut h, header(REQUESTS), Action::Default);
+        inject(
+            &mut h,
+            table_id().with("body").with(RowKey(4)),
+            Action::Default,
+        );
+        let out = run(&mut h, &mut p, 1200);
+        assert_eq!(
+            p.sorted,
+            [SortKey {
+                column: REQUESTS,
+                descending: false
+            }]
+        );
+        assert_eq!(p.selected, [4]);
+        assert_eq!(
+            out.tree.get(header(REQUESTS)).expect("header").sort,
+            Some(Sort::Ascending)
+        );
+        assert!(
+            out.tree
+                .get(table_id().with("body").with(RowKey(4)))
+                .expect("row")
+                .states
+                .contains(State::Selected)
+        );
+        // A card opens by its default action and asks for its menu by ShowMenu.
+        inject(&mut h, card(21), Action::Default);
+        run(&mut h, &mut p, 1300);
+        assert_eq!(p.opened, [21]);
+        inject(&mut h, card(13), Action::ShowMenu);
+        run(&mut h, &mut p, 1400);
+        assert_eq!(p.context, [13]);
+        // Neither touched the other composite.
+        assert_eq!(p.selected, [4]);
+        assert!(p.moved.is_empty());
+    }
+
+    #[test]
+    fn the_table_has_two_stops_and_the_board_one_for_all_its_cards() {
+        let (mut h, mut p) = settled_with(Page::new());
+        let mut ms = 1000;
+        let mut seen: Vec<WidgetId> = Vec::new();
+        for _ in 0..40 {
+            key(&mut h, NamedKey::Tab);
+            ms += 100;
+            let out = run(&mut h, &mut p, ms);
+            let f = out.focused.expect("Tab focuses something");
+            if seen.contains(&f) {
+                break;
+            }
+            seen.push(f);
+        }
+        let out = run(&mut h, &mut p, ms + 100);
+        let of = |role: Role| {
+            seen.iter()
+                .filter(|f| out.tree.get(**f).is_some_and(|n| n.role == role))
+                .count()
+        };
+        assert_eq!(of(Role::ColumnHeader), 1, "the header is one roving stop");
+        assert!(seen.contains(&body()), "the body is a stop");
+        assert_eq!(of(Role::ListItem), 1, "all the cards are one stop");
+        // The table's two stops are in its rect; the cards' stop is in the board's.
+        let inside = |outer: Rect| {
+            seen.iter()
+                .filter(|f| {
+                    out.tree
+                        .get(**f)
+                        .is_some_and(|n| outer.contains(centre(n.bounds)))
+                })
+                .count()
+        };
+        assert_eq!(inside(TABLE), 2, "a table has two stops");
+        // The board's plain buttons are stops of their own: the header's add, and an add and a
+        // menu button for each of the three columns. (Their places are not checked: focusing a
+        // button scrolls the board sideways.)
+        assert_eq!(of(Role::Button), 1 + 2 * 3, "the board's buttons");
+        assert_eq!(seen.len(), 2 + 1 + 7, "table, cards, buttons: nothing else");
+    }
+
+    #[test]
+    fn every_m8_widget_in_a_disabled_scope_passes_the_walk() {
+        let p = Page {
+            enabled: false,
+            ..Page::new()
+        };
+        let (mut h, mut p) = settled_with(p);
+        let out = run(&mut h, &mut p, 1100);
+        for (name, root) in [
+            ("table", table_id()),
+            ("bar chart", by_name(&out, Role::Image, "Hourly tokens").id),
+            ("pie chart", by_name(&out, Role::Image, "Storage").id),
+            ("board", id("board")),
+        ] {
+            assert!(out.tree.get(root).is_some(), "{name}: no node");
+            assert_eq!(disabled_violations(&out.tree, root), [], "{name}");
+        }
+    }
+
+    /// The `n`th Tab stop with this role, focused, on a page with a Global binding on every key of
+    /// `KEYS`; and the time.
+    fn focused_page(role: Role) -> (UiHarness, Page, u64) {
+        let mut h = UiHarness::new(M8_WIN);
+        for k in KEYS {
+            h.shortcuts.add(Binding::new(
+                Scope::Global,
+                Chord::key(Key::Named(k)),
+                format!("g-{k:?}"),
+            ));
+        }
+        let mut p = Page::new();
+        for at in [0, 500, 1000] {
+            run(&mut h, &mut p, at);
+        }
+        let mut ms = 1000;
+        for _ in 0..12 {
+            key(&mut h, NamedKey::Tab);
+            ms += 100;
+            let out = run(&mut h, &mut p, ms);
+            if out
+                .focused
+                .and_then(|f| out.tree.get(f))
+                .is_some_and(|n| n.role == role)
+            {
+                return (h, p, ms);
+            }
+        }
+        panic!("no Tab stop of role {role:?}");
+    }
+
+    #[test]
+    fn a_disabled_page_takes_every_key_a_focused_composite_takes_and_fires_no_global_binding() {
+        // The table's header, its body (a group) and the board's cards.
+        for (role, name) in [
+            (Role::ColumnHeader, "table header"),
+            (Role::Group, "table body"),
+            (Role::ListItem, "board cards"),
+        ] {
+            // The instrument: the keys the composite uses are the ones that fire nothing while it
+            // is enabled; the rest stay shortcuts.
+            let mut used = Vec::new();
+            for k in KEYS {
+                let (mut h, mut p, ms) = focused_page(role);
+                key(&mut h, k);
+                if run(&mut h, &mut p, ms + 100).fired.is_empty() {
+                    used.push(k);
+                }
+            }
+            assert!(
+                used.len() >= 4,
+                "{name} uses at least four of the keys: {used:?}"
+            );
+            for k in used {
+                let (mut h, mut p, mut ms) = focused_page(role);
+                p.enabled = false;
+                let before = p.state();
+                key(&mut h, k);
+                ms += 100;
+                let out = run(&mut h, &mut p, ms);
+                assert!(
+                    out.fired.is_empty(),
+                    "{name}: {k:?} reached {:?}",
+                    out.fired
+                );
+                assert_eq!(p.state(), before, "{name}: {k:?} changed the page");
+            }
+        }
+    }
+
+    #[test]
+    fn a_page_of_them_all_at_rest_reports_idle() {
+        let (mut h, mut p) = settled_with(Page::new());
+        for at in [1100, 1200, 5000] {
+            assert_eq!(run(&mut h, &mut p, at).repaint, Repaint::Idle, "{at}");
+        }
+        // After a sort, a selection and a card opened too.
+        inject(&mut h, header(ROUTE), Action::Default);
+        inject(
+            &mut h,
+            table_id().with("body").with(RowKey(2)),
+            Action::Default,
+        );
+        run(&mut h, &mut p, 5100);
+        for at in [5600, 6100, 9000] {
+            assert_eq!(
+                run(&mut h, &mut p, at).repaint,
+                Repaint::Idle,
+                "after: {at}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_shift_arrow_moves_a_card_and_the_model_lands_it_where_the_report_said() {
+        let (mut h, mut p, mut ms) = focused_page(Role::ListItem);
+        ms += 50;
+        assert_eq!(
+            run(&mut h, &mut p, ms).focused,
+            Some(card(11)),
+            "the cards' stop is the first card"
+        );
+        h.input.set_modifiers(Modifiers {
+            shift: true,
+            ..Modifiers::default()
+        });
+        key(&mut h, NamedKey::ArrowDown);
+        h.input.set_modifiers(Modifiers::default());
+        ms += 100;
+        run(&mut h, &mut p, ms);
+        assert_eq!(
+            p.moved,
+            [CardMove {
+                card: 11,
+                column: 1,
+                index: 2
+            }]
+        );
+        assert_eq!(p.cols[0].1, [12, 11, 13]);
+        // The table's own state is untouched.
+        assert!(p.sorted.is_empty() && p.selected.is_empty());
+    }
+}
