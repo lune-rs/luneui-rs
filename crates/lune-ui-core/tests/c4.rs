@@ -793,3 +793,455 @@ fn a_dropdown_pick_frame_asks_for_the_frame_that_drops_the_list() {
         assert_eq!(out.repaint, Repaint::Idle, "{tier:?}: settles");
     }
 }
+
+// ---------------------------------------------------------------------------------------------
+// M6: the control and chrome set together. One page holds every interactive M6 widget; the
+// per-widget suites own the behaviour, this section owns what only holds side by side: the
+// semantic tree, accessibility actions, one tab stop per composite and the idle report.
+// ---------------------------------------------------------------------------------------------
+
+mod m6 {
+    use super::*;
+    use lune_ui_core::icon;
+    use lune_ui_core::text::{Spec, Style};
+    use lune_ui_core::theme::DARK;
+    use lune_ui_core::widgets::button::{ButtonOptions, IconButton};
+    use lune_ui_core::widgets::filter_bar::FilterOptions;
+    use lune_ui_core::widgets::nav_item::NavEntry;
+    use lune_ui_core::widgets::progress::ProgressOptions;
+    use lune_ui_core::widgets::radio_group::RadioOption;
+    use lune_ui_core::widgets::search_picker::PickerOptions;
+    use lune_ui_core::widgets::slider::SliderOptions;
+    use lune_ui_core::widgets::spinner::SpinnerOptions;
+    use lune_ui_core::widgets::tab_strip::{Tab, TabEvent, TabKey, TabStripOptions};
+    use lune_ui_core::widgets::tone::Tone;
+
+    const GHOST: Rect = Rect::new(20.0, 10.0, 90.0, 32.0);
+    const ICON_BTN: Rect = Rect::new(120.0, 10.0, 32.0, 32.0);
+    const NAV: Rect = Rect::new(20.0, 60.0, 180.0, 0.0);
+    const RADIO: Rect = Rect::new(240.0, 60.0, 180.0, 0.0);
+    const STAR_AT: (f32, f32) = (240.0, 160.0);
+    const SLIDER: Rect = Rect::new(240.0, 220.0, 180.0, 24.0);
+    const STRIP: Rect = Rect::new(20.0, 280.0, 600.0, 32.0);
+    const CARD: Rect = Rect::new(20.0, 280.0, 600.0, 160.0);
+    const FILTER: Rect = Rect::new(20.0, 470.0, 220.0, 32.0);
+    const PICKER: Rect = Rect::new(260.0, 470.0, 220.0, 32.0);
+    const SELECT: Rect = Rect::new(500.0, 60.0, 200.0, 20.0);
+    const PROGRESS: Rect = Rect::new(500.0, 100.0, 200.0, 4.0);
+
+    const NAVS: [NavEntry<'static>; 3] = [
+        NavEntry {
+            key: 1,
+            label: "General",
+            icon: None,
+            enabled: true,
+        },
+        NavEntry {
+            key: 2,
+            label: "Network",
+            icon: None,
+            enabled: true,
+        },
+        NavEntry {
+            key: 3,
+            label: "About",
+            icon: None,
+            enabled: true,
+        },
+    ];
+    const RADIOS: [RadioOption<'static>; 3] = [
+        RadioOption {
+            key: 1,
+            label: "Small",
+            enabled: true,
+        },
+        RadioOption {
+            key: 2,
+            label: "Medium",
+            enabled: true,
+        },
+        RadioOption {
+            key: 3,
+            label: "Large",
+            enabled: true,
+        },
+    ];
+    const SLIDER_OPTS: SliderOptions<'static> = SliderOptions {
+        min: 0.0,
+        max: 100.0,
+        step: 10.0,
+        name: "Volume",
+    };
+    const ITEMS: [&str; 3] = ["main", "develop", "release"];
+
+    #[derive(Debug)]
+    struct Page {
+        nav: u64,
+        radio: u64,
+        stars: u32,
+        volume: f32,
+        tabs: Vec<(u64, &'static str)>,
+        active: u64,
+        tab_events: Vec<TabEvent>,
+        filter: String,
+        picked: Option<usize>,
+        ghost_clicks: u32,
+        busy: bool,
+    }
+
+    impl Page {
+        fn new() -> Self {
+            Page {
+                nav: 1,
+                radio: 2,
+                stars: 2,
+                volume: 40.0,
+                tabs: vec![(1, "alpha"), (2, "beta"), (3, "gamma")],
+                active: 1,
+                tab_events: Vec::new(),
+                filter: String::new(),
+                picked: Some(0),
+                ghost_clicks: 0,
+                busy: false,
+            }
+        }
+    }
+
+    fn page_frame(h: &mut UiHarness, p: &mut Page) -> FrameOutput {
+        let (_, out) = h.frame(|ui: &mut Ui<'_>| {
+            ui.painter().on(LayerId::Page);
+            let r = ui.button_with(
+                "ghost",
+                GHOST,
+                "Cancel",
+                &ButtonOptions {
+                    kind: ButtonKind::Ghost,
+                    small: true,
+                    icon: None,
+                },
+            );
+            p.ghost_clicks += u32::from(r.clicked);
+            ui.icon_button(
+                "icon-button",
+                ICON_BTN,
+                &IconButton {
+                    glyph: icon::SEARCH,
+                    glyph_size: 16.0,
+                    color: None,
+                    radius: 4.0,
+                    name: "Search",
+                },
+            );
+            ui.nav_list("nav", NAV, &NAVS, &mut p.nav, "Settings");
+            ui.radio_group("radio", RADIO, &RADIOS, &mut p.radio, "Size");
+            ui.star_rating("stars", STAR_AT, &mut p.stars, 5, "Rating");
+            ui.slider("slider", SLIDER, &mut p.volume, &SLIDER_OPTS);
+            let tabs: Vec<Tab<'_>> = p
+                .tabs
+                .iter()
+                .map(|&(k, title)| Tab {
+                    key: TabKey(k),
+                    title,
+                    closable: true,
+                    progress: None,
+                })
+                .collect();
+            let events = ui
+                .tab_strip(
+                    "strip",
+                    STRIP,
+                    &tabs,
+                    &TabStripOptions {
+                        active: Some(TabKey(p.active)),
+                        panel_focused: true,
+                        busy: None,
+                        busy_tone: Tone::Neutral,
+                        card: CARD,
+                        menu_extra: &[],
+                        name: "Documents",
+                        header_tint: None,
+                    },
+                )
+                .events;
+            for e in &events {
+                if let TabEvent::Activate(k) = e {
+                    p.active = k.0;
+                }
+            }
+            p.tab_events.extend(events);
+            ui.filter_bar(
+                "filter",
+                FILTER,
+                &mut p.filter,
+                &FilterOptions {
+                    placeholder: "Filter",
+                    label: None,
+                },
+            );
+            ui.search_picker(
+                "picker",
+                PICKER,
+                &ITEMS,
+                &mut p.picked,
+                &PickerOptions {
+                    placeholder: "Branch",
+                    name: "Branch",
+                    ..PickerOptions::default()
+                },
+            );
+            let spec = Spec::plain("v1.2.3", Style::ui(13.0, DARK.fg_primary));
+            ui.selectable_text("select", SELECT, &spec, "v1.2.3");
+            ui.progress(
+                "progress",
+                PROGRESS,
+                &ProgressOptions {
+                    value: Some(0.5),
+                    name: "Upload",
+                    ..ProgressOptions::default()
+                },
+            );
+            ui.spinner(
+                "spinner",
+                (560.0, 140.0),
+                &SpinnerOptions {
+                    busy: p.busy,
+                    size: 16.0,
+                    color: None,
+                    name: "Loading",
+                },
+            );
+        });
+        out
+    }
+
+    fn run(h: &mut UiHarness, p: &mut Page, ms: u64) -> FrameOutput {
+        h.at_ms(ms);
+        page_frame(h, p)
+    }
+
+    fn by_name<'a>(out: &'a FrameOutput, role: Role, name: &str) -> &'a Node {
+        out.tree
+            .nodes
+            .iter()
+            .find(|n| n.role == role && n.name == name)
+            .unwrap_or_else(|| panic!("no {role:?} named {name:?}"))
+    }
+
+    fn settled_page() -> (UiHarness, Page) {
+        let mut p = Page::new();
+        let mut h = UiHarness::new(WIN);
+        run(&mut h, &mut p, 0);
+        let out = run(&mut h, &mut p, 1000);
+        assert_eq!(out.repaint, Repaint::Idle, "the page settles");
+        (h, p)
+    }
+
+    #[test]
+    fn a_frame_of_every_m6_widget_yields_the_expected_roles_names_and_states() {
+        let (mut h, mut p) = settled_page();
+        let out = run(&mut h, &mut p, 1100);
+        let checked =
+            |role: Role, name: &str| by_name(&out, role, name).states.contains(State::Checked);
+
+        // Buttons.
+        for (role, name) in [(Role::Button, "Cancel"), (Role::Button, "Search")] {
+            let n = by_name(&out, role, name);
+            assert!(n.states.contains(State::Focusable), "{name}");
+            assert!(n.actions.contains(Action::Default), "{name}");
+        }
+        // The nav list: a list of items, the current one selected and current.
+        assert_eq!(by_name(&out, Role::List, "Settings").id, id("nav"));
+        for (name, on) in [("General", true), ("Network", false), ("About", false)] {
+            let n = by_name(&out, Role::ListItem, name);
+            assert_eq!(n.states.contains(State::Selected), on, "{name}");
+            assert_eq!(n.states.contains(State::Current), on, "{name}");
+            assert!(n.actions.contains(Action::Default), "{name}");
+        }
+        // The radio group: a radio-group of radios, the selected one checked.
+        assert_eq!(by_name(&out, Role::RadioGroup, "Size").id, id("radio"));
+        for (name, on) in [("Small", false), ("Medium", true), ("Large", false)] {
+            assert_eq!(checked(Role::Radio, name), on, "{name}");
+            assert!(
+                by_name(&out, Role::Radio, name)
+                    .actions
+                    .contains(Action::Default)
+            );
+        }
+        // The star rating: a radio-group of "N of 5" radios, the Nth checked.
+        assert_eq!(by_name(&out, Role::RadioGroup, "Rating").id, id("stars"));
+        for n in 1..=5 {
+            let name = format!("{n} of 5");
+            assert_eq!(checked(Role::Radio, &name), n == 2, "{name}");
+        }
+        // The slider: a number value in range with increment and decrement.
+        let s = by_name(&out, Role::Slider, "Volume");
+        assert!(
+            matches!(s.value, Some(Value::Number { value, min, max, step })
+            if (value - 40.0).abs() < 1e-4 && min == 0.0 && max == 100.0 && step == 10.0)
+        );
+        assert!(s.actions.contains(Action::Increment));
+        assert!(s.actions.contains(Action::Decrement));
+        // The tab list: tabs, the active one selected.
+        assert_eq!(by_name(&out, Role::TabList, "Documents").id, id("strip"));
+        for (name, on) in [("alpha", true), ("beta", false), ("gamma", false)] {
+            let n = by_name(&out, Role::Tab, name);
+            assert_eq!(n.states.contains(State::Selected), on, "{name}");
+            assert!(n.actions.contains(Action::Default), "{name}");
+        }
+        // The progress bar and the static text.
+        assert!(
+            out.tree
+                .nodes
+                .iter()
+                .any(|n| n.role == Role::Progress && n.name == "Upload")
+        );
+        assert_eq!(by_name(&out, Role::StaticText, "v1.2.3").name, "v1.2.3");
+    }
+
+    #[test]
+    fn an_injected_default_action_works_on_radio_star_nav_item_and_tab() {
+        let (mut h, mut p) = settled_page();
+        let out = run(&mut h, &mut p, 1100);
+        for (role, name) in [
+            (Role::Radio, "Large"),
+            (Role::Radio, "4 of 5"),
+            (Role::ListItem, "About"),
+            (Role::Tab, "gamma"),
+            (Role::Button, "Cancel"),
+        ] {
+            h.input.access(AccessAction {
+                target: by_name(&out, role, name).id,
+                action: Action::Default,
+                value: None,
+            });
+        }
+        run(&mut h, &mut p, 1200);
+        assert_eq!(p.radio, 3, "radio");
+        assert_eq!(p.stars, 4, "star");
+        assert_eq!(p.nav, 3, "nav item");
+        assert_eq!(p.active, 3, "tab");
+        assert_eq!(p.tab_events, [TabEvent::Activate(TabKey(3))]);
+        assert_eq!(p.ghost_clicks, 1, "button");
+        // The default action on the current star clears it, as a click does.
+        let out = run(&mut h, &mut p, 1300);
+        h.input.access(AccessAction {
+            target: by_name(&out, Role::Radio, "4 of 5").id,
+            action: Action::Default,
+            value: None,
+        });
+        run(&mut h, &mut p, 1400);
+        assert_eq!(p.stars, 0, "the current star clears");
+    }
+
+    #[test]
+    fn an_increment_action_steps_the_slider_and_decrement_steps_it_back() {
+        let (mut h, mut p) = settled_page();
+        let out = run(&mut h, &mut p, 1100);
+        let slider = by_name(&out, Role::Slider, "Volume").id;
+        for (action, want) in [(Action::Increment, 50.0), (Action::Decrement, 40.0)] {
+            h.input.access(AccessAction {
+                target: slider,
+                action,
+                value: None,
+            });
+            run(&mut h, &mut p, 1200);
+            assert!((p.volume - want).abs() < 1e-3, "{action:?}: {}", p.volume);
+            run(&mut h, &mut p, 1300);
+        }
+    }
+
+    #[test]
+    fn a_tab_cycle_visits_each_composite_once() {
+        let mut p = Page::new();
+        let mut h = UiHarness::new(WIN);
+        run(&mut h, &mut p, 0);
+        let mut ms = 100;
+        let mut seen: Vec<(WidgetId, Rect)> = Vec::new();
+        for _ in 0..20 {
+            key(&mut h, NamedKey::Tab);
+            ms += 100;
+            let out = run(&mut h, &mut p, ms);
+            let f = out.focused.expect("Tab focuses something");
+            if seen.iter().any(|&(s, _)| s == f) {
+                break;
+            }
+            seen.push((f, node(&out, f).bounds));
+        }
+        let stops: Vec<WidgetId> = seen.iter().map(|&(f, _)| f).collect();
+        let bounds = |f: WidgetId| {
+            seen.iter()
+                .find(|&&(s, _)| s == f)
+                .map(|&(_, r)| r)
+                .expect("a recorded stop")
+        };
+        let inside = |r: Rect, outer: Rect, tall: f32| {
+            let (cx, cy) = centre(r);
+            cx >= outer.x && cx <= outer.right() && cy >= outer.y && cy <= outer.y + tall
+        };
+        let composites: [(&str, Rect, f32); 6] = [
+            ("nav", NAV, 34.0 * 3.0),
+            ("radio", RADIO, 28.0 * 3.0),
+            ("stars", Rect::new(STAR_AT.0, STAR_AT.1, 200.0, 0.0), 40.0),
+            ("slider", SLIDER, 24.0),
+            ("strip", STRIP, 32.0),
+            ("filter", FILTER, 32.0),
+        ];
+        for (name, outer, tall) in composites {
+            let n = stops
+                .iter()
+                .filter(|&&f| inside(bounds(f), outer, tall))
+                .count();
+            // The strip is one tab stop plus its new-tab button; every other composite is one stop.
+            let want = if name == "strip" { 2 } else { 1 };
+            assert_eq!(n, want, "{name}: {n} stops in {stops:?}");
+        }
+        // A roving composite's one stop is its selected child.
+        let focused_in = |outer: Rect, tall: f32| {
+            stops
+                .iter()
+                .copied()
+                .find(|&f| inside(bounds(f), outer, tall))
+                .expect("a stop")
+        };
+        assert_eq!(focused_in(NAV, 102.0), id("nav").with(1u64));
+        assert_eq!(focused_in(RADIO, 84.0), id("radio").with(2u64));
+        assert_eq!(
+            focused_in(Rect::new(STAR_AT.0, STAR_AT.1, 200.0, 0.0), 40.0),
+            id("stars").with(2u32)
+        );
+        // The selectable text never takes a stop.
+        assert!(!stops.contains(&id("select")));
+    }
+
+    #[test]
+    fn a_page_of_them_all_at_rest_reports_idle_once_the_loops_are_off() {
+        let (mut h, mut p) = settled_page();
+        for ms in [1100, 1200, 5000] {
+            assert_eq!(run(&mut h, &mut p, ms).repaint, Repaint::Idle, "{ms}");
+        }
+        // A turning spinner is a loop: the page asks for frames, and stops asking when it stops.
+        p.busy = true;
+        let out = run(&mut h, &mut p, 5100);
+        assert_ne!(out.repaint, Repaint::Idle, "the busy spinner moves");
+        p.busy = false;
+        let mut ms = 5200;
+        let mut idle = false;
+        for _ in 0..10 {
+            ms += 100;
+            idle = run(&mut h, &mut p, ms).repaint == Repaint::Idle;
+            if idle {
+                break;
+            }
+        }
+        assert!(idle, "the page settles once the spinner stops");
+    }
+
+    #[test]
+    fn under_the_off_tier_a_busy_spinner_reports_idle_too() {
+        let (mut h, mut p) = settled_page();
+        h.tier = MotionTier::Off;
+        p.busy = true;
+        run(&mut h, &mut p, 1100);
+        assert_eq!(run(&mut h, &mut p, 1200).repaint, Repaint::Idle);
+    }
+}

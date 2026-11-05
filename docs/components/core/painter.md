@@ -79,8 +79,8 @@ The aggregate of every `New:` item in the catalogue (the list C5 gives M5; R-cor
 | primitive | needed by (ids) | first milestone | cite |
 |---|---|---|---|
 | image | core.image, widget.banner-empty-state, text.markdown-preview | M5 | [L src/Lunegit.Desktop/Views/FileViewerView.axaml:352], [L src/Lunegit.Desktop/Views/MarkdownPreviewView.axaml.cs:445], [L src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:17] |
-| rotate | widget.spinner, widget.banner-empty-state | M6 | [L src/Lunegit.Desktop/Controls/SpinBehavior.cs:38-53] |
-| dash | widget.search-picker | M6 | [L src/Lunegit.Desktop/Controls/LinkSearchPicker.axaml:30] |
+| rotate | widget.spinner, widget.banner-empty-state | M6 (done: `Painter::text_rotated` turns the spinner's glyph, scene `spinner-spinning`; the banner's busy glyph is the spinner) | [L src/Lunegit.Desktop/Controls/SpinBehavior.cs:38-53] |
+| dash | widget.search-picker | M6 (done: `Painter::dash` draws the link trigger's underline, scene `search-picker-link`) | [L src/Lunegit.Desktop/Controls/LinkSearchPicker.axaml:30] |
 | clip-rounded | layout.page, layout.panel | M7 | [L src/Lunegit.Desktop/App.axaml:769-770], [W docs/ui/components.md:249-262] |
 | sector | data.pie-chart | M8 | [L src/Lunegit.Desktop/Controls/StoragePieChartControl.cs:113-137] |
 | path-fill | data.pie-chart | M8 | [L src/Lunegit.Desktop/Controls/StoragePieChartControl.cs:140-158] |
@@ -97,7 +97,7 @@ Not needed by any entry (no row): `linear-gradient` and `shadow`. No Lunegit or 
 
 ### Build
 
-- Milestone: M5 (the seven new primitives, R-core-10) and M11 (done standard; the existing code is moved). M5 built the seven primitives (steps 4 and 5; the page is `primitives`); `core.painter` stays `in-progress` until M11's done standard.
+- Milestone: M5 (the seven new primitives, R-core-10) and M11 (done standard; the existing code is moved). M5 built the seven primitives (steps 4 and 5; the page is `primitives`); `core.painter` stays `in-progress` until M11's done standard. M6 put the rotate and dash rows to use (the spinner and the search picker's link trigger) and added the two stroke helpers `Painter::stroke_sweep` and `Painter::stroke_comet` over `StrokeStyle.mode`, which the tab strip's busy cue draws (D122).
 - Depends on: core.scene, core.theme, text.shaping, core.image.
 
 ## Open questions

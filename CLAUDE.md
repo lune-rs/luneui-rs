@@ -56,6 +56,9 @@ Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, r
 - Extend, don't patch: new OS glass = a `material` submodule of `lune-ui-platform`; new overlay or widget = a new module plus
   a catalogue file; new look = a `Theme` value. App-specific drawing goes through the `CustomDraw`
   hook, not into the toolkit (D8).
+- A composite with one tab stop (radio group, star rating, nav list, tab strip) uses roving focus: `Sense.skip_tab`,
+  `Ui::rove_stop`, `rove_keys`, `rove_focus` (D113); text that must fit a width goes through `text::elide` / `Painter::elide`
+  (D114).
 - Each seam has a fake and a contract test in `lune_ui_core::testing` (`RecordingRenderer`, `FakeText`
   with `text_system_contract`, `FakeImages` with `image_store_contract`, `ScriptedInput`, `NullMaterial` with
   `backdrop_contract`); a new adapter
