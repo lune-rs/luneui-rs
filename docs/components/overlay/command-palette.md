@@ -60,7 +60,7 @@ the view is in `Views/Dialogs/`, which the dialog overlay hosts [L src/Lunegit.D
 | section with more results | a "Show more results" row after its rows, in the selection order | [L src/Lunegit.Infrastructure/Localization/en.json:290] |
 | error | the error line | [L src/Lunegit.Infrastructure/Localization/en.json:292] |
 | focus-visible on a row | none: rows take no focus; the selected row is the cue | [D147] |
-| disabled | `with_enabled(false)`: nothing activates, the keys are taken, every node passes `disabled_violations` | [D140] |
+| disabled | `with_enabled(false)`: nothing activates, Up, Down and Enter are taken but the search box's other keys are not (`docs/architecture.md`, "Disabled keys"), every node passes `disabled_violations` | [D140] |
 
 ### Transitions
 

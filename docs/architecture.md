@@ -109,8 +109,8 @@ tree, focused widget and the shortcut commands that fired. `FrameConfig` also ca
   draw the overlays opened in its body (D139).
 - Disabled scope (D140): `Ui::node` inside a disabled scope (`with_enabled(false, ..)`) sets `State::Disabled` and
   clears `Focusable` and the actions, so a group node cannot be forgotten; a widget consumes its keys first and gates
-  after (`Ui::activation_keys`), so a disabled widget keeps its keys from the shortcuts. The stepper, slider, virtual
-  list, combo, search picker, text field, text area and scroll area do not yet (STATE's carried limits).
+  after (`Ui::activation_keys`), so a disabled widget keeps its keys from the shortcuts. Not every reader does yet:
+  "Disabled keys" below is the one list.
   `testing::disabled_violations(tree, root)` walks a subtree for a node that broke the rule.
 - Focus: scopes with a tab trap, initial focus, and restore on close (D72); keys are consumed by id
   (`consume_key`); a focused widget that is not registered for a frame loses focus unless a live
@@ -155,6 +155,79 @@ tree, focused widget and the shortcut commands that fired. `FrameConfig` also ca
   key (D70).
 
 Frames stay deterministic: time, input, theme, tier and strings all come from the caller.
+
+### Disabled keys
+
+The one list of which key readers hold D140's rule (D159). STATE, `CLAUDE.md` and DECISIONS point here and restate
+none of it. The rule: a widget that holds the key focus when its scope turns disabled (`with_enabled(false, ..)`) takes
+every key it takes when enabled and acts on none, so none reaches a shortcut. Focus stays on it. A widget disabled before
+it had focus gets no key, so a test that never focuses it proves nothing here.
+
+How it was made, at 406f780. The readers are every call in `crates/lune-ui-core/src` of `consume_key`,
+`consume_plain_key`, `consume_key_while_pressed`, `focus_events`, `activation_keys` and `rove_keys`; no other library crate
+calls them, and Tab and Escape are the frame's, at begin, so they are not in the table. Each reader then ran one probe in a
+scratch copy: focus it, disable it, press one of 27 keys with one binding on that key (14 named, 7 with Shift, a letter,
+Command with A, C, V, X, Z), against the same run enabled. A key that fires nothing enabled is a key the reader takes;
+a Shift form counts as its key below. Each run needs F5, which nothing takes, to fire: a `Global` binding is never
+offered under a modal, so it cannot fail there, and the dialog and the palette run on `Scope::Overlay`.
+
+A new reader, or a change to one, gets its row here. **Test** means a named test fails when that reader is made to leak
+(a mutant of it, run at 406f780). **Probe** means only the scratch probe showed it: nothing in the repo holds it.
+
+Holds, for the keys listed:
+
+| Reader | Keys | Evidence |
+|---|---|---|
+| `button`, `icon_button`, `toolbar_label` | Enter, Space | Test: `widget_button::a_disabled_widget_keeps_the_keys_it_handles_from_the_shortcuts` |
+| `checkbox`, `toggle` | Space | Test: the same |
+| `radio_group` | Space, arrows, Home, End | Test: the same |
+| Hosts of `Ui::button` or `icon_button`: `dialog`'s confirm and cancel, `toolbar_action`, the filter bar's clear, the tab strip's new tab | Enter, Space | Probe. `widget_dialog`'s `enter_and_space_on_a_disabled_confirm_...` binds `Global`, so it cannot fail (review F19) |
+| `star_rating` | Enter, Space, arrows, Home, End | Probe; no test failed under a mutant of its keys or of its `rove_keys` |
+| `nav_list`, so `sidebar` | Enter, Space, Up, Down, Home, End | Test: `widget_sidebar::a_focused_row_turned_disabled_keeps_its_keys_and_leaves_its_chords` (Enter, Space), `c4::m7::a_disabled_page_takes_every_key_a_focused_composite_takes_and_fires_no_global_binding` (the rest) |
+| `icon_rail` | Enter, Space, Up, Down, Home, End | Test: `c4`, the same |
+| `split_panes` | arrows, Home, End | Test: `c4`, the same, and `widget_split_panes::a_strip_that_was_focused_and_is_then_disabled_still_takes_its_keys_and_acts_on_none` |
+| `tab_strip`, its own keys (see `scroll_area` below for PageUp and PageDown) | Enter, Space, Left, Right, Home, End | Test: `widget_tab_strip::a_disabled_strip_activates_nothing_from_enter_or_space_and_still_does_after_enabling`, `a_disabled_strip_keeps_the_arrows_home_and_end_from_the_shortcuts` |
+| `menu` | Enter, Space, Up, Down, Home, End | Test: `widget_menu::a_disabled_scope_takes_the_keys_picks_nothing_and_marks_every_node` |
+| `flyout`, its rows (`menu_rows`) | Enter, Space, Up, Down, Home, End | Test: `widget_flyout::a_disabled_flyout_closes_on_escape_picks_nothing_and_marks_every_node` |
+| `dropdown`, with and without `max_rows` | Enter, Up, Down | Test: `widget_dropdown::a_disabled_dropdown_takes_the_keys_picks_nothing_and_marks_every_node` |
+| `tree_view` | Enter, Space, arrows, Home, End, PageUp, PageDown | Test: `widget_tree_view::a_disabled_tree_toggles_and_selects_nothing_takes_its_keys_and_passes_the_walk` |
+| `toasts`, the action and dismiss buttons | Enter, Space | Test: `widget_toast::the_toast_is_called_in_a_disabled_scope_and_every_node_says_so` (one stop); probe (both) |
+| `settings_page`, the restart action | Enter, Space | Probe. `widget_settings_page::a_disabled_page_reports_nothing_and_leaves_the_keys_to_shortcuts` never focuses it |
+| `command_palette`, its own keys | Up, Down, Enter | Test: `widget_command_palette::a_disabled_palette_takes_its_keys_activates_nothing_and_passes_the_walk` (`Scope::Overlay`) |
+
+Does not hold: each key listed fired nothing enabled and fired its binding disabled, with focus kept. All by probe;
+nothing acted. Each gates on `enabled` or a focus that is false in a disabled scope before it takes the key.
+
+| Reader | Keys that reach the shortcut |
+|---|---|
+| `stepper` | Up, Down |
+| `slider` | arrows |
+| `combo` | Enter, Space, Down |
+| `search_picker`, the trigger | Enter, Space. An open picker closes when disabled and focus returns to the trigger, so this row is what is left of its box |
+| `virtual_list` | Up, Down, Home, End, PageUp, PageDown; Command+C with a selection |
+| `text_field`, and the filter bar's box | Enter, Space, Backspace, Delete, Left, Right, Home, End, a typed character, Command+A, V, Z; Command+C, X with a selection (run on the field) |
+| `text_area` | those, and Up, Down, PageUp, PageDown |
+| `command_palette`, its search box (a filter bar) | Space, Backspace, Delete, Left, Right, Home, End, a typed character, Command+A, V, Z. Only Up, Down and Enter hold, by the palette's own keys |
+| `selectable_text`, so `kv_list` values and the flyout's routes (each run) | Enter, Left, Right, Home, End, Command+A; Command+C with a selection. Elided text (`spec` differs from `full`): Command+A, C |
+| `scroll_area`, a focused child the keys passed | PageUp, PageDown, Home, End, in an area that overflows. Run with a button, a slider and an overflowing tab strip (PageUp, PageDown; the strip takes the others first). So a child that holds its own keys above still loses these. Hosts: the page body, the settings content, the toast log and history |
+| `scroll_area`, itself focused (only by an app or assistive tool, STATE's limit from review F18) | Up, Down |
+
+Not a leak: Escape in a pointer drag (`consume_key_while_pressed`: the splitter, `drag_gesture`) fired nothing enabled
+and fired its binding once the scope turned disabled mid-drag (probe, splitter and tab strip). From reading: `Ui::interact`
+reports no press in a disabled scope, so the drag has ended and Escape has nothing to cancel, which `drag.rs` leaves to
+the shortcuts by design.
+
+One item disabled in a live group holds too, by probe: a nav row, a rail button, a menu row, a `toolbar_action`, the
+dialog's disabled confirm. A disabled radio option takes its keys, and the arrows move on to a live sibling.
+
+Not checked, from reading only:
+
+- `Ui::empty_state`'s and `Ui::callout`'s actions (`Ui::button`) and `Ui::toast_history`'s clear (`icon_button`), not run.
+- The tab strip's menu (`menu`), not run.
+- `free_drag_gesture`: no library caller, not run.
+- Keys outside the 27, such as Alt word moves in a text field and Control chords. D157 leaves chords to the shortcuts where it applies.
+- A closure host (`dialog` body, `popover`, `panel`, `page`, `side_panel`, `form_field`, `setting_row`) reads no key: what it
+  hosts has the row of that widget.
 
 ### Draw order
 

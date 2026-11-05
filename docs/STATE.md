@@ -1,20 +1,20 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-05 (M7 done on `orch/toolkit-v1`, all 15 steps, review rounds 1 and 2 fixed; a pause point, M8 waits for the user)
+Last updated: 2026-11-05 (M7 done on `orch/toolkit-v1`, all 15 steps, review rounds 1 to 3 fixed; a pause point, M8 waits for the user)
 
 ## Now
 
 M7 (overlays and containers) is built and closed on `orch/toolkit-v1`. Review, the final gate and the merge to main are
 the orchestrator's.
 
-What M7 added (DECISIONS D137 to D158; `docs/architecture.md` has the module map and "API changes since M1"):
+What M7 added (DECISIONS D137 to D159; `docs/architecture.md` has the module map and "API changes since M1"):
 - Plumbing: a sixth layer `LayerId::Raised` between `Modal` and `Toast` (`LAYER_COUNT` 6), chosen once in `Ui::overlay`
   when a popup or modal opens above an active modal and held to its close, so a popover, tooltip, combo list, menu or
   nested dialog over a dialog draws and takes input on top with no widget change; overlay content is out of any
   enclosing `record`; `BackdropRequest` carries `layer`, `sigma` and `saturation` and the offscreen split follows it
-  (`Scene::split`); `Painter::acrylic_radii`; `Node.level`; `Ui::node` marks every node in a disabled scope and keys are
-  consumed before they are gated; `testing::disabled_violations`.
+  (`Scene::split`); `Painter::acrylic_radii`; `Node.level`; `Ui::node` marks every node in a disabled scope; keys are
+  consumed before they are gated where the architecture's "Disabled keys" says so; `testing::disabled_violations`.
 - Overlays: menu rows (`MenuRow::Entry`, `Header`), keys, one highlight and anchored menus (`Ui::menu_with`); the
   dropdown's glass surface and `max_rows`; the glass popover; the flyout (`Ui::flyout`); toasts and their history
   (`Toasts`, `Ui::toasts`, `Ui::toast_history`); dialog variants (`Ui::dialog_with`: form width, scrim blur, disabled
@@ -35,6 +35,8 @@ a newer modal is a true open on `Raised`; Tab stays in the palette's box (`Filte
 clone no spec per frame; `wane` is in boundary rule 3; chords stay shortcuts on the splitter and `activation_keys`.
 Round 2 (D158): chords stay shortcuts on the nav list, so the sidebar's rows too; the rule is tested on all three
 modifiers and in a disabled scope; the carried limits below are corrected from probes.
+Round 3 (D159, docs only): the disabled keys are enumerated from every key reader in the source into one table in
+`docs/architecture.md`, and the lists that drifted are gone.
 
 Counts at the tip: gallery 61 pages, 305 scene names in `--list`; `cargo test --workspace` 1,743 passed, 0 failed.
 
@@ -58,16 +60,18 @@ no dependency). The gallery has a page registry (two legacy pages, 59 Ui pages),
   parent interleaves (fills under text). Two edges of that rule (step 1): a child held on `Raised` after its parent
   closed sits above, and is eligible over, a dialog opened in that window; on `Raised` a child opened in a nested dialog's
   body registers before that dialog's footer buttons, so where they overlap the buttons win the hit.
-- Disabled keys (M7 review F9, F14): the stepper, slider, virtual list, combo, search picker, text field, text area and
-  scroll area still gate key handling on `enabled` before they take the key, so one focused when its scope turns disabled
-  passes its keys to the shortcuts (`Ui::setting_row` hosts steppers). D140's consume-then-gate holds for the button,
-  toolbar, checkbox, toggle, radio group, tab strip, star rating, nav list and the M7 widgets, not for these eight (all
-  by probe but the scroll area, which is from reading the code, not run).
+- Disabled keys (M7 review F9, F14, F17; D159): not every key reader holds D140's consume-then-gate.
+  `docs/architecture.md`, "Disabled keys", is the one list of what holds, by which test or probe, what does not and what
+  was not checked; it is not restated here. Making the rest hold is open.
 - Chords (M7 review F13): the tab strip and star rating (Enter, Space), combo (Enter, Space, Down), search picker (Enter,
   Space), stepper (Up, Down) and slider (the arrows) take a Control, Alt or Command chord, so a shortcut on it dies on
-  one of them while it works on a button (by probe). The scroll area's Up and Down read the same (`consume_key`, from
-  reading, not run). D157's rule holds for `activation_keys`, the splitter's keys but Escape in a drag, the nav list,
-  `rove_keys`, the tree and the menu.
+  one of them while it works on a button (by probe). The scroll area's Up and Down do too (`consume_key`, by the
+  review's probe, on the path of the next limit). D157's rule holds for `activation_keys`, the splitter's keys but
+  Escape in a drag, the nav list, `rove_keys`, the tree and the menu.
+- A real arrow on a focused scroll area scrolls, and the wrong way (M7 review F18): the loop at `scroll_area.rs:485` is
+  for `Increment` and `Decrement`, sent as synthetic keys, but reads through `consume_key`, so real ArrowUp moves the
+  offset 0 to 48 and real ArrowDown back, against D99. Only an app or assistive tool that focuses the area itself reaches
+  it (by the review's probe); no toolkit code does.
 - One blur per frame: a glass menu over a dialog with a blurred scrim has none of its own.
 - Text cannot be cut by a rounded clip (it gets the clip's bounding rect). The toolkit keeps text out of the corners: the
   page and panel inset every text and padded body by the radius (8); a flush panel body is rounded-clipped for fills and

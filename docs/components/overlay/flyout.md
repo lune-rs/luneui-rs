@@ -87,7 +87,7 @@ Never animated: the stats and routes content (values change, [motion] list: high
 - Role `menu` for the action rows (`menu-item`, actions default and dismiss) [overlay.menu] [infra.accessibility], named by `Flyout.name` (empty uses `luneui.menu.name`).
 - The state text is a `status` node with a polite live region [infra.accessibility].
 - Stats and routes: `group` nodes (named by their labels and keys) with the cells' and pairs' own nodes under them; no actions [infra.accessibility].
-- Name of the flyout's rows: the app name and state, supplied by the app [infra.accessibility]. In a disabled scope every node is disabled and the keys are taken; Escape still closes.
+- Name of the flyout's rows: the app name and state, supplied by the app [infra.accessibility]. In a disabled scope every node is disabled and the rows' keys are taken, but a focused route value's are not (`docs/architecture.md`, "Disabled keys"); Escape still closes.
 
 ### Strings
 
