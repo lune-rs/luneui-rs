@@ -94,7 +94,7 @@ None: the control draws no text; the row's text is the owner's.
 
 ### Painter primitives
 
-- Existing only: `stroke` (lane lines and edges, the corner flattened to points by `edge_points`) and `arc` (the dot: a full circle of centre radius 2 and stroke width 6, which is a disc of radius 5). Everything is on the stroke list, which draws after every fill of a layer and in record order, so the dot is the top of the row's strokes; the GPU probe `a_lane_graph_dot_is_a_disc_of_diameter_10_over_a_line_of_another_colour` (lune-ui-wgpu, `primitives.rs`) proves the stroked circle reads as a solid disc. New: none.
+- Existing only: `stroke` (lane lines and edges, the corner flattened to points by `edge_points`) and a closed `stroke` for the dot (32 points on a circle of centre radius 2, stroke width 6: a disc of radius 5; `arc` flattens on the centre radius and left visible flats at scale 2, so it is not used). Everything is on the stroke list, which draws after every fill of a layer and in record order, so the dot is the top of the row's strokes; the GPU probe `a_lane_graph_dot_is_a_disc_of_diameter_10_over_a_line_of_another_colour` (lune-ui-wgpu, `primitives.rs`) proves the stroked circle reads as a solid disc. New: none.
 - Butt ends, not Lunegit's round caps: `StrokeStyle` has no cap mode. An edge ends under the dot and lane lines meet at the row's edges, so no end shows.
 
 ### Acceptance
