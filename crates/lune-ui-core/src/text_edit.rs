@@ -1,8 +1,12 @@
 //! The text editing engine: caret, selection, navigation, undo and redo, clipboard commands and
-//! the preedit an input method composes. It is pure: the app owns the string and passes it to
+//! the preedit an input method composes. It is pure: the app owns the text and passes it to
 //! every call, the layout answers the geometry through [`EditLayout`], and time arrives as an
 //! argument. A widget maps [`FocusEvent`]s with [`EditCommand::from_event`] and calls
 //! [`TextEdit::apply`].
+//!
+//! The text is read through [`EditText`] and changed through [`EditBuffer`]: a `String` as it
+//! always was, a [`CodeDoc`](crate::code_doc::CodeDoc) at a cost that does not follow the
+//! document's size. Every rule here serves both (D180).
 //!
 //! Every offset in this module is a char offset; the `TextSystem` queries use bytes of the spec's
 //! text, and [`SpecLayout`] turns one into the other at that seam, with the two private helpers
@@ -72,9 +76,88 @@ pub trait EditLayout {
     /// The visual lines, top to bottom, with `start` and `end` in chars.
     fn lines(&mut self) -> Vec<LineSpan>;
 
+    /// The visual lines around `at`, top to bottom, as [`Self::lines`] gives them: at least the
+    /// line that shows `at`, the lines from it to `reach` lines away (negative is up), and one
+    /// more on each side where there is one. A layout of a long document answers only these.
+    fn lines_near(&mut self, _at: usize, _reach: isize) -> Vec<LineSpan> {
+        self.lines()
+    }
+
     /// How many lines a page motion crosses.
     fn page_rows(&self) -> usize {
         DEFAULT_PAGE_ROWS
+    }
+}
+
+/// What the engine reads of a text. Offsets are chars, and all of them are total: past the end
+/// clamps. A reader of a long document answers each call without walking the document.
+pub trait EditText {
+    /// How many chars the text holds.
+    fn char_len(&self) -> usize;
+
+    /// A value that changes whenever the text does, which is how the engine sees an external
+    /// change.
+    fn fingerprint(&self) -> u64;
+
+    /// A slice around char `at` and the char offset it starts at; it holds `at`, and it starts
+    /// and ends where text segmentation does not reach across (the whole text, or whole lines).
+    /// Grapheme motions and snapping read this window of the caret. A word motion reads it too,
+    /// so a text that answers less than the whole of itself bounds the motion: see
+    /// [`CodeDoc`](crate::code_doc::CodeDoc).
+    fn window(&self, at: usize) -> (usize, &str);
+
+    /// The text of chars `chars`.
+    fn slice(&self, chars: Range<usize>) -> String;
+}
+
+/// What the engine changes of a text.
+pub trait EditBuffer: EditText {
+    /// Puts `with` in place of chars `chars`; offsets clamp as [`EditText`]'s do.
+    fn replace(&mut self, chars: Range<usize>, with: &str);
+}
+
+impl EditText for str {
+    fn char_len(&self) -> usize {
+        self.chars().count()
+    }
+
+    fn fingerprint(&self) -> u64 {
+        hash_of(self)
+    }
+
+    fn window(&self, _at: usize) -> (usize, &str) {
+        (0, self)
+    }
+
+    fn slice(&self, chars: Range<usize>) -> String {
+        let from = byte_of(self, chars.start);
+        self[from..byte_of(self, chars.end).max(from)].to_owned()
+    }
+}
+
+impl EditText for String {
+    fn char_len(&self) -> usize {
+        self.as_str().char_len()
+    }
+
+    fn fingerprint(&self) -> u64 {
+        self.as_str().fingerprint()
+    }
+
+    fn window(&self, at: usize) -> (usize, &str) {
+        self.as_str().window(at)
+    }
+
+    fn slice(&self, chars: Range<usize>) -> String {
+        self.as_str().slice(chars)
+    }
+}
+
+impl EditBuffer for String {
+    fn replace(&mut self, chars: Range<usize>, with: &str) {
+        let from = byte_of(self, chars.start);
+        let to = byte_of(self, chars.end).max(from);
+        self.replace_range(from..to, with);
     }
 }
 
@@ -363,8 +446,8 @@ struct Preedit {
 }
 
 /// The edit state of one text: caret and anchor as char offsets, the undo and redo logs, the
-/// preferred x of vertical motion, the preedit, and the hash of the last text it saw. The text
-/// stays with the app.
+/// preferred x of vertical motion, the preedit, and the fingerprint of the last text it saw. The
+/// text stays with the app.
 #[derive(Default)]
 pub struct TextEdit {
     caret: usize,
@@ -424,11 +507,39 @@ fn after(bounds: &[usize], at: usize) -> usize {
     bounds.get(i).map_or(at, |b| *b)
 }
 
-/// The char ranges of `text`'s word segments that hold a word: an alphanumeric char.
-fn words(text: &str, layout: &mut dyn EditLayout) -> Vec<(usize, usize)> {
-    let bounds = layout.boundaries(text, Unit::Word);
-    let mut chars = text.chars();
+/// The boundaries of `unit` in a [`EditText::window`], as offsets of the whole text.
+fn window_bounds(window: (usize, &str), unit: Unit, layout: &mut dyn EditLayout) -> Vec<usize> {
+    let (base, text) = window;
+    let mut bounds = layout.boundaries(text, unit);
+    if base != 0 {
+        for b in &mut bounds {
+            *b += base;
+        }
+    }
     bounds
+}
+
+/// The boundaries of `unit` around `at`.
+fn bounds_near<T: EditText + ?Sized>(
+    text: &T,
+    at: usize,
+    unit: Unit,
+    layout: &mut dyn EditLayout,
+) -> Vec<usize> {
+    window_bounds(text.window(at), unit, layout)
+}
+
+/// The char ranges of the word segments around `at` that hold a word (an alphanumeric char), and
+/// the window they were read from.
+fn words<'a, T: EditText + ?Sized>(
+    text: &'a T,
+    at: usize,
+    layout: &mut dyn EditLayout,
+) -> (Vec<(usize, usize)>, (usize, &'a str)) {
+    let window = text.window(at);
+    let bounds = window_bounds(window, Unit::Word, layout);
+    let mut chars = window.1.chars();
+    let spans = bounds
         .windows(2)
         .filter(|w| {
             let mut word = false;
@@ -438,24 +549,63 @@ fn words(text: &str, layout: &mut dyn EditLayout) -> Vec<(usize, usize)> {
             word
         })
         .map(|w| (w[0], w[1]))
-        .collect()
+        .collect();
+    (spans, window)
 }
 
-fn word_left(text: &str, at: usize, layout: &mut dyn EditLayout) -> usize {
-    words(text, layout)
-        .iter()
-        .rev()
-        .find(|w| w.0 < at)
-        .map_or(0, |w| w.0)
+/// Whether the line whose terminator ends at char `edge` is blank.
+fn blank_line_before<T: EditText + ?Sized>(text: &T, edge: usize) -> bool {
+    let tail = text.slice(edge.saturating_sub(3)..edge);
+    let body = tail
+        .strip_suffix("\r\n")
+        .or_else(|| tail.strip_suffix(['\n', '\r']))
+        .unwrap_or(&tail);
+    body.is_empty() || body.ends_with(['\n', '\r'])
 }
 
-fn word_right(text: &str, at: usize, keymap: Keymap, layout: &mut dyn EditLayout) -> usize {
-    let spans = words(text, layout);
-    let end = text.chars().count();
-    match keymap.word_motion {
-        WordMotion::EndOfWord => spans.iter().find(|w| w.1 > at).map_or(end, |w| w.1),
-        WordMotion::StartOfNext => spans.iter().find(|w| w.0 > at).map_or(end, |w| w.0),
+/// Whether the line that starts at char `edge` is blank.
+fn blank_line_at<T: EditText + ?Sized>(text: &T, edge: usize) -> bool {
+    let next = text.slice(edge..edge + 1);
+    next.is_empty() || next.starts_with(['\n', '\r'])
+}
+
+/// The word motions read [`EditText::window`]. Finding no word in it, they stop at its edge, unless
+/// the line past the edge holds text: a single blank line does not stop them, so they read one
+/// window more and stop at that one's edge. A text whose window is all of it never gets that far.
+fn word_left<T: EditText + ?Sized>(text: &T, at: usize, layout: &mut dyn EditLayout) -> usize {
+    let found = |spans: &[(usize, usize)]| spans.iter().rev().find(|w| w.0 < at).map(|w| w.0);
+    let (spans, (base, _)) = words(text, at, layout);
+    if let Some(word) = found(&spans) {
+        return word;
     }
+    if base == 0 || blank_line_before(text, base) {
+        return base;
+    }
+    let (spans, (base, _)) = words(text, base - 1, layout);
+    found(&spans).unwrap_or(base)
+}
+
+/// See [`word_left`].
+fn word_right<T: EditText + ?Sized>(
+    text: &T,
+    at: usize,
+    keymap: Keymap,
+    layout: &mut dyn EditLayout,
+) -> usize {
+    let found = |spans: &[(usize, usize)]| match keymap.word_motion {
+        WordMotion::EndOfWord => spans.iter().find(|w| w.1 > at).map(|w| w.1),
+        WordMotion::StartOfNext => spans.iter().find(|w| w.0 > at).map(|w| w.0),
+    };
+    let (spans, (base, window)) = words(text, at, layout);
+    if let Some(word) = found(&spans) {
+        return word;
+    }
+    let end = base + window.chars().count();
+    if end == text.char_len() || blank_line_at(text, end) {
+        return end;
+    }
+    let (spans, (base, window)) = words(text, end, layout);
+    found(&spans).unwrap_or_else(|| base + window.chars().count())
 }
 
 /// The index of the visual line that shows `at`: at a soft wrap, the later one.
@@ -478,11 +628,12 @@ fn row_end(rows: &[LineSpan], i: usize, bounds: &[usize]) -> usize {
 /// `text` as an insertion: in one line, line breaks become a space and control chars drop; in many
 /// lines every line break becomes `\n` (a lone `\r` too) and other chars stay.
 fn clean(text: &str, multiline: bool) -> String {
-    let unified = text.replace("\r\n", "\n").replace('\r', "\n");
+    let unified = str::replace(&text.replace("\r\n", "\n"), '\r', "\n");
     if multiline {
         return unified;
     }
-    let spaced = unified.replace(
+    let spaced = str::replace(
+        &unified,
         ['\n', '\u{b}', '\u{c}', '\u{85}', '\u{2028}', '\u{2029}'],
         " ",
     );
@@ -567,9 +718,14 @@ impl TextEdit {
     /// external change: both logs go, since they only replay against the text they were made on.
     /// Caret and anchor clamp into the text, down onto a grapheme boundary.
     pub fn sync(&mut self, text: &str, layout: &mut dyn EditLayout) {
-        let hash = hash_of(text);
-        if self.text_hash != Some(hash) {
-            self.text_hash = Some(hash);
+        self.sync_text(text, layout);
+    }
+
+    /// [`Self::sync`] for any [`EditText`]. A settled text costs one [`EditText::fingerprint`].
+    pub fn sync_text<T: EditText + ?Sized>(&mut self, text: &T, layout: &mut dyn EditLayout) {
+        let print = text.fingerprint();
+        if self.text_hash != Some(print) {
+            self.text_hash = Some(print);
             self.undo.clear();
             self.redo.clear();
             self.typing = false;
@@ -577,8 +733,15 @@ impl TextEdit {
         } else if self.snapped {
             return;
         }
-        let bounds = layout.boundaries(text, Unit::Grapheme);
-        let (caret, anchor) = (snap(&bounds, self.caret), snap(&bounds, self.anchor));
+        // They may sit a document apart; in one window, one read serves both.
+        let (near, far) = (text.window(self.caret), text.window(self.anchor));
+        let bounds = window_bounds(near, Unit::Grapheme, layout);
+        let caret = snap(&bounds, self.caret);
+        let anchor = if (near.0, near.1.len()) == (far.0, far.1.len()) {
+            snap(&bounds, self.anchor)
+        } else {
+            snap(&window_bounds(far, Unit::Grapheme, layout), self.anchor)
+        };
         if (caret, anchor) != (self.caret, self.anchor) {
             self.caret = caret;
             self.anchor = anchor;
@@ -623,15 +786,15 @@ impl TextEdit {
     /// Runs one command on `text`. It syncs first, so a text changed behind the engine is an
     /// external change here too. While a preedit exists only IME commands and a clipboard answer
     /// run; anything else does nothing and is not consumed.
-    pub fn apply(
+    pub fn apply<T: EditBuffer + ?Sized>(
         &mut self,
         cmd: EditCommand,
-        text: &mut String,
+        text: &mut T,
         layout: &mut dyn EditLayout,
         keymap: Keymap,
         now: Time,
     ) -> EditOutcome {
-        self.sync(text, layout);
+        self.sync_text(&*text, layout);
         if self.preedit.is_some() && !cmd.runs_while_composing() {
             return EditOutcome::default();
         }
@@ -645,17 +808,17 @@ impl TextEdit {
         };
         match cmd {
             EditCommand::Move { motion, extend } => {
-                let at = self.motion_target(motion, text, layout, keymap, extend);
+                let at = self.motion_target(motion, &*text, layout, keymap, extend);
                 self.place(at, extend);
             }
             EditCommand::SelectAll => {
                 self.anchor = 0;
-                self.caret = text.chars().count();
+                self.caret = text.char_len();
                 self.preferred_x = None;
             }
-            EditCommand::SelectWordAt(at) => self.select_word(at, text, layout),
+            EditCommand::SelectWordAt(at) => self.select_word(at, &*text, layout),
             EditCommand::SelectLineAt(at) => {
-                let rows = layout.lines();
+                let rows = layout.lines_near(at, 0);
                 if !rows.is_empty() {
                     let row = rows[row_of(&rows, at)];
                     self.anchor = row.start;
@@ -673,8 +836,11 @@ impl TextEdit {
                 let sel = self.selection();
                 let from = match (sel.is_empty(), word) {
                     (false, _) => sel.start,
-                    (true, true) => word_left(text, self.caret, layout),
-                    (true, false) => before(&layout.boundaries(text, Unit::Grapheme), self.caret),
+                    (true, true) => word_left(&*text, self.caret, layout),
+                    (true, false) => before(
+                        &bounds_near(&*text, self.caret, Unit::Grapheme, layout),
+                        self.caret,
+                    ),
                 };
                 out.changed = self.replace(text, from, sel.end, "", false, now);
             }
@@ -682,8 +848,11 @@ impl TextEdit {
                 let sel = self.selection();
                 let to = match (sel.is_empty(), word) {
                     (false, _) => sel.end,
-                    (true, true) => word_right(text, self.caret, keymap, layout),
-                    (true, false) => after(&layout.boundaries(text, Unit::Grapheme), self.caret),
+                    (true, true) => word_right(&*text, self.caret, keymap, layout),
+                    (true, false) => after(
+                        &bounds_near(&*text, self.caret, Unit::Grapheme, layout),
+                        self.caret,
+                    ),
                 };
                 out.changed = self.replace(text, sel.start, to, "", false, now);
             }
@@ -692,9 +861,9 @@ impl TextEdit {
             EditCommand::Copy | EditCommand::Cut if self.selection().is_empty() => {
                 out.consumed = false;
             }
-            EditCommand::Copy => out.clipboard_write = self.selected_text(text),
+            EditCommand::Copy => out.clipboard_write = self.selected_text(&*text),
             EditCommand::Cut if edits => {
-                out.clipboard_write = self.selected_text(text);
+                out.clipboard_write = self.selected_text(&*text);
                 if out.clipboard_write.is_some() {
                     let sel = self.selection();
                     out.changed = self.replace(text, sel.start, sel.end, "", false, now);
@@ -702,11 +871,11 @@ impl TextEdit {
             }
             EditCommand::Paste if edits => out.clipboard_read = true,
             EditCommand::PlaceCaret(pos) => {
-                let at = self.hit(pos, text, layout);
+                let at = self.hit(pos, &*text, layout);
                 self.place(at, false);
             }
             EditCommand::ExtendTo(pos) => {
-                let at = self.hit(pos, text, layout);
+                let at = self.hit(pos, &*text, layout);
                 self.place(at, true);
             }
             EditCommand::Enter if self.flags.multiline => {
@@ -745,12 +914,11 @@ impl TextEdit {
         (shown, Some(range))
     }
 
-    fn selected_text(&self, text: &str) -> Option<String> {
+    fn selected_text<T: EditText + ?Sized>(&self, text: &T) -> Option<String> {
         if self.flags.password {
             return None;
         }
-        let sel = self.selection();
-        Some(text[byte_of(text, sel.start)..byte_of(text, sel.end)].to_owned())
+        Some(text.slice(self.selection()))
     }
 
     /// Puts the caret at `at`; without `extend` the anchor follows. Keeps the preferred x: a
@@ -762,14 +930,24 @@ impl TextEdit {
         }
     }
 
-    fn hit(&mut self, pos: (f32, f32), text: &str, layout: &mut dyn EditLayout) -> usize {
+    fn hit<T: EditText + ?Sized>(
+        &mut self,
+        pos: (f32, f32),
+        text: &T,
+        layout: &mut dyn EditLayout,
+    ) -> usize {
         self.preferred_x = None;
         let at = layout.hit(pos);
-        snap(&layout.boundaries(text, Unit::Grapheme), at)
+        snap(&bounds_near(text, at, Unit::Grapheme, layout), at)
     }
 
-    fn select_word(&mut self, at: usize, text: &str, layout: &mut dyn EditLayout) {
-        let bounds = layout.boundaries(text, Unit::Word);
+    fn select_word<T: EditText + ?Sized>(
+        &mut self,
+        at: usize,
+        text: &T,
+        layout: &mut dyn EditLayout,
+    ) {
+        let bounds = bounds_near(text, at, Unit::Word, layout);
         let i = bounds.partition_point(|b| *b <= at);
         let (from, to) = match (i.checked_sub(1).and_then(|i| bounds.get(i)), bounds.get(i)) {
             (Some(from), Some(to)) => (*from, *to),
@@ -782,10 +960,10 @@ impl TextEdit {
         self.preferred_x = None;
     }
 
-    fn motion_target(
+    fn motion_target<T: EditText + ?Sized>(
         &mut self,
         motion: Motion,
-        text: &str,
+        text: &T,
         layout: &mut dyn EditLayout,
         keymap: Keymap,
         extend: bool,
@@ -797,12 +975,12 @@ impl TextEdit {
             Motion::PageDown => Some(layout.page_rows().max(1) as isize),
             _ => None,
         };
-        let bounds = layout.boundaries(text, Unit::Grapheme);
         if let Some(rows) = vertical {
-            return self.vertical_target(rows, &bounds, layout);
+            return self.vertical_target(rows, text, layout);
         }
         self.preferred_x = None;
         let head = self.caret;
+        let bounds = bounds_near(text, head, Unit::Grapheme, layout);
         let sel = self.selection();
         match motion {
             Motion::GraphemeLeft if !extend && !sel.is_empty() => sel.start,
@@ -812,7 +990,7 @@ impl TextEdit {
             Motion::WordLeft => word_left(text, head, layout),
             Motion::WordRight => word_right(text, head, keymap, layout),
             Motion::LineStart | Motion::LineEnd => {
-                let rows = layout.lines();
+                let rows = layout.lines_near(head, 0);
                 if rows.is_empty() {
                     return head;
                 }
@@ -824,20 +1002,20 @@ impl TextEdit {
                 }
             }
             Motion::TextStart => 0,
-            Motion::TextEnd => text.chars().count(),
+            Motion::TextEnd => text.char_len(),
             Motion::LineUp | Motion::LineDown | Motion::PageUp | Motion::PageDown => head,
         }
     }
 
     /// The offset `delta` visual lines from the caret, at the preferred x; past the first or last
     /// line it stops there, and with no line to go to the caret stays.
-    fn vertical_target(
+    fn vertical_target<T: EditText + ?Sized>(
         &mut self,
         delta: isize,
-        bounds: &[usize],
+        text: &T,
         layout: &mut dyn EditLayout,
     ) -> usize {
-        let rows = layout.lines();
+        let rows = layout.lines_near(self.caret, delta);
         let head = self.caret;
         if rows.is_empty() {
             return head;
@@ -850,15 +1028,16 @@ impl TextEdit {
         }
         let row = rows[to];
         let at = layout.hit((x, row.y + row.height / 2.0));
-        snap(bounds, at.min(row_end(&rows, to, bounds)).max(row.start))
+        let bounds = bounds_near(text, row.start, Unit::Grapheme, layout);
+        snap(&bounds, at.min(row_end(&rows, to, &bounds)).max(row.start))
     }
 
     /// Replaces the selection with `insert`, cleaned and cut to fit; `typing` lets it join the
     /// typed run before it. Empty text after cleaning changes nothing, selection included.
-    fn insert(
+    fn insert<T: EditBuffer + ?Sized>(
         &mut self,
         insert: &str,
-        text: &mut String,
+        text: &mut T,
         layout: &mut dyn EditLayout,
         typing: bool,
         now: Time,
@@ -866,7 +1045,7 @@ impl TextEdit {
         let sel = self.selection();
         let mut insert = clean(insert, self.flags.multiline);
         if let Some(max) = self.flags.max_chars {
-            let kept = text.chars().count().saturating_sub(sel.len());
+            let kept = text.char_len().saturating_sub(sel.len());
             let room = max.saturating_sub(kept);
             if insert.chars().count() > room {
                 let cut = snap(&layout.boundaries(&insert, Unit::Grapheme), room);
@@ -881,9 +1060,9 @@ impl TextEdit {
 
     /// The one place an edit changes `text`: chars `start..end` become `insert`, the caret lands
     /// after it, and the undo log learns of it. A password keeps no step.
-    fn replace(
+    fn replace<T: EditBuffer + ?Sized>(
         &mut self,
-        text: &mut String,
+        text: &mut T,
         start: usize,
         end: usize,
         insert: &str,
@@ -893,9 +1072,8 @@ impl TextEdit {
         if start == end && insert.is_empty() {
             return false;
         }
-        let (from, to) = (byte_of(text, start), byte_of(text, end));
-        let removed = text[from..to].to_owned();
-        text.replace_range(from..to, insert);
+        let removed = text.slice(start..end);
+        text.replace(start..end, insert);
         let before = (self.caret, self.anchor);
         let landed = start + insert.chars().count();
         self.caret = landed;
@@ -928,38 +1106,37 @@ impl TextEdit {
             }
         }
         self.typing = typing;
-        self.text_hash = Some(hash_of(text));
+        self.text_hash = Some(text.fingerprint());
         true
     }
 
-    fn undo(&mut self, text: &mut String) -> bool {
+    fn undo<T: EditBuffer + ?Sized>(&mut self, text: &mut T) -> bool {
         let Some(step) = self.undo.pop_back() else {
             return false;
         };
         Self::swap(text, step.at, &step.inserted, &step.removed);
         (self.caret, self.anchor) = step.before;
         self.preferred_x = None;
-        self.text_hash = Some(hash_of(text));
+        self.text_hash = Some(text.fingerprint());
         self.redo.push(step);
         true
     }
 
-    fn redo(&mut self, text: &mut String) -> bool {
+    fn redo<T: EditBuffer + ?Sized>(&mut self, text: &mut T) -> bool {
         let Some(step) = self.redo.pop() else {
             return false;
         };
         Self::swap(text, step.at, &step.removed, &step.inserted);
         (self.caret, self.anchor) = step.after;
         self.preferred_x = None;
-        self.text_hash = Some(hash_of(text));
+        self.text_hash = Some(text.fingerprint());
         self.undo.push_back(step);
         true
     }
 
     /// Puts `to` in place of `from`, which sits at char `at`.
-    fn swap(text: &mut String, at: usize, from: &str, to: &str) {
-        let start = byte_of(text, at);
-        text.replace_range(start..start + from.len(), to);
+    fn swap<T: EditBuffer + ?Sized>(text: &mut T, at: usize, from: &str, to: &str) {
+        text.replace(at..at + from.chars().count(), to);
     }
 
     fn set_preedit(&mut self, text: String, cursor: Option<(usize, usize)>) {
