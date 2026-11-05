@@ -114,7 +114,7 @@ None: the value and option text are app data.
 
 ## Open questions
 
-- None.
+- Open (API, a later step): `Ui::combo` calls `Ui::dropdown`, so a combo has no path to the glass list of `DropdownOptions::glass` [D143]; Wane's combos draw a glass list.
 
 ## Notes for the planner
 

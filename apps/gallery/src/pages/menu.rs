@@ -81,7 +81,7 @@ const VARIANTS: [MenuRow<'static>; 8] = [
     MenuRow::Entry(MenuItem {
         glyph: None,
         text: "Profile",
-        shortcut: "",
+        shortcut: "Work",
         disabled: false,
         danger: false,
         chevron: true,
@@ -89,7 +89,7 @@ const VARIANTS: [MenuRow<'static>; 8] = [
     MenuRow::Entry(MenuItem {
         glyph: None,
         text: "Live sessions",
-        shortcut: "",
+        shortcut: "3",
         disabled: true,
         danger: false,
         chevron: true,

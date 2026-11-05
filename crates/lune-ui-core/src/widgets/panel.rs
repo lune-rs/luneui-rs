@@ -79,7 +79,7 @@ impl PanelKind {
 /// What [`Ui::panel`] is given besides its rect.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct PanelOptions<'a> {
-    /// The title (`font_m` on a 20 px line, medium, `fg_bright`).
+    /// The title (`font_m` on a 20 px line, medium, `fg_primary`).
     pub title: Option<&'a str>,
     /// The meta at the header's right (`font_s` on 16, `fg_tertiary`).
     pub meta: Option<&'a str>,
@@ -198,7 +198,7 @@ impl Ui<'_> {
                         let room = (rect.w - 2.0 * head_pad_x - meta_w - gap).max(0.0);
                         let style = Style {
                             line: TITLE_LINE,
-                            ..Style::ui(t.font_m, t.fg_bright).medium()
+                            ..Style::ui(t.font_m, t.fg_primary).medium()
                         };
                         let spec = p.elide(&Spec::plain(title, style), room);
                         p.text(&spec, rect.x + head_pad_x, rect.y + HEADER_PAD.0);

@@ -90,7 +90,7 @@ fn rows(tray: Tray) -> [MenuRow<'static>; 5] {
     };
     [
         row("Open Wane", "", false, false),
-        row("Profile", "", true, false),
+        row("Profile", "Work", true, false),
         row(
             if tray == Tray::Paused {
                 "Resume compression"

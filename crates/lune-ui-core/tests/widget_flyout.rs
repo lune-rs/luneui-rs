@@ -213,7 +213,8 @@ fn the_size_is_the_drawn_card_at_the_three_states() {
 
 #[test]
 fn empty_stats_and_routes_take_no_height_and_neighbours_share_a_margin() {
-    // 6 + 6 of padding, a 32 px header; the strip is 6 + 16 + 20 + 6 = 48; three routes are 72;
+    // 6 + 6 of padding, a 32 px header; the strip is 6 + 16 + 20 + 6 = 48 in a 1 px
+    // outline = 50; three routes are 72;
     // the separator 11 and the rows 28 each.
     let rows = 11.0 + 4.0 * 28.0;
     let full = serving();
@@ -230,11 +231,11 @@ fn empty_stats_and_routes_take_no_height_and_neighbours_share_a_margin() {
     let bare = Flyout { rows: &[], ..none };
     assert_eq!(size_of(&bare), (340.0, 12.0 + 32.0));
     assert_eq!(size_of(&none), (340.0, 12.0 + 32.0 + rows));
-    assert_eq!(size_of(&stats).1, 12.0 + 32.0 + 8.0 + 48.0 + 8.0 + rows);
+    assert_eq!(size_of(&stats).1, 12.0 + 32.0 + 8.0 + 50.0 + 8.0 + rows);
     assert_eq!(size_of(&routes).1, 12.0 + 32.0 + 8.0 + 72.0 + 8.0 + rows);
     assert_eq!(
         size_of(&full).1,
-        12.0 + 32.0 + 8.0 + 48.0 + 8.0 + 72.0 + 8.0 + rows
+        12.0 + 32.0 + 8.0 + 50.0 + 8.0 + 72.0 + 8.0 + rows
     );
     // Drawn, the card is the size, and the empty parts leave no node.
     let mut h = opened(&none);
@@ -582,4 +583,34 @@ fn a_disabled_flyout_closes_on_escape_picks_nothing_and_marks_every_node() {
     }
     key(&mut h, NamedKey::Escape);
     assert!(frame(&mut h, 410).1.dismissed, "Escape still closes it");
+}
+
+/// The routes' keys are set at `font_s` (Wane's `.c-kv dt`), and the stats strip has its outline:
+/// a 1 px ring at radius 8 on the strip's 50 px rect, with the cells 1 px inside it.
+#[test]
+fn the_routes_keys_are_small_and_the_strip_has_its_outline() {
+    let f = serving();
+    let mut h = opened(&f);
+    let (scene, _, out) = draw(&mut h, 600, Some(&f));
+    let key_style = Style {
+        line: 20.0,
+        ..Style::ui(DARK.font_s, DARK.fg_tertiary)
+    };
+    let layer = &scene.layers[LayerId::Popup as usize];
+    let want = lune_ui_core::text::TextKey(Spec::plain("Sonnet", key_style).cache_key(1.0));
+    assert!(layer.texts.iter().any(|t| t.key == want), "key at font_s");
+    let strip = out
+        .tree
+        .get(root().with("stats-group"))
+        .expect("stats")
+        .bounds;
+    assert_eq!(strip.h, 50.0);
+    let ring = layer
+        .geometry
+        .under
+        .iter()
+        .find(|s| s.params[0] == 1.0 && s.radii == [8.0; 4])
+        .expect("the strip's ring");
+    assert_eq!(ring.rect, [strip.x, strip.y, strip.w, strip.h]);
+    assert_eq!(ring.color, premul(DARK.border_subtle));
 }

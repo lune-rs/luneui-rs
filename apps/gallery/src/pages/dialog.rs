@@ -8,13 +8,14 @@
 use std::time::Duration;
 
 use lune_ui::input::NamedKey;
-use lune_ui::lunegit_dark::{self, THEME};
+use lune_ui::lunegit_dark;
 use lune_ui::motion::MotionTier;
 use lune_ui::paint::Rect;
-use lune_ui::text::{Spec, Style};
 use lune_ui::ui::Ui;
 use lune_ui::widgets::button::{ButtonKind, button_width};
 use lune_ui::widgets::dialog::{Cancel, Dialog, DialogGlass, DialogOptions, DialogWidth};
+use lune_ui::widgets::field::FieldState;
+use lune_ui::widgets::form_field::FormField;
 use lune_ui::widgets::menu::MenuRow;
 use lune_ui::widgets::popover::PopoverOptions;
 
@@ -75,6 +76,13 @@ struct Dialogs {
     stop_at: Option<Duration>,
     /// The overlay the body opens is open.
     child: bool,
+    /// The form's four fields.
+    values: [String; 4],
+}
+
+/// The form's starting values, in the order of [`FORM_FIELDS`].
+fn form_values() -> [String; 4] {
+    ["staging", "10.0.0.4:8443", "wane-staging", "100"].map(String::from)
 }
 
 fn variant(variant: Variant) -> Box<dyn PageState> {
@@ -83,6 +91,7 @@ fn variant(variant: Variant) -> Box<dyn PageState> {
         open: true,
         stop_at: None,
         child: variant.has_child(),
+        values: form_values(),
     })
 }
 
@@ -92,6 +101,7 @@ fn live() -> Box<dyn PageState> {
         open: false,
         stop_at: None,
         child: false,
+        values: form_values(),
     })
 }
 
@@ -107,6 +117,7 @@ fn closing() -> Box<dyn PageState> {
             open: true,
             stop_at: None,
             child: false,
+            values: form_values(),
         }
     })
 }
@@ -180,6 +191,7 @@ impl PageState for Dialogs {
         if self.open && self.stop_at.is_none_or(|t| ui.time() < t) {
             let kind = self.variant;
             let child = &mut self.child;
+            let values = &mut self.values;
             let d = dialog_of(kind);
             let options = DialogOptions {
                 width: if kind == Variant::Form {
@@ -191,7 +203,7 @@ impl PageState for Dialogs {
                 confirm_enabled: kind != Variant::Disabled,
             };
             let r = ui.dialog_with("dialog", &d, &options, &glass(), |ui, bx, by, bw| {
-                body(ui, kind, child, bx, by, bw);
+                body(ui, kind, child, values, bx, by, bw);
             });
             if r.confirmed || r.cancelled {
                 self.open = false;
@@ -213,7 +225,7 @@ fn dialog_of(kind: Variant) -> Dialog<'static> {
         Variant::Form => Dialog {
             title: "Add upstream",
             message: "Name the upstream and say where it listens.",
-            extra_h: 116.0,
+            extra_h: 138.0,
             confirm: "Add",
             cancel: Cancel::Default,
         },
@@ -230,35 +242,51 @@ fn dialog_of(kind: Variant) -> Dialog<'static> {
 }
 
 /// The app's part of the dialog.
-fn body(ui: &mut Ui<'_>, kind: Variant, child: &mut bool, bx: f32, by: f32, bw: f32) {
+fn body(
+    ui: &mut Ui<'_>,
+    kind: Variant,
+    child: &mut bool,
+    values: &mut [String; 4],
+    bx: f32,
+    by: f32,
+    bw: f32,
+) {
     match kind {
         Variant::Confirm | Variant::Blur | Variant::Disabled => {
             caption(ui, "3 files changed since the last save.", bx, by + 12.0);
         }
-        Variant::Form => form_body(ui, bx, by, bw),
+        Variant::Form => form_body(ui, values, bx, by, bw),
         _ => anchored(ui, kind, child, bx, by),
     }
 }
 
-/// Two columns of labelled fields, the form's extra slot.
-fn form_body(ui: &mut Ui<'_>, bx: f32, by: f32, bw: f32) {
+/// The form's labels and grid cells (column, row), in the order of [`form_values`].
+const FORM_FIELDS: [(&str, f32, f32); 4] = [
+    ("Name", 0.0, 0.0),
+    ("Listens on", 1.0, 0.0),
+    ("Token", 0.0, 1.0),
+    ("Weight", 1.0, 1.0),
+];
+
+/// A field's control height, and the pitch of the form's rows (20 label + 4 + 32 + 12 between).
+const FORM_FIELD_H: f32 = 32.0;
+const FORM_PITCH: f32 = 68.0;
+
+/// Two columns of form fields, the form's extra slot: the label above a text field, as the
+/// widgets draw them.
+fn form_body(ui: &mut Ui<'_>, values: &mut [String; 4], bx: f32, by: f32, bw: f32) {
     let col = (bw - 16.0) / 2.0;
-    let fields = [
-        ("Name", "staging", 0.0, 0.0),
-        ("Listens on", "10.0.0.4:8443", 1.0, 0.0),
-        ("Token", "wane-staging", 0.0, 1.0),
-        ("Weight", "100", 1.0, 1.0),
-    ];
-    for (label, value, c, r) in fields {
-        let x = bx + c * (col + 16.0);
-        let y = by + 12.0 + r * 56.0;
-        caption(ui, label, x, y);
-        let field = Rect::new(x, y + 18.0, col, 28.0);
-        let p = ui.painter();
-        p.fill(field, 6.0, THEME.surface_input);
-        p.ring(field, 6.0, 1.0, THEME.border, false);
-        let spec = Spec::plain(value, Style::ui(THEME.font_base, THEME.fg_primary));
-        p.text(&spec, field.x + 8.0, field.y + 6.0);
+    for ((label, c, r), value) in FORM_FIELDS.into_iter().zip(values.iter_mut()) {
+        let at = Rect::new(bx + c * (col + 16.0), by + 12.0 + r * FORM_PITCH, col, 0.0);
+        let field = FormField {
+            label,
+            control_size: (0.0, FORM_FIELD_H),
+            ..FormField::default()
+        };
+        ui.form_field(label, at, &field, |ui, r| {
+            ui.text_field("input", r, value, "", FieldState::default())
+                .id
+        });
     }
 }
 

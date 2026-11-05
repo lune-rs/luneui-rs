@@ -107,7 +107,7 @@ None: nav labels and footer text are app text (Wane mock content, [W docs/ui/com
 
 ## Open questions
 
-None. Closed by [D149]: the sidebar is a toolkit component (`Ui::sidebar` with `SidebarBody::{Nav, Steps}` and an optional `SidebarFooter`); it has no collapse width of its own (the app owns the width and the rect it passes); the arrows are the nav list's (one stop, no wrap); the footer's bottom sits 10 px above the rect's bottom, its hairline spans the rect's width. Lunegit's side panel column width is the app's (it sets the window's split, not the host). Native rendering: no blur of its own: it shows the window material.
+None. Closed by [D149]: the sidebar is a toolkit component (`Ui::sidebar` with `SidebarBody::{Nav, Steps}` and an optional `SidebarFooter`); it has no collapse width of its own (the app owns the width and the rect it passes); the arrows are the nav list's (one stop, no wrap); the footer's bottom sits 10 px above the rect's bottom, its hairline spans the rect's width. Lunegit's side panel column width is the app's (it sets the window's split, not the host). Native rendering: no blur of its own: it shows the window material. Open: Wane's footer sets the label in UI type and only the address in mono, with a second line (`~/.wane`); `SidebarFooter` is one line in one family (`mono` covers it all), so matching needs an API change (a later step). The gallery keeps `mono: true` on the address footer.
 
 ## Notes for the planner
 

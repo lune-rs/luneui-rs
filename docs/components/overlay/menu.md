@@ -42,15 +42,15 @@ Conflicts (winner):
 - Open duration: Lunegit Base 250 ms quad-out [L src/Lunegit.Desktop/Themes/Animations.axaml:250-256] vs moved MENU_IN 180 ms cubic-out [R crates/lune-ui-core/src/widgets/menu.rs:21,46-49]. The moved values win; the Lunegit fade is the source of the opacity-only Reduced rule.
 - Pressed and disabled looks: Lunegit's values win [L src/Lunegit.Desktop/App.axaml:802-810, src/Lunegit.Desktop/Themes/DarkTheme.axaml:305,307] [D141].
 - Chevron colour: Wane quaternary [W docs/ui/mocks/css/components.css:676] vs `menu_text_tertiary` [D141]. The decision wins.
-- Header name: Wane 13 [W docs/ui/mocks/css/components.css:674] vs 12, the menu's label size [D141]. The decision wins; medium weight, 20 and 16 px lines and the 6 px padding are Wane's.
+- Header name: 13 (`font_base`) Medium, as Wane [W docs/ui/mocks/css/components.css:674]; the menu's label stays 12 [D141]. Settled in M7 step 13 (ruling C15); the 20 and 16 px lines and the 6 px padding are Wane's.
 
 ### Anatomy
 
 - Panel: min width 190; width = max(190, 6 + 8 + 14 + 8 + label + 16 + hint + 8 + 6) when a shortcut exists [R crates/lune-ui-core/src/widgets/menu.rs:78,89]; height = 2 × 6 + 28 per item + 11 per separator [R crates/lune-ui-core/src/widgets/menu.rs:71-73,79-80,90-92].
 - Placement: x clamped to `[8, window w − w − 8]`; y is the pointer y, or flipped above (`max(y − h, 8)`) when `y + h > window h − 8` [R crates/lune-ui-core/src/widgets/menu.rs:95-100].
 - Glass: backdrop blur at radius 9 [R crates/lune-ui-core/src/widgets/menu.rs:109]; fill `menu_glass` #2C2C2C9D [R crates/lune-ui-core/src/widgets/menu.rs:110, crates/lune-ui-core/src/theme.rs:79]; 1 px ring `menu_popup_border` #FFFFFF3A [R crates/lune-ui-core/src/widgets/menu.rs:111, crates/lune-ui-core/src/theme.rs:75]; radius 9 [R crates/lune-ui-core/src/widgets/menu.rs:74].
-- Header row: `menu::HEADER` 48 high: 6 padding, a 20 px line (8 px `status_dot::paint`, 8 gap, name 12 medium `menu_text_primary`), a 16 px line (status `font_s`, `menu_text_tertiary`, under the dot), 6 padding, 8 in from the row [W docs/ui/mocks/css/components.css:673-675] [D141]. It widens the panel like an item.
-- Chevron: `icon::CHEVRON_RIGHT` 12 px where the hint goes, 8 in from the right, `menu_text_tertiary`; a row has a hint or a chevron and the chevron wins (it counts 16 + 12 in the width) [D141].
+- Header row: `menu::HEADER` 48 high: 6 padding, a 20 px line (8 px `status_dot::paint`, 8 gap, name `font_base` 13 medium `menu_text_primary`), a 16 px line (status `font_s`, `menu_text_tertiary`, under the dot), 6 padding, 8 in from the row [W docs/ui/mocks/css/components.css:673-675] [D141]. It widens the panel like an item.
+- Chevron: `icon::CHEVRON_RIGHT` 12 px, 8 in from the right, `menu_text_quaternary`; a row may carry a hint as well, right-aligned 2 px before the chevron, and the row counts 16 + hint + 2 + 12 in the width (16 + 12 without a hint) [W docs/ui/mocks/css/components.css:676] [D141] (ruling C16; D141 does not say the chevron wins).
 - Item row: 28 high, x inset 6, width panel − 12 [R crates/lune-ui-core/src/widgets/menu.rs:72,121]; hover fill `menu_item_hover` #FFFFFF16 at radius 4 [R crates/lune-ui-core/src/widgets/menu.rs:123-124, crates/lune-ui-core/src/theme.rs:76].
 - Icon: 13 px glyph in a 14 px slot 8 px in from the row, `menu_text_tertiary` [R crates/lune-ui-core/src/widgets/menu.rs:126-128, crates/lune-ui-core/src/theme.rs:73]; label 8 px after the slot, 12 px, `menu_text_primary` [R crates/lune-ui-core/src/widgets/menu.rs:76,130-133, crates/lune-ui-core/src/theme.rs:72].
 - Shortcut hint: `font_s` 11 px, `menu_text_quaternary` #FFFFFF66, right-aligned 8 px in [R crates/lune-ui-core/src/widgets/menu.rs:77,135-138, crates/lune-ui-core/src/theme.rs:74,82].

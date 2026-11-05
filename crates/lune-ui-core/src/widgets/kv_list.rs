@@ -47,11 +47,11 @@ pub struct KvOptions {
     pub mono: bool,
 }
 
-/// The key text's style.
-fn key_style(t: &Theme) -> Style {
+/// The key text's style at `size` on the same 20 px line.
+fn key_style_sized(t: &Theme, size: f32) -> Style {
     Style {
         line: LINE,
-        ..Style::ui(t.font_base, t.fg_tertiary)
+        ..Style::ui(size, t.fg_tertiary)
     }
 }
 
@@ -68,8 +68,12 @@ fn value_style(t: &Theme, mono: bool) -> Style {
 }
 
 /// The key column's width: the longest key measured.
-fn key_column<H: Copy + PartialEq>(p: &mut Painter<'_, H>, pairs: &[(&str, &str)]) -> f32 {
-    let style = key_style(&p.theme);
+fn key_column<H: Copy + PartialEq>(
+    p: &mut Painter<'_, H>,
+    pairs: &[(&str, &str)],
+    key_size: f32,
+) -> f32 {
+    let style = key_style_sized(&p.theme, key_size);
     let mut w = 0.0_f32;
     for (k, _) in pairs {
         w = w.max(p.measure(&Spec::plain(*k, style)).0);
@@ -95,11 +99,24 @@ fn wrap_row(text_h: f32) -> f32 {
 }
 
 /// The height [`Ui::kv_list`] returns for `pairs` in a list `w` wide, without drawing.
+#[cfg(test)]
 pub(crate) fn height<H: Copy + PartialEq>(
     p: &mut Painter<'_, H>,
     pairs: &[(&str, &str)],
     opts: &KvOptions,
     w: f32,
+) -> f32 {
+    let key_size = p.theme.font_base;
+    height_keyed(p, pairs, opts, w, key_size)
+}
+
+/// [`height`] for keys set at `key_size` (the flyout's routes use the small size).
+pub(crate) fn height_keyed<H: Copy + PartialEq>(
+    p: &mut Painter<'_, H>,
+    pairs: &[(&str, &str)],
+    opts: &KvOptions,
+    w: f32,
+    key_size: f32,
 ) -> f32 {
     if pairs.is_empty() {
         return 0.0;
@@ -113,7 +130,7 @@ pub(crate) fn height<H: Copy + PartialEq>(
                 + LINE
         }
         KvMode::Wrap => {
-            let value_w = (w - key_column(p, pairs) - GAP).max(0.0);
+            let value_w = (w - key_column(p, pairs, key_size) - GAP).max(0.0);
             let style = value_style(&p.theme, opts.mono);
             pairs
                 .iter()
@@ -134,13 +151,27 @@ impl Ui<'_> {
         pairs: &[(&str, &str)],
         opts: &KvOptions,
     ) -> f32 {
+        let key_size = self.theme().font_base;
+        self.kv_list_keyed(key, rect, pairs, opts, key_size)
+    }
+
+    /// [`Ui::kv_list`] with the keys set at `key_size` (the stacked mode's keys are always
+    /// `font_s`).
+    pub(crate) fn kv_list_keyed(
+        &mut self,
+        key: impl Hash,
+        rect: Rect,
+        pairs: &[(&str, &str)],
+        opts: &KvOptions,
+        key_size: f32,
+    ) -> f32 {
         let t = *self.theme();
-        let key_style = key_style(&t);
+        let key_style = key_style_sized(&t, key_size);
         let stacked = opts.mode == KvMode::Stacked;
         let key_w = if stacked {
             0.0
         } else {
-            key_column(self.painter(), pairs)
+            key_column(self.painter(), pairs, key_size)
         };
         let col_w = ((rect.w - GAP) / 2.0).max(0.0);
         let value_x = rect.x + key_w + GAP;

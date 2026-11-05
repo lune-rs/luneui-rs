@@ -374,7 +374,7 @@ const VARIANTS: [MenuRow<'static>; 7] = [
     MenuRow::Entry(MenuItem {
         glyph: None,
         text: "Profile",
-        shortcut: "hidden by the chevron",
+        shortcut: "beside the chevron",
         disabled: false,
         danger: false,
         chevron: true,
@@ -828,7 +828,10 @@ fn a_wide_header_widens_the_panel() {
     ];
     let mut text = FakeText;
     let mut p = Painter::<u8>::new(1.0, win(), &mut text, None, DARK);
-    let spec = Spec::plain(name, Style::ui(12.0, DARK.menu_text_primary).medium());
+    let spec = Spec::plain(
+        name,
+        Style::ui(DARK.font_base, DARK.menu_text_primary).medium(),
+    );
     let nw = p.measure(&spec).0;
     let w = menu_layout(&mut p, &rows, AT).panel.w;
     assert_eq!(w, 12.0 + 8.0 + 8.0 + 8.0 + nw + 8.0);
@@ -852,7 +855,7 @@ fn the_variants_draw_their_colours() {
     let keys = text_keys(&scene);
     let label = |text, c| key_of(&Spec::plain(text, Style::ui(12.0, c)));
     let hint = |text, c| key_of(&Spec::plain(text, Style::ui(t.font_s, c)));
-    let medium = Style::ui(12.0, t.menu_text_primary).medium();
+    let medium = Style::ui(t.font_base, t.menu_text_primary).medium();
     let status = Style::ui(t.font_s, t.menu_text_tertiary);
     for (what, k) in [
         ("name", key_of(&Spec::plain("Serving on :4646", medium))),
@@ -879,14 +882,45 @@ fn the_variants_draw_their_colours() {
             key_of(&icon::glyph(
                 icon::CHEVRON_RIGHT,
                 12.0,
-                t.menu_text_tertiary,
+                t.menu_text_quaternary,
             )),
+        ),
+        (
+            "chevron row hint",
+            hint("beside the chevron", t.menu_text_quaternary),
         ),
     ] {
         assert!(keys.contains(&k), "{what}");
     }
-    let lost = hint("hidden by the chevron", t.menu_text_quaternary);
-    assert!(!keys.contains(&lost), "the chevron wins over the hint");
+}
+
+/// A row with a hint and a chevron draws both: the chevron 8 in from the row's right edge, the
+/// hint right-aligned 2 before it, and the panel counts 16 + hint + 2 + 12.
+#[test]
+fn a_row_draws_its_hint_and_its_chevron() {
+    let rows = [MenuRow::Entry(MenuItem {
+        text: "Work",
+        shortcut: "3",
+        chevron: true,
+        ..MenuItem::default()
+    })];
+    let mut text = FakeText;
+    let mut p = Painter::<u8>::new(1.0, win(), &mut text, None, DARK);
+    let hint_w = p
+        .measure(&Spec::plain(
+            "3",
+            Style::ui(DARK.font_s, DARK.menu_text_quaternary),
+        ))
+        .0;
+    let label_w = p
+        .measure(&Spec::plain(
+            "Work",
+            Style::ui(12.0, DARK.menu_text_primary),
+        ))
+        .0;
+    let w = menu_layout(&mut p, &rows, AT).panel.w;
+    let want = (12.0 + 8.0 + 14.0 + 8.0 + label_w + 16.0 + hint_w + 2.0 + 12.0 + 8.0).max(190.0);
+    assert_eq!(w, want);
 }
 
 #[test]

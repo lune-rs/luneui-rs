@@ -139,6 +139,8 @@ None: row names and costs are app text.
 
 ## Open questions
 
+`CHEVRON_GAP` (4) and `GLYPH_GAP` (6) have no source. The director accepted them in M7 step 13: 8 + 14 + 4 puts a label 26 in, so each child's label sits exactly one indent (16) right of its parent's and the chevron's ink keeps about 6 from the text; 6 after a 14 px glyph matches the menu's rhythm.
+
 None open. Answered by [D151] and `docs/motion.md`: the expand's duration and easing, the keyboard model and the Tab stop, the selection look, and Wane's "guide at x 16" against Lunegit's column centre 8 (Lunegit wins; the guide's origin is the row's left edge). The side-panel hover class on the branch rows stays unverified and changes nothing here: the row fill is the kind's `hover`, instant. `Reduced` and `Off` report `Idle` on the frame an app's write shows; a key's or a click's frame also asks D81's one catch-up, with nothing in flight.
 
 ## Notes for the planner

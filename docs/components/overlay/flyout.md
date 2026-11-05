@@ -44,7 +44,7 @@ Conflicts: none between sources. Wane `--popup-border` (flyout, 1 px) differs in
 - Routes: padding 0 8; `data.kv-list` rows [W docs/ui/components.md:571-584].
 - Action rows: `overlay.menu` items [overlay.menu].
 - Placement on Windows: 12 px above the taskbar, 12 px from the right edge [W docs/ui/components.md:571-584]; the window is placed from the tray icon's rect and kept on screen [W docs/ui/components.md:571-584]. M7 places the card from the app's anchor rect with `place`: gap 12 from the anchor, margin 12 from the window's edges, shifted inside them; M10 passes the tray rect.
-- Built geometry (card width 340, content 328 wide at 6 px in: the 5 px padding and the 1 px ring): the header is 32 high (6 + a 20 px line + 6), its text 8 px in; the mark is a 16 px glyph of the icon font in `fg_primary`, 8 px before the wordmark (14 px bold `gold`); the state is 11 px on a 16 px line in `fg_secondary`, right-aligned 8 px in, with its dot 6 px before it. The stats strip (compact cells) is the content width with 8 px above and below; the routes are `Ui::kv_list` mono, inset 8 more, with 8 px above and below; neighbouring margins collapse into one 8 px, as in the mock. Empty `stats` or `routes` draw nothing and take no height. A separator (the menu's 11 px row) and the rows follow when there are rows. All text is at least 14 px from the card's edge.
+- Built geometry (card width 340, content 328 wide at 6 px in: the 5 px padding and the 1 px ring): the header is 32 high (6 + a 20 px line + 6), its text 8 px in; the mark is a 16 px glyph of the icon font in `fg_primary`, 8 px before the wordmark (14 px bold `gold`); the state is 11 px on a 16 px line in `fg_secondary`, right-aligned 8 px in, with its dot 6 px before it. The stats strip (compact cells) is the content width, 50 high: a 1 px `border_subtle` outline at radius 8 (Wane's `c-panel c-panel--strip`) drawn after the cells, which sit 1 px inside it, with 8 px above and below; the routes are `Ui::kv_list` mono, inset 8 more, with 8 px above and below, their keys at `font_s` 11 (`.c-flyout__routes .c-kv dt`) and the values at 13; neighbouring margins collapse into one 8 px, as in the mock. Empty `stats` or `routes` draw nothing and take no height. A separator (the menu's 11 px row) and the rows follow when there are rows. All text is at least 14 px from the card's edge.
 
 ### States
 
@@ -122,6 +122,7 @@ None of its own: the header, stats, route and action labels are app text (Wane m
 
 ## Open questions
 
+- Open (API, a later step): a route's state note ("loaded", Wane's `.c-flyout__note`, sans 11 tertiary after the id) has no place in `routes: &[(&str, &str)]`.
 - Resolved [D145]: a toolkit component, so every consumer gets the surface and the keys.
 - Native rendering: needs a separate borderless, always-on-top, non-activating glass window anchored to the tray rect, with the in-app blur over the real desktop (platform work, section 5). The mock fixes its position; the real window must be placed from the tray icon's rect and kept on screen.
 - Resolved [D145]: the menu's keys carry over, and focus-visible is the highlight.

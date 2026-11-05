@@ -107,7 +107,7 @@ impl PageState for Live {
         let mut next = false;
         ui.page("card", rect, &opts, |ui, slot| match slot {
             PageSlot::Actions(at) => {
-                let y = at.y + (at.h - BUTTON_H) / 2.0;
+                let y = at.y;
                 ui.button(
                     "export",
                     Rect::new(at.x, y, EXPORT_W, BUTTON_H),

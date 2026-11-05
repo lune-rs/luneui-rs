@@ -165,7 +165,7 @@ fn title_spec(s: &str) -> Spec {
         s,
         Style {
             line: 20.0,
-            ..Style::ui(DARK.font_m, DARK.fg_bright).medium()
+            ..Style::ui(DARK.font_m, DARK.fg_primary).medium()
         },
     )
 }

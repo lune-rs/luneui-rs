@@ -39,6 +39,10 @@ const MARK_GAP: f32 = 8.0;
 /// The state's line, and the distance of its dot from its text.
 const STATE_LINE: f32 = 16.0;
 const STATE_DOT_GAP: f32 = 6.0;
+/// The stats strip's outline radius, and its width (the cells sit this far inside it).
+const STRIP_RADIUS: f32 = 8.0;
+const STRIP_RING: f32 = 1.0;
+/// The routes' key size is `font_s`, as Wane's `.c-flyout__routes .c-kv dt`.
 /// The routes' horizontal inset.
 const ROUTES_INSET: f32 = 8.0;
 /// A separator row's height.
@@ -89,12 +93,12 @@ fn block_heights<H: Copy + PartialEq>(p: &mut Painter<'_, H>, f: &Flyout<'_>) ->
         0.0
     } else {
         let cells = compact(f.stats);
-        stat::strip_height(p, &cells, w)
+        stat::strip_height(p, &cells, w - 2.0 * STRIP_RING) + 2.0 * STRIP_RING
     };
     let routes = if f.routes.is_empty() {
         0.0
     } else {
-        kv_list::height(p, f.routes, &ROUTES, w - 2.0 * ROUTES_INSET)
+        kv_list::height_keyed(p, f.routes, &ROUTES, w - 2.0 * ROUTES_INSET, p.theme.font_s)
     };
     (stats, routes)
 }
@@ -209,7 +213,16 @@ pub(crate) fn flyout_body(ui: &mut Ui<'_>, rect: Rect, f: &Flyout<'_>) -> Option
             at,
         );
         let cells = compact(f.stats);
-        ui.node_container(group, |ui| ui.stat_strip("stats", at, &cells));
+        let inner = Rect::new(
+            at.x + STRIP_RING,
+            at.y + STRIP_RING,
+            at.w - 2.0 * STRIP_RING,
+            at.h - 2.0 * STRIP_RING,
+        );
+        ui.node_container(group, |ui| ui.stat_strip("stats", inner, &cells));
+        // The outline of Wane's `c-panel--strip`, after the cells.
+        ui.painter()
+            .ring(at, STRIP_RADIUS, STRIP_RING, t.border_subtle, false);
         y += stats_h;
     }
     if !f.routes.is_empty() {
@@ -226,7 +239,9 @@ pub(crate) fn flyout_body(ui: &mut Ui<'_>, rect: Rect, f: &Flyout<'_>) -> Option
             &joined(f.routes.iter().map(|(k, _)| *k)),
             at,
         );
-        ui.node_container(group, |ui| ui.kv_list("routes", at, f.routes, &ROUTES));
+        ui.node_container(group, |ui| {
+            ui.kv_list_keyed("routes", at, f.routes, &ROUTES, t.font_s)
+        });
         y += routes_h;
     }
     if !f.stats.is_empty() || !f.routes.is_empty() {

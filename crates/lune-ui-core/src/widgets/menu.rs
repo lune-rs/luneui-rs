@@ -61,7 +61,7 @@ pub fn menu_close_anim(t: f32) -> Option<MenuAnim> {
 pub struct MenuItem<'s> {
     pub glyph: Option<&'s str>,
     pub text: &'s str,
-    /// The hint at the row's right end; a `chevron` takes its place.
+    /// The hint at the row's right end, 2 px before a `chevron` when the row has one.
     pub shortcut: &'s str,
     /// Not picked, skipped by the keys and never lit; it still blocks what is under it.
     pub disabled: bool,
@@ -145,8 +145,9 @@ pub const HEADER: f32 = 48.0;
 const HEADER_PAD: f32 = 6.0;
 const HEADER_NAME_LINE: f32 = 20.0;
 const HEADER_STATUS_LINE: f32 = 16.0;
-/// The side of a chevron's glyph.
+/// The side of a chevron's glyph, and its distance from the hint left of it.
 const CHEVRON: f32 = 12.0;
+const CHEVRON_GAP: f32 = 2.0;
 
 /// How one row is drawn this frame; the default draws it at rest.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -192,7 +193,10 @@ pub struct MenuLayout {
 /// The header's name and status specs.
 fn header_specs(theme: &crate::theme::Theme, name: &str, status: &str) -> (Spec, Spec) {
     (
-        Spec::plain(name, Style::ui(12.0, theme.menu_text_primary).medium()),
+        Spec::plain(
+            name,
+            Style::ui(theme.font_base, theme.menu_text_primary).medium(),
+        ),
         Spec::plain(status, Style::ui(theme.font_s, theme.menu_text_tertiary)),
     )
 }
@@ -222,12 +226,16 @@ pub fn menu_layout_at<H: Copy + PartialEq>(
         h += e.height();
         if let Some(item) = e.item() {
             let tw = p.measure(&Spec::plain(item.text, label_style)).0;
-            let sw = if item.chevron {
-                16.0 + CHEVRON
-            } else if item.shortcut.is_empty() {
+            let hint_w = if item.shortcut.is_empty() {
                 0.0
             } else {
-                16.0 + p.measure(&Spec::plain(item.shortcut, hint_style)).0
+                p.measure(&Spec::plain(item.shortcut, hint_style)).0
+            };
+            let sw = match (item.chevron, item.shortcut.is_empty()) {
+                (true, true) => 16.0 + CHEVRON,
+                (true, false) => 16.0 + hint_w + CHEVRON_GAP + CHEVRON,
+                (false, true) => 0.0,
+                (false, false) => 16.0 + hint_w,
             };
             w = w.max(2.0 * PAD + 8.0 + 14.0 + 8.0 + tw + sw + 8.0);
         } else if let MenuRow::Header { name, status, .. } = e {
@@ -291,13 +299,13 @@ fn paint_item<H: Copy + PartialEq>(
         let c = t.menu_text_disabled;
         (c, c, c, c)
     } else if item.danger {
-        (t.err, t.err, t.menu_text_quaternary, t.menu_text_tertiary)
+        (t.err, t.err, t.menu_text_quaternary, t.menu_text_quaternary)
     } else {
         (
             t.menu_text_primary,
             t.menu_text_tertiary,
             t.menu_text_quaternary,
-            t.menu_text_tertiary,
+            t.menu_text_quaternary,
         )
     };
     let icon_slot = Rect::new(r.x + 8.0, r.y, 14.0, r.h);
@@ -309,13 +317,17 @@ fn paint_item<H: Copy + PartialEq>(
         Rect::new(icon_slot.right() + 8.0, r.y, 0.0, r.h),
         0.0,
     );
+    // The hint ends 8 in from the row, or 2 before the chevron, which keeps its place.
+    let mut hint_right = r.right() - 8.0;
     if item.chevron {
         let slot = Rect::new(r.right() - 8.0 - CHEVRON, r.y, CHEVRON, r.h);
         p.text_centered(&icon::glyph(icon::CHEVRON_RIGHT, CHEVRON, chevron), slot);
-    } else if !item.shortcut.is_empty() {
+        hint_right = slot.x - CHEVRON_GAP;
+    }
+    if !item.shortcut.is_empty() {
         let spec = Spec::plain(item.shortcut, Style::ui(t.font_s, hint));
         let sw = p.measure(&spec).0;
-        p.text_in(&spec, Rect::new(r.right() - 8.0 - sw, r.y, sw, r.h), 0.0);
+        p.text_in(&spec, Rect::new(hint_right - sw, r.y, sw, r.h), 0.0);
     }
 }
 
