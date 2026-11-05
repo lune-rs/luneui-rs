@@ -13,6 +13,7 @@
 //! selection fill draws only while it is focused, and a focus loss clears the selection.
 
 use std::hash::Hash;
+use std::ops::Range;
 
 use super::field::{EditConfig, NodeFacts, Shown, begin_edit, edit_node, edit_pointer, end_edit};
 use super::text_lines::range_boxes;
@@ -80,39 +81,7 @@ impl Ui<'_> {
         let ink = t.text_selection;
 
         if positioned {
-            let cfg = EditConfig {
-                style: spec.runs[0].1,
-                password: false,
-                read_only: true,
-                multiline: spec.wrap.is_some(),
-                max_chars: None,
-                wrap: spec.wrap,
-                page_rows: 1,
-                rich: Some(spec),
-            };
-            let mut text = full.to_owned();
-            let (mut st, _) = begin_edit(self, id, &cfg, &mut text);
-            if !held {
-                let c = st.edit.caret();
-                st.edit.set_selection(c, c);
-            }
-            edit_pointer(self, &cfg, &mut st, &r, &mut text, (rect.x, rect.y));
-            let shown = Shown::new(&cfg, &st.edit, &text, focused);
-            let range = if focused { st.edit.selection() } else { 0..0 };
-            for b in range_boxes(self, &shown.spec, &range) {
-                let at = Rect::new(rect.x + b.x, rect.y + b.y, b.w, b.h);
-                self.painter().fill(at, 0.0, ink);
-            }
-            self.painter().text(spec, rect.x, rect.y);
-            let facts = NodeFacts {
-                role: Role::StaticText,
-                name,
-                description: None,
-                error: false,
-                enabled: r.enabled,
-            };
-            edit_node(self, id, hit, &cfg, &st.edit, &text, facts);
-            end_edit(self, id, &cfg, st, None);
+            self.selectable_positional(id, hit, &r, rect, spec, full, name, &[], focused, held);
         } else {
             let mut selected = self.persistent::<WholeSelection>(id).0 && held;
             if r.press_started {
@@ -170,4 +139,139 @@ impl Ui<'_> {
         }
         r
     }
+
+    /// Rich read-only text under `key`, selectable by position over its own joined text, whose
+    /// chars `pads` (sorted, apart) are padding the drawing needs and the text does not hold: a
+    /// copy writes the selection without them and the node's name, value and selection leave
+    /// them out, by offsets, so a char equal to a pad's outside the pads stays. The node is a
+    /// `StaticText`.
+    pub(super) fn selectable_padded(
+        &mut self,
+        key: impl Hash,
+        rect: Rect,
+        spec: &Spec,
+        pads: &[Range<usize>],
+    ) -> Response {
+        let id = self.id(key);
+        let (w, h) = self.painter().measure(spec);
+        let hit = Rect::new(
+            rect.x,
+            rect.y,
+            w.min(rect.w),
+            if h > 0.0 { h } else { rect.h },
+        );
+        let r = self.interact(id, hit, SELECT_SENSE);
+        let held = self.focus_state().0 == Some(id);
+        let full = joined_text(spec);
+        let name = strip_pads(&full, 0..full.chars().count(), pads);
+        if spec.runs.is_empty() {
+            return r;
+        }
+        self.selectable_positional(id, hit, &r, rect, spec, &full, &name, pads, r.focused, held);
+        if r.hovered || r.pressed {
+            self.set_cursor(CursorIcon::Text);
+        }
+        r
+    }
+
+    /// The positional case: the engine over `full`, which is the spec's joined text.
+    #[allow(clippy::too_many_arguments)]
+    fn selectable_positional(
+        &mut self,
+        id: crate::ui::WidgetId,
+        hit: Rect,
+        r: &Response,
+        rect: Rect,
+        spec: &Spec,
+        full: &str,
+        name: &str,
+        pads: &[Range<usize>],
+        focused: bool,
+        held: bool,
+    ) {
+        let ink = self.theme().text_selection;
+        let cfg = EditConfig {
+            style: spec.runs[0].1,
+            password: false,
+            read_only: true,
+            multiline: spec.wrap.is_some(),
+            max_chars: None,
+            wrap: spec.wrap,
+            page_rows: 1,
+            rich: Some(spec),
+        };
+        let before = self.pending_clipboard().map(str::to_owned);
+        let mut text = full.to_owned();
+        let (mut st, _) = begin_edit(self, id, &cfg, &mut text);
+        if !held {
+            let c = st.edit.caret();
+            st.edit.set_selection(c, c);
+        }
+        edit_pointer(self, &cfg, &mut st, r, &mut text, (rect.x, rect.y));
+        if !pads.is_empty() {
+            // A Copy this frame wrote the raw slice; the pads are not part of what was copied.
+            let sel = st.edit.selection();
+            let raw = text_slice(full, sel.clone());
+            if self.pending_clipboard() != before.as_deref()
+                && self.pending_clipboard() == Some(&raw)
+            {
+                self.clipboard_write(strip_pads(full, sel, pads));
+            }
+        }
+        let shown = Shown::new(&cfg, &st.edit, &text, focused);
+        let range = if focused { st.edit.selection() } else { 0..0 };
+        for b in range_boxes(self, &shown.spec, &range) {
+            let at = Rect::new(rect.x + b.x, rect.y + b.y, b.w, b.h);
+            self.painter().fill(at, 0.0, ink);
+        }
+        self.painter().text(spec, rect.x, rect.y);
+        let facts = NodeFacts {
+            role: Role::StaticText,
+            name,
+            description: None,
+            error: false,
+            enabled: r.enabled,
+        };
+        edit_node(self, id, hit, &cfg, &st.edit, &text, facts);
+        end_edit(self, id, &cfg, st, None);
+        if !pads.is_empty() {
+            let stripped = strip_pads(full, 0..full.chars().count(), pads);
+            self.patch_node(id, |n| {
+                let at = n.text.as_ref().map_or((0, 0), |t| t.selection);
+                n.value = Some(Value::Text(stripped.clone()));
+                n.text = Some(TextValue {
+                    text: stripped,
+                    selection: (unpadded(at.0, pads), unpadded(at.1, pads)),
+                });
+            });
+        }
+    }
+}
+
+/// Chars `range` of `text`.
+fn text_slice(text: &str, range: Range<usize>) -> String {
+    text.chars()
+        .skip(range.start)
+        .take(range.end.saturating_sub(range.start))
+        .collect()
+}
+
+/// Chars `range` of `text` without the chars in `pads`.
+fn strip_pads(text: &str, range: Range<usize>, pads: &[Range<usize>]) -> String {
+    text.chars()
+        .enumerate()
+        .skip(range.start)
+        .take(range.end.saturating_sub(range.start))
+        .filter(|(at, _)| !pads.iter().any(|p| p.contains(at)))
+        .map(|(_, c)| c)
+        .collect()
+}
+
+/// `at`, a char offset of the padded text, as an offset of the text without the pads.
+fn unpadded(at: usize, pads: &[Range<usize>]) -> usize {
+    let inside: usize = pads
+        .iter()
+        .map(|p| at.min(p.end).saturating_sub(p.start.min(at)))
+        .sum();
+    at - inside
 }

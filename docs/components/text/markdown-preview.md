@@ -124,6 +124,7 @@ n/a — the preview is document content: no change in it animates (a document re
 - `markdown-html-inert`: an HTML block as inert text, settled.
 - `markdown-rule`: a thematic break between two paragraphs, settled.
 - `markdown-readonly-tasks`: task boxes on a read-only host, settled.
+- `markdown-link-focus`: the first link with keyboard focus: its ring, settled (D197).
 
 ### Painter primitives
 
@@ -144,16 +145,29 @@ n/a — the preview is document content: no change in it animates (a document re
 
 ### Build
 
-- Milestone: M9
+- Milestone: M9. Built in M9 step 7: `Ui::markdown`, `MdBlock`, `MdInline`, `MdItem`, `MdTask`, `MdRow`, `MdAlign`, `MdImage`, `MdOptions`, `MdResponse`, `is_actionable`, 16 scenes on the page `markdown-preview`.
 - Depends on: text.code-block, text.text-edit, layout.scroll-area, widget.scrollbar, widget.checkbox, core.image, core.ui, core.focus, infra.accessibility
 
 ## Open questions
 
-- Keyboard reach of links: Lunegit's links are not focusable; a keyboard user cannot follow one. `role` `link` exists in the node list, so making them Tab stops is possible; M9 decides.
-- `role-gap: heading level` (SF8 has no heading role).
-- Selection across blocks: Lunegit selects within one block only; whether the toolkit does better is M9's call.
-- The Markdown colours (`#61AFEF`, `#20FFFFFF`, `#10FFFFFF`, `#0AFFFFFF`, `#14FFFFFF`) are Lunegit resources with no `Theme` field; M9 adds `Theme` values or derives them from existing tokens (hard rule 8, [D51]).
-- Whether a host-rendered Mermaid or math image is supported in v1: the model allows an image per block; no engine ships (D13).
+Answered in M9 (D12 of the plan, D197):
+
+- Keyboard reach of links: an actionable link is a Tab stop with `Role::Link`, Enter and Space raise it. One region per row box of the link, the first is the stop; a press on a link raises it once and starts no selection.
+- `role-gap: heading level`: a heading is a `StaticText` node with `level` set, no new role.
+- Selection across blocks: no. A selection stays inside one block, as Lunegit's.
+- The Markdown colours: tokens. `link` (links, quote bar), `code_inline` (inline code pill), and the rest are existing tokens of equal value: `surface_input` (code, quote and HTML fill), `surface_hover` (table header), `surface_active` (rule, table border and row rules).
+- A host-rendered Mermaid or maths image: the model's `rendered` field takes a picture the app drew. No engine ships.
+
+Built as the entry's contract, with these notes:
+
+- The model is borrowed data (`&[MdBlock]`); the toolkit draws it and interprets none of it. A level outside 1 to 6 clamps, a picture with no size is its placeholder, an `http` or `https` image target is never drawn, even with a picture supplied.
+- The top-level blocks are the virtual rows: an estimate of 48 until built, then the measured height, and a block above the first in view that changes height moves the area by as much. A width change forgets the heights.
+- Inline code is a run padded with two U+2009 either side (in the UI face), which draws the pill's padding. The pads are left out of Copy and of the node by offset, so a U+2009 in the source survives. Underline, strike and the pill are fills from the text's row boxes.
+- The marker column of a list is as wide as its widest marker, so the items' text lines up (Lunegit sizes each item's own).
+- A task box is the checkbox's look at 15 px, drawn from the model with no transition of its own. Click or Space reports `task` when `tasks_live`; the box keeps the model's value until the app changes it. Off, it draws and reports nothing.
+- A table's cells do not wrap: a column is its widest cell plus 16, 80 at least, and the table scrolls sideways alone; the header fill and the rules reach the table's width when it is narrower than the view.
+- Mermaid and maths without a picture show the failure note above the source block, not inside it (the code block holds only code).
+- The document is a `Group`; a quote a `Group`, a list a `List` with `ListItem`s, a table a `Table` with `Row`s and `Cell`s or `ColumnHeader`s.
 
 ## Notes for the planner
 

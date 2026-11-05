@@ -1075,6 +1075,11 @@ impl<'a> Ui<'a> {
         self.clipboard_write = Some(text);
     }
 
+    /// The text a widget has put on the clipboard this frame, if any.
+    pub(crate) fn pending_clipboard(&self) -> Option<&str> {
+        self.clipboard_write.as_deref()
+    }
+
     /// Asks for the clipboard's text; the answer arrives as an event on a later frame. Repeated
     /// calls in a frame send one request.
     pub fn clipboard_read(&mut self) {
