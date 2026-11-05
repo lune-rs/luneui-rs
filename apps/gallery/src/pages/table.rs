@@ -69,7 +69,13 @@ const DATA: [TableColumn<'static>; 4] = [
 
 /// The tones table: one column a tone, so each reads against the others.
 const TONES: [TableColumn<'static>; 6] = [
-    tone_col(1, "Default"),
+    TableColumn {
+        key: 1,
+        title: "Default",
+        width: ColumnWidth::Fill(1.0),
+        num: false,
+        sortable: false,
+    },
     tone_col(2, "Muted"),
     tone_col(3, "Warn"),
     tone_col(4, "Err"),
@@ -367,9 +373,8 @@ fn cell(ui: &mut Ui<'_>, mode: Mode, toggles: &mut [bool; 6], c: &CellCtx) -> Ce
             _ => Cell::text(grouped(latency(id))),
         },
         Mode::Tones => match c.column {
-            0 => Cell::text(format!("Row {id}")).tone(CellTone::Default),
-            n => Cell::text(format!("{:.2}", f64::from(id + 1) * 12.5 * n as f64))
-                .tone(TONE_OF[n - 1]),
+            0 => Cell::text(format!("Row {id}")).tone(TONE_OF[0]),
+            n => Cell::text(format!("{:.2}", f64::from(id + 1) * 12.5 * n as f64)).tone(TONE_OF[n]),
         },
         Mode::Controls => controls_cell(ui, toggles, c, id),
         Mode::Wrap => wrap_cell(c, id),
@@ -485,14 +490,14 @@ const SCENES: &[UiScene] = &[
         600,
         Expect::Settled,
     ),
-    // Tab to the header, Right to Requests (Status does not sort), Enter: sorted by requests,
-    // ascending, the header ring on.
+    // Tab to the header (Route, the first sortable), Enter: ascending, Enter again: descending,
+    // the header ring on.
     scene(
         "table-sorted",
         few,
         &[
             key(0, &[Ev::Tab]),
-            key(50, &[Ev::Key(NamedKey::ArrowRight)]),
+            key(50, &[Ev::Key(NamedKey::Enter)]),
             key(100, &[Ev::Key(NamedKey::Enter)]),
         ],
         900,

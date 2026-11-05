@@ -51,7 +51,7 @@ pub const LEGEND_GAP: f32 = 8.0;
 /// Between a swatch and its name.
 pub const KEY_GAP: f32 = 8.0;
 /// Between two legend entries.
-pub const KEY_SPACING: f32 = 16.0;
+pub const KEY_SPACING: f32 = 12.0;
 
 /// One series: its legend name and the colour of its segments.
 #[derive(Debug, Clone, Copy, PartialEq)]
