@@ -2,10 +2,10 @@
 id: text.diff-view
 title: Diff view (unified, split, hunk actions)
 area: text
-status: planned
+status: in-progress
 consumers: lunegit, wane
-source: Lunegit: src/Lunegit.Desktop/Views/DiffView.axaml
-owner: —
+source: crates/lune-ui-core/src/widgets/diff_view.rs
+owner: toolkit-v1 M9
 summary: Unified and split diff over an app-supplied line model: line numbers, add and remove tints, hunk header rows with actions, row selection, intra-line marks
 ---
 

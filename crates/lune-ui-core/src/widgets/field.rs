@@ -17,6 +17,7 @@ use std::ops::Range;
 
 use super::input_box::{self, InputBoxLook};
 use super::label;
+use super::text_lines::range_boxes;
 use crate::access::{AccessValue, Action, Node, Role, State, TextValue, Value};
 use crate::color::{Rgba, premul};
 use crate::icon;
@@ -247,7 +248,7 @@ pub fn field<H: Copy + PartialEq>(
 
 /// How one edit widget runs its engine and shapes its text.
 #[derive(Debug, Clone, Copy)]
-pub(super) struct EditConfig {
+pub(super) struct EditConfig<'a> {
     pub(super) style: Style,
     pub(super) password: bool,
     pub(super) read_only: bool,
@@ -257,9 +258,12 @@ pub(super) struct EditConfig {
     pub(super) wrap: Option<f32>,
     /// How many lines a page motion crosses.
     pub(super) page_rows: usize,
+    /// The runs the text is drawn from when it is the joined text of this spec: a read-only rich
+    /// text, selected by position (D11). Any other text takes one run of `style`.
+    pub(super) rich: Option<&'a Spec>,
 }
 
-impl EditConfig {
+impl EditConfig<'_> {
     fn flags(&self) -> EditFlags {
         EditFlags {
             read_only: self.read_only,
@@ -272,6 +276,15 @@ impl EditConfig {
 
     /// The spec that draws `shown`; for a password, the mask, or nothing while it is empty.
     fn spec(&self, shown: &str) -> Spec {
+        if let Some(rich) = self.rich
+            && !self.password
+            && crate::text::joined_text(rich) == shown
+        {
+            return Spec {
+                runs: rich.runs.clone(),
+                wrap: self.wrap,
+            };
+        }
         let text = if self.password && !shown.is_empty() {
             "\u{2022}".repeat(MASK_DOTS)
         } else {
@@ -652,7 +665,11 @@ impl Shown {
 }
 
 /// Runs `f` on the plain layout of `spec`.
-fn drawn_layout<R>(ui: &mut Ui<'_>, spec: &Spec, f: impl FnOnce(&mut SpecLayout<'_>) -> R) -> R {
+pub(super) fn drawn_layout<R>(
+    ui: &mut Ui<'_>,
+    spec: &Spec,
+    f: impl FnOnce(&mut SpecLayout<'_>) -> R,
+) -> R {
     let p = ui.painter();
     let scale = p.s;
     let system: &mut dyn TextSystem = &mut *p.text;
@@ -662,38 +679,6 @@ fn drawn_layout<R>(ui: &mut Ui<'_>, spec: &Spec, f: impl FnOnce(&mut SpecLayout<
 /// Where the caret sits at `offset` of `spec`.
 pub(super) fn caret_at(ui: &mut Ui<'_>, spec: &Spec, offset: usize) -> CaretPos {
     drawn_layout(ui, spec, |l| l.caret(offset))
-}
-
-/// The boxes of chars `range` of `spec`, one per visual line it touches, from the text's top-left.
-pub(super) fn range_boxes(ui: &mut Ui<'_>, spec: &Spec, range: &Range<usize>) -> Vec<Rect> {
-    let Some((text, style)) = spec.runs.first().filter(|_| !range.is_empty()) else {
-        return Vec::new();
-    };
-    let parts = drawn_layout(ui, spec, |l| {
-        let rows = l.lines();
-        let spans = rows.iter().enumerate().filter_map(|(i, row)| {
-            let (a, b) = (range.start.max(row.start), range.end.min(row.end));
-            (a < b).then_some((i, *row, a, b))
-        });
-        let spans: Vec<_> = spans.collect();
-        spans
-            .into_iter()
-            .map(|(i, row, a, b)| (i, row, a, b, l.caret(a), l.caret(b)))
-            .collect::<Vec<_>>()
-    });
-    let mut boxes = Vec::with_capacity(parts.len());
-    for (i, row, a, b, from, to) in parts {
-        // A soft wrap's end offset shows on the next row, so this row's part is measured.
-        let to_x = if to.line == i {
-            to.x
-        } else {
-            let part: String = text.chars().skip(a).take(b - a).collect();
-            from.x + ui.painter().measure(&Spec::plain(part, *style)).0
-        };
-        let (x0, x1) = (from.x.min(to_x), from.x.max(to_x));
-        boxes.push(Rect::new(x0, row.y, x1 - x0, row.height));
-    }
-    boxes
 }
 
 /// Draws `shown` with its text's top-left at `(x, y)`: the selection and the clause under the
@@ -921,6 +906,7 @@ impl Ui<'_> {
             max_chars: opts.max_chars,
             wrap: None,
             page_rows: 1,
+            rich: None,
         };
         let mut r = self.interact(id, rect, EDIT_SENSE);
         let (mut st, frame) = begin_edit(self, id, &cfg, text);

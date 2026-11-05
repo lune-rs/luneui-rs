@@ -2,10 +2,10 @@
 id: text.markdown-preview
 title: Markdown preview
 area: text
-status: planned
+status: in-progress
 consumers: lunegit
-source: Lunegit: src/Lunegit.Desktop/Views/MarkdownPreviewView.axaml
-owner: —
+source: crates/lune-ui-core/src/widgets/markdown.rs
+owner: toolkit-v1 M9
 summary: Renders an app-supplied Markdown block model: headings, paragraphs with inline marks, lists with task boxes, quotes, tables, code, images; links raise an event
 ---
 

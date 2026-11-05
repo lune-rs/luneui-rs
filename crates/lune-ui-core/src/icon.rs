@@ -5,6 +5,8 @@ use crate::color::Rgba;
 use crate::text::{Spec, Style};
 
 pub const ADD: &str = "\u{ea60}";
+/// `cod-remove`, a minus.
+pub const REMOVE: &str = "\u{eb3b}";
 pub const GEAR: &str = "\u{eb51}";
 pub const ELLIPSIS: &str = "\u{ea7c}";
 pub const CHROME_CLOSE: &str = "\u{eab8}";

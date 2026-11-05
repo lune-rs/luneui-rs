@@ -130,6 +130,19 @@ the plot, a slice's share of the turn), so a scale change animates with no speci
 The board's ghost tracks the pointer 1:1 and never transitions (`settle`). Off snaps every row above. The lane graph
 never animates (a self-painting surface, below).
 
+## M9 rows: the code block's button, the diff's hunk action
+
+Lunegit animates neither the code block nor the diff beyond a button's hover, so the rows are D40's kinds at their defaults
+[D186, D191]. Document text, the selection, lines and diff rows are not here: they never animate (below).
+
+| component | kind | property | duration | easing | reduced | cite |
+|---|---|---|---|---|---|---|
+| code block copy button | hover, press | the button fill, as the toolkit icon button | instant | linear | keep | [D40], [D186] |
+| code block copy icon | appear | the copy glyph and the check mark cross-fade when a copy lands and when the feedback ends; the feedback's clock is the frame time the app passes | instant | linear | snap | [D40], [D186] |
+| diff hunk action | hover, press | the action button's fill, as the toolkit icon button | instant | linear | keep | [D40], [D191] |
+
+Off snaps every row above.
+
 ## Tiers
 
 The app chooses the tier; the toolkit reads no OS setting (hard rule 2). Lunegit's three tiers are
@@ -180,6 +193,8 @@ From Lunegit's rules plus D40's performance rules:
   many times per second [L .claude/docs/animation-rules.md:148].
   A chart value escapes it with `live: true`: the app says the quantity changes often, and the bars and slices
   follow it directly, as the stat's `live` does [D126, D164].
+- Document text, the selection, lines of a code view, diff rows, and the mode and wrap switches of a diff or a code
+  view (M9): they change what the document is, not how it is shown [D186, D191].
 - Layout properties on large or virtualized surfaces; prefer transforms
   [L .claude/docs/animation-rules.md:149].
 - Anything longer than `slow` (500 ms), except the flash cue and the indicator loops

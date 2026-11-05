@@ -1,14 +1,18 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-06 (M9 in progress, step 1 of 9 done; M8 merged to main at 2474248)
+Last updated: 2026-11-06 (M9 in progress, steps 1 and 2 of 9 done; M8 merged to main at 2474248)
 
 ## Now
 
 M9 (text views: code block, code editor view, markdown preview, diff view) in progress. Step 1 is in: text readers consume then
 gate (D177: `begin_edit` and `selectable_text` take the keys while disabled and act on none, `TextEdit::takes`; the filter bar and
 the palette's box with them) and a wheel delta routes per axis (D178: `HitRecord.scroll_axes`, so a code block or column that scrolls
-one way no longer swallows the other, and the M8 sideways-swipe limit is gone). Steps 2 to 9 follow the plan.
+one way no longer swallows the other, and the M8 sideways-swipe limit is gone). Step 2 is in (the scaffold, D179 to D194):
+`Style.italic` (the GPU test shows the skew), six theme tokens, `icon::REMOVE`, the strings, `widgets::text_lines` (spans,
+`line_spec`, `range_boxes` across runs), rich selectable text by position (D187), the list frame's x axis, `fill`, `identity`
+and `link` with the scroll link, stub modules for the four widgets and four empty gallery pages (70 pages, 332 scenes still).
+Steps 3 to 9 follow the plan.
 
 M8 (data views: table, bar chart, pie chart, kanban board, lane graph) is merged to main at 2474248 (7 steps, DECISIONS
 D160 to D176) and closed: the cross-widget suite, the disabled-keys rows, the catalogue audit, the architecture notes and the
@@ -117,7 +121,7 @@ frame 19.01 ms (`radio-group`).
 
 ## Next
 
-1. M9 steps 2 to 9 (plan: scaffold, then the editor chain and the diff, the visual step, the close).
+1. M9 steps 3 to 9 (plan: scaffold, then the editor chain and the diff, the visual step, the close).
 2. CI (fmt, clippy `-D warnings`, tests on macOS, Windows and Linux) now that there is code to run.
 3. An export script for Luneterm's vendored snapshot, before Luneterm M9. The migration
    map for M11 is "API changes since M1" in `docs/architecture.md`.

@@ -4,7 +4,8 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 
 use glyphon::{
-    Attrs, Buffer, Color, Cursor, Family, FontSystem, Metrics, Shaping, SwashCache, Weight, Wrap,
+    Attrs, Buffer, Color, Cursor, Family, FontSystem, Metrics, Shaping, Style as FontStyle,
+    SwashCache, Weight, Wrap,
 };
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -417,6 +418,11 @@ impl TextSystem for TextCache {
             Attrs::new()
                 .family(family)
                 .weight(Weight(st.weight))
+                .style(if st.italic {
+                    FontStyle::Italic
+                } else {
+                    FontStyle::Normal
+                })
                 .color(Color::rgba(r, g, b, a))
         };
         let default = attrs(&first);

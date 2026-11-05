@@ -758,3 +758,44 @@ fn select_all_on_an_elided_value_focused_then_disabled_selects_nothing() {
         .selection;
     assert_eq!(sel, (0, 0), "nothing was selected while disabled");
 }
+
+/// D11: a rich spec whose runs join to `full` selects by position, across its runs.
+#[test]
+fn a_two_run_spec_equal_to_full_selects_part_of_it_and_copies_that_part() {
+    let a = Style::ui(13.0, DARK.fg_primary);
+    let b = Style {
+        color: DARK.fg_secondary,
+        ..a
+    };
+    let spec = Spec {
+        runs: vec![("abc".to_owned(), a), ("defg".to_owned(), b)],
+        wrap: None,
+    };
+    let rect = Rect::new(20.0, 30.0, 200.0, 20.0);
+    let mut h = UiHarness::new(WIN);
+    let run = |h: &mut UiHarness| {
+        h.frame(|ui| {
+            ui.selectable_text("s", rect, &spec, "abcdefg");
+        })
+    };
+    run(&mut h);
+    // From between "b" and "c" (char 2) to between "e" and "f" (char 5), across both runs.
+    h.input.pointer_to(20.0 + 2.0 * GLYPH + 0.5, 40.0);
+    run(&mut h);
+    h.input.press(PointerButton::Primary);
+    run(&mut h);
+    h.input.pointer_to(20.0 + 5.0 * GLYPH + 0.5, 40.0);
+    run(&mut h);
+    let (scene, out) = run(&mut h);
+    let node = out.tree.get(WidgetId::ROOT.with("s")).expect("node");
+    assert_eq!(node.text.as_ref().expect("text").selection, (2, 5));
+    let f = fills(&scene);
+    assert_eq!(f.len(), 1, "one fill: {f:?}");
+    assert!((f[0].rect[0] - (20.0 + 2.0 * GLYPH)).abs() < 0.01, "{f:?}");
+    assert!((f[0].rect[2] - 3.0 * GLYPH).abs() < 0.01, "{f:?}");
+    h.input.release(PointerButton::Primary);
+    run(&mut h);
+    chord(&mut h, "c");
+    let (_, out) = run(&mut h);
+    assert_eq!(out.clipboard, [ClipboardRequest::Write("cde".to_owned())]);
+}

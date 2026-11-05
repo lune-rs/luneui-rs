@@ -2,10 +2,10 @@
 id: text.code-editor-view
 title: Code viewer and editor with syntax highlighting
 area: text
-status: planned
+status: in-progress
 consumers: lunegit, wane
-source: Lunegit: src/Lunegit.Desktop/Markdown/TextMateEditorSupport.cs
-owner: —
+source: crates/lune-ui-core/src/widgets/code_editor.rs
+owner: toolkit-v1 M9
 summary: Multi-line code view and editor over an app-supplied document: gutter, app-supplied highlight spans, line bands, synced scrolling, overlay anchors
 ---
 

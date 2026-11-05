@@ -53,6 +53,40 @@ pub const DEFAULTS: &[(&str, &str)] = &[
     ("luneui.kanban-board.add-card", "Add card"),
     ("luneui.kanban-board.column-actions", "Column actions"),
     ("luneui.kanban-board.empty-column", "No cards yet."),
+    ("luneui.code-block.copy", "Copy code"),
+    ("luneui.code-block.copied", "Copied"),
+    (
+        "luneui.code-editor.truncated",
+        "File truncated \u{2014} showing partial content",
+    ),
+    (
+        "luneui.code-editor.highlight-disabled",
+        "Syntax highlighting disabled for large files",
+    ),
+    ("luneui.code-editor.read-only", "Read-only"),
+    (
+        "luneui.markdown.image-remote-blocked",
+        "Remote image not loaded",
+    ),
+    (
+        "luneui.markdown.mermaid-failed",
+        "Diagram could not be rendered \u{2014} showing source",
+    ),
+    (
+        "luneui.markdown.math-failed",
+        "Formula could not be rendered \u{2014} showing source",
+    ),
+    ("luneui.diff-view.unified", "Unified diff"),
+    ("luneui.diff-view.side-by-side", "Side-by-side diff"),
+    ("luneui.diff-view.options", "Diff options"),
+    ("luneui.diff-view.word-wrap", "Word wrap"),
+    (
+        "luneui.diff-view.copy-selected-lines",
+        "Copy selected lines",
+    ),
+    ("luneui.diff-view.row-added", "Added"),
+    ("luneui.diff-view.row-removed", "Removed"),
+    ("luneui.diff-view.row-context", "Unchanged"),
 ];
 
 /// The default text of a toolkit key, if it is one.

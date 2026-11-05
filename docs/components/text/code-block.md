@@ -2,10 +2,10 @@
 id: text.code-block
 title: Code block
 area: text
-status: planned
+status: in-progress
 consumers: lunegit, wane
-source: —
-owner: —
+source: crates/lune-ui-core/src/widgets/code_block.rs
+owner: toolkit-v1 M9
 summary: Read-only mono block with optional app-supplied highlight spans, horizontal scroll, selectable text and a copy button with feedback
 ---
 

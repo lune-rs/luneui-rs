@@ -361,6 +361,10 @@ impl Ui<'_> {
             role: Role::Group,
             row_role: Role::Row,
             flat: true,
+            content_w: None,
+            fill: true,
+            identity: None,
+            link: None,
         };
         let header = Header {
             id,

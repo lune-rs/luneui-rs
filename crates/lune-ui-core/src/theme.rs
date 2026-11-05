@@ -96,6 +96,18 @@ pub struct Theme {
     /// available: Lunegit's `WindowFallbackBackground` #FF333333 (`DarkTheme.axaml:245`, D128).
     /// Opaque, so the toolbar never reads as see-through without a backdrop.
     pub window_fallback: Rgba,
+    /// A link, a quote bar and a diff hunk header: Lunegit's `MarkdownLinkForeground` and
+    /// `DiffHunkForeground` #61AFEF (D14).
+    pub link: Rgba,
+    /// The fill behind inline code (`MarkdownInlineCodeBackground` #14FFFFFF).
+    pub code_inline: Rgba,
+    /// A diff line's fill: added (`DiffAddedBackground` #1A73C991) and removed (#1AE06C75).
+    pub diff_added: Rgba,
+    pub diff_removed: Rgba,
+    /// The intra-line mark under changed words, the line fill's hue at alpha 0x40. No source
+    /// reads them: a deliberate look deviation (D14).
+    pub diff_added_mark: Rgba,
+    pub diff_removed_mark: Rgba,
     pub font_s: f32,
     pub font_base: f32,
     pub font_m: f32,
@@ -185,6 +197,13 @@ pub mod lunegit_dark {
         paused: [0x8A, 0x90, 0x99, 0xFF],
         // Lunegit `Themes/DarkTheme.axaml:245`.
         window_fallback: [0x33, 0x33, 0x33, 0xFF],
+        // Lunegit `DarkTheme.axaml:106-110,134-141`; the marks are derived (D14).
+        link: [0x61, 0xAF, 0xEF, 0xFF],
+        code_inline: [0xFF, 0xFF, 0xFF, 0x14],
+        diff_added: [0x73, 0xC9, 0x91, 0x1A],
+        diff_removed: [0xE0, 0x6C, 0x75, 0x1A],
+        diff_added_mark: [0x73, 0xC9, 0x91, 0x40],
+        diff_removed_mark: [0xE0, 0x6C, 0x75, 0x40],
         font_s: 11.0,
         font_base: 13.0,
         font_m: 14.0,

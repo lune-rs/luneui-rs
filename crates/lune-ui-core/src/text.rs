@@ -20,6 +20,8 @@ pub struct Style {
     pub line: f32,
     pub weight: u16,
     pub color: Rgba,
+    /// Slanted. No italic face ships, so the shaper skews the roman one (D13).
+    pub italic: bool,
 }
 
 impl Style {
@@ -30,6 +32,7 @@ impl Style {
             line: (size * 1.3).round(),
             weight: 400,
             color,
+            italic: false,
         }
     }
 
@@ -40,6 +43,7 @@ impl Style {
             line,
             weight: 400,
             color,
+            italic: false,
         }
     }
 
@@ -57,12 +61,20 @@ impl Style {
         }
     }
 
+    pub fn italic(self) -> Self {
+        Self {
+            italic: true,
+            ..self
+        }
+    }
+
     fn hash_into(&self, h: &mut impl Hasher) {
         self.font.hash(h);
         self.size.to_bits().hash(h);
         self.line.to_bits().hash(h);
         self.weight.hash(h);
         self.color.hash(h);
+        self.italic.hash(h);
     }
 }
 

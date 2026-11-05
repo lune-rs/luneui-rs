@@ -56,6 +56,18 @@ pub(crate) struct ListStyle {
     /// Rows fill their slot edge to edge at radius 0, and hover reads the pointer over the slot
     /// (so a control in a cell keeps its row lit).
     pub(crate) flat: bool,
+    /// The width of the rows' content when it can exceed the viewport: the x axis is then live
+    /// (a bar that shows only when it overflows) and [`RowCtx::scroll_x`] says how far the rows'
+    /// content has scrolled. `None`: no horizontal scroll.
+    pub(crate) content_w: Option<f64>,
+    /// Whether the list paints the hover and selection fill. `false`: the row's closure draws it
+    /// (from [`RowCtx::fill`]); the focus ring stays the list's.
+    pub(crate) fill: bool,
+    /// The app's "same document" key, given to the area; a new key clears the list's offset,
+    /// measured heights and selection.
+    pub(crate) identity: Option<u64>,
+    /// A scroll link (D8): lists with the same group share their vertical offset.
+    pub(crate) link: Option<WidgetId>,
 }
 
 impl ListStyle {
@@ -64,6 +76,10 @@ impl ListStyle {
         role: Role::List,
         row_role: Role::ListItem,
         flat: false,
+        content_w: None,
+        fill: true,
+        identity: None,
+        link: None,
     };
 }
 
@@ -131,6 +147,9 @@ pub struct RowCtx {
     pub focus_visible: bool,
     /// The highlight colour this frame.
     pub fill: Rgba,
+    /// How far the rows' content has scrolled sideways, in px: 0 unless the frame has a content
+    /// width (the slot itself does not move).
+    pub scroll_x: f32,
 }
 
 /// What [`Ui::virtual_list`] returns.
@@ -146,6 +165,8 @@ pub struct ListResponse {
     pub offset: f64,
     /// The height of all rows this frame used.
     pub extent: f64,
+    /// A row was pressed this frame (the primary button went down on it).
+    pub pressed: bool,
 }
 
 /// A list's retained selection: persistent, so it outlives the rows it names.
@@ -490,6 +511,8 @@ struct ListMem {
     press: Option<RowKey>,
     /// The row a drag selection last reached.
     drag_end: Option<usize>,
+    /// The identity the rows belong to.
+    identity: Option<u64>,
 }
 
 impl ListMem {
@@ -524,6 +547,7 @@ struct RowMem {
 #[derive(Debug, Default)]
 struct Outcome {
     changed: bool,
+    pressed: bool,
     context: Option<RowKey>,
     copy: Option<Vec<RowKey>>,
 }
@@ -586,17 +610,40 @@ impl Ui<'_> {
             key: row_key,
         };
         let mut out = Outcome::default();
+        if style.identity != mem.identity {
+            // Another document: nothing of the last one carries over.
+            mem = ListMem {
+                identity: style.identity,
+                ..ListMem::default()
+            };
+            mem.heights.sync(opts.count, opts.heights);
+            st = ListState::default();
+        }
 
         // Always: a list focused and then disabled takes its keys and acts on none.
         let enabled = self.is_enabled();
         self.list_keys(&mut st, &mem, &rows, enabled, &mut out);
 
+        // A linked pane takes the group's offset before its area runs.
+        let drawn_at = mem.offset;
+        let pulled = style
+            .link
+            .map_or(0.0, |group| self.scroll_link_pull(group, drawn_at));
+        if pulled != 0.0 {
+            self.scroll_shift(AREA, pulled);
+        }
         let area = ScrollOptions {
             bars: (
-                Bars::Disabled,
+                style.content_w.map_or(Bars::Disabled, |w| {
+                    Bars::Auto.unless_fits(w, f64::from(rect.w))
+                }),
                 Bars::Auto.unless_fits(mem.heights.total(), f64::from(rect.h)),
             ),
-            extent: Some((f64::from(rect.w), mem.heights.total())),
+            extent: Some((
+                style.content_w.unwrap_or(f64::from(rect.w)),
+                mem.heights.total(),
+            )),
+            identity: style.identity,
             ..ScrollOptions::default()
         };
         let scroll = self.scroll_area_untranslated(AREA, rect, &area, |ui, view| {
@@ -608,11 +655,17 @@ impl Ui<'_> {
                 State::Disabled
             });
             let response = ui.node_container(node, |ui| {
-                ui.list_rows(view.offset.1, st, &mut mem, &rows, draw, &mut out)
+                ui.list_rows(view.offset, st, &mut mem, &rows, draw, &mut out)
             });
             (response, Extent::default())
         });
         *self.persistent::<ListMem>(id) = mem;
+        // Only a move of its own publishes; a pane that was just pulled follows, and says nothing.
+        if let Some(group) = style.link
+            && pulled == 0.0
+        {
+            self.scroll_link_push(group, drawn_at, scroll.offset.1);
+        }
 
         let mut response = scroll.value;
         if out.changed {
@@ -624,6 +677,7 @@ impl Ui<'_> {
             copy: out.copy,
             offset: scroll.offset.1,
             extent: scroll.extent.1,
+            pressed: out.pressed,
         }
     }
 
@@ -710,7 +764,7 @@ impl Ui<'_> {
     /// One frame of the rows inside the area: registers them, applies their input, then draws.
     fn list_rows(
         &mut self,
-        offset: f64,
+        view_offset: (f64, f64),
         mut st: ListState,
         mem: &mut ListMem,
         rows: &Rows<'_>,
@@ -718,6 +772,7 @@ impl Ui<'_> {
         out: &mut Outcome,
     ) -> Response {
         let (id, rect, style) = (rows.id, rows.rect, rows.style);
+        let (scroll_x, offset) = (view_offset.0 as f32, view_offset.1);
         let response = self.interact(id, rect, Sense::CLICK_FOCUS);
         let still = mem.still(offset, rect);
         let viewport = f64::from(rect.h);
@@ -737,6 +792,7 @@ impl Ui<'_> {
             if r.press_started {
                 let primary = keymap.is_primary(r.press_modifiers);
                 out.changed |= st.press(index, r.press_modifiers, primary, rows);
+                out.pressed = true;
                 mem.press = Some(key);
                 mem.drag_end = Some(index);
                 self.request_focus(id);
@@ -804,6 +860,7 @@ impl Ui<'_> {
                     cursor,
                     focus_visible: cursor && ring,
                     fill: row_fill(&theme, hovered, selected),
+                    scroll_x,
                 },
             });
         }
@@ -831,7 +888,7 @@ impl Ui<'_> {
                     theme.item_radius,
                 )
             };
-            if ctx.fill[3] != 0 {
+            if style.fill && ctx.fill[3] != 0 {
                 self.painter().fill(highlight, radius, ctx.fill);
             }
 
@@ -872,5 +929,317 @@ impl Ui<'_> {
             self.request_catch_up();
         }
         response
+    }
+}
+
+/// The frame's crate-private fields (`ListStyle`'s `content_w`, `fill`, `identity` and `link`,
+/// `RowCtx::scroll_x`, `ListResponse::pressed`) at non-default values. The suites in `tests/` hold
+/// the defaults; the diff view proves these again from outside.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::color::premul;
+    use crate::input::{Key, PointerButton, Repaint};
+    use crate::scene::Scene;
+    use crate::testing::UiHarness;
+    use crate::theme::DARK;
+
+    const WIN: (f32, f32) = (500.0, 300.0);
+    const RECT: Rect = Rect::new(20.0, 20.0, 200.0, 100.0);
+    const RIGHT: Rect = Rect::new(260.0, 20.0, 200.0, 100.0);
+    const ROW: f32 = 20.0;
+    const COUNT: usize = 60;
+
+    fn opts(count: usize) -> ListOptions<'static> {
+        ListOptions {
+            count,
+            heights: Heights::Fixed(ROW),
+            selection: SelectionMode::Single,
+            index_of: None,
+            label: "rows",
+        }
+    }
+
+    struct Seen {
+        rows: Vec<RowCtx>,
+        resp: ListResponse,
+    }
+
+    /// One pane of a frame.
+    fn pane(ui: &mut Ui<'_>, rect: Rect, count: usize, style: ListStyle) -> Seen {
+        let mut rows = Vec::new();
+        let resp = ui.list_styled(
+            ("l", rect.x as i32),
+            rect,
+            &opts(count),
+            style,
+            |i| RowKey(i as u64),
+            |_, c| {
+                rows.push(*c);
+                ROW
+            },
+        );
+        Seen { rows, resp }
+    }
+
+    /// One frame with the left pane.
+    fn frame(h: &mut UiHarness, style: ListStyle) -> (Seen, Scene) {
+        let mut seen = None;
+        let (scene, _) = h.frame(|ui| seen = Some(pane(ui, RECT, COUNT, style)));
+        (seen.expect("the frame ran"), scene)
+    }
+
+    /// One frame with both panes, left drawn first; the repaint request comes with it.
+    fn both(
+        h: &mut UiHarness,
+        styles: (ListStyle, ListStyle),
+        counts: (usize, usize),
+    ) -> (Seen, Seen, Repaint) {
+        let mut seen = (None, None);
+        let (_, out) = h.frame(|ui| {
+            seen.0 = Some(pane(ui, RECT, counts.0, styles.0));
+            seen.1 = Some(pane(ui, RIGHT, counts.1, styles.1));
+        });
+        (
+            seen.0.expect("left drew"),
+            seen.1.expect("right drew"),
+            out.repaint,
+        )
+    }
+
+    fn shapes(scene: &Scene) -> usize {
+        scene
+            .layers
+            .iter()
+            .map(|l| l.geometry.under.len() + l.geometry.over.len())
+            .sum()
+    }
+
+    fn fills_of(scene: &Scene, colors: &[Rgba]) -> usize {
+        let cs: Vec<_> = colors.iter().map(|c| premul(*c)).collect();
+        scene
+            .layers
+            .iter()
+            .flat_map(|l| l.geometry.under.iter())
+            .filter(|s| cs.contains(&s.color))
+            .count()
+    }
+
+    #[test]
+    fn a_content_width_makes_the_x_axis_live_with_its_bar() {
+        let wide = ListStyle {
+            content_w: Some(600.0),
+            ..ListStyle::LIST
+        };
+        let mut seen = Vec::new();
+        for style in [ListStyle::LIST, wide] {
+            let mut h = UiHarness::new(WIN);
+            frame(&mut h, style);
+            h.input.pointer_to(100.0, 60.0);
+            frame(&mut h, style);
+            h.input.scroll_pixels(-50.0, 0.0);
+            frame(&mut h, style);
+            // Past the bar's fade-in.
+            h.at_ms(300);
+            let (s, scene) = frame(&mut h, style);
+            seen.push((s.rows[0].scroll_x, shapes(&scene)));
+        }
+        assert_eq!(seen[0].0, 0.0, "no content width, no sideways scroll");
+        assert_eq!(seen[1].0, 50.0, "the wheel moved the rows' content");
+        assert!(seen[1].1 > seen[0].1, "the x bar draws: {seen:?}");
+    }
+
+    #[test]
+    fn a_content_that_fits_the_width_has_no_x_scroll() {
+        let fits = ListStyle {
+            content_w: Some(150.0),
+            ..ListStyle::LIST
+        };
+        let mut h = UiHarness::new(WIN);
+        frame(&mut h, fits);
+        h.input.pointer_to(100.0, 60.0);
+        frame(&mut h, fits);
+        h.input.scroll_pixels(-50.0, 0.0);
+        assert_eq!(frame(&mut h, fits).0.rows[0].scroll_x, 0.0);
+    }
+
+    #[test]
+    fn no_fill_paints_no_highlight_but_keeps_the_fill_value_and_the_ring() {
+        let quiet = ListStyle {
+            fill: false,
+            ..ListStyle::LIST
+        };
+        let tones = [DARK.surface_selected, DARK.surface_active];
+        let mut result = Vec::new();
+        for style in [ListStyle::LIST, quiet] {
+            let mut h = UiHarness::new(WIN);
+            frame(&mut h, style);
+            h.input
+                .pointer_to(100.0, 30.0)
+                .click(PointerButton::Primary);
+            frame(&mut h, style);
+            h.input.key_down(Key::Named(NamedKey::ArrowDown), None);
+            frame(&mut h, style);
+            h.at_ms(500);
+            let (s, scene) = frame(&mut h, style);
+            let selected = s.rows.iter().find(|r| r.selected).expect("a selected row");
+            assert_ne!(selected.fill[3], 0, "the row is still given its fill");
+            assert!(s.rows.iter().any(|r| r.focus_visible), "the ring shows");
+            let strokes: usize = scene.layers.iter().map(|l| l.geometry.over.len()).sum();
+            result.push((fills_of(&scene, &tones), strokes));
+        }
+        assert!(result[0].0 > 0, "the instrument sees the fill: {result:?}");
+        assert_eq!(result[1].0, 0, "no fill: {result:?}");
+        assert_eq!(result[0].1, result[1].1, "the ring stays: {result:?}");
+        assert!(result[1].1 > 0, "and there is a ring: {result:?}");
+    }
+
+    fn selected(h: &mut UiHarness) -> usize {
+        let mut n = 0;
+        h.frame(|ui| n = ui.list_state(("l", RECT.x as i32)).selection.len());
+        n
+    }
+
+    #[test]
+    fn a_new_identity_clears_the_offset_and_the_selection() {
+        let at = |id| ListStyle {
+            identity: Some(id),
+            ..ListStyle::LIST
+        };
+        let mut h = UiHarness::new(WIN);
+        frame(&mut h, at(1));
+        h.input
+            .pointer_to(100.0, 30.0)
+            .click(PointerButton::Primary);
+        frame(&mut h, at(1));
+        h.input.scroll_pixels(0.0, -200.0);
+        assert_eq!(frame(&mut h, at(1)).0.resp.offset, 200.0);
+        assert_eq!(
+            frame(&mut h, at(1)).0.resp.offset,
+            200.0,
+            "the same key keeps it"
+        );
+        assert_eq!(selected(&mut h), 1, "the selection is kept with the key");
+        assert_eq!(
+            frame(&mut h, at(2)).0.resp.offset,
+            0.0,
+            "a new key starts at the top"
+        );
+        assert_eq!(selected(&mut h), 0, "and unselected");
+    }
+
+    #[test]
+    fn pressed_is_true_on_the_frame_a_row_goes_down_only() {
+        let mut h = UiHarness::new(WIN);
+        let s = ListStyle::LIST;
+        frame(&mut h, s);
+        h.input.pointer_to(100.0, 30.0);
+        assert!(!frame(&mut h, s).0.resp.pressed);
+        h.input.press(PointerButton::Primary);
+        assert!(frame(&mut h, s).0.resp.pressed);
+        assert!(!frame(&mut h, s).0.resp.pressed, "held");
+        h.input.release(PointerButton::Primary);
+        assert!(!frame(&mut h, s).0.resp.pressed);
+    }
+
+    fn linked() -> ListStyle {
+        ListStyle {
+            link: Some(WidgetId::ROOT.with("group")),
+            ..ListStyle::LIST
+        }
+    }
+
+    fn offsets(h: &mut UiHarness, styles: (ListStyle, ListStyle)) -> (f64, f64, Repaint) {
+        let (a, b, repaint) = both(h, styles, (COUNT, COUNT));
+        (a.resp.offset, b.resp.offset, repaint)
+    }
+
+    #[test]
+    fn a_wheel_on_the_first_pane_moves_the_second_in_the_same_frame() {
+        let mut h = UiHarness::new(WIN);
+        let styles = (linked(), linked());
+        offsets(&mut h, styles);
+        h.input.pointer_to(100.0, 60.0);
+        offsets(&mut h, styles);
+        h.input.scroll_pixels(0.0, -120.0);
+        let (a, b, _) = offsets(&mut h, styles);
+        assert_eq!((a, b), (120.0, 120.0));
+    }
+
+    #[test]
+    fn a_wheel_on_the_second_pane_moves_the_first_on_the_catch_up_frame() {
+        let mut h = UiHarness::new(WIN);
+        let styles = (linked(), linked());
+        offsets(&mut h, styles);
+        h.input.pointer_to(300.0, 60.0);
+        offsets(&mut h, styles);
+        h.input.scroll_pixels(0.0, -120.0);
+        let (a, b, repaint) = offsets(&mut h, styles);
+        assert_eq!(b, 120.0);
+        assert_eq!(a, 0.0, "the first drew before the move");
+        assert_eq!(repaint, Repaint::Now, "a catch-up frame was asked");
+        let (a, b, _) = offsets(&mut h, styles);
+        assert_eq!((a, b), (120.0, 120.0));
+        h.at_ms(500);
+        let (_, _, repaint) = offsets(&mut h, styles);
+        assert_eq!(repaint, Repaint::Idle, "equal values ask nothing");
+    }
+
+    #[test]
+    fn a_pane_not_drawn_for_three_frames_catches_up_when_drawn() {
+        let mut h = UiHarness::new(WIN);
+        let styles = (linked(), linked());
+        offsets(&mut h, styles);
+        h.input.pointer_to(100.0, 60.0);
+        offsets(&mut h, styles);
+        h.input.scroll_pixels(0.0, -120.0);
+        // The right pane drops out of the page for the moves that follow.
+        let alone = |h: &mut UiHarness| {
+            let mut seen = None;
+            h.frame(|ui| seen = Some(pane(ui, RECT, COUNT, linked())));
+            seen.expect("drew").resp.offset
+        };
+        assert_eq!(alone(&mut h), 120.0);
+        h.input.scroll_pixels(0.0, -40.0);
+        assert_eq!(alone(&mut h), 160.0);
+        assert_eq!(alone(&mut h), 160.0);
+        let (a, b, _) = offsets(&mut h, styles);
+        assert_eq!((a, b), (160.0, 160.0), "it caught up when drawn again");
+    }
+
+    #[test]
+    fn panes_without_a_group_scroll_alone() {
+        let mut h = UiHarness::new(WIN);
+        let styles = (ListStyle::LIST, ListStyle::LIST);
+        offsets(&mut h, styles);
+        h.input.pointer_to(100.0, 60.0);
+        offsets(&mut h, styles);
+        h.input.scroll_pixels(0.0, -120.0);
+        let (a, b, _) = offsets(&mut h, styles);
+        assert_eq!((a, b), (120.0, 0.0));
+    }
+
+    #[test]
+    fn a_pane_that_cannot_reach_the_value_does_not_ask_every_frame() {
+        // The right pane has fewer rows, so it stops below the group's value; it must settle.
+        let styles = (linked(), linked());
+        let mut h = UiHarness::new(WIN);
+        let two = |h: &mut UiHarness| {
+            let (a, b, repaint) = both(h, styles, (COUNT, 8));
+            (a.resp.offset, b.resp.offset, repaint)
+        };
+        two(&mut h);
+        h.input.pointer_to(100.0, 60.0);
+        two(&mut h);
+        h.input.scroll_pixels(0.0, -500.0);
+        let (a, _, _) = two(&mut h);
+        assert_eq!(a, 500.0);
+        let (_, b, _) = two(&mut h);
+        assert_eq!(b, 60.0, "the short pane stops at its end");
+        h.at_ms(500);
+        let (_, _, repaint) = two(&mut h);
+        assert_eq!(repaint, Repaint::Idle);
+        let (a, b, repaint) = two(&mut h);
+        assert_eq!((a, b, repaint), (500.0, 60.0, Repaint::Idle));
     }
 }

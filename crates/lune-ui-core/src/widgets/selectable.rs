@@ -1,22 +1,21 @@
 //! Read-only text that takes focus and selection, and copies (`data.kv-list`, D125).
 //!
 //! A value is drawn from a [`Spec`] (maybe elided by the caller) and copied from `full`. Where
-//! the two are the same single-run text, the field's engine runs read-only over `full` (a
-//! [`TextEdit`](crate::text_edit::TextEdit)): a press places the caret, a drag, a double press and
-//! Shift extend it, Copy writes the selected bytes of `full`. Where they differ (an elided value,
-//! a rich spec), no position of the drawn text maps to a position of `full`, so the value is
-//! selected whole: a press, Select all or a double press selects all of it, the fill covers all of
-//! what is drawn, and Copy writes all of `full`. Navigation keys do nothing there, so a partial
-//! selection cannot exist.
+//! the runs of the spec join to `full`, one run or several (D11), the field's engine runs
+//! read-only over `full` (a [`TextEdit`](crate::text_edit::TextEdit)): a press places the caret, a
+//! drag, a double press and Shift extend it, Copy writes the selected bytes of `full`, and the
+//! fill covers the part across runs. Where they differ (an elided value), no position of the
+//! drawn text maps to a position of `full`, so the value is selected whole: a press, Select all
+//! or a double press selects all of it, the fill covers all of what is drawn, and Copy writes all
+//! of `full`. Navigation keys do nothing there, so a partial selection cannot exist.
 //!
 //! A value is no tab stop (`skip_tab`): a press or an assistive technology focuses it. The
 //! selection fill draws only while it is focused, and a focus loss clears the selection.
 
 use std::hash::Hash;
 
-use super::field::{
-    EditConfig, NodeFacts, Shown, begin_edit, edit_node, edit_pointer, end_edit, range_boxes,
-};
+use super::field::{EditConfig, NodeFacts, Shown, begin_edit, edit_node, edit_pointer, end_edit};
+use super::text_lines::range_boxes;
 use crate::access::{Action, Node, Role, State, TextValue, Value};
 use crate::input::CursorIcon;
 use crate::paint::Rect;
@@ -75,8 +74,9 @@ impl Ui<'_> {
         let focused = r.focused;
         // The key focus, kept in a disabled scope: the keys are taken there and nothing acts (D140).
         let held = self.focus_state().0 == Some(id);
-        let single = spec.runs.len() == 1;
-        let positioned = single && joined_text(spec) == full;
+        // Positional whenever the runs join to `full`, one run or many (D11); only a text that
+        // differs from it (an elided one) is selected whole.
+        let positioned = !spec.runs.is_empty() && joined_text(spec) == full;
         let ink = t.text_selection;
 
         if positioned {
@@ -88,6 +88,7 @@ impl Ui<'_> {
                 max_chars: None,
                 wrap: spec.wrap,
                 page_rows: 1,
+                rich: Some(spec),
             };
             let mut text = full.to_owned();
             let (mut st, _) = begin_edit(self, id, &cfg, &mut text);

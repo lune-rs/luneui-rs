@@ -302,6 +302,16 @@ impl AxisState {
     }
 }
 
+/// A scroll link's retained state (D8), under the group's id: the value the panes share, the
+/// value each pane last took, and how many panes drew this frame.
+#[derive(Debug, Default)]
+struct LinkState {
+    value: Option<f64>,
+    taken: std::collections::BTreeMap<WidgetId, f64>,
+    frame: u64,
+    drawn: u32,
+}
+
 /// The retained state of one scroll area.
 #[derive(Debug, Default)]
 struct ScrollState {
@@ -427,6 +437,50 @@ impl Ui<'_> {
     pub(crate) fn scroll_shift_x(&mut self, key: impl Hash, by: f64) {
         let id = self.id(key);
         self.transient::<Requests>(id).shift_x += by;
+    }
+
+    /// A pane of a scroll link (D8) asks what to apply before its area runs: the shift that takes
+    /// `own_offset`, the vertical offset it drew last frame, to the group's value. Zero when the
+    /// group has no value yet, when the pane already took that value (a pane that clamps does not
+    /// ask every frame), or when they are equal. The pane is the current scope.
+    pub(crate) fn scroll_link_pull(&mut self, group: WidgetId, own_offset: f64) -> f64 {
+        let (pane, frame) = (self.scope_id(), self.frame_number());
+        let link = self.persistent::<LinkState>(group);
+        if link.frame != frame {
+            link.frame = frame;
+            link.drawn = 0;
+        }
+        link.drawn += 1;
+        let Some(value) = link.value else {
+            return 0.0;
+        };
+        if link.taken.get(&pane) == Some(&value) {
+            return 0.0;
+        }
+        link.taken.insert(pane, value);
+        if value.is_finite() {
+            value - own_offset
+        } else {
+            0.0
+        }
+    }
+
+    /// A pane tells the group where it ended: `before` is what it drew last frame, `after` what it
+    /// is at now. Only a move publishes; equal values do nothing, so a pane that took the group's
+    /// value does not echo it. A pane that moved after another one already drew this frame asks a
+    /// catch-up frame, since that one drew the old value.
+    pub(crate) fn scroll_link_push(&mut self, group: WidgetId, before: f64, after: f64) {
+        if before == after {
+            return;
+        }
+        let pane = self.scope_id();
+        let link = self.persistent::<LinkState>(group);
+        link.value = Some(after);
+        link.taken.insert(pane, after);
+        let stale = link.drawn > 1;
+        if stale {
+            self.request_catch_up();
+        }
     }
 
     fn scroll_area_with<R>(
