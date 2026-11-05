@@ -81,12 +81,12 @@ The aggregate of every `New:` item in the catalogue (the list C5 gives M5; R-cor
 | image | core.image, widget.banner-empty-state, text.markdown-preview | M5 | [L src/Lunegit.Desktop/Views/FileViewerView.axaml:352], [L src/Lunegit.Desktop/Views/MarkdownPreviewView.axaml.cs:445], [L src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:17] |
 | rotate | widget.spinner, widget.banner-empty-state | M6 (done: `Painter::text_rotated` turns the spinner's glyph, scene `spinner-spinning`; the banner's busy glyph is the spinner) | [L src/Lunegit.Desktop/Controls/SpinBehavior.cs:38-53] |
 | dash | widget.search-picker | M6 (done: `Painter::dash` draws the link trigger's underline, scene `search-picker-link`) | [L src/Lunegit.Desktop/Controls/LinkSearchPicker.axaml:30] |
-| clip-rounded | layout.page, layout.panel | M7 | [L src/Lunegit.Desktop/App.axaml:769-770], [W docs/ui/components.md:249-262] |
+| clip-rounded | layout.page, layout.panel | M5 (done: `Painter::push_clip_rounded`, scene `primitive-clip-rounded`; M7 uses it in `Ui::page` and `Ui::panel`, scenes `page-body-scroll` and `panel-card`) | [L src/Lunegit.Desktop/App.axaml:769-770], [W docs/ui/components.md:249-262] |
 | sector | data.pie-chart | M8 | [L src/Lunegit.Desktop/Controls/StoragePieChartControl.cs:113-137] |
 | path-fill | data.pie-chart | M8 | [L src/Lunegit.Desktop/Controls/StoragePieChartControl.cs:140-158] |
 | arc | data.pie-chart | M8 | [L src/Lunegit.Desktop/Controls/StoragePieChartControl.cs:132] |
 
-Not needed by any entry (no row): `linear-gradient` and `shadow`. No Lunegit or Wane component read draws either (Wane's panel states "no shadow", [W docs/ui/components.md:249-262]); they are added only when a spec needs them. Of the other entries, 76 list `New: none`, 8 read `n/a` (no painter section applies) and 4 are external (no painter section); counted by script over the `### Painter primitives` subsections.
+Not needed by any entry (no row): `linear-gradient` and `shadow`. No Lunegit or Wane component read draws either (Wane's panel states "no shadow", [W docs/ui/components.md:249-262]); they are added only when a spec needs them. Of the other entries, 78 list `New: none` (two more since the page and the panel took the M5 clip-rounded), 8 read `n/a` (no painter section applies) and 4 are external (no painter section); counted by script over the `### Painter primitives` subsections.
 
 ### Acceptance
 

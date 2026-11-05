@@ -93,7 +93,7 @@ None: the host draws no text; panel titles are app text.
 
 - `side-panel-shown` (new): one panel (a row list) shown, settled.
 - `side-panel-inactive` (new): the host with the window inactive, settled.
-- `side-panel-show-mid` (new): show at t = 175 ms (half of moderate, 350 ms) [L src/Lunegit.Desktop/App.axaml:154].
+- `side-panel-show-mid` (new): show at t = 175 ms after the first frame of the new panel (half of moderate, 350 ms) [L src/Lunegit.Desktop/App.axaml:154].
 
 ### Painter primitives
 
@@ -114,10 +114,7 @@ None: the host draws no text; panel titles are app text.
 
 ## Open questions
 
-- Panel widths and the minimum column width: not read (the host has no width of its own; the window sets it); open.
-- Whether a show moves focus to the panel's first control: open.
-- Which of the nine panels are toolkit chrome and which are Git UI: the planner decides; the host is the toolkit's part.
-- Keyboard switching between panels: not in the sources read; open.
+None. Closed by [D149]: the host is a toolkit component (`Ui::side_panel`, `SidePanelOptions { panel, keys, active, glass, under, name }`); the panels' contents are the app's. The host has no width of its own (the app passes the rect). A show moves no focus: the app knows the first control. `keys` lists every panel so hidden ones stay alive (`keep_alive` for the shown one, `mark_alive` for the rest): a hidden panel's scroll offset and text edit survive any number of undrawn frames. The show is `SHOW_OPACITY` (kept under Reduced) and `SHOW_SLIDE` (-6 to 0 px, dropped under Reduced) from the frame `panel` changes; the first frame does not animate; a show in flight restarts from the look it has; a hide snaps. Keyboard switching is the icon rail's (`layout.icon-rail`). The content is inset 10, above the radius of 8 (a rounded clip cannot cut text, [D148]).
 
 ## Notes for the planner
 
