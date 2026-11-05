@@ -47,8 +47,8 @@ Conflicts: none (no Wane entry; the stub's "which splitter" is answered: `GridSp
 | splitter rest | transparent 4 px strip | [L src/Lunegit.Desktop/MainWindow.axaml:120-121,211-216] |
 | column shown | the side-panel column and the splitter | [L src/Lunegit.Desktop/MainWindow.axaml:120-121] |
 | column hidden | no column and no splitter (snap) | [L src/Lunegit.Desktop/Themes/Animations.axaml:314-317] |
-| splitter hover and drag | not in the sources read; open question | open question |
-| focus-visible on the splitter | not in the sources read; open question | open question |
+| splitter hover and drag | no look: transparent, as at rest; the cursor is `ColResize` (columns) or `RowResize` (rows) while hovered or held | [D150] |
+| focus-visible on the splitter | the 4 px strip fills with `accent` (fade `focus`, snaps under Off) | [D150] |
 
 ### Transitions
 
@@ -57,23 +57,23 @@ Never animated: the split sizes during a drag (layout properties on large surfac
 
 ### Input and focus
 
-- Pointer: press and drag the 4 px splitter to resize [L src/Lunegit.Desktop/MainWindow.axaml:120-121,211-216].
-- Keyboard: none in the sources read; open question.
-- Tab stop: open question.
+- Pointer: press and drag the splitter to resize [L src/Lunegit.Desktop/MainWindow.axaml:120-121,211-216]. The hit is 8 px (2 px into each pane) over the 4 px paint. A press follows at once (no drag threshold): size = the size at the press plus the travel, clamped to `[min, max]` and to the room the other pane's `min_other` leaves; `min` wins when both cannot fit [D150]. The pointer is captured from the press to the release; a release ends the drag.
+- Keyboard: the strip is one tab stop. The arrows along the axis (Left and Right for columns, Up and Down for rows) move the strip 16 px; Home and End set the sized pane to its smallest and largest; Escape during a drag restores the size at the press and is consumed (with nothing in flight it is not). Up and Down on columns are the sized pane's increment and decrement (what the accessibility actions arrive as); on rows those two actions move the strip up and down. Keys are dropped while the pointer holds the strip [D150].
+- Tab stop: the strip, after the panes' own stops (panes draw first, the strip last, so its hit is on top).
 - Layer: Base [R crates/lune-ui-core/src/scene.rs:17-22].
 - Focus scope: none.
-- Pointer capture while dragging: the `GridSplitter` captures during drag; the capture code is not read; open question.
+- Pointer capture while dragging: the strip holds the capture (`Sense` drag plus focusable), so a drag that crosses a pane's button clicks nothing.
 
 ### Retained state
 
-- Transient: splitter hover and drag offset.
-- Persistent: the split sizes (column width, terminal height) owned by the container; survive under `ui.keep_alive` [core.ui]. Lunegit's persistence of the sizes was not read: open question.
-- App-owned: the shown and hidden flags (`IsSidePanelColumnVisible`, `IsTerminalPanelOpen`) [L src/Lunegit.Desktop/MainWindow.axaml:121,216].
+- Transient: the drag's press point, press size and whether Escape cancelled it.
+- Persistent: the sized pane's stored size (`SplitState.size`, `Ui::split_state(key)`), which survives undrawn frames under `ui.keep_alive` [core.ui]. It changes only on user input or the app's own write: a smaller window clamps what is drawn, not what is stored, so the size comes back when the window grows [D150]. A NaN or infinite size, written by the app or asked by an assistive technology, counts as unset or changes nothing.
+- App-owned: the shown and hidden flags (`SplitOptions.hidden`; `IsSidePanelColumnVisible`, `IsTerminalPanelOpen`) [L src/Lunegit.Desktop/MainWindow.axaml:121,216], the bounds (`min`, `max`, `min_other`, `default`; Lunegit's side panel 310 to 700 and terminal 120 to 900 are the gallery's) and whether the size persists across launches: the app loads and stores `SplitState.size`.
 - Exit retention: no.
 
 ### Accessibility
 
-- The splitter has role `separator` (resizable, with a value) [infra.accessibility], [D55].
+- The splitter has role `separator` (resizable, with a value) [infra.accessibility], [D55]: `Value::Number` with the sized pane's size in px, its effective `min` and `max`, `step` 16, and the actions Increment, Decrement and SetValue. A set value is clamped; NaN and infinity change nothing. Disabled: `Disabled`, not focusable, no action. Hidden: no node.
 - Live region: none.
 
 ### Strings
@@ -82,9 +82,11 @@ None: the splitter draws no text.
 
 ### Gallery scenes
 
-- `split-panes-two` (new): two columns, splitter between, settled.
-- `split-panes-collapsed` (new): second column hidden, settled.
-- `split-panes-drag-mid` (new): splitter dragged to a mid position, settled.
+- `split-panes-two` (new): a column split and a row split, the strips transparent, settled.
+- `split-panes-collapsed` (new): the first column hidden, the second takes the whole width, settled.
+- `split-panes-drag-mid` (new): the column strip dragged 200 px to the right and held, settled.
+- `split-panes-rows` (new): the row strip dragged 70 px up, the panel below grown, settled.
+- `split-panes-focus` (new): Tab onto the column strip, the 4 px strip filled with `accent`, settled.
 
 ### Painter primitives
 
@@ -93,10 +95,10 @@ None: the splitter draws no text.
 
 ### Acceptance
 
-- Behaviour (scripted input, injected time): a drag of N px changes the column width by N px, clamped to the minimum and maximum (open question); a hidden column snaps shown with no animation. None exists.
-- Pixel probes at scale 2: splitter 8 px wide or high; hit area open question.
-- Conformance: the column snap is instant under all tiers.
-- Semantic node: role `separator` [D55]; the sizes are exposed as a value (open question).
+- Behaviour (scripted input, injected time): `crates/lune-ui-core/tests/widget_split_panes.rs`: a drag of N changes the size by N on both axes and sides; clamps at `min`, `max` and `min_other`, `min` winning when nothing fits; shrinking then growing the window returns the stored size; arrows, Home, End; increment, decrement and set value, NaN ignored; Escape; hidden snaps in all tiers and hits nothing; the size survives `keep_alive` and undrawn frames; the 8 px hit over the 4 px strip; a drag across a pane's button clicks nothing.
+- Pixel probes at scale 2: the strip is 8 device px (4 logical) and its hit 16 (8 logical); the focus fill is the 4 px strip in `accent`.
+- Conformance: the size never animates, so a hidden pane snaps in every tier; only the focus fill fades (`focus`, snaps under Off).
+- Semantic node: role `separator` [D55]; the size is exposed as a number value.
 
 ### Build
 
@@ -105,11 +107,7 @@ None: the splitter draws no text.
 
 ## Open questions
 
-- Minimum and maximum column and row sizes: not read; open.
-- Keyboard resize and the splitter's Tab stop: not in the sources read; open.
-- Whether the sizes persist across launches (Lunegit `TerminalPanelHeight` persistence): not read; open.
-- The stub named `infra.drag-and-drop` for drag handling; a splitter drag is pointer input, not DnD: confirm with the planner; open.
-- Hit area of the 4 px splitter (wider than the paint): not read; open.
+None. Closed by [D150]: the splitter is a toolkit component (`Ui::split_panes`, `SplitOptions`, `SplitState`). Minimum and maximum are the app's arguments (Lunegit's 310 to 700 and 120 to 900 are the gallery's); keyboard resize is the arrows (16 px), Home and End, with the splitter one tab stop; persistence is the app's (it reads and writes `SplitState.size`); the stub's `infra.drag-and-drop` does not apply, a splitter drag is pointer input; the hit is 8 px over the 4 px paint. The strip is a 4 px gutter between the panes: the sized pane gets exactly its size and the other what is left. Panes are drawn with the size the frame began with, so a size the frame's input changed shows in the strip and the response at once and in the panes on the catch-up frame the widget asks for.
 
 ## Notes for the planner
 
