@@ -2,10 +2,10 @@
 id: widget.toolbar
 title: Main toolbar
 area: widget
-status: planned
+status: in-progress
 consumers: lunegit
 source: Lunegit: src/Lunegit.Desktop/Views/ToolbarView.axaml
-owner: —
+owner: toolkit-v1 M6
 summary: Toolbar: three-column command bar of 40 px toolbar-action buttons with 20 px icons on a glass material
 ---
 
@@ -33,11 +33,11 @@ Not read: `ToolbarView.axaml:82-220` (the centre and right groups, the branch an
 ### Anatomy
 
 - Bar: padding 0 6 top and bottom, 8 right [L src/Lunegit.Desktop/Views/ToolbarView.axaml:38]; three columns `*, Auto, *` [L src/Lunegit.Desktop/Views/ToolbarView.axaml:39].
-- Left group: spacing 8; icon spacing 0 [L src/Lunegit.Desktop/Views/ToolbarView.axaml:13-14,41-46].
+- Left group: the actions touch (icon spacing 0), and the branch button sits one group gap (8) after the last action, in the same stack [L src/Lunegit.Desktop/Views/ToolbarView.axaml:13-14,38,41-46,96-110]. The gallery page places them so; `GROUP_GAP` is the spacing between groups, not between buttons.
 - Action button: 40 x 40, padding 6, centred content [L src/Lunegit.Desktop/Views/ToolbarView.axaml:13,19,48-50].
 - Action icon: 20 px, `ForegroundMuted` [L src/Lunegit.Desktop/Views/ToolbarView.axaml:11,53-54].
-- Utility icon 16 px [L src/Lunegit.Desktop/Views/ToolbarView.axaml:12]; branch icon 14 px, content spacing 4, max width 420 [L src/Lunegit.Desktop/Views/ToolbarView.axaml:16-18]; branch button padding 6 horizontal, 4 vertical [L src/Lunegit.Desktop/Views/ToolbarView.axaml:20].
-- Glass material: acrylic with the dark tint and opacity, visible while the window is active; when inactive a solid `WindowFallbackBackground` replaces it [L src/Lunegit.Desktop/Views/ToolbarView.axaml:27-37]; the fallback rule is `material` (M3 `material` entry).
+- Utility icon 16 px [L src/Lunegit.Desktop/Views/ToolbarView.axaml:12]; branch icon 14 px, content spacing 4, max width 420 [L src/Lunegit.Desktop/Views/ToolbarView.axaml:16-18]; branch button padding 6 horizontal, 4 vertical [L src/Lunegit.Desktop/Views/ToolbarView.axaml:20]. The branch label draws `fg_subtle` #808080 at `font_m` 14 [L src/Lunegit.Desktop/Views/ToolbarView.axaml:113,116-117], [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:14], [D133].
+- Glass material: acrylic with the dark tint and opacity (`GlassTintDarkOpacity`, `GlassMaterialDarkOpacity`: the preset's `WINDOW` layer, which the gallery page passes), visible while the window is active; when inactive a solid `WindowFallbackBackground` replaces it [L src/Lunegit.Desktop/Views/ToolbarView.axaml:27-37]; the fallback rule is `material` (M3 `material` entry).
 - Button chrome: class `toolbar-action`, see States [L src/Lunegit.Desktop/App.axaml:460-464].
 
 ### States
@@ -81,11 +81,11 @@ Reduced keeps the background tween and drops the press scale [L src/Lunegit.Desk
 
 ### Strings
 
-- `luneui.toolbar.fetch`, `luneui.toolbar.pull`, `luneui.toolbar.push`, `luneui.toolbar.branch`: the tooltips are Lunegit keys `toolbar.fetch`, `toolbar.pull`, `toolbar.push`, `toolbar.branch` [L src/Lunegit.Desktop/Views/ToolbarView.axaml:52,61,70,80]; English defaults not read in this tree (Lunegit.Infrastructure).
+None. The tooltips and labels are the app's commands: `Ui::toolbar_action` and `Ui::toolbar_label` take them as arguments, so the entry's `luneui.toolbar.*` keys are not added ([D128]).
 
 ### Gallery scenes
 
-- `toolbar-actions`: four action buttons with icons, rest and hover on the second, settled.
+- `toolbar-actions`: three action buttons and the branch label button, rest and hover on the second, its tooltip shown; settled.
 - `toolbar-inactive`: the window inactive, fallback background shown; settled.
 - `toolbar-action-mid`: press on the first action, t = 90 ms (half of `fast`).
 - `toolbar-hover-mid`: second action rest → hover, t = 60 ms (half of `instant`).
@@ -109,8 +109,7 @@ Reduced keeps the background tween and drops the press scale [L src/Lunegit.Desk
 
 ## Open questions
 
-- `read-gap`: the centre and right groups of `ToolbarView.axaml` (lines 82-220) are not read; the spec covers the left group and the resources only.
-- `inactive-fallback`: the inactive fallback colour is `WindowFallbackBackground` [L src/Lunegit.Desktop/Views/ToolbarView.axaml:37]; its value is not read here.
+None. Closed by [D128]: `read-gap` (the centre and right groups are the caller's: `Ui::toolbar` hands over the `*, Auto, *` columns and the branch button's shape is `Ui::toolbar_label`; the middle column is zero wide, a centred group is placed around its x), and `inactive-fallback` (`Theme.window_fallback` is #333333FF, Lunegit `DarkTheme.axaml:245`). Focus-visible stays the button's ring.
 
 ## Notes for the planner
 

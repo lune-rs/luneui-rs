@@ -26,6 +26,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Display;
 use std::ops::Range;
 
+pub use focus::RoveAxis;
 pub use id::WidgetId;
 pub use overlay::{Dismissal, OverlayFrame, OverlayOptions, OverlayPhase};
 pub use response::{Response, Sense};
@@ -263,9 +264,11 @@ impl<'a> Ui<'a> {
 
         if let Some(id) = store.focus.pending.take() {
             store.focus.focused = Some(id);
-            store.focus.visible = false;
+            store.focus.visible = std::mem::take(&mut store.focus.pending_ring);
             focus_loss(&active, &hits, Some(id), &mut dismissed);
         }
+        // The roving groups of the frame `hits` came from; this frame's are collected anew.
+        let roves = std::mem::take(&mut store.focus.roves);
         store
             .pointer
             .drop_capture_if(|id| !hits.iter().any(|h| h.id == id && eligible(h)));
@@ -386,7 +389,13 @@ impl<'a> Ui<'a> {
                                 let scopes = active.iter().rev().map(|o| (o.tag, o.opts.modal));
                                 let mut to = None;
                                 for (tag, trap) in scopes.chain([(0, true)]) {
-                                    let stops = focus::tab_stops(&hits, tag, &eligible);
+                                    let stops = focus::tab_stops(
+                                        &hits,
+                                        tag,
+                                        &eligible,
+                                        store.focus.focused,
+                                        &roves,
+                                    );
                                     if !stops.is_empty() || trap {
                                         to = focus::step(
                                             &stops,
@@ -649,12 +658,12 @@ impl<'a> Ui<'a> {
         };
         store.hover_catch_up = stale_hover;
         // A pending focus request counts iff applying it at the next begin changes something:
-        // another widget, a ring to hide, or a focus-loss overlay to dismiss. The last is begin's
-        // own test over the same active set and the regions it will see (`hits` becomes its
-        // `prev_hits`).
+        // another widget, a ring to show or hide, or a focus-loss overlay to dismiss. The last is
+        // begin's own test over the same active set and the regions it will see (`hits` becomes
+        // its `prev_hits`).
         let request_acts = store.focus.pending.is_some_and(|p| {
             store.focus.focused != Some(p)
-                || store.focus.visible
+                || store.focus.visible != store.focus.pending_ring
                 || store
                     .overlays
                     .iter()
@@ -926,7 +935,7 @@ impl<'a> Ui<'a> {
             .get(mark..)
             .unwrap_or_default()
             .iter()
-            .any(|r| r.enabled && r.sense.focusable)
+            .any(|r| r.enabled && r.sense.focusable && !r.sense.skip_tab)
     }
 
     /// The focused widget and whether its ring shows (keyboard origin).

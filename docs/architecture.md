@@ -41,9 +41,9 @@ app passes time, sizes, fonts, theme, scale and hit values in), so frames are de
 | `color` (`color.rs`) | Straight-alpha colour and blend helpers | `Rgba = [u8; 4]`, `premul`, `over`, `with_alpha` |
 | `theme` (`theme.rs`) | Theme tokens widgets read; the dark preset with its glass layers | `Theme`, `DARK`, `lunegit_dark::{THEME, WINDOW, PANEL, CARD, ...}` |
 | `acrylic` (`acrylic.rs`) | Avalonia acrylic colour math and the noise opacity | `AcrylicColors`, `NOISE_OPACITY` |
-| `paint` (`paint.rs`, `paint/path.rs`) | Immediate-mode painter: five layers, clip and rounded clip (`push_clip_rounded`), a transform stack (D66) and `push_translate`, the seven M5 primitives (image, rotate, dash, rounded clip, sector, path fill, arc; D105), hit regions generic over the app's hit type `H` and tagged with the overlay they belong to, an op recorder (`start_recording`, `take_recording`, replayed by exit painters), faded acrylic; builds a `Scene`; holds `&mut dyn TextSystem` | `Painter<H>`, `Rect`, `StrokeStyle`, `Xform`, `Ops` |
+| `paint` (`paint.rs`, `paint/path.rs`) | Immediate-mode painter: five layers, clip and rounded clip (`push_clip_rounded`), a transform stack (D66) and `push_translate`, the seven M5 primitives (image, rotate, dash, rounded clip, sector, path fill, arc; D105), hit regions generic over the app's hit type `H` and tagged with the overlay they belong to, an op recorder (`start_recording`, `take_recording`, replayed by exit painters), faded acrylic, `stroke_sweep` and `stroke_comet` over `StrokeStyle.mode` (the busy cue's conic arc and dash, D122), `Painter::elide` (see `text`); builds a `Scene`; holds `&mut dyn TextSystem` | `Painter<H>`, `Rect`, `StrokeStyle`, `Xform`, `Ops` |
 | `scene` (`scene.rs`) | The display list: plain data plus the draw-order contract | `Scene`, `Layer`, `LayerGeometry`, `Shape`, `Acrylic` (a shape and its opacity, D61), `StrokeVertex`, `TextItem`, `CustomItem`, `BackdropRequest`, `ImageItem`, `RoundClip`, `LayerId` (Base, Page, Popup, Modal, Toast; D54), `LAYER_COUNT` (5), `SCENE_LAYERS`, `FrameParams` |
-| `text` (`text.rs`) | Text specs and the text seam, with the caret, hit, line and segment queries (D86, D94) | `TextSystem` (`prepare`, `measure`, `caret`, `hit`, `lines`, `segments`), `TextKey`, `Spec`, `Style`, `Font`, `CaretPos`, `LineSpan`, `Unit` |
+| `text` (`text.rs`) | Text specs and the text seam, with the caret, hit, line and segment queries (D86, D94) | `TextSystem` (`prepare`, `measure`, `caret`, `hit`, `lines`, `segments`), `TextKey`, `Spec`, `Style`, `Font`, `CaretPos`, `LineSpan`, `Unit`, `elide` (D114: one line cut on a grapheme boundary, U+2026 in the last kept run's style, found by binary search over `caret`; a spec that fits comes back unchanged) |
 | `input` (`input.rs`) | The input seam: what the app hands in, what the toolkit asks back | `RawInput`, `Event` (with `Access`, `ClipboardText`, `ClipboardUnavailable`), `Key`, `NamedKey`, `Modifiers`, `ImeEvent`, `FocusEvent`, `Keymap` (`MAC`, `PC`; D92), `FrameOutput` (with `repaint`, `clipboard`, `tree`, `focused`, `cursor`, `ime_area`, `fired`), `Repaint`, `ClipboardRequest`, `WindowCommand`, `CursorIcon` (with `ALL`), `printable` |
 | `image` (`image.rs`) | The picture seam: the app decodes, registers by id, releases explicitly; fit geometry | `ImageStore`, `ImageData`, `ImageId`, `ImageError`, `Fit`, `ImageAlign`, `image_rect` |
 | `layout` (`layout.rs`) | Pure stack, row, column and grid helpers: rects out, nothing drawn or stored (D108) | `stack`, `row`, `column`, `grid`, `Size`, `Align`, `Insets`, `Track` |
@@ -57,14 +57,14 @@ app passes time, sizes, fonts, theme, scale and hit values in), so frames are de
 | `access` (`access.rs`) | The semantic tree and the actions that come back; plain data the `Ui` fills and routes | `Node`, `SemanticTree`, `Role` (36), `State` (15), `Action` (10), `Value`, `AccessAction` |
 | `motion` (`motion.rs`, `motion/{easing,tween,transition,tokens,conformance}.rs`) | Closed-form motion: every value is a function of the app's `Time` and stored parameters; the 60 Hz conformance harness | `Time`, `Easing`, `Tween`, `Spring`, `Keyframes`, `Transition`, `Token`, `Kind`, `Motion`, `MotionTier`, `MOTION`, `conformance` |
 | `strings` (`strings.rs`) | The string table: keys, `{n}` and `{n:spec}` placeholders, the toolkit's defaults | `StringTable`, `DEFAULTS`, `ArgFormat`, `DisplayFormat`, `format_template` |
-| `widgets` (`widgets/<name>.rs`, `widgets/mod.rs`) | One file per control, generic over `H` for the Painter API; each has a `Look`, a `paint` function, the old function as a wrapper and a `Ui` method (D60) | `button`, `toggle`, `checkbox`, `label`, `combo`, `stepper`, `field` (text field with its variants), `text_area`, `input_box` (shared look), `focus_ring`, `popup_panel`, `scroll_area`, `scrollbar`, `virtual_list`, `popover`, `tooltip` |
+| `widgets` (`widgets/<name>.rs`, `widgets/mod.rs`) | One file per control, generic over `H` for the Painter API; each has a `Look`, a `paint` function, the old function as a wrapper and a `Ui` method (D60) | `button`, `toggle`, `checkbox`, `label`, `combo`, `stepper`, `field` (text field with its variants), `text_area`, `input_box` (shared look), `focus_ring`, `popup_panel`, `scroll_area`, `scrollbar`, `virtual_list`, `popover`, `tooltip`; M6 added `badge`, `status_dot`, `verdict_row`, `progress`, `spinner`, `callout`, `stat`, `kv_list` (with `selectable`, the read-only selectable text of D125), `row`, `list_row`, `form_field`, `steps`, `nav_item` (`Ui::nav_list`), `radio_group`, `star_rating`, `slider`, `filter_bar`, `search_picker`, `tab_strip`, `toolbar`, `banner` (with the empty state) and `tone` (the one tone recipe, D129); `button` gained `Ghost`, `ButtonOptions` (`Ui::button_with`) and `IconButton` (`Ui::icon_button`, D116) |
 | `widgets::menu`, `dropdown`, `dialog` | The overlays: the old Painter functions and `Ui::menu`, `Ui::dropdown`, `Ui::dialog` on the overlay stack | `menu`, `MenuRow`, `menu_open_anim`; `dropdown`; `dialog`, `Dialog`, `DialogGlass`, `Cancel` |
 | `chrome` (`chrome.rs`) | Tab chrome outline geometry | `outline`, `TabSpan` |
 | `testing` (`testing/`) | Fakes and contract suites of the seams, public so apps can use them | `RecordingRenderer`, `FakeText`, `text_system_contract`, `FakeImages`, `image_store_contract`, `ScriptedInput`, `NullMaterial`, `backdrop_contract`, `UiHarness` |
 
 `lib.rs` re-exports `Backdrop`, `BackdropKind`, `GlassLayer` and `theme::lunegit_dark`. Tests: unit
 tests in the modules and the files under `tests/` (`window`, `painter`, `motion`, `strings`, `ui_*`,
-one `widget_*` file per retrofitted control, and `c4`, the cross-widget contract suite); none needs a
+one `widget_*` file per control, and `c4`, the cross-widget contract suite, with a section for the M6 set: roles, names and states of every interactive M6 widget in one frame, accessibility actions, one tab stop per composite, idle at rest); none needs a
 GPU or a window.
 
 ### The `Ui` frame
@@ -98,6 +98,15 @@ tree, focused widget and the shortcut commands that fired. `FrameConfig` also ca
 - Focus: scopes with a tab trap, initial focus, and restore on close (D72); keys are consumed by id
   (`consume_key`); a focused widget that is not registered for a frame loses focus unless a live
   keep-alive scope covers it.
+- Roving focus (D113): `Sense.skip_tab` marks a focusable region that is not a tab stop; `Sense::CLICK_ROVE` is
+  that and a click. A composite with one stop (the radio group, star rating, nav list, tab strip) gives
+  `Ui::rove_stop(items, active)` its children, `(id, enabled)` in order, and the index of the current
+  selection: the stop is the focused child, else the active child if enabled, else the first enabled one;
+  that child registers with `Sense::CLICK_FOCUS` and the others with `CLICK_ROVE`. `Ui::rove_keys(items,
+  RoveAxis, wrap)` moves focus with the arrows and returns the new index; `Ui::rove_focus(id)` focuses a
+  child and keeps the ring. `tab_stops` also lists the focused child, so Tab from a child that stopped
+  being the stop continues in call order, and `FocusState.roves` holds each composite's children so
+  Tab skips the others. The stop is derived each frame; nothing stores a cursor.
 - Focus input (D91): the frame keeps the keys (named and character, with modifiers and repeat), typed text,
   IME events and clipboard answers as one ordered list; `ui.focus_events(id)` hands the focused widget its
   entries in arrival order and `ui.consume_focus_event(i)` takes one, so a widget sees Backspace then
@@ -273,8 +282,10 @@ capture frame, with the `Repaint` it must report: `Settled` or `Moving`) and opt
 functions; mid-transition and interaction scenes are live scripted `Ui` frames. Pages: `button`,
 `toggle`, `checkbox`, `label`, `stepper`, `combo`, `text_field`, `dialog`, `dropdown`, `menu`, `motion`,
 `ui`, `focus`, `a11y`, `locale`, and from M5 `stack`, `image`, `shortcuts`, `primitives`, `scroll_area`,
-`scrollbar`, `virtual_list`, `popover`, `tooltip`, `text_edit`, `ime` and `drag_drop` (every page of the
-same pattern: a live state, scripted scenes, a bench timeline); `apps/gallery/src/pages/controls_ui.rs` is the shared composition of every M4 widget that the
+`scrollbar`, `virtual_list`, `popover`, `tooltip`, `text_edit`, `ime` and `drag_drop`, and from M6 `badge`, `status_dot`,
+`verdict_row`, `progress`, `spinner`, `callout`, `stat`, `kv_list`, `row`, `list_row`, `form_field`, `steps`,
+`nav_item`, `radio_group`, `star_rating`, `slider`, `filter_bar`, `search_picker`, `tab_strip`, `toolbar` and `banner`
+(50 pages in all, 231 scene names; every page of the same pattern: a live state, scripted scenes, a bench timeline); `apps/gallery/src/pages/controls_ui.rs` is the shared composition of every M4 widget that the
 core pages draw. Window mode builds a `Ui` per frame over the page's live state; dump and bench
 drive the same state through a `Player` (a scripted input, the retained store and the page state). A scene's `Expect` is `Settled` (`Idle`),
 `Moving` (`Now`) or, for a pending tooltip, `Waiting` (`At`). `Ev` scripts pointer, scroll, typed text, keys
@@ -348,6 +359,25 @@ facade keeps those paths):
 - new: `RawInput`, `FrameOutput`, `Translator`, `OutputState`, `Backdrop::apply`, `WindowBackdrop`,
   the `testing` module.
 
+Since M6 (D113 to D136):
+
+- `Sense` gains `skip_tab` and the constant `CLICK_ROVE`; `Ui` gains `rove_stop`, `rove_keys`, `rove_focus` (with
+  `RoveAxis`) and `snap_f32` (a pointer-driven value that must not animate); `tab_stops` lists the focused
+  child of a roving group;
+- `text::elide` and `Painter::elide`; `Painter` gains `stroke_sweep` and `stroke_comet`; `ScrollOptions`
+  gains `wheel_x` (a vertical wheel scrolls sideways, the tab strip's);
+- `Ui::button_with` (`ButtonOptions`: kind, small, icon), `ButtonKind::Ghost`, `Ui::icon_button`
+  (`IconButton`); `FieldOptions.chrome: FieldChrome::{Box, Bare}` for the filter bar's field (D116);
+- new widgets with a `Ui` method each: `badge`, `status_dot`, `verdict_row`, `progress`, `spinner`, `callout`,
+  `stat`, `stat_strip`, `kv_list`, `selectable_text`, `setting_row`, `item_row`, `list_row` (inside `virtual_list`), `form_field`, `steps`,
+  `nav_list`, `radio_group`, `star_rating`, `slider`, `filter_bar`, `search_picker`, `tab_strip`, `toolbar`,
+  `toolbar_label`, `banner` and `empty_state`; `Tone` is the shared tone recipe; `Font::Mono` is the mono
+  face the app supplies;
+- `Theme` gains `window_fallback`, `fg_subtle` and `status_error_light` (22 tokens in the in-crate token
+  test); `strings` gains the `luneui.tab-strip.*`, `luneui.verdict-row.*` and `luneui.stat.no-data` keys;
+  `icon` gains `SYNC`, `STAR_FULL`, `STAR_EMPTY` and `CLOSE`;
+- the radio joins `focus-ring-kinds` (the only intended change of an existing scene since M5).
+
 Since M5 (D91 to D109):
 
 - `Event`, `FrameConfig` and `FrameOutput` grow: `FocusEvent` and the ordered focus queue, `Keymap` and
@@ -420,7 +450,7 @@ only under `target/`, except that `scripts/pixel-gate.sh` extracts its base sour
 | `scripts/check-targets.sh [--skip-linux]` | The workspace lints and builds beyond the host: Windows `clippy` (needs the `x86_64-pc-windows-msvc` target) and Linux fmt, clippy and tests in a `rust:1.92` container. Not a pixel gate; it covers the code the host `cfg` hides | `windows: passed`, `linux: passed` or `skipped (<reason>)` | 0 every half that ran passed; 1 a check failed; 2 usage |
 
 Dump file names: the gallery writes `<id>@<scale>x.png` (logical 1040x660; `gallery --list` prints
-the 15 legacy names first, then the Ui pages' scenes: 62 names after M4); Luneterm's spike writes `NN-<name>@<scale>x.png` (18 scenes). `tools/dump-compare`
+the 15 legacy names first, then the Ui pages' scenes: 62 names after M4, 152 after M5, 231 after M6); Luneterm's spike writes `NN-<name>@<scale>x.png` (18 scenes). `tools/dump-compare`
 (`cargo run -p dump-compare -- <baseline> <candidate> [--max-delta N] [--allow-new]`) compares per
 pixel, max channel delta including alpha; a file missing from the candidate, a file only in the
 candidate (unless `--allow-new`), a size or colour-type mismatch or a delta above `N` (default 0)

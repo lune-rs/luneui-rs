@@ -67,7 +67,7 @@ impl Style {
 }
 
 /// Text to draw: one or more styled runs; `wrap` is a width in logical px.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Spec {
     pub runs: Vec<(String, Style)>,
     pub wrap: Option<f32>,
@@ -190,4 +190,121 @@ pub fn clamp_to_boundary(text: &str, offset: usize) -> usize {
         at -= 1;
     }
     at
+}
+
+/// The mark an elided text ends in.
+const ELLIPSIS: &str = "\u{2026}";
+
+/// The style of the run holding the byte before `at`, else of the first run with text.
+fn style_before(spec: &Spec, at: usize) -> Option<Style> {
+    let mut end = 0;
+    for (text, style) in &spec.runs {
+        end += text.len();
+        if !text.is_empty() && end >= at {
+            return Some(*style);
+        }
+    }
+    None
+}
+
+/// `spec`'s text up to `bounds[i]` with trailing whitespace dropped and the ellipsis after it, in
+/// the last kept run's style, or in `first` alone when nothing is kept. The runs before the cut
+/// stay as they are.
+fn cut_at(spec: &Spec, text: &str, bounds: &[usize], mut i: usize, first: Style) -> Spec {
+    while i > 0
+        && text[bounds[i - 1]..bounds[i]]
+            .chars()
+            .all(char::is_whitespace)
+    {
+        i -= 1;
+    }
+    let mut left = bounds[i];
+    if left == 0 {
+        return Spec::plain(ELLIPSIS, first);
+    }
+    let mut runs = Vec::new();
+    for (run, style) in &spec.runs {
+        if left == 0 {
+            break;
+        }
+        let keep = left.min(run.len());
+        runs.push((run[..keep].to_string(), *style));
+        left -= keep;
+    }
+    if let Some((last, _)) = runs.last_mut() {
+        last.push_str(ELLIPSIS);
+    }
+    Spec { runs, wrap: None }
+}
+
+/// `spec` cut to one line at most `max_w` wide, ending in an ellipsis in the last kept run's style.
+///
+/// A spec that fits on one line comes back equal, and nothing but it is shaped. A line break cuts
+/// there, also when the first line fits. Only the first line counts, so the result is one line; the
+/// cut falls on a grapheme boundary and trailing whitespace goes with it. The result's width is at
+/// most `max_w` when the ellipsis alone fits; otherwise the result is the ellipsis alone. A spec
+/// with `wrap` set, an empty text or a `max_w` that is not finite comes back as it is.
+///
+/// The search reads carets of the shaped `spec`, so it shapes no prefix. A caret ignores what the
+/// cut changes (kerning across it, joining, the order of mixed-direction text), so the result is
+/// measured, and only a result that is over `max_w` searches again by measuring.
+pub fn elide(system: &mut dyn TextSystem, spec: &Spec, scale: f32, max_w: f32) -> Spec {
+    let text = joined_text(spec);
+    if !max_w.is_finite() || spec.wrap.is_some() || text.is_empty() {
+        return spec.clone();
+    }
+    let head = text
+        .find(['\n', '\r'])
+        .map_or(text.as_str(), |at| &text[..at]);
+    if head.len() == text.len() && system.measure(spec, scale).0 <= max_w {
+        return spec.clone();
+    }
+    let Some(first) = style_before(spec, 0) else {
+        return spec.clone();
+    };
+    let alone = Spec::plain(ELLIPSIS, first);
+    if system.measure(&alone, scale).0 > max_w {
+        return alone;
+    }
+    let bounds = system.segments(head, Unit::Grapheme);
+
+    let mut marks: Vec<(Style, f32)> = Vec::new();
+    let (mut lo, mut hi) = (0, bounds.len());
+    while hi - lo > 1 {
+        let mid = lo + (hi - lo) / 2;
+        let style = style_before(spec, bounds[mid]).unwrap_or(first);
+        let mark = match marks.iter().find(|m| m.0 == style) {
+            Some(m) => m.1,
+            None => {
+                let w = system.measure(&Spec::plain(ELLIPSIS, style), scale).0;
+                marks.push((style, w));
+                w
+            }
+        };
+        if system.caret(spec, scale, bounds[mid]).x + mark <= max_w {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    if lo == 0 {
+        return alone;
+    }
+    let cut = cut_at(spec, &text, &bounds, lo, first);
+    if system.measure(&cut, scale).0 <= max_w {
+        return cut;
+    }
+    let mut best = alone;
+    let (mut lo, mut hi) = (0, lo);
+    while hi - lo > 1 {
+        let mid = lo + (hi - lo) / 2;
+        let cut = cut_at(spec, &text, &bounds, mid, first);
+        if system.measure(&cut, scale).0 <= max_w {
+            lo = mid;
+            best = cut;
+        } else {
+            hi = mid;
+        }
+    }
+    best
 }

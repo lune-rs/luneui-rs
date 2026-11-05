@@ -2,12 +2,13 @@
 //! blur, modal trap, restore on close, the vanish rule and keep-alive, request_focus, initial
 //! focus, key consumption and focus-loss dismissal.
 
+use lune_ui_core::access::{AccessAction, Action, Actions, Node, Role, State, States};
 use lune_ui_core::input::{Key, Modifiers, NamedKey, PointerButton, Repaint};
 use lune_ui_core::motion::MotionTier;
 use lune_ui_core::motion::{Kind, Motion};
 use lune_ui_core::paint::{LayerId, Rect};
 use lune_ui_core::testing::UiHarness;
-use lune_ui_core::ui::{Dismissal, OverlayOptions, Response, Sense, Ui, WidgetId};
+use lune_ui_core::ui::{Dismissal, OverlayOptions, Response, RoveAxis, Sense, Ui, WidgetId};
 
 const P: PointerButton = PointerButton::Primary;
 
@@ -677,4 +678,656 @@ fn a_focus_request_outside_a_focus_loss_overlay_dismisses_it_then_settles() {
         seq[5..].iter().all(|&s| s == (Repaint::Idle, false, true)),
         "{seq:?}"
     );
+}
+
+// Roving focus: a three-child composite between two buttons, its children `c0` to `c2`.
+
+const CHILDREN: [&str; 3] = ["c0", "c1", "c2"];
+
+#[derive(Debug, Clone)]
+struct Rove {
+    active: Option<usize>,
+    enabled: [bool; 3],
+    shown: [bool; 3],
+    axis: RoveAxis,
+    wrap: bool,
+    /// An overlay with the stops `x` and `y` opens over the page.
+    overlay: Option<OverlayOptions>,
+    /// The app calls `request_focus` on this child.
+    ask: Option<&'static str>,
+}
+
+fn rove(active: usize) -> Rove {
+    Rove {
+        active: Some(active),
+        enabled: [true; 3],
+        shown: [true; 3],
+        axis: RoveAxis::Vertical,
+        wrap: false,
+        overlay: None,
+        ask: None,
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+struct Seen {
+    focused: Option<&'static str>,
+    ring: bool,
+    /// The composite's stop, as an index of its listed children.
+    stop: Option<usize>,
+    moved: Option<usize>,
+    repaint_now: bool,
+}
+
+fn note(seen: &mut Seen, key: &'static str, r: &Response) {
+    if r.focused {
+        assert!(seen.focused.is_none(), "one focused widget");
+        seen.focused = Some(key);
+        seen.ring = r.focus_visible;
+    }
+}
+
+fn labelled(ui: &mut Ui<'_>, id: WidgetId, at: Rect) {
+    let mut states = States::default();
+    states.insert(State::Focusable);
+    ui.node(Node {
+        id,
+        role: Role::Button,
+        name: "n".to_owned(),
+        description: None,
+        value: None,
+        text: None,
+        bounds: at,
+        parent: None,
+        children: Vec::new(),
+        live: None,
+        states,
+        actions: Actions::default(),
+        sort: None,
+    });
+}
+
+fn rove_frame(h: &mut UiHarness, c: &Rove) -> Seen {
+    let mut seen = Seen::default();
+    let (_, out) = h.frame(|ui| {
+        ui.painter().on(LayerId::Page);
+        let r = stop(ui, "before", 0);
+        note(&mut seen, "before", &r);
+        let shown: Vec<usize> = (0..3).filter(|i| c.shown[*i]).collect();
+        let items: Vec<(WidgetId, bool)> = shown
+            .iter()
+            .map(|i| (ui.id(CHILDREN[*i]), c.enabled[*i]))
+            .collect();
+        seen.stop = ui.rove_stop(&items, c.active);
+        for (n, i) in shown.iter().enumerate() {
+            let sense = if seen.stop == Some(n) {
+                Sense::CLICK_FOCUS
+            } else {
+                Sense::CLICK_ROVE
+            };
+            let (id, enabled) = items[n];
+            let r = ui.with_enabled(enabled, |ui| ui.interact(id, rect(1 + i), sense));
+            note(&mut seen, CHILDREN[*i], &r);
+            labelled(ui, id, rect(1 + i));
+        }
+        seen.moved = ui.rove_keys(&items, c.axis, c.wrap);
+        if let Some(k) = c.ask {
+            let id = ui.id(k);
+            ui.request_focus(id);
+        }
+        let r = stop(ui, "after", 4);
+        note(&mut seen, "after", &r);
+        if let Some(o) = &c.overlay {
+            ui.overlay(
+                "over",
+                o,
+                |_, _, _| {},
+                |ui, _| {
+                    for (k, i) in [("x", 0), ("y", 1)] {
+                        let id = ui.id(k);
+                        let r = ui.interact(
+                            id,
+                            Rect::new(rect(i).x, 100.0, 50.0, 30.0),
+                            Sense::CLICK_FOCUS,
+                        );
+                        note(&mut seen, k, &r);
+                    }
+                },
+            );
+        }
+    });
+    seen.repaint_now = out.repaint == Repaint::Now;
+    seen
+}
+
+fn key(h: &mut UiHarness, k: NamedKey) {
+    h.input.key_down(Key::Named(k), None);
+}
+
+/// Tabs from `before` onto the composite's stop.
+fn enter(h: &mut UiHarness, c: &Rove) -> Seen {
+    rove_frame(h, c);
+    tab(h);
+    assert_eq!(rove_frame(h, c).focused, Some("before"));
+    tab(h);
+    rove_frame(h, c)
+}
+
+fn press_child(h: &mut UiHarness, i: usize) {
+    h.input.pointer_to(rect(1 + i).x + 5.0, 20.0).click(P);
+}
+
+#[test]
+fn tab_enters_on_active_and_the_second_tab_leaves() {
+    for (active, child) in CHILDREN.into_iter().enumerate() {
+        let mut h = harness();
+        let c = rove(active);
+        let seen = enter(&mut h, &c);
+        assert_eq!(seen.focused, Some(child));
+        assert!(seen.ring);
+        tab(&mut h);
+        assert_eq!(rove_frame(&mut h, &c).focused, Some("after"));
+    }
+}
+
+#[test]
+fn shift_tab_from_after_re_enters_on_the_focused_or_active_child() {
+    let mut h = harness();
+    let c = rove(1);
+    enter(&mut h, &c);
+    tab(&mut h);
+    assert_eq!(rove_frame(&mut h, &c).focused, Some("after"));
+    shift_tab(&mut h);
+    assert_eq!(
+        rove_frame(&mut h, &c).focused,
+        Some("c1"),
+        "the active child"
+    );
+    key(&mut h, NamedKey::ArrowDown);
+    rove_frame(&mut h, &c);
+    assert_eq!(rove_frame(&mut h, &c).focused, Some("c2"));
+    tab(&mut h);
+    assert_eq!(rove_frame(&mut h, &c).focused, Some("after"));
+    shift_tab(&mut h);
+    assert_eq!(
+        rove_frame(&mut h, &c).focused,
+        Some("c1"),
+        "focus left: the stop is the active child again"
+    );
+    shift_tab(&mut h);
+    assert_eq!(rove_frame(&mut h, &c).focused, Some("before"));
+}
+
+/// Each arrow from the middle child, each way out: the old stop is on either side of the new
+/// child, and the frame after the arrow still reads the regions of the frame with the old stop.
+#[test]
+fn an_arrow_and_a_tab_in_adjacent_frames_leave_the_composite() {
+    for arrow in [NamedKey::ArrowDown, NamedKey::ArrowUp] {
+        for back in [false, true] {
+            let mut h = harness();
+            let c = rove(1);
+            enter(&mut h, &c);
+            key(&mut h, arrow);
+            assert!(rove_frame(&mut h, &c).moved.is_some());
+            if back {
+                shift_tab(&mut h);
+            } else {
+                tab(&mut h);
+            }
+            let want = if back { "before" } else { "after" };
+            assert_eq!(
+                rove_frame(&mut h, &c).focused,
+                Some(want),
+                "{arrow:?} then back={back}"
+            );
+        }
+    }
+}
+
+#[test]
+fn an_arrow_and_a_tab_in_the_same_frame_leave_the_composite() {
+    for order in [[true, false], [false, true]] {
+        for arrow in [NamedKey::ArrowDown, NamedKey::ArrowUp] {
+            let mut h = harness();
+            let c = rove(1);
+            enter(&mut h, &c);
+            for is_tab in order {
+                if is_tab {
+                    tab(&mut h);
+                } else {
+                    key(&mut h, arrow);
+                }
+            }
+            let seen = rove_frame(&mut h, &c);
+            assert_eq!(seen.focused, Some("after"), "{order:?} {arrow:?}");
+            assert_eq!(seen.moved, None, "the arrow has no focused child to move");
+            assert_eq!(rove_frame(&mut h, &c).focused, Some("after"));
+        }
+    }
+}
+
+#[test]
+fn a_press_on_a_non_stop_child_focuses_it_with_no_ring_then_an_arrow_shows_it() {
+    let mut h = harness();
+    let c = rove(0);
+    rove_frame(&mut h, &c);
+    press_child(&mut h, 1);
+    let seen = rove_frame(&mut h, &c);
+    assert_eq!((seen.focused, seen.ring), (Some("c1"), false));
+    assert_eq!(seen.stop, Some(1));
+    key(&mut h, NamedKey::ArrowDown);
+    assert_eq!(rove_frame(&mut h, &c).moved, Some(2));
+    let seen = rove_frame(&mut h, &c);
+    assert_eq!((seen.focused, seen.ring), (Some("c2"), true));
+}
+
+#[test]
+fn a_press_and_a_tab_in_one_frame_leave_the_composite() {
+    let mut h = harness();
+    let c = rove(2);
+    rove_frame(&mut h, &c);
+    press_child(&mut h, 0);
+    tab(&mut h);
+    assert_eq!(rove_frame(&mut h, &c).focused, Some("after"));
+}
+
+#[test]
+fn an_access_focus_on_a_non_stop_child_makes_it_the_stop() {
+    let mut h = harness();
+    let c = rove(2);
+    rove_frame(&mut h, &c);
+    h.input.access(AccessAction {
+        target: WidgetId::ROOT.with("c0"),
+        action: Action::Focus,
+        value: None,
+    });
+    let seen = rove_frame(&mut h, &c);
+    assert_eq!((seen.focused, seen.ring), (Some("c0"), false));
+    assert_eq!(seen.stop, Some(0));
+    tab(&mut h);
+    assert_eq!(rove_frame(&mut h, &c).focused, Some("after"));
+}
+
+#[test]
+fn an_access_focus_and_a_tab_in_one_frame_leave_the_composite() {
+    let mut h = harness();
+    let c = rove(2);
+    rove_frame(&mut h, &c);
+    h.input.access(AccessAction {
+        target: WidgetId::ROOT.with("c0"),
+        action: Action::Focus,
+        value: None,
+    });
+    tab(&mut h);
+    assert_eq!(rove_frame(&mut h, &c).focused, Some("after"));
+}
+
+#[test]
+fn a_request_focus_on_a_child_and_a_tab_in_the_next_frame_leave_the_composite() {
+    let mut h = harness();
+    let mut c = rove(2);
+    rove_frame(&mut h, &c);
+    c.ask = Some("c0");
+    rove_frame(&mut h, &c);
+    c.ask = None;
+    tab(&mut h);
+    assert_eq!(rove_frame(&mut h, &c).focused, Some("after"));
+}
+
+#[test]
+fn a_disabled_active_falls_to_the_first_enabled() {
+    let mut h = harness();
+    let mut c = rove(1);
+    c.enabled = [false, false, true];
+    assert_eq!(enter(&mut h, &c).focused, Some("c2"));
+    c.enabled = [true, false, true];
+    c.active = Some(1);
+    let mut h = harness();
+    let seen = enter(&mut h, &c);
+    assert_eq!((seen.focused, seen.stop), (Some("c0"), Some(0)));
+}
+
+#[test]
+fn with_all_children_disabled_there_is_no_stop() {
+    let mut h = harness();
+    let mut c = rove(1);
+    c.enabled = [false; 3];
+    rove_frame(&mut h, &c);
+    tab(&mut h);
+    let seen = rove_frame(&mut h, &c);
+    assert_eq!((seen.focused, seen.stop), (Some("before"), None));
+    tab(&mut h);
+    assert_eq!(rove_frame(&mut h, &c).focused, Some("after"));
+}
+
+#[test]
+fn the_focused_child_removed_loses_focus_and_the_stop_returns_to_active() {
+    let mut h = harness();
+    let mut c = rove(0);
+    enter(&mut h, &c);
+    key(&mut h, NamedKey::ArrowDown);
+    rove_frame(&mut h, &c);
+    assert_eq!(rove_frame(&mut h, &c).focused, Some("c1"));
+    c.shown = [true, false, true];
+    rove_frame(&mut h, &c);
+    let seen = rove_frame(&mut h, &c);
+    assert_eq!((seen.focused, seen.stop), (None, Some(0)));
+}
+
+#[test]
+fn tab_from_a_child_disabled_under_focus_leaves_the_composite() {
+    for active in [0, 2] {
+        let mut h = harness();
+        let mut c = rove(active);
+        rove_frame(&mut h, &c);
+        press_child(&mut h, 1);
+        assert_eq!(rove_frame(&mut h, &c).focused, Some("c1"));
+        c.enabled[1] = false;
+        assert_eq!(rove_frame(&mut h, &c).stop, Some(active));
+        rove_frame(&mut h, &c);
+        tab(&mut h);
+        assert_eq!(rove_frame(&mut h, &c).focused, Some("after"));
+    }
+}
+
+#[test]
+fn the_app_moving_active_moves_the_stop_only_while_focus_is_outside() {
+    let mut h = harness();
+    let mut c = rove(0);
+    enter(&mut h, &c);
+    c.active = Some(2);
+    assert_eq!(rove_frame(&mut h, &c).stop, Some(0), "focus holds the stop");
+    tab(&mut h);
+    assert_eq!(rove_frame(&mut h, &c).focused, Some("after"));
+    assert_eq!(rove_frame(&mut h, &c).stop, Some(2));
+    shift_tab(&mut h);
+    assert_eq!(rove_frame(&mut h, &c).focused, Some("c2"));
+}
+
+fn popup() -> OverlayOptions {
+    OverlayOptions {
+        layer: LayerId::Popup,
+        modal: false,
+        ..modal()
+    }
+}
+
+#[test]
+fn a_menu_opened_from_a_child_and_closed_restores_it_and_tab_then_leaves() {
+    for active in [0, 2] {
+        let mut h = harness();
+        let mut c = rove(active);
+        rove_frame(&mut h, &c);
+        press_child(&mut h, 1);
+        rove_frame(&mut h, &c);
+        c.overlay = Some(popup());
+        rove_frame(&mut h, &c);
+        let seen = rove_frame(&mut h, &c);
+        assert_eq!(seen.focused, Some("x"));
+        assert_eq!(seen.stop, Some(active), "focus left the composite");
+        c.overlay = None;
+        rove_frame(&mut h, &c);
+        tab(&mut h);
+        assert_eq!(rove_frame(&mut h, &c).focused, Some("after"));
+    }
+}
+
+#[test]
+fn a_closing_menu_gives_focus_back_to_a_non_stop_child() {
+    let mut h = harness();
+    let mut c = rove(2);
+    rove_frame(&mut h, &c);
+    press_child(&mut h, 0);
+    rove_frame(&mut h, &c);
+    c.overlay = Some(popup());
+    rove_frame(&mut h, &c);
+    assert_eq!(rove_frame(&mut h, &c).focused, Some("x"));
+    c.overlay = None;
+    rove_frame(&mut h, &c);
+    assert_eq!(rove_frame(&mut h, &c).focused, Some("c0"));
+}
+
+#[test]
+fn a_modal_over_a_composite_keeps_its_tab_trap() {
+    let mut h = harness();
+    let mut c = rove(0);
+    enter(&mut h, &c);
+    c.overlay = Some(modal());
+    rove_frame(&mut h, &c);
+    assert_eq!(rove_frame(&mut h, &c).focused, Some("x"));
+    for _ in 0..6 {
+        tab(&mut h);
+        let seen = rove_frame(&mut h, &c);
+        assert!(matches!(seen.focused, Some("x" | "y")), "{seen:?}");
+    }
+    key(&mut h, NamedKey::ArrowDown);
+    assert_eq!(rove_frame(&mut h, &c).moved, None);
+}
+
+#[test]
+fn rove_keys_walk_skips_disabled_stops_at_the_ends_and_wraps_when_asked() {
+    let mut c = rove(0);
+    c.enabled = [true, false, true];
+    let mut h = harness();
+    enter(&mut h, &c);
+    key(&mut h, NamedKey::ArrowDown);
+    assert_eq!(
+        rove_frame(&mut h, &c).moved,
+        Some(2),
+        "over the disabled one"
+    );
+    rove_frame(&mut h, &c);
+    key(&mut h, NamedKey::ArrowDown);
+    assert_eq!(rove_frame(&mut h, &c).moved, None, "no wrap");
+    assert_eq!(rove_frame(&mut h, &c).focused, Some("c2"));
+    c.wrap = true;
+    key(&mut h, NamedKey::ArrowDown);
+    assert_eq!(rove_frame(&mut h, &c).moved, Some(0), "wraps");
+    rove_frame(&mut h, &c);
+    key(&mut h, NamedKey::ArrowUp);
+    assert_eq!(rove_frame(&mut h, &c).moved, Some(2), "wraps back");
+}
+
+#[test]
+fn home_end_and_several_presses_in_one_frame_move_in_order() {
+    let mut c = rove(0);
+    c.axis = RoveAxis::Horizontal;
+    c.enabled = [true, true, true];
+    let mut h = harness();
+    enter(&mut h, &c);
+    key(&mut h, NamedKey::End);
+    assert_eq!(rove_frame(&mut h, &c).moved, Some(2));
+    rove_frame(&mut h, &c);
+    key(&mut h, NamedKey::Home);
+    assert_eq!(rove_frame(&mut h, &c).moved, Some(0));
+    rove_frame(&mut h, &c);
+    key(&mut h, NamedKey::ArrowRight);
+    key(&mut h, NamedKey::ArrowRight);
+    assert_eq!(rove_frame(&mut h, &c).moved, Some(2));
+}
+
+/// What stays in the queue for the focused child after `rove_keys`, from `press`.
+fn left_after(
+    axis: RoveAxis,
+    wrap: bool,
+    one_child: bool,
+    press: NamedKey,
+    chord: Modifiers,
+) -> usize {
+    let mut h = harness();
+    let items = |ui: &Ui<'_>| {
+        let mut v = vec![(ui.id("c0"), true), (ui.id("c1"), !one_child)];
+        v.push((ui.id("c2"), !one_child));
+        v
+    };
+    let mut left = 0;
+    let mut run = |h: &mut UiHarness| {
+        h.frame(|ui| {
+            let list = items(ui);
+            let at = ui.rove_stop(&list, Some(0));
+            for (i, (id, on)) in list.iter().enumerate() {
+                let sense = if Some(i) == at {
+                    Sense::CLICK_FOCUS
+                } else {
+                    Sense::CLICK_ROVE
+                };
+                ui.with_enabled(*on, |ui| ui.interact(*id, rect(i), sense));
+            }
+            ui.rove_keys(&list, axis, wrap);
+            left = ui.focus_events(list[0].0).len();
+        });
+    };
+    run(&mut h);
+    tab(&mut h);
+    run(&mut h);
+    h.input.set_modifiers(chord);
+    key(&mut h, press);
+    h.input.set_modifiers(Modifiers::default());
+    run(&mut h);
+    left
+}
+
+#[test]
+fn a_key_with_no_move_is_taken_and_keys_off_the_axis_are_left() {
+    use NamedKey::{ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Home};
+    let none = Modifiers::default();
+    assert_eq!(
+        left_after(RoveAxis::Vertical, false, false, ArrowUp, none),
+        0
+    );
+    assert_eq!(left_after(RoveAxis::Vertical, false, false, Home, none), 0);
+    assert_eq!(
+        left_after(RoveAxis::Vertical, false, true, ArrowDown, none),
+        0
+    );
+    assert_eq!(
+        left_after(RoveAxis::Vertical, true, true, ArrowDown, none),
+        0
+    );
+    assert_eq!(
+        left_after(RoveAxis::Vertical, false, false, ArrowLeft, none),
+        1
+    );
+    assert_eq!(
+        left_after(RoveAxis::Horizontal, false, false, ArrowDown, none),
+        1
+    );
+    assert_eq!(
+        left_after(RoveAxis::Both, false, false, ArrowRight, none),
+        0
+    );
+    assert_eq!(left_after(RoveAxis::Both, false, false, ArrowUp, none), 0);
+    let chord = Modifiers {
+        control: true,
+        ..none
+    };
+    assert_eq!(
+        left_after(RoveAxis::Vertical, false, false, ArrowDown, chord),
+        1
+    );
+}
+
+#[test]
+fn with_one_enabled_child_nothing_moves() {
+    for wrap in [false, true] {
+        let mut c = rove(1);
+        c.enabled = [false, true, false];
+        c.wrap = wrap;
+        let mut h = harness();
+        enter(&mut h, &c);
+        for k in [
+            NamedKey::ArrowDown,
+            NamedKey::ArrowUp,
+            NamedKey::Home,
+            NamedKey::End,
+        ] {
+            key(&mut h, k);
+            assert_eq!(rove_frame(&mut h, &c).moved, None, "{k:?}");
+            assert_eq!(rove_frame(&mut h, &c).focused, Some("c1"));
+        }
+    }
+}
+
+#[test]
+fn rove_focus_shows_the_ring_and_request_focus_clears_it() {
+    let mut h = harness();
+    let a = WidgetId::ROOT.with("a");
+    let run = |h: &mut UiHarness, ask: &dyn Fn(&mut Ui<'_>)| {
+        let mut seen = (false, false);
+        let (_, out) = h.frame(|ui| {
+            let r = stop(ui, "a", 0);
+            seen = (r.focused, r.focus_visible);
+            ask(ui);
+        });
+        (seen, out.repaint)
+    };
+    run(&mut h, &|_| {});
+    assert_eq!(run(&mut h, &|ui| ui.request_focus(a)).1, Repaint::Now);
+    assert_eq!(run(&mut h, &|_| {}), ((true, false), Repaint::Idle));
+    // The same id, the ring off: the request still changes something.
+    assert_eq!(run(&mut h, &|ui| ui.rove_focus(a)).1, Repaint::Now);
+    assert_eq!(run(&mut h, &|_| {}), ((true, true), Repaint::Idle));
+    // The ring on and asked for again: nothing to do.
+    assert_eq!(run(&mut h, &|ui| ui.rove_focus(a)).1, Repaint::Idle);
+    assert_eq!(run(&mut h, &|_| {}), ((true, true), Repaint::Idle));
+    assert_eq!(run(&mut h, &|ui| ui.request_focus(a)).1, Repaint::Now);
+    assert_eq!(run(&mut h, &|_| {}), ((true, false), Repaint::Idle));
+}
+
+#[test]
+fn a_skip_tab_region_is_no_stop_and_tab_continues_from_it_in_call_order() {
+    let mut h = harness();
+    let run = |h: &mut UiHarness| {
+        let mut seen = Seen::default();
+        h.frame(|ui| {
+            let r = stop(ui, "a", 0);
+            note(&mut seen, "a", &r);
+            let id = ui.id("text");
+            let r = ui.interact(id, rect(1), Sense::CLICK_ROVE);
+            note(&mut seen, "text", &r);
+            let r = stop(ui, "b", 2);
+            note(&mut seen, "b", &r);
+        });
+        seen.focused
+    };
+    run(&mut h);
+    let mut order = Vec::new();
+    for _ in 0..3 {
+        tab(&mut h);
+        order.push(run(&mut h));
+    }
+    assert_eq!(order, [Some("a"), Some("b"), Some("a")]);
+    h.input.pointer_to(rect(1).x + 5.0, 20.0).click(P);
+    assert_eq!(run(&mut h), Some("text"));
+    tab(&mut h);
+    assert_eq!(run(&mut h), Some("b"));
+    h.input.pointer_to(rect(1).x + 5.0, 20.0).click(P);
+    assert_eq!(run(&mut h), Some("text"));
+    shift_tab(&mut h);
+    assert_eq!(run(&mut h), Some("a"));
+}
+
+#[test]
+fn initial_focus_ignores_skip_tab_regions() {
+    let mut h = harness();
+    let mut focused = None;
+    for _ in 0..2 {
+        h.frame(|ui| {
+            ui.overlay(
+                "m",
+                &modal(),
+                |_, _, _| {},
+                |ui, _| {
+                    let id = ui.id("text");
+                    if ui.interact(id, rect(0), Sense::CLICK_ROVE).focused {
+                        focused = Some("text");
+                    }
+                    if stop(ui, "x", 1).focused {
+                        focused = Some("x");
+                    }
+                },
+            );
+        });
+    }
+    assert_eq!(focused, Some("x"));
 }

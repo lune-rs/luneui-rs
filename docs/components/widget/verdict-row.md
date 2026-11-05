@@ -2,10 +2,10 @@
 id: widget.verdict-row
 title: Verdict check row
 area: widget
-status: planned
+status: in-progress
 consumers: wane
 source: —
-owner: —
+owner: toolkit-v1 M6
 summary: Verdict row: mark OK, WARN or NO in its tone, then name and text; three-column or stacked; static
 ---
 
@@ -19,7 +19,7 @@ summary: Verdict row: mark OK, WARN or NO in its tone, then name and text; three
 
 ## Existing code
 
-None in luneui-rs or Luneterm's `lune-ui` [W docs/ui/components.md:524]. Wane is the only source for this entry.
+`crates/lune-ui-core/src/widgets/verdict_row.rs` (M6): `Verdict`, `Ui::verdict_row`. Gallery page `apps/gallery/src/pages/verdict_row.rs`; tests `crates/lune-ui-core/tests/widget_verdict_row.rs`. Wane is the only source for this entry.
 
 ## Spec
 
@@ -31,8 +31,8 @@ Conflict: the mark tones. Wane's `--ok` #6fd39a and `--warn` #f2a65a against Lun
 ### Anatomy
 
 - Rows min 24 high; grid 40 / 92 / 1fr [W docs/ui/components.md:520].
-- Mark: RznMono 11 Medium [W docs/ui/components.md:520]; name 13 tertiary [W docs/ui/components.md:520], [W docs/ui/mocks/css/tokens.css:14]; text 13/20 primary [W docs/ui/components.md:520], [W docs/ui/mocks/css/tokens.css:12,125].
-- Stacked (`--stacked`): grid 40 / 1fr, padding 4 0; mark and name on line 1; text 11 secondary below, wrapping; hairlines between rows; for a column about 214 px wide [W docs/ui/components.md:518,686].
+- Mark: RznMono 11 Medium [W docs/ui/components.md:520]; name 13 tertiary (stacked: primary, as `.c-verdict--stacked .c-verdict__name` in the mock) [W docs/ui/components.md:520], [W docs/ui/mocks/css/tokens.css:14]; text 13/20 primary [W docs/ui/components.md:520], [W docs/ui/mocks/css/tokens.css:12,125].
+- Stacked (`--stacked`): grid 40 / 1fr, padding 4 0; mark and name on line 1; text 11 secondary on a 16 px line below, wrapping (row 90 px at scale 2 for one line); hairlines between rows (the widget draws one under every stacked row: it cannot know the last row, [D130]); for a column about 214 px wide [W docs/ui/components.md:518,686].
 
 ### States
 
@@ -65,7 +65,7 @@ n/a — static [W docs/ui/components.md:521].
 
 ### Strings
 
-None: the mark words OK, WARN and NO are fixed mock words; no Lunegit `en.json` line was read for them.
+The mark words are the toolkit strings `luneui.verdict-row.ok` (OK), `luneui.verdict-row.warn` (WARN) and `luneui.verdict-row.no` (NO), read through `ui.tr` so an app's table can translate them [D129]. The name and the text are app data.
 
 ### Gallery scenes
 
@@ -89,7 +89,7 @@ None: the mark words OK, WARN and NO are fixed mock words; no Lunegit `en.json` 
 
 ## Open questions
 
-- None.
+- None. (The mark words' source, once unsettled, is answered by [D129]: toolkit strings.)
 
 ## Notes for the planner
 

@@ -2,10 +2,10 @@
 id: widget.steps
 title: Wizard steps
 area: widget
-status: planned
+status: in-progress
 consumers: wane
 source: —
-owner: —
+owner: toolkit-v1 M6
 summary: Wizard steps: four 32 px rows in the sidebar slot with upcoming, current and done states; not clickable
 ---
 
@@ -19,7 +19,7 @@ summary: Wizard steps: four 32 px rows in the sidebar slot with upcoming, curren
 
 ## Existing code
 
-None in luneui-rs or Luneterm's `lune-ui` [W docs/ui/components.md:510]. Wane is the only source for this entry.
+`crates/lune-ui-core/src/widgets/steps.rs` (M6): `Ui::steps`, `Ui::steps_with_lead`. Gallery page `apps/gallery/src/pages/steps.rs`; tests `crates/lune-ui-core/tests/widget_steps.rs`. None before it in luneui-rs or Luneterm's `lune-ui` [W docs/ui/components.md:510]. Wane is the only source for this entry.
 
 ## Spec
 
@@ -31,9 +31,9 @@ No conflict: one source. The row language is `widget.nav-item` [W docs/ui/compon
 ### Anatomy
 
 - Rows 32 high, radius 6, 2 apart; padding 0 8; gap 8 [W docs/ui/components.md:506].
-- Number circle 20 px with a 1 px `--border` ring; number 11 Medium [W docs/ui/components.md:506], [W docs/ui/mocks/css/tokens.css:27].
+- Number circle 20 px with a 1 px `--border` ring, `fg_primary` on the current step (the mock's `.is-current .c-steps__num`; Wane's text names only `--border`, the mock is the reference; visual batch 3, C8); number 11 Medium [W docs/ui/components.md:506], [W docs/ui/mocks/css/tokens.css:27].
 - Label 13 in a 148 px column that never wraps; a long label is shortened [W docs/ui/components.md:506,695].
-- Lead line 13/20 tertiary, 12 px below the first row [W docs/ui/components.md:695].
+- Lead line 13/20 tertiary, 12 px below the last row [W docs/ui/components.md:695] (`Ui::steps_with_lead`; the mock text says "first row", which cannot be a position under a list of rows), wrapping at the width.
 
 ### States
 
@@ -62,7 +62,7 @@ n/a — not clickable [W docs/ui/components.md:507]. Back and Continue are the o
 
 ### Accessibility
 
-- Role `navigation` (Wane's steps list is a labelled navigation landmark [W docs/ui/mocks/js/shell.js:117], [D55]) wrapping a `list` of `list-item`s; the current row is state `selected` and `current`; name = the step label; `done` has no state in the vocabulary, see Open questions [infra.accessibility].
+- Role `navigation` (Wane's steps list is a labelled navigation landmark [W docs/ui/mocks/js/shell.js:117], [D55]) wrapping a `list` of `list-item`s; the current row is state `selected` and `current`; name = the step label; a done step is `checked` [D121] [infra.accessibility].
 
 ### Strings
 
@@ -90,7 +90,7 @@ None: step labels are app data.
 
 ## Open questions
 
-- `role-gap`: the done state needs a semantic state (for example `checked`) that the vocabulary lacks; M6 picks a state from the list or extends the list.
+- None. `role-gap` is answered by [D121]: a done step carries the node state `checked`, from the existing vocabulary; no new field.
 
 ## Notes for the planner
 

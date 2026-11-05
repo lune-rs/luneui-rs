@@ -2,10 +2,10 @@
 id: widget.spinner
 title: Spinner
 area: widget
-status: planned
+status: in-progress
 consumers: any
 source: —
-owner: orch/toolkit-v1
+owner: toolkit-v1 M6
 summary: Spinner: a 14 px glyph that turns a full revolution every 1.2 s while busy; static under Reduced and Off
 ---
 
@@ -20,7 +20,7 @@ summary: Spinner: a 14 px glyph that turns a full revolution every 1.2 s while b
 
 ## Existing code
 
-`src/Lunegit.Desktop/Controls/SpinBehavior.cs` (attached property `Enabled` that rotates any control), used at `src/Lunegit.Desktop/Controls/IndexingBanner.axaml:16`. No luneui-rs code yet.
+`src/Lunegit.Desktop/Controls/SpinBehavior.cs` (attached property `Enabled` that rotates any control), used at `src/Lunegit.Desktop/Controls/IndexingBanner.axaml:16`. In luneui-rs (M6): `crates/lune-ui-core/src/widgets/spinner.rs` (`SpinnerOptions`, `Ui::spinner`, `spinner::paint`) over `motion::spin_angle` and `Painter::text_rotated`; gallery page `apps/gallery/src/pages/spinner.rs`; tests `crates/lune-ui-core/tests/widget_spinner.rs`.
 
 ## Spec
 
@@ -103,7 +103,7 @@ None: the spinner has no text.
 
 ## Open questions
 
-- `motion-gap`: the continuous spin against animation-rules.md:150 (500 ms cap) and the 1200 ms period, which is not one of the five tokens. The `motion.md` spin rule must settle both before M6; until then the table names `slow`.
+- `motion-gap` (answered by [D117]): the spin kind and its 1200 ms period outside the scale are in `docs/motion.md` (its `spin` row and the not-on-the-scale paragraph, which already exempts the spinner from the 500 ms cap). The widget turns under Full only: elapsed time alone sets the angle, a stop holds it and a restart continues from it; Reduced and Off draw a static glyph at angle 0 and report `Idle`. Nothing open.
 
 ## Notes for the planner
 

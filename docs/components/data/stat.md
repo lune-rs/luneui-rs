@@ -2,10 +2,10 @@
 id: data.stat
 title: Stat cell
 area: data
-status: planned
+status: in-progress
 consumers: wane
 source: —
-owner: —
+owner: toolkit-v1 M6
 summary: A labelled figure in a strip: label, mono value, sub-line, optional meter
 ---
 
@@ -22,7 +22,7 @@ A labelled figure in a strip: label, mono value, sub-line, optional meter. Named
 
 ## Existing code
 
-None in luneui-rs or Luneterm's `lune-ui` (Wane: missing). Design source (not code to move): Wane `docs/ui/mocks/css/components.css` (data.stat); no lune-ui source. Value at most 22 px (A4).
+`crates/lune-ui-core/src/widgets/stat.rs` (M6): `StatOptions`, `Ui::stat`, `Ui::stat_strip`. Gallery page `apps/gallery/src/pages/stat.rs`; tests `crates/lune-ui-core/tests/widget_stat.rs`. Design source (not code moved): Wane `docs/ui/mocks/css/components.css` (data.stat); no lune-ui source. Value at most 22 px (A4).
 
 ## Spec
 
@@ -60,7 +60,7 @@ Conflicts: none. The repo has no RznMono face token; the value font is an open q
 | value changes on a discrete update | value | value | fast | linear | keep | [D40], [motion] |
 
 The value animates on a discrete change only. Never animated: a continuously updating value (high-frequency
-content, [L .claude/docs/animation-rules.md:148]). The duration and easing are a [D40] choice with no source; open question.
+content, [L .claude/docs/animation-rules.md:148]). The duration and easing are a [D40] choice with no source, settled by [D126]: the `value` kind at `fast`, linear, kept under Reduced (its 120 ms) and snapped under Off. The tween runs on a number the app passes with its formatter (`StatOptions.number`); at rest the drawn text is exactly the app's `value`; a text-only value and a `live` one snap.
 
 ### Input and focus
 
@@ -86,7 +86,7 @@ content, [L .claude/docs/animation-rules.md:148]). The duration and easing are a
 
 ### Strings
 
-None: the label, value and sub-line are app text; the placeholder "—" and "No data" are the mock's strings, not in any source (Open questions).
+The label, value and sub-line are app text. The placeholder value "—" is a literal; the sub-line "No data" is the toolkit string `luneui.stat.no-data` [D126].
 
 ### Gallery scenes
 
@@ -104,7 +104,7 @@ None: the label, value and sub-line are app text; the placeholder "—" and "No 
 
 ### Acceptance
 
-- Behaviour (scripted input, injected time): a discrete value change animates once from the old to the new value; a continuous value does not animate. None exists.
+- Behaviour (scripted input, injected time): a discrete value change animates once from the old to the new value; a continuous value does not animate. Tests `widget_stat.rs` (`a_change_of_number_animates_once_from_the_old_to_the_new`, `a_live_or_text_only_value_never_puts_the_frame_in_flight`).
 - Pixel probes at scale 2: cell padding 24 px top and bottom, 32 px sides; hairline 2 px.
 - Conformance: value change reaches the new value in 180 ms (fast) under Full, snaps under Off.
 - Semantic node: `group` per cell; label, value and sub-line as `static-text`.
@@ -116,11 +116,7 @@ None: the label, value and sub-line are app text; the placeholder "—" and "No 
 
 ## Open questions
 
-- The RznMono face: no repo token or font entry is in the sources read; the value font is open (fonts are an app or toolkit decision; the README says RznSans).
-- The value's duration and easing: [D40] choice; no source; open.
-- The placeholder strings "—" and "No data": mock text, not in Lunegit; open.
-- Whether this is a toolkit component or app code composed from the painter: the planner decides (Wane needs it either way).
-- Native rendering: needs tabular figures from RznMono; none otherwise.
+- None. The value font is `Font::Mono`, which the app supplies (RznMono or other) [D129]; the duration, easing and placeholder strings are settled by [D126], which also makes this a toolkit component (M7's flyout needs it). Native rendering of tabular figures is the app's face.
 
 ## Notes for the planner
 

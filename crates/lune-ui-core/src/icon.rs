@@ -19,6 +19,10 @@ pub const CHROME_MAXIMIZE: &str = "\u{eab9}";
 pub const CHROME_RESTORE: &str = "\u{eabb}";
 pub const SEARCH: &str = "\u{ea6d}";
 pub const CALENDAR: &str = "\u{eab0}";
+pub const SYNC: &str = "\u{ea77}";
+pub const STAR_FULL: &str = "\u{eb59}";
+pub const STAR_EMPTY: &str = "\u{ea6a}";
+pub const CLOSE: &str = "\u{ea76}";
 
 /// Text spec for one icon glyph at `size`.
 pub fn glyph(glyph: &str, size: f32, color: Rgba) -> Spec {

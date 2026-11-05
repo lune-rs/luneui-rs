@@ -2,10 +2,10 @@
 id: widget.slider
 title: Slider
 area: widget
-status: planned
+status: in-progress
 consumers: any
 source: —
-owner: orch/toolkit-v1
+owner: toolkit-v1 M6
 summary: Slider: 4 px track with accent fill and a 12 px knob (14 hovered); look derived from the toggle knob and the progress track; arrow keys step
 ---
 
@@ -21,7 +21,7 @@ summary: Slider: 4 px track with accent fill and a 12 px knob (14 hovered); look
 
 ## Existing code
 
-None. The knob geometry is `crates/lune-ui-core/src/widgets/mod.rs:28-47` (`toggle`), the sibling the knob derives from.
+`crates/lune-ui-core/src/widgets/slider.rs` (`Ui::slider`, `SliderOptions`, `SliderLook`, `paint`). The knob geometry derives from `crates/lune-ui-core/src/widgets/toggle.rs`.
 
 ## Spec
 
@@ -33,16 +33,16 @@ Derivation sources: `widget.toggle` (knob), `data.progress` (track and fill), `w
 
 ### Anatomy
 
-- Track: height 4, radius 4, full width of the rect; fill `surface_overlay` #ffffff15 [W docs/ui/components.md:632], [W docs/ui/mocks/css/tokens.css:22]; derived from `data.progress` [D51].
+- Track: height 4, radius 2 (half the height: a CSS radius of 4 clamps to it in the mock, `sd_round_rect` does not, [D135]), full width of the rect; fill `surface_overlay` #ffffff15 [W docs/ui/components.md:632], [W docs/ui/mocks/css/tokens.css:22]; derived from `data.progress` [D51].
 - Value fill: `accent` from the track start to the knob [W docs/ui/components.md:632], [W docs/ui/mocks/css/tokens.css:40]; `accent` is the toggle's on fill [R crates/lune-ui-core/src/theme.rs:64].
-- Knob: circle 12 (14 hovered), centred vertically on the track, centre at the value position [derived: widget.toggle knob geometry, R crates/lune-ui-core/src/widgets/mod.rs:28-29]; fill `fg_primary` (the toggle's off knob) [derived: widget.toggle, R crates/lune-ui-core/src/widgets/mod.rs:45].
+- Knob: circle 12 (14 hovered), centred vertically on the track, centre at the value position [derived: widget.toggle knob geometry, R crates/lune-ui-core/src/widgets/mod.rs:28-29]; fill `on_accent` #FFFFFF, opaque: the knob rides an accent fill, which is the toggle's on state; `fg_primary` (the toggle's off knob) is #FFFFFFCC and let the fill's end show through [derived: widget.toggle, R crates/lune-ui-core/src/widgets/mod.rs:45], [W docs/ui/mocks/css/components.css:169-170], [D134].
 - Hit area: the track grown by 4 px across and 6 px up and down, as the toggle's hit area [derived: widget.toggle, R crates/lune-ui-core/src/widgets/mod.rs:47].
 
 ### States
 
 | state | look | cite |
 |---|---|---|
-| rest | track `surface_overlay`, fill `accent`, knob 12 `fg_primary` | [derived: widget.toggle, R crates/lune-ui-core/src/widgets/mod.rs:29,45], [derived: data.progress, W docs/ui/components.md:632] [D51] |
+| rest | track `surface_overlay`, fill `accent`, knob 12 `on_accent` | [derived: widget.toggle, R crates/lune-ui-core/src/widgets/mod.rs:29,45], [derived: data.progress, W docs/ui/components.md:632] [D51] |
 | hover | knob 14 | [derived: widget.toggle, R crates/lune-ui-core/src/widgets/mod.rs:29] [D51] |
 | focus-visible | 1 px outline, offset 2, around the knob | [widget.button] [D51] |
 | disabled | opacity 0.4, inert | [widget.button], [L src/Lunegit.Desktop/App.axaml:481-483] [D51] |
@@ -55,26 +55,29 @@ Derivation sources: `widget.toggle` (knob), `data.progress` (track and fill), `w
 | rest ↔ hover | knob size 12 ↔ 14 | hover | instant | linear | size snap | [L .claude/docs/animation-rules.md:102], [D40], [D51] |
 | focus-visible on/off | outline opacity | focus | fast | linear | keep | [L .claude/docs/animation-rules.md:104], [D40], [D51] |
 
-Never animated: the knob while it follows the pointer during a drag, because that is high-frequency content [L .claude/docs/animation-rules.md:148].
+Never animated: the knob while it follows the pointer during a drag, because that is high-frequency content [L .claude/docs/animation-rules.md:148]. Only a key or an accessibility step (increment, decrement) tweens the knob; a press, a drag, a set-value and an app-driven change snap, and a press also ends a tween in flight, so while pressed the knob equals the value on every frame [D119]. A key step during the tween retargets from the current position.
 
 ### Input and focus
 
-- Pointer: press on the knob and drag to set the value; the drag follows the pointer without a transition. Click-to-set on the track is not specified (Open questions).
-- Keyboard: Right and Up increment, Left and Down decrement, by one `step` [contract: widget.slider role, arrow keys].
+- Pointer: a press anywhere in the hit area sets the value at once and starts following (no drag threshold); the following has no transition, keeps going off the track, and ends with the release, whose frame still takes the pointer's last move [D119]. The pointer maps through the transform stack onto the whole track, not the clipped hit rect. While the pointer holds the slider, keys and accessibility requests are dropped.
+- Keyboard: Right and Up increment, Left and Down decrement, by one stop [contract: widget.slider role, arrow keys]; every arrow of a frame counts, in arrival order. From an off-step value the key goes to the stop beside it.
+- Stops: `min + k * step`, and `max` itself when `step` does not divide the range; the widget clamps to `[min, max]` and snaps every value it writes to the nearest stop [D119]. `step <= 0` is continuous, with a key step of `(max - min) / 100`. A step below the `f32` resolution of the value cannot move it.
+- A value in hand is not rewritten until the user acts: an off-step or out-of-range value survives idle frames and hover (out of range it draws at the end). `changed` is set only when the stored value changed.
+- Degenerate input (`min >= max`, a value, `min`, `max` or `step` not finite, a rect with no width): no panic, no change, fraction 0, knob at the start.
 - Tab stop: yes [core.focus]; focus-visible after keyboard navigation [core.focus].
 - Layer: `Base`; no overlay, no focus scope.
 - Pointer capture while dragging [core.input].
 
 ### Retained state
 
-- Transient: hover, drag in progress, focus ring [core.ui].
+- Transient: hover, drag in progress, focus ring, the fraction the knob last aimed at (a different one on the next frame is the app's change and snaps) [core.ui].
 - Persistent: none.
 - App-owned: `value`, `min`, `max`, `step` (passed every frame).
 - Exit retention: no.
 
 ### Accessibility
 
-- Role `slider`; value = the number with min, max and step the owner passes; states focusable, focused, disabled; actions `increment` and `decrement` [infra.accessibility].
+- Role `slider`; value = the number with min, max and step the owner passes; states focusable, focused, disabled; actions `increment`, `decrement` and `set-value` [infra.accessibility]. Increment and decrement arrive as Up and Down [D71]; set-value settles on the nearest stop, a NaN or a non-number is ignored and an infinity goes to that end. Numbers that are not finite are reported as 0.
 
 ### Strings
 
@@ -95,7 +98,7 @@ None: the slider has no text; the label is the owner's.
 ### Acceptance
 
 - Scripted: Right and Left change the value by one step; the value stops at `min` and `max` (Open questions); a disabled slider changes nothing.
-- Pixel probes at scale 2: track 8 px high, radius 8 px; knob 24 px (28 hovered); knob centre at the value position.
+- Pixel probes at scale 2: track 8 px high, radius 4 px (a semicircular end); knob `on_accent`; knob 24 px (28 hovered); knob centre at the value position.
 - Conformance: knob x over 60 Hz samples is monotonic, ends exact, settles within 180 ms + 1 frame; Reduced snaps.
 - Semantic node: role slider; value follows `value`; injected `AccessAction` increment and decrement change it by one step.
 
@@ -106,8 +109,8 @@ None: the slider has no text; the label is the owner's.
 
 ## Open questions
 
-- `pointer-gap`: click-to-set on the track is not in any source; M6 decides.
-- `clamp-gap`: whether the slider clamps the step at the ends or the owner does is not in any source; M6 decides.
+- Resolved [D119] `pointer-gap`: a press anywhere in the hit area sets the value.
+- Resolved [D119] `clamp-gap`: the widget clamps and snaps.
 - `no-consumer`: neither Lunegit nor Wane uses a slider today; the entry is kept for the M6 control set (R-widget-5).
 
 ## Notes for the planner

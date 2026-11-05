@@ -75,6 +75,7 @@ pub(super) const EDIT_SENSE: Sense = Sense {
     drag: true,
     focusable: true,
     scroll: false,
+    skip_tab: false,
 };
 
 /// What the app says about the field: an error flag (the form around it sets it).
@@ -98,6 +99,18 @@ pub enum Variant {
     Date,
 }
 
+/// The chrome a field draws around its text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum FieldChrome {
+    /// The box: fill, border and the focus and error rings.
+    #[default]
+    Box,
+    /// None: no fill, border or ring, the caret in `fg_tertiary`. The text, the placeholder,
+    /// editing, focus, composition and the node are the box field's. For a bar that draws its own
+    /// frame (the filter bar).
+    Bare,
+}
+
 /// What [`Ui::text_field_with`] is given besides its rect and text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct FieldOptions<'a> {
@@ -105,6 +118,8 @@ pub struct FieldOptions<'a> {
     pub placeholder: &'a str,
     pub error: bool,
     pub variant: Variant,
+    /// The box (default) or no chrome at all.
+    pub chrome: FieldChrome,
     /// 24 high, whatever the rect says; the top stays.
     pub small: bool,
     /// The caret and selection work, edits do not.
@@ -629,7 +644,7 @@ pub(super) fn caret_at(ui: &mut Ui<'_>, spec: &Spec, offset: usize) -> CaretPos 
 }
 
 /// The boxes of chars `range` of `spec`, one per visual line it touches, from the text's top-left.
-fn range_boxes(ui: &mut Ui<'_>, spec: &Spec, range: &Range<usize>) -> Vec<Rect> {
+pub(super) fn range_boxes(ui: &mut Ui<'_>, spec: &Spec, range: &Range<usize>) -> Vec<Rect> {
     let Some((text, style)) = spec.runs.first().filter(|_| !range.is_empty()) else {
         return Vec::new();
     };
@@ -663,7 +678,19 @@ fn range_boxes(ui: &mut Ui<'_>, spec: &Spec, range: &Range<usize>) -> Vec<Rect> 
 /// Draws `shown` with its text's top-left at `(x, y)`: the selection and the clause under the
 /// text, then the text, the preedit's underlines and, with `caret`, the caret. Returns the box the
 /// input method's candidate window avoids, in the same space.
-pub(super) fn draw_shown(ui: &mut Ui<'_>, shown: &Shown, (x, y): (f32, f32), caret: bool) -> Rect {
+pub(super) fn draw_shown(ui: &mut Ui<'_>, shown: &Shown, at: (f32, f32), caret: bool) -> Rect {
+    let ink = ui.theme().fg_primary;
+    draw_shown_inked(ui, shown, at, caret, ink)
+}
+
+/// [`draw_shown`] with the caret in `caret_ink`.
+pub(super) fn draw_shown_inked(
+    ui: &mut Ui<'_>,
+    shown: &Shown,
+    (x, y): (f32, f32),
+    caret: bool,
+    caret_ink: Rgba,
+) -> Rect {
     let t = *ui.theme();
     let at = |b: &Rect| Rect::new(x + b.x, y + b.y, b.w, b.h);
     for b in range_boxes(ui, &shown.spec, &shown.selection) {
@@ -704,7 +731,7 @@ pub(super) fn draw_shown(ui: &mut Ui<'_>, shown: &Shown, (x, y): (f32, f32), car
     };
     let bar = Rect::new(x + pos.x + CARET_GAP, y + pos.y, CARET_WIDTH, ch);
     if caret && shown.caret.is_some() {
-        ui.painter().fill_over(bar, 0.0, ink);
+        ui.painter().fill_over(bar, 0.0, premul(caret_ink));
     }
     clause
         .first()
@@ -918,7 +945,10 @@ impl Ui<'_> {
         let clearing = clearable && !text.is_empty();
 
         let look = animated_look(self, id, r.hovered, r.focused, opts.error);
-        paint_box(self.painter(), rect, &look);
+        let bare = opts.chrome == FieldChrome::Bare;
+        if !bare {
+            paint_box(self.painter(), rect, &look);
+        }
 
         let shown = Shown::new(&cfg, &st.edit, text, r.focused);
         let right = match opts.variant {
@@ -953,7 +983,8 @@ impl Ui<'_> {
             EMPTY_CARET
         };
         let top = rect.y + (rect.h - text_h) / 2.0;
-        let bar = draw_shown(self, &shown, (left - scroll, top), look.caret);
+        let caret_ink = if bare { t.fg_tertiary } else { t.fg_primary };
+        let bar = draw_shown_inked(self, &shown, (left - scroll, top), look.caret, caret_ink);
         let area = screen_area(self, bar, clip);
         self.painter().pop_clip();
 

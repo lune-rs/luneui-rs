@@ -2,10 +2,10 @@
 id: widget.radio-group
 title: Radio group
 area: widget
-status: planned
+status: in-progress
 consumers: wane
 source: —
-owner: —
+owner: toolkit-v1 M6
 summary: Radio group: vertical 16 px rings, accent ring and 6 px dot when selected; arrow keys move the selection inside the group
 ---
 
@@ -34,7 +34,7 @@ Conflicts: none on the values drawn. Lunegit leaves the inner dot to Fluent's wh
 - Circle 16 px, vertically centred in the row [W docs/ui/components.md:338].
 - Unselected: 1 px ring `--text-secondary` [W docs/ui/components.md:338], [W docs/ui/mocks/css/tokens.css:13].
 - Selected: fill `accent` [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:191-196], [R crates/lune-ui-core/src/theme.rs:64]; 6 px dot in `on_accent` [W docs/ui/components.md:337].
-- Row min height 28; label 13 `--text-secondary`; gap 8 [W docs/ui/components.md:338].
+- Row min height 28; label 13 `--text-secondary`; gap 8 [W docs/ui/components.md:338]. The circle sits 8 px in from the row's left edge (the row's hover fill, radius 4, has to clear it) and the label is cut with an ellipsis 8 px before the right edge [derived: D120].
 - Vertical only [W docs/ui/components.md:336].
 
 ### States
@@ -60,7 +60,7 @@ Lunegit has no RadioButton motion selector; every row is the general rule under 
 ### Input and focus
 
 - Pointer: click selects [W docs/ui/components.md:339].
-- Keyboard: arrow keys move the selection inside the group; Tab enters the group once [W docs/ui/components.md:339]; roving focus inside the group.
+- Keyboard: arrow keys move the selection inside the group; Tab enters the group once [W docs/ui/components.md:339]; roving focus inside the group. Up and Left go to the previous option, Down and Right to the next, wrapping at both ends, skipping disabled options; the arrow moves focus and selection in the same frame, and `changed` is reported once. Space selects the focused option [D120].
 - Tab stop: one stop for the group [core.focus].
 - Layer: `Base`; no overlay, no focus scope.
 - Pointer capture while pressed [core.input].
@@ -110,4 +110,4 @@ None: option labels are app data.
 
 ## Notes for the planner
 
-Wane P0. The arrow-key wrap rule is not in Wane's text; the acceptance test needs it, so M6 decides it and records it here.
+Wane P0. The arrow-key wrap rule is not in Wane's text; M6 decided it [D120]: the arrows wrap both ways, and the acceptance test (`widget_radio_group`) pins it.

@@ -31,7 +31,7 @@ Conflicts: none between sources. The painter is the moved, pixel-gated code, so 
 
 ### Anatomy
 
-- Existing primitives (the SF11 vocabulary, mapped to the methods that implement them): `fill` [R crates/lune-ui-core/src/paint.rs:215], `fill-radii` [R crates/lune-ui-core/src/paint.rs:219], `fill-over` [R crates/lune-ui-core/src/paint.rs:225], `ring` [R crates/lune-ui-core/src/paint.rs:231], `acrylic` [R crates/lune-ui-core/src/paint.rs:243], `backdrop` [R crates/lune-ui-core/src/paint.rs:189], `text` (with `text_in`, `text_centered`, `measure`) [R crates/lune-ui-core/src/paint.rs:274-311], `icon` (a glyph drawn through the text path) [R crates/lune-ui-core/src/icon.rs:22], `stroke`, `stroke-sweep` and `stroke-comet` (one tessellated polyline; the sweep and comet are `StrokeStyle.mode` 1 and 2, drawn by the shader) [R crates/lune-ui-core/src/paint.rs:64-72,329], [R crates/lune-ui-wgpu/src/shader.wgsl:106,150-157], `custom` [R crates/lune-ui-core/src/paint.rs:254], `clip-rect` (`set_clip`) [R crates/lune-ui-core/src/paint.rs:167], `xform` (`set_xform`: scale about an origin, a vertical offset and an alpha) [R crates/lune-ui-core/src/paint.rs:171,86-93].
+- Existing primitives (the SF11 vocabulary, mapped to the methods that implement them): `fill` [R crates/lune-ui-core/src/paint.rs:215], `fill-radii` [R crates/lune-ui-core/src/paint.rs:219], `fill-over` [R crates/lune-ui-core/src/paint.rs:225], `ring` [R crates/lune-ui-core/src/paint.rs:231], `acrylic` [R crates/lune-ui-core/src/paint.rs:243], `backdrop` [R crates/lune-ui-core/src/paint.rs:189], `text` (with `text_in`, `text_centered`, `measure`) [R crates/lune-ui-core/src/paint.rs:274-311], `icon` (a glyph drawn through the text path) [R crates/lune-ui-core/src/icon.rs:22], `stroke`, `stroke-sweep` and `stroke-comet` (one tessellated polyline; `Painter::stroke_sweep` and `Painter::stroke_comet` are `StrokeStyle.mode` 1 and 2, drawn by the shader; a style's lengths and centre are logical px of the drawing space, and `stroke` turns them into the shader's units through the transform stack, so a recorded `Op::Stroke` replays right in another painter's space) [R crates/lune-ui-core/src/paint.rs:64-72,329], [R crates/lune-ui-wgpu/src/shader.wgsl:106,150-157], `custom` [R crates/lune-ui-core/src/paint.rs:254], `clip-rect` (`set_clip`) [R crates/lune-ui-core/src/paint.rs:167], `xform` (`set_xform`: scale about an origin, a vertical offset and an alpha) [R crates/lune-ui-core/src/paint.rs:171,86-93].
 - Order: layers draw back to front; inside a layer the draw-order contract is in [core.scene]. Every primitive records on the layer set by `on` [R crates/lune-ui-core/src/paint.rs:162].
 - Every primitive method records plain data into the `Scene`; none touches a GPU, window or text-shaping type [core.scene].
 - Rule for a new primitive: it is a method on `Painter` that records into `Scene`, with a recording-fake test and a gallery scene; the wgpu adapter draws it; the pixel gate stays at zero delta for every existing scene [D47].
@@ -65,7 +65,7 @@ None: the painter draws text it is given.
 
 ### Gallery scenes
 
-- Existing scenes exercise the existing primitives: `controls` (fill, fill-radii, ring, text, icon), `acrylic` (acrylic), `blur-contrast` and `menu` (backdrop), `chrome` (stroke, stroke-sweep, stroke-comet, clip-rect), `custom-draw` (custom), `menu-opening` (xform).
+- Existing scenes exercise the existing primitives: `controls` (fill, fill-radii, ring, text, icon), `acrylic` (acrylic), `blur-contrast` and `menu` (backdrop), `chrome` (stroke, clip-rect), `tab-strip-busy-sweep` (stroke-sweep), `tab-strip-busy-comet` (stroke-comet), `custom-draw` (custom), `menu-opening` (xform).
 - M5 built the seven new primitives and shows each on the gallery's `primitives` and `image` pages: `primitive-arc`, `primitive-sector`, `primitive-path-fill`, `primitive-dash`, `primitive-clip-rounded`, `primitive-rotate` and the seven `image-*` scenes (D105).
 - New primitives are exercised by the scenes of the entries that need them: image: `image-contain-wide` ([core.image]); rotate: `spinner-spinning` ([widget.spinner]); dash: `search-picker-link` ([widget.search-picker]); clip-rounded: `page-body-scroll` ([layout.page]) and `panel-card` ([layout.panel]); sector, path-fill and arc: `pie-chart-three` and `pie-chart-half` ([data.pie-chart]).
 
@@ -79,8 +79,8 @@ The aggregate of every `New:` item in the catalogue (the list C5 gives M5; R-cor
 | primitive | needed by (ids) | first milestone | cite |
 |---|---|---|---|
 | image | core.image, widget.banner-empty-state, text.markdown-preview | M5 | [L src/Lunegit.Desktop/Views/FileViewerView.axaml:352], [L src/Lunegit.Desktop/Views/MarkdownPreviewView.axaml.cs:445], [L src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:17] |
-| rotate | widget.spinner, widget.banner-empty-state | M6 | [L src/Lunegit.Desktop/Controls/SpinBehavior.cs:38-53] |
-| dash | widget.search-picker | M6 | [L src/Lunegit.Desktop/Controls/LinkSearchPicker.axaml:30] |
+| rotate | widget.spinner, widget.banner-empty-state | M6 (done: `Painter::text_rotated` turns the spinner's glyph, scene `spinner-spinning`; the banner's busy glyph is the spinner) | [L src/Lunegit.Desktop/Controls/SpinBehavior.cs:38-53] |
+| dash | widget.search-picker | M6 (done: `Painter::dash` draws the link trigger's underline, scene `search-picker-link`) | [L src/Lunegit.Desktop/Controls/LinkSearchPicker.axaml:30] |
 | clip-rounded | layout.page, layout.panel | M7 | [L src/Lunegit.Desktop/App.axaml:769-770], [W docs/ui/components.md:249-262] |
 | sector | data.pie-chart | M8 | [L src/Lunegit.Desktop/Controls/StoragePieChartControl.cs:113-137] |
 | path-fill | data.pie-chart | M8 | [L src/Lunegit.Desktop/Controls/StoragePieChartControl.cs:140-158] |
@@ -97,7 +97,7 @@ Not needed by any entry (no row): `linear-gradient` and `shadow`. No Lunegit or 
 
 ### Build
 
-- Milestone: M5 (the seven new primitives, R-core-10) and M11 (done standard; the existing code is moved). M5 built the seven primitives (steps 4 and 5; the page is `primitives`); `core.painter` stays `in-progress` until M11's done standard.
+- Milestone: M5 (the seven new primitives, R-core-10) and M11 (done standard; the existing code is moved). M5 built the seven primitives (steps 4 and 5; the page is `primitives`); `core.painter` stays `in-progress` until M11's done standard. M6 put the rotate and dash rows to use (the spinner and the search picker's link trigger) and added the two stroke helpers `Painter::stroke_sweep` and `Painter::stroke_comet` over `StrokeStyle.mode`, which the tab strip's busy cue draws (D122).
 - Depends on: core.scene, core.theme, text.shaping, core.image.
 
 ## Open questions

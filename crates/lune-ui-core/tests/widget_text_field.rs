@@ -1071,6 +1071,81 @@ mod edit {
             "a new field: the caret after the text"
         );
     }
+
+    #[test]
+    fn a_bare_field_draws_no_fill_border_or_ring_and_the_box_field_does() {
+        use lune_ui_core::widgets::field::FieldChrome;
+        let bare = FieldOptions {
+            chrome: FieldChrome::Bare,
+            placeholder: "Filter",
+            ..FieldOptions::default()
+        };
+        let boxed = FieldOptions {
+            placeholder: "Filter",
+            ..FieldOptions::default()
+        };
+        // At rest, hovered and focused (by Tab and by a click), after the transitions settle.
+        for reach in [Reach::Rest, Reach::Hover, Reach::Tab, Reach::Click] {
+            for (opts, expect_box) in [(&bare, false), (&boxed, true)] {
+                let mut text = String::new();
+                let mut h = UiHarness::new(WIN);
+                run(&mut h, &mut text, opts);
+                match reach {
+                    Reach::Rest => {}
+                    Reach::Hover => {
+                        h.input.pointer_to(CENTRE.0, CENTRE.1);
+                    }
+                    Reach::Tab => {
+                        press(&mut h, NamedKey::Tab);
+                    }
+                    Reach::Click => {
+                        h.input
+                            .pointer_to(CENTRE.0, CENTRE.1)
+                            .click(PointerButton::Primary);
+                    }
+                }
+                h.at_ms(10);
+                run(&mut h, &mut text, opts);
+                h.at_ms(1000);
+                let (scene, _, _) = run(&mut h, &mut text, opts);
+                let under = scene.layers[0].geometry.under.len();
+                assert_eq!(under > 0, expect_box, "{reach:?} box={expect_box}: {under}");
+                if !expect_box {
+                    let g = &scene.layers[0].geometry;
+                    let focused = matches!(reach, Reach::Tab | Reach::Click);
+                    assert_eq!(g.under.len(), 0, "{reach:?}: no fill, border or ring");
+                    assert_eq!(g.over.len(), usize::from(focused), "{reach:?}: caret only");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn a_bare_field_has_its_caret_in_fg_tertiary_and_takes_typing_and_focus() {
+        use lune_ui_core::widgets::field::FieldChrome;
+        let opts = FieldOptions {
+            chrome: FieldChrome::Bare,
+            ..FieldOptions::default()
+        };
+        let mut text = String::new();
+        let mut h = focused(&mut text, &opts);
+        typed(&mut h, "hi");
+        let (scene, r, out) = run(&mut h, &mut text, &opts);
+        assert_eq!(text, "hi");
+        assert!(r.response.changed && r.response.focused);
+        assert_eq!(caret_shape(&scene).color, premul(DARK.fg_tertiary));
+        // The node is the box field's: a focused text input holding the text.
+        let node = out.tree.get(id()).expect("node");
+        assert_eq!(node.role, Role::TextInput);
+        assert!(node.states.contains(State::Focused));
+        assert_eq!(selection(&out), (2, 2));
+        // The box field's caret stays `fg_primary`.
+        let mut text = String::new();
+        let mut h = focused(&mut text, &FieldOptions::default());
+        typed(&mut h, "hi");
+        let (scene, _, _) = plain(&mut h, &mut text);
+        assert_eq!(caret_shape(&scene).color, premul(DARK.fg_primary));
+    }
 }
 
 /// One frame of `draw` inside a parent that scrolls over 1000 px on both axes.

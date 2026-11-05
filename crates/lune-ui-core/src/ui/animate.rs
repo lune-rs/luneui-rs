@@ -39,6 +39,19 @@ impl Ui<'_> {
         v
     }
 
+    /// Settles the transition of `id` at `v` and returns `v`: a later [`Self::animate_f32`] with
+    /// target `v` is not in flight, one with a new target starts from `v`.
+    pub fn snap_f32(&mut self, id: WidgetId, v: f32) -> f32 {
+        let frame = self.store.frame;
+        let a = self.store.anim_f32.entry(id).or_insert(Anim {
+            used: frame,
+            transition: Transition::settled(v),
+        });
+        a.used = frame;
+        a.transition.snap(v);
+        v
+    }
+
     /// [`Self::animate_f32`] for a colour, channel by channel (straight alpha); exactly `target`
     /// once settled.
     pub fn animate_color(&mut self, id: WidgetId, target: Rgba, motion: &Motion) -> Rgba {

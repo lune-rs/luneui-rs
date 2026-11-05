@@ -36,7 +36,8 @@ pub type Time = std::time::Duration;
 pub const SPIN_PERIOD: Duration = Duration::from_millis(1200);
 
 /// Spinner angle in degrees at `t`: `360 · frac(t / 1200 ms)`, from the app's time so it does not
-/// accumulate per frame. An indicator, not a transition: it runs in every tier.
+/// accumulate per frame. This is the raw phase, whatever the tier: the spinner widget decides by
+/// tier (a turning glyph under Full, a static one at angle 0 under Reduced and Off, D117).
 pub fn spin_angle(t: Time) -> f32 {
     let period = SPIN_PERIOD.as_nanos();
     let into = t.as_nanos() % period;

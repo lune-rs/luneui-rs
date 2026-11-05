@@ -2,10 +2,10 @@
 id: widget.filter-bar
 title: Filter bar
 area: widget
-status: planned
+status: in-progress
 consumers: lunegit
 source: Lunegit: src/Lunegit.Desktop/Controls/FilterBar.axaml
-owner: —
+owner: toolkit-v1 M6
 summary: Filter bar: search field in an inset surface with a 14 px search icon, a clear button when text is present, and no focus ring
 ---
 
@@ -19,6 +19,8 @@ summary: Filter bar: search field in an inset surface with a 14 px search icon, 
 - Text entry and caret (`text.text-edit`); Tab stop (R-widget-3); semantic node (R-infra-4).
 
 ## Existing code
+
+`crates/lune-ui-core/src/widgets/filter_bar.rs` (`Ui::filter_bar`, `FilterOptions`), on `FieldChrome::Bare` and `Ui::icon_button`.
 
 `src/Lunegit.Desktop/Controls/FilterBar.axaml` (47 lines, one user control ; the watermark is bound from the owner at line 22; the code-behind `FilterBar.axaml.cs` was not read). Surface styles: `src/Lunegit.Desktop/App.axaml:302-309` (`Border.filter-bar`).
 
@@ -53,24 +55,25 @@ n/a — Lunegit has no motion selector for the filter bar and the clear button a
 
 ### Input and focus
 
-- Pointer: click focuses the text box; click on the clear button clears the text [L src/Lunegit.Desktop/Controls/FilterBar.axaml:13-17].
-- Keyboard: typing edits the text [text.text-edit]; Tab stop yes [core.focus].
+- Pointer: click focuses the text box; a press on the surface outside it (the padding, the icon) focuses it too; click on the clear button clears the text [L src/Lunegit.Desktop/Controls/FilterBar.axaml:13-17].
+- Clear: empties the text, marks the response `changed` and leaves focus on the field. The button sits after the field in the Tab order, so the clear lands after the field drew: the frame reports the change and the frame the input asks for after it shows the empty field [D81]. While the field composes a clear does nothing.
+- Keyboard: typing edits the text [text.text-edit]; Tab stops: the field, then the clear button while it shows, Enter and Space clear [core.focus].
 - Layer: `Base`; no overlay, no focus scope.
 
 ### Retained state
 
-- Transient: hover, caret blink [core.ui].
+- Transient: hover [core.ui]. The caret does not blink: it is solid [D103].
 - Persistent: the text and the caret position, owned by `text.text-edit`.
 - App-owned: `Watermark` (passed by the owner).
 - Exit retention: no.
 
 ### Accessibility
 
-- Role `text-input`; name = the owner's label; value = the text; states focusable, focused, disabled; action `set-value`; the clear button is a `button` named by the owner [infra.accessibility].
+- Role `text-input`; name = the owner's label; value = the text; states focusable, focused, disabled; action `set-value`; the clear button is a `button` named `luneui.text-field.clear` [infra.accessibility].
 
 ### Strings
 
-None: `Watermark` is passed by the owner (`src/Lunegit.Desktop/Controls/FilterBar.axaml:22`), so no key is named here.
+`luneui.text-field.clear` names the clear button (`widget.text-field`). `Watermark` is passed by the owner (`src/Lunegit.Desktop/Controls/FilterBar.axaml:22`).
 
 ### Gallery scenes
 

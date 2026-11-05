@@ -264,6 +264,50 @@ fn the_caret_after_a_cluster_of_several_glyphs_is_at_the_width() {
     }
 }
 
+/// The cut text stays within the width at each contract scale, on a cluster boundary, for every
+/// width from the ellipsis alone to the whole text. The cut changes the shaping of what stays, so
+/// the carets the search reads are not the result's width: only the result is measured.
+fn elided_stays_within_the_width(text: &mut TextCache, s: &str) {
+    use lune_ui_core::text::{Spec, Style, TextSystem, Unit, elide, joined_text};
+    let style = Style::ui(13.0, [255; 4]);
+    let body = format!("{s} {s} {s}");
+    let spec = Spec::plain(body.clone(), style);
+    let bounds = text.segments(&body, Unit::Grapheme);
+    for scale in [1.0, 1.25, 1.5, 1.75, 2.0, 3.0] {
+        let dots = text.measure(&Spec::plain("\u{2026}", style), scale).0;
+        let full = text.measure(&spec, scale).0;
+        assert!(dots > 0.0 && full > dots, "{s:?}");
+        let mut w = dots;
+        while w < full {
+            let got = elide(text, &spec, scale, w);
+            let kept = joined_text(&got);
+            let kept = kept.strip_suffix('\u{2026}').expect("cut");
+            assert!(text.measure(&got, scale).0 <= w, "{s:?} at {scale}, {w}");
+            assert!(bounds.contains(&kept.len()), "{s:?} at {scale}, {w}");
+            assert!(body.starts_with(kept), "{s:?} at {scale}, {w}");
+            w += 1.7;
+        }
+        assert_eq!(elide(text, &spec, scale, full), spec, "{s:?} at {scale}");
+        let tight = elide(text, &spec, scale, dots * 0.5);
+        assert_eq!(joined_text(&tight), "\u{2026}", "{s:?} at {scale}");
+    }
+}
+
+#[test]
+fn elided_cluster_text_stays_within_the_width() {
+    let mut text = with_fonts();
+    for s in CLUSTER_ENDINGS {
+        elided_stays_within_the_width(&mut text, s);
+    }
+}
+
+/// Mixed-direction text: a caret's x does not grow with the offset, so the caret search can miss.
+#[test]
+fn elided_mixed_direction_text_stays_within_the_width() {
+    let mut text = with_fonts();
+    elided_stays_within_the_width(&mut text, "word \u{5d0}\u{5d1}\u{5d2} more \u{5d3}\u{5d4}");
+}
+
 /// The same with fonts that cover the script, where the system has them: the gallery's draw Thai
 /// and Devanagari as boxes.
 #[test]
@@ -288,6 +332,7 @@ fn the_caret_after_a_shaped_cluster_is_at_the_width() {
         };
         let mut text = TextCache::new(&[&data], family, family);
         end_caret_is_the_width(&mut text, s);
+        elided_stays_within_the_width(&mut text, s);
     }
 }
 

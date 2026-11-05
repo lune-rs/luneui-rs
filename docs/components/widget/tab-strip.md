@@ -2,10 +2,10 @@
 id: widget.tab-strip
 title: Tab strip
 area: widget
-status: planned
+status: in-progress
 consumers: luneterm, lunegit
 source: —
-owner: —
+owner: toolkit-v1 M6
 summary: Tab strip: tabs with close, new-tab button, overflow scrolling, drag reorder, and the connected tab outline with a running cue
 ---
 
@@ -28,6 +28,7 @@ rename and close policy.
 
 ## Existing code
 
+The widget: `crates/lune-ui-core/src/widgets/tab_strip.rs` (`Ui::tab_strip`, `TabKey`, `Tab`, `TabStripOptions`, `TabEvent`, `BusyCue`, `CONTENT_SWAP`), tests `crates/lune-ui-core/tests/widget_tab_strip.rs`, page and scenes `apps/gallery/src/pages/tab_strip.rs`.
 Geometry: `crates/lune-ui-core/src/chrome.rs:5-20` (constants and `outline`), tests `:172-226`; see `core.tab-outline`. The gallery `chrome` scene draws it (`apps/gallery/src/scenes.rs:173`).
 Lunegit's strip: `src/Lunegit.Desktop/Views/TerminalPanelView.axaml:22-125,203-374` and `Views/TerminalPanelView.axaml.cs:255-480`, `Controls/Terminal/TerminalTabChrome.cs` (outline control),
 `Controls/Terminal/TerminalChromeGeometry.cs`, `Controls/Terminal/TerminalChromeAnimation.cs`, `Controls/Terminal/TerminalTabDragController.cs`.
@@ -54,7 +55,7 @@ Conflict: a comment in Lunegit's tab template says the tab "is capped at MaxWidt
 - Title colour: ForegroundMuted inactive, `fg_primary` active [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:71-77]. ForegroundMuted is the solid #B0B0B0 [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:13]; `Theme` has no such token today [R crates/lune-ui-core/src/theme.rs:11-18], so the token `fg_muted` is added in M4 ([D58]).
 - Connected outline: one closed polyline that wraps the active tab and the card body; card radius 8, seam radius 8, flare radius 6 (concave foot where the tab meets the seam), stroke 1; below a visible tab width of 12 (twice the flare radius) the notch is dropped and the loop falls back to the body silhouette [R crates/lune-ui-core/src/chrome.rs:5-10], [L src/Lunegit.Desktop/Controls/Terminal/TerminalChromeGeometry.cs:43-58]. The active tab has no fill and no border of its own: its identity is the loop plus a header-tint punch-out [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:22-27].
 - Outline brush: `border_subtle` normally, `border` while the panel has focus within it; focus is expressed solely by the loop's brush [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:26-33].
-- Busy cue (a command is running): the outline gets one of three treatments: conic sweep (a bright arc travels the loop, period 2400 ms, with a 3 px bloom under the 1 px line at opacity 0.25), comet (a dash of 0.14 of the contour travelling, period 2400 ms), breath (opacity 0.38 to 1.0, period 1800 ms) [L src/Lunegit.Desktop/Controls/Terminal/TerminalChromeAnimation.cs:16-33], [L src/Lunegit.Desktop/Controls/Terminal/TerminalTabChrome.cs:246-356]. Brush: `accent`, retinted to the error colour or the warning colour by the progress state, the same signal as the spinner [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:35-46].
+- Busy cue (a command is running): the outline gets one of three treatments: conic sweep (a bright arc travels the loop, period 2400 ms, with a 3 px bloom under the 1 px line at opacity 0.25), comet (a dash of 0.14 of the contour travelling, period 2400 ms), breath (opacity 0.38 to 1.0, period 1800 ms) [L src/Lunegit.Desktop/Controls/Terminal/TerminalChromeAnimation.cs:16-33], [L src/Lunegit.Desktop/Controls/Terminal/TerminalTabChrome.cs:246-356]. Brush: `accent`, retinted to `status_error_light` #EF9A9A or `status_warning_light` #FFD666 by the progress state ([D132]), the same signal as the spinner [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:35-46].
 - Context menu per tab (through `overlay.menu`): Close, Close Others, Close All, Rename, Duplicate, Copy Working Directory; the last two are app items [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:265-298].
 - Tab tooltip: the full title, with a show delay of 800 ms [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:263-264].
 
@@ -69,9 +70,9 @@ Conflict: a comment in Lunegit's tab template says the tab "is capped at MaxWidt
 | panel focused | outline brush `border` | [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:31-33] |
 | panel unfocused | outline brush `border_subtle` | [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:28-30] |
 | focus-visible (tab) | outline ring per the toolkit's focus ring on the activate area | [core.focus] |
-| progress | spinner icon in the tab, tinted `accent`, error or warning | [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:123-125,317-325] |
+| progress | spinner icon in the tab, tinted `accent`, `status_error_light` #EF9A9A or `status_warning_light` #FFD666 ([D132]) | [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:123-125,317-325] |
 | busy (command running) | outline sweep, comet or breath (Reduced: breath; Off: static) | [L src/Lunegit.Desktop/Controls/Terminal/TerminalTabChrome.cs:246-272], [L src/Lunegit.Core/Settings/TerminalOutlineAnimationResolver.cs:17-28] |
-| dragging | dragged tab tracks the pointer, neighbours shifted | [infra.drag-and-drop] |
+| dragging | dragged tab tracks the pointer, neighbours shifted; a neighbour's title shows through the dragged tab's translucent fill, as in Lunegit (no ZIndex or opacity on the drag) | [infra.drag-and-drop], [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:54-69] |
 | overflow | strip scrolled; a partially visible tab has its notch dropped under 12 px | [L src/Lunegit.Desktop/Controls/Terminal/TerminalChromeGeometry.cs:54-58] |
 | empty (no tabs) | strip holds only the new-tab button; the app shows its empty state | [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:365-373] |
 | disabled | not specified by either source | [derived: no `:disabled` style in TerminalPanelView.axaml:54-125]; see Open questions |
@@ -95,8 +96,10 @@ Never animated: the strip's layout, tab widths changing as the close button show
 
 - Pointer: press on a tab activates it and arms a reorder; click on the close button closes (a separate click target); click on the new-tab button adds a tab; right press on a tab opens its context menu; wheel and trackpad scroll the strip [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:303-311,338-348,365-368], [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:244-247]. Double-click is not bound in the file read.
 - Reorder: through `infra.drag-and-drop` (threshold 4 horizontal, nearest-slot target, edge auto-scroll, Escape cancels) [infra.drag-and-drop].
-- Keys: Meta+T opens a new tab [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:17-19]; Escape cancels a drag [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml.cs:336-341]. Arrow-key switching between tabs, close and rename shortcuts: none found in the file; see Open questions.
-- Tab stops: the strip is one `tab-list`; whether each tab is its own stop or arrows rove inside it is open [core.focus].
+- Keys: Meta+T opens a new tab, which is the app's shortcut [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:17-19], [D122]; Escape cancels a drag [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml.cs:336-341]. No close or rename key [D122].
+- Gesture: from the press to the end of a gesture the strip draws and feeds the drag machine the press frame's widths [D123]. A tab added, closed or swapped ends the gesture with no reorder. A change of the active tab reveals it only after the gesture, since a reveal scrolls the slots under a held pointer. No tooltip runs during a gesture.
+- Menu: the rows of a tab with `closable` false leave out Close. The app's rows follow in `menu_extra`.
+- Tab stops: the strip is one `tab-list` stop, roving: Left and Right wrap, Home and End go to the ends, Enter and Space activate, focus does not activate [D122]. The close buttons are no stops (a pointer target and a node); the new-tab button is the next stop.
 - Layer: `Page` (inside the card). Context menu and the tooltip are overlays above [core.ui].
 - Close policy is the app's: Lunegit confirms with a dialog (checkbox "Don't ask again") only when the session is alive and the prompt is not suppressed [L src/Lunegit.Desktop/ViewModels/TerminalPanelViewModel.cs:574-612]; rename opens a modal dialog with a text field [L src/Lunegit.Desktop/ViewModels/TerminalPanelViewModel.cs:656-659]. The strip emits `close_requested(tab)` and `rename_requested(tab)`; it never decides.
 - No focus scope of its own.
@@ -112,7 +115,7 @@ Never animated: the strip's layout, tab widths changing as the close button show
 
 - Role `tab-list` for the strip with one `tab` per tab; name = the tab title; states selected (the active tab), focused, and `busy` while a command runs; actions: default (activate), focus, show-menu, scroll-into-view [infra.accessibility].
 - Close button: role `button`, name = `luneui.tab-strip.close`; new-tab button: role `button`, name = `luneui.tab-strip.new`; each is its own node [infra.accessibility].
-- The tab panel relationship (which content a tab controls) has no field in the node list: `role-gap: tab to panel association`.
+- The tab panel relationship (which content a tab controls) has no field in the node list: `role-gap: tab to panel association` (stays open, [D122]).
 
 ### Strings
 
@@ -129,13 +132,13 @@ The confirm and rename dialog texts, "Duplicate Tab" and "Copy Working Directory
 
 - `chrome` (existing): the tab-outline chrome.
 - `tab-strip-rest`: three tabs, the second active, settled.
-- `tab-strip-hover`: tab 3 hovered, close visible, settled.
+- `tab-strip-hover`: tab 3 hovered, close visible, the hover settled and the tooltip's delay still running (`Waiting`).
 - `tab-strip-unfocused`: the same strip with the panel unfocused (outline `border_subtle`), settled.
-- `tab-strip-progress`: tab 1 with the spinner, tinted accent, then error and warning in two more tabs, settled.
-- `tab-strip-busy-sweep`: active tab with the conic sweep at phase 0.25 (t = 600 ms), settled otherwise.
+- `tab-strip-progress`: tab 1 with the spinner, tinted accent, then error and warning in two more tabs, moving.
+- `tab-strip-busy-sweep`: active tab with the conic sweep at phase 0.25 (t = 600 ms), moving.
 - `tab-strip-busy-comet`: comet at phase 0.25 (t = 600 ms).
 - `tab-strip-busy-breath`: breath at its brightest (t = 900 ms).
-- `tab-strip-overflow`: 12 tabs scrolled to the middle, a tab cut at the left edge under 12 px, settled.
+- `tab-strip-overflow`: 12 tabs scrolled 105 px, the active first tab cut at the left edge to 3 px, so no notch, settled.
 - `tab-strip-long-title`: a title longer than the 270 px maximum, ellipsis, settled.
 - `tab-strip-empty`: no tabs, only the new-tab button, settled.
 - `tab-strip-dragging`: tab 1 dragged between tabs 2 and 3 (see `dnd-dragging`), settled.
@@ -166,11 +169,10 @@ The confirm and rename dialog texts, "Duplicate Tab" and "Copy Working Directory
 
 ## Open questions
 
-- Keyboard model: arrow keys or Tab between tabs, a close shortcut and a rename shortcut have no source in the files read; M6 decides (Meta+T exists).
-- Disabled tab: no source; presumably only the app's close policy.
-- `Theme` token for the muted foreground (#B0B0B0, plus the new-tab icon): token to add (M4), `fg_muted` = #B0B0B0 [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:13], [D58].
-- `role-gap: tab to panel association` (see Accessibility).
-- Whether the busy cue's three treatments all ship: Lunegit offers a user picker for the treatment [L src/Lunegit.Core/Settings/TerminalOutlineAnimationResolver.cs:12-15]; the toolkit takes the treatment as a parameter from the app, and M6 decides the default.
+- `role-gap: tab to panel association` (see Accessibility; stays open, [D122]).
+- Header tint: `Theme` has no token for the header's layer, so `TabStripOptions.header_tint` takes the colour from the app and `None` draws no tint; the gallery uses #00000024 ([D131]). It is a plain fill, drawn after the under shapes, so a hover fill sits under it, where Lunegit's sits over it.
+
+Closed by [D122]: the keyboard model, the disabled tab (none), all three busy treatments ship with Sweep as the default. `fg_muted` landed in M4 ([D58]).
 
 ## Notes for the planner
 

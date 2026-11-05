@@ -688,3 +688,40 @@ fn a_region_that_moves_with_its_own_hover_does_not_loop_the_catch_up() {
         "{seq:?}"
     );
 }
+
+#[test]
+fn snap_f32_settles_at_the_value_and_keeps_the_entry() {
+    let mut h = harness();
+    let id = WidgetId::ROOT.with("v");
+    let motion = Motion::of(Kind::Hover);
+    h.frame(|ui| assert_eq!(ui.animate_f32(id, 0.0, &motion), 0.0));
+    // In flight, then snapped: the same target is at rest at once.
+    h.at_ms(10);
+    h.frame(|ui| assert_eq!(ui.animate_f32(id, 1.0, &motion), 0.0));
+    h.at_ms(20);
+    let (_, out) = h.frame(|ui| {
+        assert_eq!(ui.snap_f32(id, 0.5), 0.5);
+    });
+    assert_eq!(out.repaint, Repaint::Idle);
+    h.at_ms(21);
+    let (_, out) = h.frame(|ui| assert_eq!(ui.animate_f32(id, 0.5, &motion), 0.5));
+    assert_eq!(out.repaint, Repaint::Idle, "not in flight");
+    // A new target starts from the snapped value.
+    h.at_ms(22);
+    let (_, out) = h.frame(|ui| assert_eq!(ui.animate_f32(id, 1.0, &motion), 0.5));
+    assert_eq!(out.repaint, Repaint::Now);
+    h.at_ms(5000);
+    h.frame(|ui| assert_eq!(ui.animate_f32(id, 1.0, &motion), 1.0));
+}
+
+#[test]
+fn snap_f32_makes_and_keeps_an_entry_on_a_first_use() {
+    let mut h = harness();
+    let id = WidgetId::ROOT.with("v");
+    let motion = Motion::of(Kind::Hover);
+    h.frame(|ui| assert_eq!(ui.snap_f32(id, 2.0), 2.0));
+    // Used only through the snap: the entry lives on, so the next target starts from it.
+    h.frame(|ui| assert_eq!(ui.snap_f32(id, 3.0), 3.0));
+    h.at_ms(10);
+    h.frame(|ui| assert_eq!(ui.animate_f32(id, 4.0, &motion), 3.0));
+}

@@ -140,7 +140,7 @@ None: no user-visible text.
 
 ### Build
 
-- Milestone: M4. Deferred [D74]: the radio in `focus-ring-kinds` (the control arrives in M6).
+- Milestone: M4. The radio row of `focus-ring-kinds` was deferred [D74] and landed with `widget.radio-group` in M6 [D116], [D120]; the scene's delta is the one allowed change of that step.
 - Depends on: core.ui, core.input, motion.transitions, infra.accessibility.
 
 ## Open questions

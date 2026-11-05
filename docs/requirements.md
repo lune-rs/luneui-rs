@@ -98,15 +98,16 @@ standard in `docs/motion.md`. Numbers appear where a source states one.
   tooltip (`overlay.tooltip`), star rating (`widget.star-rating`), tab control (`widget.tab-strip`),
   and the other Lunegit controls in the catalogue (`widget.filter-bar`, `widget.search-picker`,
   `widget.list-row-badge`, `widget.banner-empty-state`, `widget.toolbar`). Resolved by the M3
-  specs; D42 maps the app-shaped ones.
+  specs; D42 maps the app-shaped ones. Built in M6: star rating, tab control, filter bar, search picker,
+  list-row badge, banner and empty state, toolbar (the scrollbar and tooltip are M5).
 - R-widget-3 [new] Keyboard focus order, focus-visible and key handling inside widgets: Tab order
   follows call order within a focus scope, overlays push and pop scopes. Not in today's `lune-ui`.
   Resolved: `core.focus` (M4) and the focus rules in `core.ui`.
 - R-widget-4 [new] The controls Wane uses that the toolkit lacks: radio group, status dot, navigation
   item, badge, form field (label, control, hint), setting and item rows, callout, wizard steps,
-  verdict row.
+  verdict row. Built in M6 (each with a page and scenes in the gallery).
 - R-widget-5 [new] Controls with no Lunegit look: slider (`widget.slider`) and spinner
-  (`widget.spinner`), their looks derived from sibling tokens (D51).
+  (`widget.spinner`), their looks derived from sibling tokens (D51). Built in M6.
 
 ### Overlays
 

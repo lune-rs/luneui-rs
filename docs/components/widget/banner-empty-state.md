@@ -2,10 +2,10 @@
 id: widget.banner-empty-state
 title: Banners, empty states and loading gates
 area: widget
-status: planned
+status: in-progress
 consumers: lunegit
 source: Lunegit: src/Lunegit.Desktop/Controls/IndexingBanner.axaml
-owner: —
+owner: toolkit-v1 M6
 summary: Indexing banner (warning tone, spinning sync icon) and the empty-repository view: centred icon, title, subtitle, action buttons
 ---
 
@@ -41,7 +41,7 @@ Empty-repository view:
 - Icon: app icon, 100 x 100, uniform stretch [L src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:17-21], [L src/Lunegit.Desktop/App.axaml:213].
 - Title: 18 px `FontSizeL` [L src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:24-27], [L src/Lunegit.Desktop/App.axaml:162], `ForegroundPrimary`.
 - Subtitle: 13 px, centred, wrapped, `ForegroundSecondary` [L src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:30-35].
-- Actions: row of `Button.empty-state-action`, spacing 12 [L src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:38-39].
+- Actions: row of `Button.empty-state-action`, spacing 12 [L src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:38-39]; each at least 140 wide, 51 high (padding 16 above and below, a 17 px line, a 1 px `border` ring that scales with the press), radius `item_radius`, the Secondary button's fill [L src/Lunegit.Desktop/App.axaml:440-450], [D136].
 
 ### States
 
@@ -82,13 +82,11 @@ The banner has no transition of its own; the spinner's rotation is in `widget.sp
 
 ### Strings
 
-- `luneui.banner-empty-state.indexing-banner`: English default not read in this tree; Lunegit key `indexing.banner` (`src/Lunegit.Desktop/Controls/IndexingBanner.axaml:21`).
-- `luneui.banner-empty-state.empty-title`: Lunegit key `emptyRepo.title` (`src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:24`); English default not read.
-- `luneui.banner-empty-state.empty-subtitle`: Lunegit key `emptyRepo.subtitle` (`src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:30`); English default not read.
+None. The banner text, the empty view's title and subtitle and the action labels are the app's: `Ui::banner` and `Ui::empty_state` take them as arguments, so the entry's `luneui.banner-empty-state.*` keys are not added ([D128]).
 
 ### Gallery scenes
 
-- `banner-shown`: banner with the spinner, settled.
+- `banner-shown`: banner with the spinner, 300 ms in (the spinner runs: moving).
 - `banner-empty-state`: empty-repository view with two actions, settled.
 - `banner-empty-state-action-mid`: action pressed, t = 90 ms (half of `fast`).
 - `banner-empty-state-hover-mid`: action rest → hover, t = 60 ms (half of `instant`).
@@ -102,7 +100,7 @@ The banner has no transition of its own; the spinner's rotation is in `widget.sp
 
 ### Acceptance
 
-- Pixel probes at scale 2: banner radius 12 px, 2 px border; empty icon 200 x 200 px; subtitle centred.
+- Pixel probes at scale 2: banner radius 12 px, 2 px border; empty icon 200 x 200 px; subtitle centred; action buttons at least 280 wide and 102 high with a 2 px ring.
 - Conformance: action press scale over 60 Hz samples settles within 180 ms + 1 frame; Reduced snaps the scale.
 - Semantic node: banner role status, polite live region; empty-view title role static-text.
 
@@ -113,8 +111,9 @@ The banner has no transition of its own; the spinner's rotation is in `widget.sp
 
 ## Open questions
 
-- `scope`: the startup loading view and the EULA and Git gate views are app code per the survey; their look is not read here. Confirm the split with the owner before M6.
-- `design-gap`: the banner's solid warning fill against Wane's callout tint; see `widget.callout`.
+None. Closed by [D128] and [D129]: `scope` (the startup loading view and the EULA and Git gate views stay app code), `design-gap` (the banner's solid fill and the callout's tint are two widgets with two looks, each per its source). The empty view has no field for the picture's name, so its `Image` node is always hidden.
+
+Marked gap (ruling C13, [D136]): Lunegit stacks a 24 px glyph over each action's label, spacing 8 [L src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:38-62]; `EmptyState.actions` has no glyph, which is an API change outside M6 step 13. The actions' Secondary fill (#10) also differs from Lunegit's `SurfaceOverlay` (#15).
 
 ## Notes for the planner
 

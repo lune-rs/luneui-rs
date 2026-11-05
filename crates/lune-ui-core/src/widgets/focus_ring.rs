@@ -17,6 +17,9 @@ pub enum RingKind {
     Offset { radius: f32 },
     /// Field, stepper, open combo: the `accent` border over the box's own border.
     Border,
+    /// A button's ring on the rect's own edge at its own corner `radius` (the small button, the
+    /// icon button, the star): `fg_secondary`, or `on_accent_text` with `on_accent`.
+    Edge { radius: f32, on_accent: bool },
 }
 
 /// `color` with its alpha scaled by `opacity` (0 to 1).
@@ -64,5 +67,13 @@ pub fn paint<H: Copy + PartialEq>(
             );
         }
         RingKind::Border => p.ring(rect, t.item_radius, 1.0, faded(t.accent, opacity), false),
+        RingKind::Edge { radius, on_accent } => {
+            let color = if on_accent {
+                t.on_accent_text
+            } else {
+                t.fg_secondary
+            };
+            p.ring(rect, radius, 1.0, faded(color, opacity), false);
+        }
     }
 }
