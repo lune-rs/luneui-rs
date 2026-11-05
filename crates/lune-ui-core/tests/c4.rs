@@ -2797,9 +2797,13 @@ mod m8 {
         }
     }
 
-    /// The `n`th Tab stop with this role, focused, on a page with a Global binding on every key of
-    /// `KEYS`; and the time.
+    /// The first Tab stop with this role, focused, on a page with a Global binding on every key
+    /// of `KEYS`; and the time.
     fn focused_page(role: Role) -> (UiHarness, Page, u64) {
+        focused_page_where(|n| n.role == role)
+    }
+
+    fn focused_page_where(want: impl Fn(&Node) -> bool) -> (UiHarness, Page, u64) {
         let mut h = UiHarness::new(M8_WIN);
         for k in KEYS {
             h.shortcuts.add(Binding::new(
@@ -2817,15 +2821,11 @@ mod m8 {
             key(&mut h, NamedKey::Tab);
             ms += 100;
             let out = run(&mut h, &mut p, ms);
-            if out
-                .focused
-                .and_then(|f| out.tree.get(f))
-                .is_some_and(|n| n.role == role)
-            {
+            if out.focused.and_then(|f| out.tree.get(f)).is_some_and(&want) {
                 return (h, p, ms);
             }
         }
-        panic!("no Tab stop of role {role:?}");
+        panic!("no Tab stop of that kind");
     }
 
     #[test]
@@ -2918,5 +2918,32 @@ mod m8 {
         assert_eq!(p.cols[0].1, [12, 11, 13]);
         // The table's own state is untouched.
         assert!(p.sorted.is_empty() && p.selected.is_empty());
+    }
+
+    #[test]
+    fn the_boards_buttons_focused_then_disabled_keep_enter_and_space_from_the_shortcuts() {
+        for name in ["Add column", "Add card", "Column actions"] {
+            for k in [NamedKey::Enter, NamedKey::Space] {
+                // The instrument: enabled, the key presses the button and fires nothing.
+                let (mut h, mut p, ms) = focused_page_where(|n| n.name == name);
+                key(&mut h, k);
+                let out = run(&mut h, &mut p, ms + 100);
+                assert!(out.fired.is_empty(), "{name}: {k:?} enabled");
+                if name != "Column actions" {
+                    assert_eq!(p.added, 1, "{name}: {k:?} presses it enabled");
+                }
+                // Disabled, the same key is taken and presses nothing.
+                let (mut h, mut p, ms) = focused_page_where(|n| n.name == name);
+                p.enabled = false;
+                key(&mut h, k);
+                let out = run(&mut h, &mut p, ms + 100);
+                assert!(
+                    out.fired.is_empty(),
+                    "{name}: {k:?} reached {:?}",
+                    out.fired
+                );
+                assert_eq!(p.added, 0, "{name}: {k:?} pressed it disabled");
+            }
+        }
     }
 }
