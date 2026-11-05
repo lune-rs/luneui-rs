@@ -2651,7 +2651,7 @@ mod m8 {
             .iter()
             .filter(|n| n.role == Role::Row && n.id != head.id)
             .count();
-        assert!(rows >= 6 && rows < 30, "only the window is built: {rows}");
+        assert!((6..30).contains(&rows), "only the window is built: {rows}");
 
         // The bar chart: an image with the app's name, its legend as static text.
         let bars = by_name(&out, Role::Image, "Hourly tokens");
