@@ -626,9 +626,11 @@ impl Ui<'_> {
 
         // A linked pane takes the group's offset before its area runs.
         let drawn_at = mem.offset;
-        let pulled = style
-            .link
-            .map_or(0.0, |group| self.scroll_link_pull(group, drawn_at));
+        // Where this pane's own queued shift (a measured height above the first row) takes it.
+        let pending = self.scroll_pending_shift(AREA);
+        let pulled = style.link.map_or(0.0, |group| {
+            self.scroll_link_pull(group, drawn_at + pending)
+        });
         if pulled != 0.0 {
             self.scroll_shift(AREA, pulled);
         }
