@@ -104,11 +104,14 @@ impl Ui<'_> {
     ) -> Response {
         let id = self.id(key);
         let mut r = self.interact(id, rect, Sense::CLICK_FOCUS);
+        // Disabled, the keys are taken and nothing opens; a chord on them stays a shortcut.
+        let key = self.activation_keys(
+            id,
+            r.enabled,
+            &[NamedKey::Enter, NamedKey::Space, NamedKey::ArrowDown],
+        );
         if r.enabled {
-            let enter = self.consume_key(id, NamedKey::Enter);
-            let space = self.consume_key(id, NamedKey::Space);
-            let down = self.consume_key(id, NamedKey::ArrowDown);
-            if enter || space || down {
+            if key {
                 r.clicked = true;
             }
             if r.clicked && !*open {

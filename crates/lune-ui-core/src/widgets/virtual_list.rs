@@ -46,6 +46,27 @@ pub const MIN_ROW: f32 = 1.0;
 /// The inner scroll area's key, under the list's scope.
 const AREA: &str = "area";
 
+/// What distinguishes a list frame that is not the plain list (the table runs on it).
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ListStyle {
+    /// The role of the frame's node.
+    pub(crate) role: Role,
+    /// The role of each row's node.
+    pub(crate) row_role: Role,
+    /// Rows fill their slot edge to edge at radius 0, and hover reads the pointer over the slot
+    /// (so a control in a cell keeps its row lit).
+    pub(crate) flat: bool,
+}
+
+impl ListStyle {
+    /// The virtualized list as it is.
+    pub(crate) const LIST: Self = Self {
+        role: Role::List,
+        row_role: Role::ListItem,
+        flat: false,
+    };
+}
+
 /// A row's identity: stable across scrolling and replaced data, unlike its index.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct RowKey(pub u64);
@@ -421,6 +442,7 @@ struct Rows<'r> {
     id: WidgetId,
     rect: Rect,
     opts: &'r ListOptions<'r>,
+    style: ListStyle,
     key: &'r dyn Fn(usize) -> RowKey,
 }
 
@@ -524,15 +546,31 @@ impl Ui<'_> {
         rect: Rect,
         opts: &ListOptions<'_>,
         row_key: impl Fn(usize) -> RowKey,
+        draw: impl FnMut(&mut Self, &RowCtx) -> f32,
+    ) -> ListResponse {
+        self.list_styled(key, rect, opts, ListStyle::LIST, row_key, draw)
+    }
+
+    /// [`Self::virtual_list`] in another [`ListStyle`].
+    pub(crate) fn list_styled(
+        &mut self,
+        key: impl Hash,
+        rect: Rect,
+        opts: &ListOptions<'_>,
+        style: ListStyle,
+        row_key: impl Fn(usize) -> RowKey,
         mut draw: impl FnMut(&mut Self, &RowCtx) -> f32,
     ) -> ListResponse {
-        self.scope(key, |ui| ui.list_frame(rect, opts, &row_key, &mut draw))
+        self.scope(key, |ui| {
+            ui.list_frame(rect, opts, style, &row_key, &mut draw)
+        })
     }
 
     fn list_frame(
         &mut self,
         rect: Rect,
         opts: &ListOptions<'_>,
+        style: ListStyle,
         row_key: &dyn Fn(usize) -> RowKey,
         draw: &mut dyn FnMut(&mut Self, &RowCtx) -> f32,
     ) -> ListResponse {
@@ -544,21 +582,25 @@ impl Ui<'_> {
             id,
             rect,
             opts,
+            style,
             key: row_key,
         };
         let mut out = Outcome::default();
 
-        if self.is_enabled() {
-            self.list_keys(&mut st, &mem, &rows, &mut out);
-        }
+        // Always: a list focused and then disabled takes its keys and acts on none.
+        let enabled = self.is_enabled();
+        self.list_keys(&mut st, &mem, &rows, enabled, &mut out);
 
         let area = ScrollOptions {
-            bars: (Bars::Disabled, Bars::Auto),
+            bars: (
+                Bars::Disabled,
+                Bars::Auto.unless_fits(mem.heights.total(), f64::from(rect.h)),
+            ),
             extent: Some((f64::from(rect.w), mem.heights.total())),
             ..ScrollOptions::default()
         };
         let scroll = self.scroll_area_untranslated(AREA, rect, &area, |ui, view| {
-            let mut node = Node::new(id, Role::List, opts.label, rect);
+            let mut node = Node::new(id, style.role, opts.label, rect);
             let enabled = ui.is_enabled();
             node.states.insert(if enabled {
                 State::Focusable
@@ -587,7 +629,17 @@ impl Ui<'_> {
 
     /// Takes the frame's keys: the cursor moves before the area runs, so its reveal lands this
     /// frame.
-    fn list_keys(&mut self, st: &mut ListState, mem: &ListMem, rows: &Rows<'_>, out: &mut Outcome) {
+    ///
+    /// Every key the list reads is consumed; the cursor, the selection, the reveal and the copy
+    /// happen only when `enabled`.
+    fn list_keys(
+        &mut self,
+        st: &mut ListState,
+        mem: &ListMem,
+        rows: &Rows<'_>,
+        enabled: bool,
+        out: &mut Outcome,
+    ) {
         let last = match rows.count() {
             0 => return,
             n => n - 1,
@@ -607,7 +659,9 @@ impl Ui<'_> {
                     && c.eq_ignore_ascii_case("c")
                     && !st.selection.is_empty()
                 {
-                    out.copy = Some(st.selection.iter().copied().collect());
+                    if enabled {
+                        out.copy = Some(st.selection.iter().copied().collect());
+                    }
                     self.consume_focus_event(index);
                 }
                 continue;
@@ -643,8 +697,10 @@ impl Ui<'_> {
                 _ => continue,
             };
             self.consume_focus_event(index);
-            out.changed |= st.key_move(to, modifiers.shift, rows);
-            moved = Some(to);
+            if enabled {
+                out.changed |= st.key_move(to, modifiers.shift, rows);
+                moved = Some(to);
+            }
         }
         if let Some(i) = moved {
             self.scroll_to(AREA, Target::span_y(h.top(i), h.height(i)), Reveal::Nearest);
@@ -661,7 +717,7 @@ impl Ui<'_> {
         draw: &mut dyn FnMut(&mut Self, &RowCtx) -> f32,
         out: &mut Outcome,
     ) -> Response {
-        let (id, rect) = (rows.id, rows.rect);
+        let (id, rect, style) = (rows.id, rows.rect, rows.style);
         let response = self.interact(id, rect, Sense::CLICK_FOCUS);
         let still = mem.still(offset, rect);
         let viewport = f64::from(rect.h);
@@ -715,7 +771,12 @@ impl Ui<'_> {
                 let (top, height) = (mem.heights.top(index), mem.heights.height(index));
                 self.scroll_to(AREA, Target::span_y(top, height), Reveal::Center);
             }
-            slots.push((index, key, row_id, slot, r.hovered));
+            let hovered = if style.flat {
+                r.enabled && self.pointer_in(slot)
+            } else {
+                r.hovered
+            };
+            slots.push((index, key, row_id, slot, hovered));
         }
         if !pressing {
             mem.press = None;
@@ -762,12 +823,19 @@ impl Ui<'_> {
                 };
                 ctx.fill = self.animate_color(b.id.with("fill"), ctx.fill, motion);
             }
-            let highlight = ctx.rect.inset(HIGHLIGHT_INSET.0, HIGHLIGHT_INSET.1);
+            let (highlight, radius) = if style.flat {
+                (ctx.rect, 0.0)
+            } else {
+                (
+                    ctx.rect.inset(HIGHLIGHT_INSET.0, HIGHLIGHT_INSET.1),
+                    theme.item_radius,
+                )
+            };
             if ctx.fill[3] != 0 {
-                self.painter().fill(highlight, theme.item_radius, ctx.fill);
+                self.painter().fill(highlight, radius, ctx.fill);
             }
 
-            let mut node = Node::new(b.id, Role::ListItem, "", ctx.rect);
+            let mut node = Node::new(b.id, style.row_role, "", ctx.rect);
             if ctx.selected {
                 node.states.insert(State::Selected);
             }

@@ -1,6 +1,7 @@
-//! Key routing: Escape and Tab are handled at begin; every other key press, typed text, IME event
-//! and clipboard answer waits in the frame's queue, in arrival order, for the focused widget of the
-//! active scope (or, for an accessibility action's synthetic key, its target) to take it with
+//! Key routing: Escape and Tab are handled at begin (an Escape a live pointer gesture takes queues
+//! for it instead, D175); every other key press, typed text, IME event and clipboard answer waits
+//! in the frame's queue, in arrival order, for the focused widget of the active scope (or, for an
+//! accessibility action's synthetic key, its target) to take it with
 //! [`Ui::consume_key`] or [`Ui::consume_focus_event`].
 
 use crate::input::{FocusEvent, Key, Keymap, NamedKey};
@@ -69,6 +70,32 @@ impl Ui<'_> {
         self.take_key(id, key, false)
     }
 
+    /// Takes this frame's next synthetic press of `key` aimed at `id` (an accessibility
+    /// increment or decrement) and no real key: a real key on a focused widget is its own to
+    /// read, and a chord or a disabled widget leaves it to the shortcuts.
+    pub(crate) fn consume_synthetic_key(&mut self, id: WidgetId, key: NamedKey) -> bool {
+        let Some(k) = self
+            .keys
+            .iter_mut()
+            .find(|k| !k.consumed && k.named() == Some(key) && k.target == Some(id))
+        else {
+            return false;
+        };
+        k.consumed = true;
+        self.input_acted = true;
+        true
+    }
+
+    /// Whether `id` registered a region through `interact` since `mark` in a disabled scope: a
+    /// focused widget a scroll area cannot see through its watch list.
+    pub(crate) fn disabled_registered_since(&self, mark: usize, id: WidgetId) -> bool {
+        self.registered
+            .get(mark..)
+            .unwrap_or_default()
+            .iter()
+            .any(|r| !r.enabled && self.painter.hits.get(r.index).is_some_and(|h| h.1 == id))
+    }
+
     fn take_key(&mut self, id: WidgetId, key: NamedKey, chords: bool) -> bool {
         let focus = self.key_focus;
         let Some(k) = self.keys.iter_mut().find(|k| {
@@ -106,6 +133,16 @@ impl Ui<'_> {
         k.consumed = true;
         self.input_acted = true;
         true
+    }
+
+    /// Says that a pointer gesture which Escape cancels (a drag, a resize) is live at the end of this
+    /// frame. The next frame's Escape is then queued for it, through
+    /// [`Self::consume_key_while_pressed`], instead of dismissing the overlay on top; once the gesture
+    /// ends nothing sets the flag and the next Escape dismisses (D175). An Escape in the frame the
+    /// capture ends, after the release or the capture's loss, is the overlay's too (D176). Call it
+    /// only while dragging, not while a press is merely armed.
+    pub(crate) fn note_live_gesture(&mut self) {
+        self.store.gesture_live = true;
     }
 
     /// The frame's unconsumed input for `id`, in arrival order, each with the index

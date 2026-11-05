@@ -67,7 +67,7 @@ None: the painter draws text it is given.
 
 - Existing scenes exercise the existing primitives: `controls` (fill, fill-radii, ring, text, icon), `acrylic` (acrylic), `blur-contrast` and `menu` (backdrop), `chrome` (stroke, clip-rect), `tab-strip-busy-sweep` (stroke-sweep), `tab-strip-busy-comet` (stroke-comet), `custom-draw` (custom), `menu-opening` (xform).
 - M5 built the seven new primitives and shows each on the gallery's `primitives` and `image` pages: `primitive-arc`, `primitive-sector`, `primitive-path-fill`, `primitive-dash`, `primitive-clip-rounded`, `primitive-rotate` and the seven `image-*` scenes (D105).
-- New primitives are exercised by the scenes of the entries that need them: image: `image-contain-wide` ([core.image]); rotate: `spinner-spinning` ([widget.spinner]); dash: `search-picker-link` ([widget.search-picker]); clip-rounded: `page-body-scroll` ([layout.page]) and `panel-card` ([layout.panel]); sector, path-fill and arc: `pie-chart-three` and `pie-chart-half` ([data.pie-chart]).
+- New primitives are exercised by the scenes of the entries that need them: image: `image-contain-wide` ([core.image]); rotate: `spinner-spinning` ([widget.spinner]); dash: `search-picker-link` ([widget.search-picker]); clip-rounded: `page-body-scroll` ([layout.page]) and `panel-card` ([layout.panel]); sector: `pie-chart-three` and `pie-chart-half` ([data.pie-chart]); path-fill and arc: no M8 entry uses them (the pie is `sector` fans, the lane dot a closed stroke, D172), so only the `primitives` page and the tab strip (`fill_path`) show them.
 
 ### Painter primitives
 
@@ -82,9 +82,9 @@ The aggregate of every `New:` item in the catalogue (the list C5 gives M5; R-cor
 | rotate | widget.spinner, widget.banner-empty-state | M6 (done: `Painter::text_rotated` turns the spinner's glyph, scene `spinner-spinning`; the banner's busy glyph is the spinner) | [L src/Lunegit.Desktop/Controls/SpinBehavior.cs:38-53] |
 | dash | widget.search-picker | M6 (done: `Painter::dash` draws the link trigger's underline, scene `search-picker-link`) | [L src/Lunegit.Desktop/Controls/LinkSearchPicker.axaml:30] |
 | clip-rounded | layout.page, layout.panel | M5 (done: `Painter::push_clip_rounded`, scene `primitive-clip-rounded`; M7 uses it in `Ui::page` and `Ui::panel`, scenes `page-body-scroll` and `panel-card`) | [L src/Lunegit.Desktop/App.axaml:769-770], [W docs/ui/components.md:249-262] |
-| sector | data.pie-chart | M8 | [L src/Lunegit.Desktop/Controls/StoragePieChartControl.cs:113-137] |
-| path-fill | data.pie-chart | M8 | [L src/Lunegit.Desktop/Controls/StoragePieChartControl.cs:140-158] |
-| arc | data.pie-chart | M8 | [L src/Lunegit.Desktop/Controls/StoragePieChartControl.cs:132] |
+| sector | data.pie-chart | M8 (done: `Ui::pie_chart` draws a fan per slice and the top-half highlight with `Painter::sector`, scenes `pie-chart-three` and `pie-chart-half`) | [L src/Lunegit.Desktop/Controls/StoragePieChartControl.cs:113-137] |
+| path-fill | data.pie-chart | M8 (not used by the pie: a fan through `sector` is a whole disc at a sweep of 2π, so no path fill is needed; the primitive stays built, M7's tab strip tints with `Painter::fill_path`) | [L src/Lunegit.Desktop/Controls/StoragePieChartControl.cs:140-158] |
+| arc | data.pie-chart | M8 (not used by the pie: `sector` covers it; the lane graph's dot first used `Painter::arc` and is a closed `Painter::stroke` since D172, because `arc` flattens on the centre radius) | [L src/Lunegit.Desktop/Controls/StoragePieChartControl.cs:132] |
 
 Not needed by any entry (no row): `linear-gradient` and `shadow`. No Lunegit or Wane component read draws either (Wane's panel states "no shadow", [W docs/ui/components.md:249-262]); they are added only when a spec needs them. Of the other entries, 78 list `New: none` (two more since the page and the panel took the M5 clip-rounded), 8 read `n/a` (no painter section applies) and 4 are external (no painter section); counted by script over the `### Painter primitives` subsections.
 
@@ -97,7 +97,7 @@ Not needed by any entry (no row): `linear-gradient` and `shadow`. No Lunegit or 
 
 ### Build
 
-- Milestone: M5 (the seven new primitives, R-core-10) and M11 (done standard; the existing code is moved). M5 built the seven primitives (steps 4 and 5; the page is `primitives`); `core.painter` stays `in-progress` until M11's done standard. M6 put the rotate and dash rows to use (the spinner and the search picker's link trigger) and added the two stroke helpers `Painter::stroke_sweep` and `Painter::stroke_comet` over `StrokeStyle.mode`, which the tab strip's busy cue draws (D122).
+- Milestone: M5 (the seven new primitives, R-core-10) and M11 (done standard; the existing code is moved). M5 built the seven primitives (steps 4 and 5; the page is `primitives`); `core.painter` stays `in-progress` until M11's done standard. M8 put `sector` to use (the pie chart) and used no new primitive. M6 put the rotate and dash rows to use (the spinner and the search picker's link trigger) and added the two stroke helpers `Painter::stroke_sweep` and `Painter::stroke_comet` over `StrokeStyle.mode`, which the tab strip's busy cue draws (D122).
 - Depends on: core.scene, core.theme, text.shaping, core.image.
 
 ## Open questions

@@ -28,7 +28,7 @@ use std::time::Duration;
 
 use super::button::{self, ButtonKind, ButtonLook, FOCUS, HOVER, IconButton, PRESS};
 use super::progress::{self, ProgressOptions};
-use super::scroll_area::{Extent, ScrollOptions};
+use super::scroll_area::{Bars, Extent, ScrollOptions};
 use super::spinner::{self, SpinnerOptions};
 use super::tone::Tone;
 use crate::access::{Action, Live, Node, Role, State};
@@ -1029,7 +1029,14 @@ impl<'a> Ui<'a> {
         let history = &toasts.history;
         self.node_container(list, |ui| {
             ui.scope(&key, |ui| {
-                ui.scroll_area("list", area, &ScrollOptions::default(), |ui, view| {
+                let opts = ScrollOptions {
+                    bars: (
+                        Bars::Disabled,
+                        Bars::Auto.unless_fits(f64::from(total), f64::from(area.h)),
+                    ),
+                    ..ScrollOptions::default()
+                };
+                ui.scroll_area("list", area, &opts, |ui, view| {
                     let mut y = view.viewport.y;
                     for (n, (spec, (msg_h, h))) in history.iter().zip(&rows).enumerate() {
                         let row = Rect::new(view.viewport.x, y, view.viewport.w, *h);

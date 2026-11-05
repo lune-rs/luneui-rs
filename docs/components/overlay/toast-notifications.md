@@ -82,6 +82,7 @@ Off snaps all four. A toast's y is one transition retargeted from where it is: w
 
 ### Input and focus
 
+- Wheel and swipe: the history list registers no scroll sense while it has nothing to scroll, so the delta reaches the scroll area around it; one that overflows keeps it (D176).
 - Pointer: a click on the toast toggles expansion [L src/Lunegit.Desktop/MainWindow.axaml:294]; action buttons on prompts [L src/Lunegit.Desktop/MainWindow.axaml:387-389]; cancel on cancellable loading toasts [L src/Lunegit.Desktop/MainWindow.axaml:325-330]; clear-all in the history [L src/Lunegit.Desktop/Views/SidePanels/NotificationHistoryPanelView.axaml:14-21].
 - Keyboard: only the buttons take focus: Tab reaches them (of the scope the app called `Ui::toasts` in), Enter and Space press the focused one. The body is not a tab stop; an access Default action toggles it and `Dismiss` dismisses it [D146].
 - Tab stop: action and cancel buttons only, not the toast body [core.focus] (derived: the body is a click target, MainWindow.axaml:294).

@@ -3,13 +3,14 @@
 
 use lune_ui_core::access::{AccessAction, Action, Role, State, Value};
 use lune_ui_core::color::premul;
-use lune_ui_core::input::{Key, NamedKey, PointerButton, Repaint};
+use lune_ui_core::input::{Key, Modifiers, NamedKey, PointerButton, Repaint};
 use lune_ui_core::motion::{MotionTier, conformance};
 use lune_ui_core::paint::{Painter, Rect};
 use lune_ui_core::scene::Scene;
+use lune_ui_core::shortcuts::{Binding, Chord, Scope};
 use lune_ui_core::testing::{FakeText, UiHarness};
 use lune_ui_core::theme::DARK;
-use lune_ui_core::ui::{Response, WidgetId};
+use lune_ui_core::ui::{Response, Ui, WidgetId};
 use lune_ui_core::widgets::combo::{BORDER, HOVER, combo};
 
 const WIN: (f32, f32) = (400.0, 300.0);
@@ -281,5 +282,109 @@ fn the_node_is_a_combo_box_whose_expanded_state_follows_open() {
         assert!(node.actions.contains(Action::Expand));
         // It never closes itself, so it advertises no collapse (review F5).
         assert!(!node.actions.contains(Action::Collapse));
+    }
+}
+
+// Keys: the combo takes its three activation keys and leaves a chord on them to the shortcuts.
+
+/// A held modifier and the same modifier on a binding's chord.
+type Held = (Modifiers, fn(Chord) -> Chord);
+
+fn a_combo(ui: &mut Ui<'_>) {
+    ui.combo("c", RECT, "RznSans", &mut false, "Font");
+}
+
+#[test]
+fn a_chord_on_the_combos_keys_is_a_shortcut_and_opens_nothing() {
+    let chords: [Held; 3] = [
+        (
+            Modifiers {
+                control: true,
+                ..Modifiers::default()
+            },
+            Chord::ctrl,
+        ),
+        (
+            Modifiers {
+                alt: true,
+                ..Modifiers::default()
+            },
+            Chord::alt,
+        ),
+        (
+            Modifiers {
+                logo: true,
+                ..Modifiers::default()
+            },
+            Chord::logo,
+        ),
+    ];
+    for (m, chord) in chords {
+        for k in [NamedKey::Enter, NamedKey::Space, NamedKey::ArrowDown] {
+            let mut h = UiHarness::new(WIN);
+            h.shortcuts.add(Binding::new(
+                Scope::Global,
+                chord(Chord::key(Key::Named(k))),
+                "chord",
+            ));
+            let mut open = false;
+            frame(&mut h, &mut open);
+            h.input.key_down(Key::Named(NamedKey::Tab), None);
+            h.at_ms(10);
+            frame(&mut h, &mut open);
+            h.input.set_modifiers(m);
+            h.input.key_down(Key::Named(k), None);
+            h.at_ms(20);
+            let mut resp = None;
+            let (_, out) = h.frame(|ui| {
+                resp = Some(ui.combo("c", RECT, "RznSans", &mut open, "Font"));
+            });
+            assert!(!open && !resp.expect("ran").clicked, "{m:?} {k:?}");
+            assert_eq!(out.fired.len(), 1, "{m:?} {k:?}");
+            // And disabled, still its key: the chord fires, nothing opens.
+            let mut h = UiHarness::new(WIN);
+            h.shortcuts.add(Binding::new(
+                Scope::Global,
+                chord(Chord::key(Key::Named(k))),
+                "chord",
+            ));
+            h.frame(a_combo);
+            h.input.key_down(Key::Named(NamedKey::Tab), None);
+            h.frame(a_combo);
+            let disabled = |ui: &mut Ui<'_>| ui.with_enabled(false, a_combo);
+            h.frame(disabled);
+            h.input.set_modifiers(m);
+            h.input.key_down(Key::Named(k), None);
+            let (_, out) = h.frame(disabled);
+            assert_eq!(out.fired.len(), 1, "disabled {m:?} {k:?}");
+        }
+    }
+}
+
+#[test]
+fn a_combo_focused_then_disabled_keeps_its_keys_from_the_shortcuts() {
+    for k in [NamedKey::Enter, NamedKey::Space, NamedKey::ArrowDown] {
+        let mut h = UiHarness::new(WIN);
+        h.shortcuts
+            .add(Binding::new(Scope::Global, Chord::key(Key::Named(k)), "go"));
+        h.frame(a_combo);
+        h.input.key_down(Key::Named(NamedKey::Tab), None);
+        let (_, out) = h.frame(a_combo);
+        assert!(out.focused.is_some(), "tab reached it");
+        let disabled = |ui: &mut Ui<'_>| ui.with_enabled(false, a_combo);
+        h.frame(disabled);
+        h.frame(disabled);
+        h.input.key_down(Key::Named(k), None);
+        let (_, out) = h.frame(disabled);
+        assert!(out.fired.is_empty(), "{k:?}");
+        // F5 is not the combo's: it still fires.
+        h.shortcuts.add(Binding::new(
+            Scope::Global,
+            Chord::key(Key::Named(NamedKey::F5)),
+            "f5",
+        ));
+        h.input.key_down(Key::Named(NamedKey::F5), None);
+        let (_, out) = h.frame(disabled);
+        assert_eq!(out.fired.len(), 1, "F5 after {k:?}");
     }
 }

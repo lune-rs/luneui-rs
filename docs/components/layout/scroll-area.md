@@ -77,7 +77,7 @@ high-frequency content while the offset changes [L .claude/docs/animation-rules.
 
 ### Input and focus
 
-- Pointer: wheel and trackpad scroll the area under the pointer; the topmost scroll area under the pointer takes the delta, and an area at its end does not pass it up (derived by the single-topmost-hit rule, [core.ui]). Thumb drag is `widget.scrollbar`.
+- Pointer: wheel and trackpad scroll the area under the pointer; the topmost scroll area under the pointer takes the delta, and an area at its end does not pass it up (derived by the single-topmost-hit rule, [core.ui]). An area with `Bars::Disabled` on both axes registers no scroll sense, so it is outside that rule: the composites that nest an area and know their extent first (the list, the table, the tree, the tab strip, the text area, the toast history, the board and its columns) disable an axis with nothing to scroll, and a delta over them reaches the area around them (D176). Thumb drag is `widget.scrollbar`.
 - Keys when the area or a child holds focus and the child does not use the key: PageUp and PageDown scroll by one viewport [W docs/ui/components.md:409]; Home and End: no source read states them (Open questions).
 - Tab stop: no; the focusable content is. Scroll-into-view runs when focus moves to a child outside the viewport [core.focus].
 - Layer: the layer of its content. No focus scope.

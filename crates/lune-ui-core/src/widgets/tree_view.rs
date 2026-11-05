@@ -703,7 +703,10 @@ impl Ui<'_> {
         }
 
         let area = ScrollOptions {
-            bars: (Bars::Disabled, Bars::Auto),
+            bars: (
+                Bars::Disabled,
+                Bars::Auto.unless_fits(lay.extent(), f64::from(rect.h)),
+            ),
             extent: Some((f64::from(rect.w), lay.extent())),
             ..ScrollOptions::default()
         };

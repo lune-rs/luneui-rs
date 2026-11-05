@@ -79,6 +79,7 @@ Never animated: any row property while the offset changes, row recycling, expand
 
 ### Input and focus
 
+- Wheel and swipe: a list registers no scroll sense while it has nothing to scroll, so the delta reaches the scroll area around it; one that overflows keeps it (D176).
 - Pointer: click selects that row only and sets the anchor [L src/Lunegit.Desktop/Views/SplitDiffView.axaml.cs:168-173]; Meta-click toggles the row in the set [L src/Lunegit.Desktop/Views/SplitDiffView.axaml.cs:153-159]; Shift-click selects the range between the anchor and the row, replacing the set [L src/Lunegit.Desktop/Views/SplitDiffView.axaml.cs:160-167]; press then drag selects the range from the anchor to the row under the pointer [L src/Lunegit.Desktop/Views/SplitDiffView.axaml.cs:201-215]. The toggle modifier is Meta in Lunegit; Ctrl on Windows and Linux is [derived: the platform convention, no source states it].
 - Keys: Up and Down move the selection [W docs/ui/components.md:479]; Shift with Up or Down extends the range, PageUp, PageDown, Home and End move by a viewport and to the ends [derived: the `ListBox` defaults Lunegit inherits are not in its source; no Wane or Lunegit line states them]; the moved row scrolls into view [layout.scroll-area].
 - Copy: Cmd or Ctrl+C copies the selected rows in key order [L src/Lunegit.Desktop/Views/SplitDiffView.axaml.cs:253-275].

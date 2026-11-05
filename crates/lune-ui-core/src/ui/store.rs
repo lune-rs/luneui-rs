@@ -57,6 +57,9 @@ pub struct UiStore {
     pub(crate) prev_node_meta: BTreeMap<WidgetId, (usize, u32)>,
     /// The previous frame asked for a frame only because its hover was stale (D81).
     pub(crate) hover_catch_up: bool,
+    /// A pointer gesture that Escape cancels (a drag, a resize) was live at the end of the previous
+    /// frame; cleared at each `begin` (D175).
+    pub(crate) gesture_live: bool,
 }
 
 impl std::fmt::Debug for UiStore {

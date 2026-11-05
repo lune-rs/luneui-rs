@@ -480,3 +480,65 @@ fn acrylic_radii_cuts_only_the_corner_it_names() {
     assert_eq!(px(&img, l, b), green_px, "bottom-left is square");
     assert_eq!(px(&img, l + 30, t + 30), green_px, "inside");
 }
+
+/// Whether two opaque pixels agree to within one level a channel.
+fn near(a: [u8; 4], b: [u8; 4]) -> bool {
+    a.iter().zip(b).all(|(x, y)| x.abs_diff(y) <= 1)
+}
+
+#[test]
+fn a_lane_graph_dot_is_a_disc_of_diameter_10_over_a_line_of_another_colour() {
+    use lune_ui_core::widgets::lane_graph::{LaneLine, LaneRow, paint as lane_row};
+    let Some(mut gpu) = headless_gpu() else {
+        return;
+    };
+    let mut text = text_cache();
+    let line = [200, 30, 30, 255];
+    let dot = [30, 30, 200, 255];
+    // Lane 0 at x = 10 + 20 = 30, the centre line at 17.5 + 22.5 = 40 logical: device (60, 80).
+    let lanes = [LaneLine {
+        lane: 0,
+        color: line,
+        above: true,
+        below: true,
+    }];
+    let scene = paint(&mut text, |p| {
+        lane_row(
+            p,
+            (10.0, 17.5),
+            &LaneRow {
+                dot_lane: 0,
+                dot_color: dot,
+                lanes: &lanes,
+                edges: &[],
+            },
+        );
+    });
+    let img = render(&mut gpu, &mut text, &scene);
+    // Instrument check: far from the row is empty, and the line away from the dot is the line's.
+    assert_eq!(px(&img, 200, 140), [0, 0, 0, 0]);
+    assert!(
+        near(px(&img, 60, 66), line),
+        "7 logical px above: {:?}",
+        px(&img, 60, 66)
+    );
+    assert!(
+        near(px(&img, 60, 94), line),
+        "7 logical px below: {:?}",
+        px(&img, 60, 94)
+    );
+    // The dot's colour at the centre, where the line passes through, and 4 logical px from it.
+    assert!(near(px(&img, 60, 80), dot), "centre {:?}", px(&img, 60, 80));
+    for (x, y) in [(68, 80), (52, 80), (60, 72), (60, 88)] {
+        assert!(near(px(&img, x, y), dot), "({x}, {y}) {:?}", px(&img, x, y));
+    }
+    // Diameter 10 logical (20 device px) within 1 logical px, read along the centre row.
+    let run = (0..SIZE.0 as usize)
+        .filter(|&x| near(px(&img, x, 80), dot))
+        .count();
+    assert!((18..=22).contains(&run), "dot diameter {run} device px");
+    let col = (0..SIZE.1 as usize)
+        .filter(|&y| near(px(&img, 60, y), dot))
+        .count();
+    assert!((18..=22).contains(&col), "dot height {col} device px");
+}

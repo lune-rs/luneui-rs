@@ -80,6 +80,7 @@ Typing, caret movement and selection changes never animate: they are high-freque
 
 ### Input and focus
 
+- Wheel and swipe: a text area registers no scroll sense while its text fits, so the delta reaches the scroll area around it; one that overflows keeps it (D176).
 - Pointer: press places the caret at the hit offset; drag selects with pointer capture until release; Shift-press extends; double-click selects a word, triple-click the line [derived: the platform convention]; the cursor icon over a field is `Text` [R crates/lune-ui-core/src/input.rs:185-199].
 - Keys, with the shortcut modifier being logo on macOS and control elsewhere (the app passes which; the toolkit reads no OS, hard rule 2) [R crates/lune-ui-core/src/input.rs:130-139]: Left and Right move by grapheme; with the word modifier by word; Home and End go to the line ends, with the shortcut modifier to the text ends; Shift extends the selection; Up, Down, PageUp and PageDown in multi-line text; Backspace and Delete remove the selection or one grapheme, with the word modifier a word; select-all, undo, redo, cut, copy and paste on the shortcut modifier plus A, Z, Shift-Z or Y, X, C, V [derived: the platform text-editing convention, as Avalonia's `TextBox` implements it for Lunegit]. The listed behaviours are Wane's set: caret, selection, clipboard (cut, copy, paste), Esc, Tab [W docs/ui/components.md:353].
 - Enter: in a single-line field reports `submitted`; in a multi-line text inserts a line break [derived: `AcceptsReturn` marks multi-line text in Lunegit, CrashReportWindow.axaml:75].

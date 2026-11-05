@@ -26,7 +26,7 @@ v1 [D43]; OS file drop is an input event (`core.input`).
 
 ## Existing code
 
-Built in M5 (D89, D104): `crates/lune-ui-core/src/drag.rs` (`ReorderDrag`, `FreeDrag`, `Ui::drag_gesture`, `free_drag_gesture`, `drag_offset`, `drag_dim`, `paint_drop_line`). Design source (not code to move): Lunegit `src/Lunegit.Desktop/Controls/Terminal/TerminalTabDragController.cs` (458 lines, the pure state machine),
+Built in M5 (D89, D104): `crates/lune-ui-core/src/drag.rs` (`ReorderDrag`, `FreeDrag`, `Ui::drag_gesture`, `free_drag_gesture`, `drag_offset`, `drag_dim`, `paint_drop_line`), `edge_step` and the crate's `Ui::drag_ghost` added for the board in M8 (D168). Design source (not code to move): Lunegit `src/Lunegit.Desktop/Controls/Terminal/TerminalTabDragController.cs` (458 lines, the pure state machine),
 `Views/TerminalPanelView.axaml.cs:262-480` (the event translator), `ViewModels/Scratchpad/ScratchpadBoardViewModel.cs:253-327` and
 `Views/Scratchpad/ScratchpadBoardView.axaml.cs:44-103` (kanban). `Views/SplitDiffView.axaml.cs` drags only to select rows (see `layout.virtualized-list`).
 
@@ -54,7 +54,7 @@ the toolkit takes the axis as a parameter (horizontal or both), each site cites 
 - Auto-scroll tick: the pointer is parked but the content moves, so the content X is re-derived as `viewportX + newOffset` each tick [L src/Lunegit.Desktop/Controls/Terminal/TerminalTabDragController.cs:225-244]; Lunegit drives it with a 16 ms timer started only while a delta is non-zero [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml.cs:99-103,444-475]. The toolkit has no timer: the frame time drives it (about 750 px/s times the frame's dt) and the gesture reports `Repaint::Now` while a delta is non-zero [core.ui].
 - Release result: `Click` (a drag that ended where it started, or armed and never dragged), `Commit(from, to)`, or `None`; the indices travel in the result because release clears all state [L src/Lunegit.Desktop/Controls/Terminal/TerminalTabDragController.cs:65-82,250-272].
 - Totality is a contract: any input (empty or null widths, a single item, an out-of-range index, NaN or infinite coordinates, zero or negative widths) returns a usable result and never throws; the degenerate answer is not dragging, all offsets zero, delta zero [L src/Lunegit.Desktop/Controls/Terminal/TerminalTabDragController.cs:16-20].
-- Kanban: a free drag where the card stays in place dimmed while a 2 px accent drop line shows the insertion slot and the target column's background becomes `surface_hover`; there is no ghost [L src/Lunegit.Desktop/Views/Scratchpad/ScratchpadBoardView.axaml:17-19,38-42], [L src/Lunegit.Desktop/ViewModels/Scratchpad/KanbanCardViewModel.cs:49]. Insertion index = the count of cards whose vertical midpoint is above the pointer, in the column under the pointer's X [L src/Lunegit.Desktop/Views/Scratchpad/ScratchpadBoardView.axaml.cs:107-147].
+- Kanban: a free drag where the card stays in place dimmed while a 2 px accent drop line shows the insertion slot and the target column's background becomes `surface_hover`; Lunegit has no ghost, the toolkit's board adds one and a landing (D168) [L src/Lunegit.Desktop/Views/Scratchpad/ScratchpadBoardView.axaml:17-19,38-42], [L src/Lunegit.Desktop/ViewModels/Scratchpad/KanbanCardViewModel.cs:49]. Insertion index = the count of cards whose vertical midpoint is above the pointer, in the column under the pointer's X [L src/Lunegit.Desktop/Views/Scratchpad/ScratchpadBoardView.axaml.cs:107-147].
 - Decision state lives in a pure object and the view is a thin event translator [L src/Lunegit.Desktop/Controls/Terminal/TerminalTabDragController.cs:6-10], [L src/Lunegit.Desktop/Views/Scratchpad/ScratchpadBoardView.axaml.cs:11-24]; the toolkit keeps that shape: the state machine is a pure type, `ui.interact` feeds it.
 - No OS drag and drop: Lunegit uses manual pointer capture because `DragDrop.DoDragDrop` runs a native nested loop whose macOS reliability was unverified [L src/Lunegit.Desktop/Views/Scratchpad/ScratchpadBoardView.axaml.cs:18-24].
 
@@ -90,9 +90,10 @@ Never animated: auto-scroll (linear and un-eased on purpose [L src/Lunegit.Deskt
 ### Input and focus
 
 - Pointer: press on an item arms (left button only; right press opens the context menu, middle is ignored [L src/Lunegit.Desktop/Views/Scratchpad/ScratchpadBoardView.axaml.cs:48]); the item activates on press and the gesture never activates anything [L src/Lunegit.Desktop/Controls/Terminal/TerminalTabDragController.cs:136-140]; crossing the threshold takes pointer capture from the pressed button, so that button gets capture-lost and does not fire a click [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml.cs:284-290]; capture stays until release, even outside the strip [core.ui].
-- Cancel paths, all through one teardown: Escape while dragging (swallowed only then) [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml.cs:336-341]; capture lost [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml.cs:330-334]; the button no longer down, or the host hidden mid-drag [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml.cs:266-278]; a collection change mid-drag [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml.cs:343-347]. Kanban: capture lost cancels [L src/Lunegit.Desktop/Views/Scratchpad/ScratchpadBoardView.axaml.cs:88-95].
+- Cancel paths, all through one teardown: Escape while dragging (swallowed only then, and before an overlay around the drag dismisses on it, D175) [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml.cs:336-341]; capture lost [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml.cs:330-334]; the button no longer down, or the host hidden mid-drag [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml.cs:266-278]; a collection change mid-drag [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml.cs:343-347]. Kanban: capture lost cancels [L src/Lunegit.Desktop/Views/Scratchpad/ScratchpadBoardView.axaml.cs:88-95].
 - Keys: Escape only; no keyboard drag in Lunegit (see Open questions). Tab stop: none, the items are the stops [core.focus].
-- Layer: the layer of the strip or board; the dragged item is drawn in place (no overlay) [derived: Lunegit transforms the tab in place, TerminalPanelView.axaml.cs:404-409].
+- Layer: the layer of the strip; the dragged item is drawn in place (no overlay) [derived: Lunegit transforms the tab in place, TerminalPanelView.axaml.cs:404-409]. A free drag's ghost is the caller's: `Ui::drag_ghost` runs it one layer group up, out of every clip and recording; the board's is the one user (D168).
+- The free gesture only sees an item that still calls it: when the source leaves the items, the caller cancels the machine. A press and its release in one frame are a click.
 - Focus scope: none.
 
 ### Retained state
@@ -148,7 +149,9 @@ None: the gesture has no text.
 ## Open questions
 
 - Still open (D104, no keyboard reorder in v1): `role-gap: move/reorder action for list-item and tab` (see Accessibility); keyboard reordering is not in Lunegit and is left to M5 to decide.
-- Answered (D104, the free two-axis form): whether the kanban board (data.kanban-board) takes the free two-axis form of this machine or its own: the board's numbers are cited above; the component spec decides.
+- Answered (D104, the free two-axis form): whether the kanban board (data.kanban-board) takes the free two-axis form of this machine or its own: it takes it, through `free_drag_gesture`.
+- Answered (D168): who owns the board's drag: the toolkit's `FreeDrag` and `Ui::kanban_board`; the app owns the order and applies the reported move. Edge auto-scroll is `edge_step`, shared with the strip.
+- Answered in part (D169): keyboard moves exist on the board (Shift with an arrow); the `role-gap` above stays.
 
 ## Notes for the planner
 

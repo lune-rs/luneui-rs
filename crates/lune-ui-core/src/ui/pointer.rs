@@ -291,6 +291,11 @@ impl PointerState {
         });
     }
 
+    /// Whether a press holds a widget's capture now, at this point in the frame's event batch.
+    pub(crate) fn captured(&self) -> bool {
+        self.press.is_some_and(|p| p.id.is_some())
+    }
+
     /// Releases a capture whose id `lost` says can no longer hold it (it fell under a modal).
     pub(crate) fn drop_capture_if(&mut self, lost: impl Fn(WidgetId) -> bool) {
         if let Some(p) = &mut self.press

@@ -2,10 +2,10 @@
 id: data.lane-graph
 title: Lane graph (row)
 area: data
-status: planned
+status: in-progress
 consumers: lunegit
-source: Lunegit: src/Lunegit.Desktop/Controls/GraphRowControl.cs
-owner: —
+source: crates/lune-ui-core/src/widgets/lane_graph.rs
+owner: toolkit-v1 M8
 summary: One row of a lane graph: connection curves between lanes, vertical lane lines, and a node dot in its lane; generalised from commits to app data
 ---
 
@@ -43,7 +43,7 @@ Conflicts: none. The lane layout (which lane each commit takes) is outside the c
 - Pass 3, node dot: radius 5, at the child lane x and the centre line [L src/Lunegit.Desktop/Controls/GraphRowControl.cs:27,150-153].
 - Edge pen: thickness 2.5, round caps [L src/Lunegit.Desktop/Controls/GraphRowControl.cs:28,167].
 - Colours: a brush per lane colour key and variant (`GraphStroke` for edges, `GraphDot` for the dot) [L src/Lunegit.Desktop/Controls/GraphRowControl.cs:152,156-158,167].
-- Geometry cache: bounded LRU of 2048 entries, so scroll distance does not grow it [L src/Lunegit.Desktop/Controls/GraphRowControl.cs:35-39].
+- Geometry cache: bounded LRU of 2048 entries [L src/Lunegit.Desktop/Controls/GraphRowControl.cs:35-39]; not ported (see Retained state).
 
 ### States
 
@@ -72,8 +72,8 @@ n/a — never animate the graph canvas: it renders via `DrawingContext` and must
 ### Retained state
 
 - Transient: none.
-- Persistent: the geometry cache (bounded LRU, 2048 entries) and the pen cache keyed by colour key [L src/Lunegit.Desktop/Controls/GraphRowControl.cs:32-39].
-- App-owned: the row's data object (`DataProperty`): the row index, the dot lane and colour key, the active lanes with their continue flags and colour keys, and the outgoing connections [L src/Lunegit.Desktop/Controls/GraphRowControl.cs:43-54,95-154].
+- Persistent: none. Lunegit's 2048-entry geometry cache and pen cache are not ported: only the rows in view are built (a virtualized list), so there is nothing for an LRU to bound, and `edge_points` is a few dozen operations per edge (D170).
+- App-owned: the row's data (`LaneRow`: the dot lane and colour, the lane lines with their continue flags, the edges with rows relative to the row). The lane layout is the app's: the toolkit ships no layout helper.
 - Exit retention: no.
 
 ### Accessibility
@@ -87,21 +87,21 @@ None: the control draws no text; the row's text is the owner's.
 
 ### Gallery scenes
 
-- `lane-graph-linear` (new): one lane, one node, lane lines above and below, settled.
-- `lane-graph-merge` (new): two lanes merging into one node, with a connection curve, settled.
-- `lane-graph-branch` (new): a branch leaving a node on a second lane, with a connection curve, settled.
+- `lane-graph-linear`: one lane, a node per row, lane lines above and below, settled.
+- `lane-graph-merge`: a node on lane 1 whose edge goes straight down and bends into the trunk, settled.
+- `lane-graph-branch`: a branch leaving a node for lane 1, settled.
+- `lane-graph-list`: the graph beside a text column in a 100,000-row `virtual_list`, row 2 selected and row 4 hovered (the owner's look), settled.
 
 ### Painter primitives
 
-- Existing: fill (node dot: a fill with the radius at half the diameter), stroke (lane lines and curves: `stroke` takes a point list, so a curve is flattened to points). [R crates/lune-ui-core/src/paint.rs:215,329]
-- New: none.
-- The bézier corner is drawn as a flattened point list through `stroke`; no new primitive is needed.
+- Existing only: `stroke` (lane lines and edges, the corner flattened to points by `edge_points`) and a closed `stroke` for the dot (32 points on a circle of centre radius 2, stroke width 6: a disc of radius 5; `arc` flattens on the centre radius and left visible flats at scale 2, so it is not used). Everything is on the stroke list, which draws after every fill of a layer and in record order, so the dot is the top of the row's strokes; the GPU probe `a_lane_graph_dot_is_a_disc_of_diameter_10_over_a_line_of_another_colour` (lune-ui-wgpu, `primitives.rs`) proves the stroked circle reads as a solid disc. New: none.
+- Butt ends, not Lunegit's round caps: `StrokeStyle` has no cap mode. An edge ends under the dot and lane lines meet at the row's edges, so no end shows.
 
 ### Acceptance
 
 - Behaviour (scripted input, injected time): a row with a dot in lane 2 draws the dot at x = 20 + 2 × 25 = 70 on the centre line 22.5; a lane that continues above starts at y = 0. None exists.
-- Pixel probes at scale 2: row 90 px; node dot diameter 10 px at x = 40 + lane × 50; edge 5 px wide.
-- Conformance: none (no motion).
+- Pixel probes at scale 2: row 90 px; node dot diameter 20 device px (10 logical; the earlier "10 px" was logical) at x = 40 + lane × 50; edge 5 px wide.
+- Conformance: none (no motion; never animated).
 - Semantic node: none (decorative); the owner's list-item carries the row.
 
 ### Build
@@ -111,11 +111,12 @@ None: the control draws no text; the row's text is the owner's.
 
 ## Open questions
 
-- Flattening tolerance for the bézier corner through `stroke`: not in the source; open.
-- Row count and scroll performance (R-nfr-5): the geometry cache bounds memory (2048); the frame budget is not measured here; open.
-- Lane layout algorithm: outside the control; the app owns it; whether the toolkit ships a helper is open for the planner.
-- Hover and selection looks for the row: the owner draws them; open.
+All answered in M8 (D170):
+- Flattening tolerance: each quadratic corner is 8 segments (`CORNER_STEPS`); the chord stays under 0.25 device px at scale 2 for radius 10 (`the_flattened_corner_stays_within_a_quarter_device_pixel_at_scale_2`).
+- Row count and scroll performance: the geometry is rebuilt per visible row each frame; the frame budget is the page's bench (100,000 rows in a virtualized list, scrolled), judged by D85.
+- Lane layout: the app's; no helper.
+- Hover and selection: the owner's (a `virtual_list` row); the `lane-graph-list` scene shows the list's own selected and hovered fills under the graph.
 
 ## Notes for the planner
 
-Renamed from the Lunegit commit-graph row (D10): the commit words are gone from the entry; lanes, nodes and edges are the app's data.
+Renamed from the Lunegit commit-graph row (D10): the commit words are gone from the entry; lanes, nodes and edges are the app's data. Built in M8 (D170). API: `lane_graph::paint(p, origin, &LaneRow)`, `Ui::lane_graph_row(rect, &LaneRow)`, `lane_graph::width(max_lane)`, `lane_graph::edge_points(d_lanes, d_rows)`. Geometry reaches past the row's rect and nothing clips it: the owner's list does. Rows in `LaneEdge` are relative to the row drawn.

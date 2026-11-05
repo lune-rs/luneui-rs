@@ -9,8 +9,8 @@ use std::time::Duration;
 use lune_ui_core::access::{Node, Role, SemanticTree, State};
 use lune_ui_core::drag::{
     AUTO_SCROLL_MAX, AUTO_SCROLL_TICK, AUTO_SCROLL_ZONE, Column, DIM, DIM_ALPHA, DRAG_THRESHOLD,
-    DragFrame, DropResult, DropTarget, FreeDrag, FreeResult, Metrics, ReorderDrag, SETTLE, SLIDE,
-    Strip, drop_index, drop_target, paint_drop_line,
+    DragFrame, DropResult, DropTarget, FreeDrag, FreeFrame, FreeResult, Metrics, ReorderDrag,
+    SETTLE, SLIDE, Strip, drop_index, drop_target, paint_drop_line,
 };
 use lune_ui_core::input::{Key, NamedKey, PointerButton, Repaint};
 use lune_ui_core::motion::{MotionTier, conformance};
@@ -19,6 +19,7 @@ use lune_ui_core::scene::{Scene, Shape};
 use lune_ui_core::testing::UiHarness;
 use lune_ui_core::theme::DARK;
 use lune_ui_core::ui::{Sense, Ui, WidgetId};
+use lune_ui_core::widgets::dialog::{Cancel, Dialog, DialogGlass};
 use lune_ui_core::widgets::scroll_area::{Extent, ScrollOptions};
 
 const SPACING: f64 = 5.0;
@@ -728,6 +729,10 @@ struct Model {
     extent: f64,
     /// Items drawn disabled this frame.
     disabled: bool,
+    /// The items are the body of a dialog.
+    dialog: bool,
+    /// The dialog reported a cancel in the last frame.
+    dialog_cancelled: bool,
 }
 
 impl Model {
@@ -740,6 +745,8 @@ impl Model {
             viewport: 300.0,
             extent: 410.0,
             disabled: false,
+            dialog: false,
+            dialog_cancelled: false,
         }
     }
 
@@ -769,52 +776,80 @@ fn run(h: &mut UiHarness, m: &mut Model, ms: u64) -> Run {
     let mut gestures = Vec::new();
     let mut offsets = Vec::new();
     let mut escape_left = Vec::new();
+    let mut cancelled = false;
+    let in_dialog = m.dialog;
     let (_, fo) = h.frame(|ui| {
-        let mut resps = Vec::new();
-        for (i, key) in m.keys.iter().enumerate() {
-            let rect = Rect::new(
-                (ORIGIN + x[i] - m.offset) as f32,
-                ROW_Y,
-                widths[i] as f32,
-                ITEM_H,
-            );
-            let id = item(*key);
-            let resp = ui.with_enabled(!m.disabled, |ui| {
-                let r = ui.interact(id, rect, Sense::DRAG);
-                ui.node(Node::new(id, Role::Tab, "tab", rect));
-                r
-            });
-            resps.push(resp);
-        }
-        let strip_metrics = Metrics {
-            widths: &widths,
-            spacing: SPACING,
-            viewport: m.viewport,
-            offset: m.offset,
-            extent: m.extent,
-        };
-        for (i, key) in m.keys.iter().enumerate() {
-            let strip = Strip {
-                index: i,
-                origin: ORIGIN,
-                metrics: strip_metrics,
+        let mut body = |ui: &mut Ui<'_>| {
+            let mut resps = Vec::new();
+            for (i, key) in m.keys.iter().enumerate() {
+                let rect = Rect::new(
+                    (ORIGIN + x[i] - m.offset) as f32,
+                    ROW_Y,
+                    widths[i] as f32,
+                    ITEM_H,
+                );
+                let id = item(*key);
+                let resp = ui.with_enabled(!m.disabled, |ui| {
+                    let r = ui.interact(id, rect, Sense::DRAG);
+                    ui.node(Node::new(id, Role::Tab, "tab", rect));
+                    r
+                });
+                resps.push(resp);
+            }
+            let strip_metrics = Metrics {
+                widths: &widths,
+                spacing: SPACING,
+                viewport: m.viewport,
+                offset: m.offset,
+                extent: m.extent,
             };
-            gestures.push(ui.drag_gesture(item(*key), &resps[i], &mut m.drag, &strip));
-        }
-        for (i, key) in m.keys.iter().enumerate() {
-            offsets.push(ui.drag_offset(item(*key), &m.drag, i, x[i] as f32));
-        }
-        // Whether an Escape press is still unconsumed (taken by `consume_key_while_pressed`).
-        for key in &m.keys {
-            escape_left.push(ui.consume_key_while_pressed(item(*key), NamedKey::Escape));
+            for (i, key) in m.keys.iter().enumerate() {
+                let strip = Strip {
+                    index: i,
+                    origin: ORIGIN,
+                    metrics: strip_metrics,
+                };
+                gestures.push(ui.drag_gesture(item(*key), &resps[i], &mut m.drag, &strip));
+            }
+            for (i, key) in m.keys.iter().enumerate() {
+                offsets.push(ui.drag_offset(item(*key), &m.drag, i, x[i] as f32));
+            }
+            // Whether an Escape press is still unconsumed (taken by `consume_key_while_pressed`).
+            for key in &m.keys {
+                escape_left.push(ui.consume_key_while_pressed(item(*key), NamedKey::Escape));
+            }
+        };
+        if in_dialog {
+            cancelled = ui
+                .dialog("dlg", &DIALOG, &dialog_glass(), |ui, _, _, _| body(ui))
+                .cancelled;
+        } else {
+            body(ui);
         }
     });
+    m.dialog_cancelled = cancelled;
     Run {
         gestures,
         offsets,
         repaint: fo.repaint,
         tree: fo.tree,
         escape_left,
+    }
+}
+
+const DIALOG: Dialog<'static> = Dialog {
+    title: "Tabs",
+    message: "m",
+    extra_h: 100.0,
+    confirm: "OK",
+    cancel: Cancel::Default,
+};
+
+fn dialog_glass() -> DialogGlass {
+    DialogGlass {
+        panel: [0.0; 4],
+        fill: [0.0; 4],
+        noise: false,
     }
 }
 
@@ -982,6 +1017,79 @@ fn escape_cancels_a_drag_and_is_taken_only_then() {
     h.input.release(P);
     let r = run(&mut h, &mut m, 60);
     assert_eq!(result_of(&r), DropResult::None);
+}
+
+#[test]
+fn in_a_dialog_the_first_escape_cancels_a_reorder_drag_and_only_the_second_closes_the_dialog() {
+    let mut m = Model::new();
+    m.dialog = true;
+    let mut h = start(&mut m);
+    // The dialog opens before the strip takes a press.
+    run(&mut h, &mut m, 1000);
+    let end = drag_first_to_the_end(&mut h, &mut m, 1010);
+    assert!(m.drag.is_dragging(), "dragging to {end}");
+    h.input.key_down(Key::Named(NamedKey::Escape), None);
+    let r = run(&mut h, &mut m, 1100);
+    assert!(cancelled(&r), "the drag is cancelled");
+    assert!(!m.dialog_cancelled, "and the dialog stays");
+    assert!(!m.drag.is_active());
+    h.input.key_down(Key::Named(NamedKey::Escape), None);
+    run(&mut h, &mut m, 1110);
+    assert!(m.dialog_cancelled, "the second Escape closes the dialog");
+}
+
+#[test]
+fn in_a_dialog_an_armed_press_does_not_take_escape_from_the_dialog() {
+    let mut m = Model::new();
+    m.dialog = true;
+    let mut h = start(&mut m);
+    run(&mut h, &mut m, 1000);
+    // Armed, not dragging: Escape is the dialog's (the flag means dragging).
+    press_at(&mut h, point(&m, 1, 50.0));
+    run(&mut h, &mut m, 1010);
+    assert!(m.drag.is_armed() && !m.drag.is_dragging());
+    h.input.key_down(Key::Named(NamedKey::Escape), None);
+    run(&mut h, &mut m, 1020);
+    assert!(m.dialog_cancelled);
+}
+
+#[test]
+fn in_a_dialog_the_first_escape_cancels_a_free_drag_and_only_the_second_closes_the_dialog() {
+    let b = board();
+    let cols = columns(&b);
+    let card = |k: u32| WidgetId::ROOT.with("card").with(k);
+    let rect = Rect::new(10.0, 60.0, 80.0, 40.0);
+    let mut drag = FreeDrag::new();
+    let mut h = UiHarness::new(WIN);
+    let frame = |h: &mut UiHarness, ms: u64, drag: &mut FreeDrag| {
+        let mut out = Vec::new();
+        let mut cancelled = false;
+        h.at_ms(ms).frame(|ui: &mut Ui<'_>| {
+            cancelled = ui
+                .dialog("dlg", &DIALOG, &dialog_glass(), |ui, _, _, _| {
+                    let r = ui.interact(card(5), rect, Sense::DRAG);
+                    ui.node(Node::new(card(5), Role::ListItem, "card", rect));
+                    out.push(ui.free_drag_gesture(card(5), &r, drag, 5, &cols));
+                })
+                .cancelled;
+        });
+        (out[0], cancelled)
+    };
+    frame(&mut h, 0, &mut drag);
+    frame(&mut h, 1000, &mut drag);
+    h.input.pointer_to(50.0, 80.0);
+    h.input.press(P);
+    frame(&mut h, 1010, &mut drag);
+    h.input.pointer_to(300.0, 80.0);
+    frame(&mut h, 1020, &mut drag);
+    assert!(drag.is_dragging());
+    h.input.key_down(Key::Named(NamedKey::Escape), None);
+    let (f, cancelled) = frame(&mut h, 1030, &mut drag);
+    assert!(f.cancelled && !drag.is_active(), "the drag is cancelled");
+    assert!(!cancelled, "and the dialog stays");
+    h.input.key_down(Key::Named(NamedKey::Escape), None);
+    let (_, cancelled) = frame(&mut h, 1040, &mut drag);
+    assert!(cancelled, "the second Escape closes the dialog");
 }
 
 #[test]
@@ -1539,4 +1647,179 @@ fn a_free_gesture_in_a_scrolled_parent_reads_the_same_as_on_a_plain_page() {
     };
     assert_eq!(plain, want);
     assert_eq!(free_result(true), plain);
+}
+
+// The edge zone, shared by the strip and the board.
+
+#[test]
+fn edge_step_is_the_strip_s_zone_on_any_viewport() {
+    use lune_ui_core::drag::edge_step;
+    // The acceptance table, on `0..500` and moved to `100..600`.
+    for lo in [0.0, 100.0] {
+        let hi = lo + 500.0;
+        assert_eq!(edge_step(lo, lo, hi, true, true), -12.0);
+        assert_eq!(edge_step(lo + 12.0, lo, hi, true, true), -6.0);
+        assert_eq!(edge_step(lo + 24.0, lo, hi, true, true), 0.0);
+        assert_eq!(edge_step(lo - 50.0, lo, hi, true, true), -12.0);
+        assert_eq!(edge_step(hi, lo, hi, true, true), 12.0);
+        assert_eq!(edge_step(hi - 12.0, lo, hi, true, true), 6.0);
+        assert_eq!(edge_step(hi - 24.0, lo, hi, true, true), 0.0);
+        assert_eq!(edge_step(hi + 50.0, lo, hi, true, true), 12.0);
+        assert_eq!(edge_step(lo, lo, hi, false, true), 0.0);
+        assert_eq!(edge_step(hi, lo, hi, true, false), 0.0);
+    }
+    assert_eq!(edge_step(f64::NAN, 0.0, 500.0, true, true), 0.0);
+    assert_eq!(edge_step(0.0, f64::INFINITY, 500.0, true, true), 0.0);
+}
+
+#[test]
+fn a_free_press_and_release_in_one_frame_is_a_click() {
+    let b = board();
+    let cols = columns(&b);
+    let card = WidgetId::ROOT.with("card");
+    let rect = Rect::new(10.0, 60.0, 80.0, 40.0);
+    let mut drag = FreeDrag::new();
+    let mut h = UiHarness::new(WIN);
+    let frame = |h: &mut UiHarness, ms: u64, drag: &mut FreeDrag| {
+        let mut out = None;
+        h.at_ms(ms).frame(|ui: &mut Ui<'_>| {
+            let r = ui.interact(card, rect, Sense::DRAG);
+            out = Some(ui.free_drag_gesture(card, &r, drag, 5, &cols));
+        });
+        out.expect("a frame")
+    };
+    frame(&mut h, 0, &mut drag);
+    h.input.pointer_to(50.0, 80.0);
+    frame(&mut h, 10, &mut drag);
+    h.input.press(P);
+    let armed = frame(&mut h, 20, &mut drag);
+    assert_eq!(armed.result, FreeResult::None);
+    assert_eq!(drag.pressed(), Some(5));
+    assert_eq!(drag.source(), None, "armed, no drag");
+    h.input.release(P);
+    assert_eq!(frame(&mut h, 30, &mut drag).result, FreeResult::Click);
+    assert_eq!(drag.pressed(), None);
+    h.input.click(P);
+    assert_eq!(frame(&mut h, 40, &mut drag).result, FreeResult::Click);
+    assert!(!drag.is_active());
+}
+
+// A free drag on a card in a dialog, with a second dialog over it on request: what each frame's
+// gesture and the two dialogs report.
+struct InDialog {
+    gesture: FreeFrame,
+    first: bool,
+    second: bool,
+}
+
+fn free_in_dialog(
+    h: &mut UiHarness,
+    ms: u64,
+    drag: &mut FreeDrag,
+    cols: &[Column<'_>],
+    open_second: bool,
+) -> InDialog {
+    let card = WidgetId::ROOT.with("card").with(5_u32);
+    let rect = Rect::new(10.0, 60.0, 80.0, 40.0);
+    let mut gesture = None;
+    let mut second = false;
+    let mut first = false;
+    h.at_ms(ms).frame(|ui: &mut Ui<'_>| {
+        first = ui
+            .dialog("dlg", &DIALOG, &dialog_glass(), |ui, _, _, _| {
+                let r = ui.interact(card, rect, Sense::DRAG);
+                ui.node(Node::new(card, Role::ListItem, "card", rect));
+                gesture = Some(ui.free_drag_gesture(card, &r, drag, 5, cols));
+                if open_second {
+                    second = ui
+                        .dialog("over", &DIALOG, &dialog_glass(), |_, _, _, _| {})
+                        .cancelled;
+                }
+            })
+            .cancelled;
+    });
+    InDialog {
+        gesture: gesture.expect("the frame ran"),
+        first,
+        second,
+    }
+}
+
+/// Up to a live free drag in the dialog, with the pointer over the second column.
+fn dragging_in_dialog(h: &mut UiHarness, drag: &mut FreeDrag, cols: &[Column<'_>]) {
+    free_in_dialog(h, 0, drag, cols, false);
+    free_in_dialog(h, 1000, drag, cols, false);
+    h.input.pointer_to(50.0, 80.0);
+    h.input.press(P);
+    free_in_dialog(h, 1010, drag, cols, false);
+    h.input.pointer_to(300.0, 80.0);
+    free_in_dialog(h, 1020, drag, cols, false);
+    assert!(drag.is_dragging());
+}
+
+#[test]
+fn in_a_dialog_an_armed_free_drag_press_does_not_take_escape_from_the_dialog() {
+    let b = board();
+    let cols = columns(&b);
+    let mut drag = FreeDrag::new();
+    let mut h = UiHarness::new(WIN);
+    free_in_dialog(&mut h, 0, &mut drag, &cols, false);
+    free_in_dialog(&mut h, 1000, &mut drag, &cols, false);
+    h.input.pointer_to(50.0, 80.0);
+    h.input.press(P);
+    free_in_dialog(&mut h, 1010, &mut drag, &cols, false);
+    // The frame after the press too: the gesture has run armed to its end, where the note would be.
+    free_in_dialog(&mut h, 1020, &mut drag, &cols, false);
+    assert!(drag.is_active() && !drag.is_dragging(), "armed");
+    h.input.key_down(Key::Named(NamedKey::Escape), None);
+    let f = free_in_dialog(&mut h, 1030, &mut drag, &cols, false);
+    assert!(f.first, "the flag means dragging: Escape is the dialog's");
+}
+
+#[test]
+fn an_escape_after_the_release_in_one_frame_closes_the_dialog() {
+    let b = board();
+    let cols = columns(&b);
+    let mut drag = FreeDrag::new();
+    let mut h = UiHarness::new(WIN);
+    dragging_in_dialog(&mut h, &mut drag, &cols);
+    h.input.release(P);
+    h.input.key_down(Key::Named(NamedKey::Escape), None);
+    let f = free_in_dialog(&mut h, 1030, &mut drag, &cols, false);
+    assert!(f.first, "at the key no gesture held the capture");
+}
+
+#[test]
+fn an_escape_in_the_frame_a_second_dialog_takes_the_capture_closes_that_dialog() {
+    let b = board();
+    let cols = columns(&b);
+    let mut drag = FreeDrag::new();
+    let mut h = UiHarness::new(WIN);
+    dragging_in_dialog(&mut h, &mut drag, &cols);
+    free_in_dialog(&mut h, 1030, &mut drag, &cols, true);
+    h.input.key_down(Key::Named(NamedKey::Escape), None);
+    let f = free_in_dialog(&mut h, 1040, &mut drag, &cols, true);
+    assert!(f.second && !f.first, "the top dialog, and only it");
+}
+
+/// The limit D176 states: at the key the press still holds, so the key queues, and at the gesture's
+/// turn the press is gone. The drop commits and the one key is lost; the next Escape dismisses.
+#[test]
+fn an_escape_before_the_release_in_one_frame_is_lost_and_the_next_closes_the_dialog() {
+    let b = board();
+    let cols = columns(&b);
+    let mut drag = FreeDrag::new();
+    let mut h = UiHarness::new(WIN);
+    dragging_in_dialog(&mut h, &mut drag, &cols);
+    h.input.key_down(Key::Named(NamedKey::Escape), None);
+    h.input.release(P);
+    let f = free_in_dialog(&mut h, 1030, &mut drag, &cols, false);
+    assert!(!f.first && !f.gesture.cancelled, "the key is lost");
+    assert!(
+        matches!(f.gesture.result, FreeResult::Drop { .. }),
+        "and the drop commits"
+    );
+    h.input.key_down(Key::Named(NamedKey::Escape), None);
+    let f = free_in_dialog(&mut h, 1040, &mut drag, &cols, false);
+    assert!(f.first);
 }

@@ -105,9 +105,9 @@ impl Ui<'_> {
                 if opts.wrap {
                     Bars::Disabled
                 } else {
-                    Bars::Auto
+                    Bars::Auto.unless_fits(extent.0, f64::from(viewport.w))
                 },
-                Bars::Auto,
+                Bars::Auto.unless_fits(extent.1, f64::from(viewport.h)),
             ),
             extent: Some(extent),
             ..ScrollOptions::default()

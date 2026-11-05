@@ -7,6 +7,7 @@ use lune_ui_core::input::{FrameOutput, Key, Modifiers, NamedKey, PointerButton, 
 use lune_ui_core::motion::{MotionTier, conformance};
 use lune_ui_core::paint::Rect;
 use lune_ui_core::scene::Scene;
+use lune_ui_core::shortcuts::{Binding, Chord, CommandId, Scope};
 use lune_ui_core::testing::UiHarness;
 use lune_ui_core::theme::DARK;
 use lune_ui_core::ui::{Response, Sense, Ui, WidgetId};
@@ -776,6 +777,183 @@ fn arrow_keys_do_not_scroll_and_a_child_that_takes_the_key_keeps_it() {
     let r = got.expect("ran");
     assert!(r.value.1);
     assert_eq!(r.offset.1, 0.0);
+}
+
+/// A held modifier and the same modifier on a binding's chord.
+type Held = (Modifiers, fn(Chord) -> Chord);
+
+/// The three modifiers that make a key a chord.
+fn chord_mods() -> [Held; 3] {
+    let held = |control, alt, logo| Modifiers {
+        control,
+        alt,
+        logo,
+        ..Modifiers::default()
+    };
+    [
+        (held(true, false, false), Chord::ctrl),
+        (held(false, true, false), Chord::alt),
+        (held(false, false, true), Chord::logo),
+    ]
+}
+
+/// One frame of the area; `area_off` disables the whole area, `child_off` only child A.
+fn run_off(
+    h: &mut UiHarness,
+    o: &ScrollOptions,
+    area_off: bool,
+    child_off: bool,
+) -> (ScrollResponse<()>, Vec<CommandId>) {
+    let mut got = None;
+    let (_, out) = h.frame(|ui| {
+        ui.with_enabled(!area_off, |ui| {
+            got = Some(ui.scroll_area("a", AREA, o, |ui, _| {
+                ui.with_enabled(!child_off, |ui| child(ui, a_id(), A, "a"));
+                child(ui, b_id(), B, "b");
+                ((), Extent::new(300.0, 1200.0))
+            }));
+        });
+    });
+    (got.expect("frame ran"), out.fired)
+}
+
+/// A harness whose child A holds the key focus, with a global binding on each of `keys`.
+fn focused_child(o: &ScrollOptions, keys: &[NamedKey]) -> UiHarness {
+    let mut h = hovered(tall(), o);
+    for k in keys {
+        h.shortcuts.add(Binding::new(
+            Scope::Global,
+            Chord::key(Key::Named(*k)),
+            "go",
+        ));
+    }
+    at(&mut h, 100.0);
+    tab(&mut h);
+    at(&mut h, 110.0);
+    assert!(run(&mut h, o, tall()).r.value.a.focused);
+    h
+}
+
+#[test]
+fn a_focused_child_that_is_disabled_keeps_the_page_keys_from_the_shortcuts_and_scrolls_nothing() {
+    use NamedKey::{End, Home, PageDown, PageUp};
+    let o = opts(None);
+    for k in [PageUp, PageDown, Home, End] {
+        let mut h = focused_child(&o, &[k]);
+        // Scrolled to the middle first, so a jump to either end would show.
+        h.input.scroll_pixels(0.0, -300.0);
+        at(&mut h, 200.0);
+        assert_eq!(run_off(&mut h, &o, false, false).0.offset.1, 300.0);
+        at(&mut h, 210.0);
+        run_off(&mut h, &o, false, true);
+        h.input.key_down(Key::Named(k), None);
+        at(&mut h, 220.0);
+        let (r, fired) = run_off(&mut h, &o, false, true);
+        assert!(fired.is_empty(), "{k:?} fired a binding");
+        assert_eq!(r.offset.1, 300.0, "{k:?} moved it");
+    }
+}
+
+#[test]
+fn a_disabled_focused_child_leaves_f5_and_the_page_key_chords_to_the_shortcuts() {
+    let o = opts(None);
+    let mut h = focused_child(&o, &[NamedKey::F5]);
+    at(&mut h, 210.0);
+    run_off(&mut h, &o, false, true);
+    h.input.key_down(Key::Named(NamedKey::F5), None);
+    at(&mut h, 220.0);
+    assert_eq!(run_off(&mut h, &o, false, true).1.len(), 1, "F5");
+    for (m, chord) in chord_mods() {
+        for k in [NamedKey::PageDown, NamedKey::End] {
+            let mut h = focused_child(&o, &[]);
+            h.shortcuts.add(Binding::new(
+                Scope::Global,
+                chord(Chord::key(Key::Named(k))),
+                "chord",
+            ));
+            at(&mut h, 210.0);
+            run_off(&mut h, &o, false, true);
+            h.input.set_modifiers(m);
+            h.input.key_down(Key::Named(k), None);
+            at(&mut h, 220.0);
+            let (r, fired) = run_off(&mut h, &o, false, true);
+            assert_eq!(fired.len(), 1, "{m:?} {k:?}");
+            assert_eq!(r.offset.1, 0.0);
+        }
+    }
+}
+
+#[test]
+fn nested_areas_take_a_page_key_of_a_disabled_child_once() {
+    let inner = Rect::new(AREA.x, AREA.y, 300.0, 300.0);
+    let o = opts(None);
+    let nested = |h: &mut UiHarness, child_off: bool| {
+        let mut offsets = (0.0, 0.0);
+        let (_, out) = h.frame(|ui| {
+            let outer = ui.scroll_area("a", AREA, &o, |ui, _| {
+                let i = ui.scroll_area("inner", inner, &o, |ui, _| {
+                    ui.with_enabled(!child_off, |ui| child(ui, a_id(), A, "a"));
+                    ((), Extent::new(300.0, 900.0))
+                });
+                (i.offset.1, Extent::new(300.0, 1200.0))
+            });
+            offsets = (outer.offset.1, outer.value);
+        });
+        (offsets, out.fired)
+    };
+    for child_off in [false, true] {
+        let mut h = UiHarness::new(WIN);
+        h.shortcuts.add(Binding::new(
+            Scope::Global,
+            Chord::key(Key::Named(NamedKey::PageDown)),
+            "go",
+        ));
+        nested(&mut h, false);
+        h.input.key_down(Key::Named(NamedKey::Tab), None);
+        at(&mut h, 10.0);
+        nested(&mut h, false);
+        at(&mut h, 15.0);
+        nested(&mut h, child_off);
+        h.input.key_down(Key::Named(NamedKey::PageDown), None);
+        at(&mut h, 20.0);
+        let ((outer, inner_off), fired) = nested(&mut h, child_off);
+        assert!(fired.is_empty(), "off={child_off}: consumed by the areas");
+        assert_eq!(outer, 0.0, "off={child_off}: the outer area did not scroll");
+        assert_eq!(
+            inner_off,
+            if child_off { 0.0 } else { 300.0 },
+            "off={child_off}"
+        );
+    }
+}
+
+#[test]
+fn a_real_arrow_on_a_focused_area_scrolls_nothing_and_stays_a_shortcut() {
+    use NamedKey::{ArrowDown, ArrowUp};
+    let o = opts(None);
+    for (area_off, k) in [
+        (false, ArrowUp),
+        (false, ArrowDown),
+        (true, ArrowUp),
+        (true, ArrowDown),
+    ] {
+        let mut variants = vec![(Modifiers::default(), Chord::key(Key::Named(k)))];
+        variants.extend(chord_mods().map(|(m, c)| (m, c(Chord::key(Key::Named(k))))));
+        for (m, binding) in variants {
+            let mut h = hovered(tall(), &o);
+            h.shortcuts.add(Binding::new(Scope::Global, binding, "go"));
+            // The area itself holds the key focus.
+            h.frame(|ui| ui.request_focus(area_id()));
+            at(&mut h, 100.0);
+            run_off(&mut h, &o, area_off, false);
+            h.input.set_modifiers(m);
+            h.input.key_down(Key::Named(k), None);
+            at(&mut h, 600.0);
+            let (r, fired) = run_off(&mut h, &o, area_off, false);
+            assert_eq!(r.offset.1, 0.0, "off={area_off} {m:?} {k:?} scrolled");
+            assert_eq!(fired.len(), 1, "off={area_off} {m:?} {k:?} did not fire");
+        }
+    }
 }
 
 // The node.
