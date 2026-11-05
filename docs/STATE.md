@@ -1,12 +1,12 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-05 (M7 done on `orch/toolkit-v1`, all 15 steps, review rounds 1 to 3 fixed; a pause point, M8 waits for the user)
+Last updated: 2026-11-05 (M7 merged to main at 662d310; paused, M8 waits for the user)
 
 ## Now
 
-M7 (overlays and containers) is built and closed on `orch/toolkit-v1`. Review, the final gate and the merge to main are
-the orchestrator's.
+M7 (overlays and containers) is merged to main at 662d310 (15 steps; review passed at round 5, after three fix rounds and
+one docs pass).
 
 What M7 added (DECISIONS D137 to D159; `docs/architecture.md` has the module map and "API changes since M1"):
 - Plumbing: a sixth layer `LayerId::Raised` between `Modal` and `Toast` (`LAYER_COUNT` 6), chosen once in `Ui::overlay`
@@ -43,10 +43,11 @@ Counts at the tip: gallery 61 pages, 305 scene names in `--list`; `cargo test --
 Pixel gate (`scripts/pixel-gate.sh --base a75a708`) at 8dd4e41: 231 identical, 74 new, nothing allowed. Each step passed
 it at zero delta against its own base.
 
-Bench (`cargo run --release -p gallery -- --bench`, verdict per D85 at 61 pages) at 8dd4e41: 0 of 61 over at load 5 to
-10.5, highest page p99 15.83 ms (`banner`); at 53d673e, load 1.5 to 4.3: 0 over, highest p99 12.75 ms (`dialog`).
-
-Neither was re-measured at the round 2 commit, which draws nothing new; the orchestrator's final gate re-runs both.
+Final gate at 0d8776c: 1,743 tests, 0 failed; GPU tests pass; `--list` 305; pixel gate against a75a708 231 identical, 74 new,
+nothing allowed; Windows and Linux pass. Bench (`cargo run --release -p gallery -- --bench`, verdict per D85, 61 pages, load
+2.4 to 5.0, self-test in range, spread p99 +3.80): 0 pages over, every page 0 of 5 runs over; highest page p99 12.33 ms and
+worst frame 15.54 ms, both `dialog`. An earlier run at 8dd4e41, at load 5 to 10.5 beside a review, had 12 pages over in 1 or
+2 of 5 runs, still 0 over.
 
 M6 (widgets) is merged to main at a75a708: 21 catalogue entries, roving focus, `text::elide`, the button variants
 (DECISIONS D113 to D136). Earlier: M5 (foundations, 1aeaf1b), M4 (interaction and motion, d9fe71f), M3 (catalogue specs),
@@ -103,7 +104,7 @@ no dependency). The gallery has a page registry (two legacy pages, 59 Ui pages),
 
 ## Next
 
-1. M7 is a pause point: the orchestrator runs review and the final gate, then merges. M8 waits for the user.
+1. M8 waits for the user (paused after M7). Decide first whether the disabled-keys and chord limits above are fixed before M8.
 2. CI (fmt, clippy `-D warnings`, tests on macOS, Windows and Linux) now that there is code to run.
 3. An export script for Luneterm's vendored snapshot, before Luneterm M9. The migration
    map for M11 is "API changes since M1" in `docs/architecture.md`.
