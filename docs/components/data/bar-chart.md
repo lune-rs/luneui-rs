@@ -55,7 +55,7 @@ Conflicts:
 
 ### Transitions
 
-n/a — static in the mock (Wane: "Static"); no bar-growth motion has a source. Data changes redraw without motion.
+Value transitions (D165, D5 of M8): a segment's height tweens with `Kind::Value` (fast, quad-out; Reduced and Off snap) on its share of the plot (`value / max`), so a change of a value, of `max`, empty to data and back, and a rolling window all animate the same way; a column is keyed by its index and morphs in place, nothing slides. A column new to the chart appears at its height at once. `BarChartOptions.live` snaps (the never-animate rule for high-frequency content, as the stat). No hover motion. Corrects the earlier "n/a" under D40.
 
 ### Input and focus
 
@@ -68,38 +68,37 @@ n/a — static in the mock (Wane: "Static"); no bar-growth motion has a source. 
 
 ### Retained state
 
-- Transient: the hovered column.
+- Transient: the hovered column; one tween per (column, series).
 - Persistent: none.
 - App-owned: the hourly series values (two series), the scale, the legend labels [W docs/ui/components.md:641-654].
 - Exit retention: no.
 
 ### Accessibility
 
-- Role `image` for the plot, with the summary as its name (open question: the summary text); the legend entries are `static-text` [infra.accessibility].
+- Role `image` named by `label` (fallback `luneui.bar-chart.name`) with `description`; the legend entries are `static-text` children [infra.accessibility].
 - Tooltip values: exposed through the tooltip's `tooltip` role [overlay.tooltip].
 - Live region: none.
 
 ### Strings
 
-None: axis labels and legend names are app text (the mock's hour labels and series names are not in any source).
+One toolkit key, `luneui.bar-chart.name` ("Bar chart"), the fallback name. Axis labels and legend names are app text.
 
 ### Gallery scenes
 
-- `bar-chart-data` (new): 24 hourly columns, two series, legend, settled.
-- `bar-chart-empty` (new): no data, grid and x labels only, settled.
-- `bar-chart-hover` (new): one column hovered with its tooltip, settled.
+- `bar-chart-data`: 24 hourly columns, two series, legend, settled.
+- `bar-chart-empty`: no data, grid and x labels only, settled.
+- `bar-chart-hover`: column 10 hovered with its tooltip, settled.
+- `bar-chart-value-mid`: the data retargets; captured in the middle of the tween (`Moving`).
 
 ### Painter primitives
 
-- Existing: fill (bars, grid, swatches), text (labels). [R crates/lune-ui-core/src/paint.rs:215,274]
-- New: none.
-- The chart is painter rectangles; a custom-draw hook is the alternative (Open questions).
+- Existing only: `fill` (bars, grid, swatches), `text` (labels). New: none.
 
 ### Acceptance
 
 - Behaviour (scripted input, injected time): a hover on a column opens its tooltip with the exact value; an empty chart draws no bars. None exists.
 - Pixel probes at scale 2: plot 320 px high; bar width 24 px; grid lines 2 px; y gutter 80 px.
-- Conformance: none (no motion).
+- Conformance: the `Kind::Value` row on Full, Reduced and Off (`widget_bar_chart.rs`).
 - Semantic node: `image` plot with a name; legend `static-text`.
 
 ### Build
@@ -109,11 +108,13 @@ None: axis labels and legend names are app text (the mock's hour labels and seri
 
 ## Open questions
 
-- Series colour `--data`: token to add (M4), #5C8FE6 [W docs/ui/mocks/css/tokens.css:58], [D58]; further series colours (more than two) are not in the sources.
-- The chart's summary text for the `image` name: not in the mock; open.
-- Whether bars animate on a data change: no source; open.
-- Drawn by a `render.custom-draw` hook or painter rectangles: the planner decides; the painter path is the default here.
+All answered in M8:
+- Series colour `--data`: the app passes each series' colour (`BarSeries.color`); the gallery uses `data` and `accent`. Any number of series, series 0 at the bottom.
+- The `image` name: `BarChartOptions.label` (empty falls to `luneui.bar-chart.name`) with `description` as the summary.
+- Whether bars animate: yes, see Transitions.
+- Custom-draw or painter rectangles: painter rectangles, no `CustomDraw`.
 
 ## Notes for the planner
 
-Wane priority P0 (P0 = needed by Overview, Requests or Settings). Full spec: Wane `docs/ui/components.md`, section `data.bar-chart`; mock: Wane `docs/ui/mocks/components.html`. Screens using it: components, overview. Related stub `data.pie-chart` shows the custom-draw precedent in Lunegit.
+Built in M8 (D164, D165). API: `Ui::bar_chart(key, rect, &BarChartOptions) -> BarChartResponse { hovered }`, `bar_chart::height()`. The top y label is centred on the top grid line, so it reaches 8 px above the rect. The legend sits under the x labels (Wane draws it in the panel header). Values that are negative, NaN or infinite count as 0; a stack above `max` is cut at the plot's top. The page's button retargets the data; the bench presses it.
+
