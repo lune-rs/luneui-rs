@@ -373,6 +373,27 @@ fn content_rect(r: Rect, viewport: Rect) -> Rect {
     Rect::new(r.x - viewport.x, r.y - viewport.y, r.w, r.h)
 }
 
+/// Whether `inner` lies wholly inside `outer`, both in one space.
+fn within(inner: Rect, outer: Rect) -> bool {
+    inner.x >= outer.x
+        && inner.y >= outer.y
+        && inner.right() <= outer.right()
+        && inner.bottom() <= outer.bottom()
+}
+
+/// What an area hands on to the area around it for a child at `child`: its viewport on the axes it
+/// scrolls itself. On a translated axis it cannot move (its offset there is 0), only the outer area
+/// can bring the child into view, so the child's own span goes on (a tall table that scrolls only
+/// sideways, in a document). An untranslated area's child is a region of its own, not content.
+fn handed_on(child: Rect, viewport: Rect, live: [bool; 2], translate: bool) -> Rect {
+    let span = |axis_live: bool, own: (f32, f32), child: (f32, f32)| {
+        if axis_live || !translate { own } else { child }
+    };
+    let (x, w) = span(live[0], (viewport.x, viewport.w), (child.x, child.w));
+    let (y, h) = span(live[1], (viewport.y, viewport.h), (child.y, child.h));
+    Rect::new(x, y, w, h)
+}
+
 fn clean(v: f64) -> f64 {
     if v.is_finite() && v > 0.0 { v } else { 0.0 }
 }
@@ -394,7 +415,10 @@ impl Ui<'_> {
     /// [`Self::scroll_area`] without the translation: the content places itself from
     /// [`ScrollView::offset`] (a virtual list subtracts in `f64` and casts the small result, which
     /// an `f32` translation could not do at a million rows). The clip, the input, the thumb and the
-    /// node are the same; focus reveals are the content's own business.
+    /// node are the same. A keyboard focus move to a child that shows only in part brings it into
+    /// view by the least movement, as in a translated area; a child placed over the whole viewport
+    /// (a list's own region) has nothing to reveal, and a scroll-into-view stays the content's
+    /// business.
     pub fn scroll_area_untranslated<R>(
         &mut self,
         key: impl Hash,
@@ -654,6 +678,20 @@ impl Ui<'_> {
             {
                 reveals.push((Target::rect(content_rect(r, rect)), Reveal::Nearest));
             }
+        } else if let Some((f, r)) = inside
+            && ring
+            && st.last_focus != Some(f)
+            && !within(r, rect)
+        {
+            // Drawn at the offset the content was given, in the viewport's own space.
+            let at = |start: f32, origin: f32, ax: usize| f64::from(start - origin) + pre[ax];
+            reveals.push((
+                Target {
+                    x: Some((at(r.x, rect.x, 0), f64::from(r.w))),
+                    y: Some((at(r.y, rect.y, 1), f64::from(r.h))),
+                },
+                Reveal::Nearest,
+            ));
         }
         st.last_focus = inside.map(|(f, _)| f);
         for (target, how) in reveals {
@@ -770,7 +808,10 @@ impl Ui<'_> {
             }
         });
         // A nested area hands the widgets it dealt with to the outer one as its own viewport.
-        let keep: Vec<(WidgetId, Rect)> = watched.iter().map(|(w, _)| (*w, rect)).collect();
+        let keep: Vec<(WidgetId, Rect)> = watched
+            .iter()
+            .map(|(w, r)| (*w, handed_on(*r, rect, live, translate)))
+            .collect();
         self.watch_replace(watch_mark, keep);
 
         let ran = Ran {

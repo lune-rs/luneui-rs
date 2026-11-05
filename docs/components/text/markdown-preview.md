@@ -87,7 +87,7 @@ n/a — the preview is document content: no change in it animates (a document re
 - Task box click: `task_toggle_requested(item)` to the host; a read-only host does nothing [L src/Lunegit.Desktop/Markdown/IMarkdownPreviewHost.cs:58-65]. The write-back refuses unless the source at the marker is exactly `[ ]`, `[x]` or `[X]` and matches the expected state, else it returns nothing and the host reloads [L src/Lunegit.Desktop/Markdown/MarkdownTaskToggler.cs:7-12,28-44]; that function is app code.
 - Copy button on code blocks: see `text.code-block`.
 - Keys: scrolling keys (PageUp, PageDown, Home, End) through the scroll area; select-all and copy on a focused block [layout.scroll-area], [text.text-edit]. Keyboard reach of links: none in Lunegit (they are inline runs hit-tested by position); see Open questions.
-- Tab stops: the code blocks' copy buttons and task boxes; Layer: the host's. No focus scope.
+- Tab stops: the code blocks' copy buttons, task boxes and actionable links in the blocks in view; a keyboard focus move brings its target into view (D200). Layer: the host's. No focus scope.
 
 ### Retained state
 
@@ -161,7 +161,7 @@ Answered in M9 (D12 of the plan, D197):
 Built as the entry's contract, with these notes:
 
 - The model is borrowed data (`&[MdBlock]`); the toolkit draws it and interprets none of it. A level outside 1 to 6 clamps, a picture with no size is its placeholder, an `http` or `https` image target is never drawn, even with a picture supplied.
-- The top-level blocks are the virtual rows: an estimate of 48 until built, then the measured height, and a block above the first in view that changes height moves the area by as much. A width change forgets the heights.
+- The top-level blocks are the virtual rows: an estimate of 48 until built, then the measured height, and a block above the first in view that changes height moves the area by as much. A width change keeps the heights: what is built re-measures, so the reader's place stays (D201). The block that holds the focus stays built outside the window, off the Tab order, so the Page keys keep working after they scroll it away (D200).
 - Inline code is a run padded with two U+2009 either side (in the UI face), which draws the pill's padding. The pads are left out of Copy and of the node by offset, so a U+2009 in the source survives. Underline, strike and the pill are fills from the text's row boxes. Their places (D198): the underline `(row height * 0.87).round()` below the row top, the strike `(row height * 0.6).round()`, the pill from 1 px under the row top to the row's bottom (Lunegit's zero bottom padding); a focused link's ring is `RingKind::Offset { radius: 3 }`.
 - The marker column of a list is as wide as its widest marker, so the items' text lines up (Lunegit sizes each item's own).
 - A task box is the checkbox's look at 15 px, drawn from the model with no transition of its own. Click or Space reports `task` when `tasks_live`; the box keeps the model's value until the app changes it. Off, it draws and reports nothing.

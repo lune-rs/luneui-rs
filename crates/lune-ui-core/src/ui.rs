@@ -152,6 +152,8 @@ pub struct Ui<'a> {
     /// this frame and is the key focus or an accessibility scroll-into-view target, in call order:
     /// a scroll area reads it, because the clipped hit of an off-screen child is empty.
     watch: Vec<(WidgetId, Rect)>,
+    /// The regions registered now are no Tab stops ([`Self::off_tab_order`]).
+    off_tab_order: bool,
     tree: SemanticTree,
     /// Indices in `tree` of the open containers.
     containers: Vec<usize>,
@@ -542,6 +544,7 @@ impl<'a> Ui<'a> {
             set_values: routed.set_values,
             scroll_into_view: routed.scroll_into_view,
             watch: Vec::new(),
+            off_tab_order: false,
             tree: SemanticTree::default(),
             containers: Vec::new(),
             node_meta: BTreeMap::new(),
@@ -887,6 +890,10 @@ impl<'a> Ui<'a> {
     /// Registers `rect` as a hit region of `id` on the painter's current layer and returns the
     /// frame's reading of it. The region is clipped and transformed like `Painter::hit`.
     pub fn interact(&mut self, id: WidgetId, rect: Rect, sense: Sense) -> Response {
+        let sense = Sense {
+            skip_tab: sense.skip_tab || self.off_tab_order,
+            ..sense
+        };
         let content_rect = rect;
         let index = self.painter.hits.len();
         self.painter.hit(rect, id);
@@ -936,6 +943,16 @@ impl<'a> Ui<'a> {
         if r.focused || r.scroll_into_view {
             self.watch.push((id, content_rect));
         }
+        r
+    }
+
+    /// Runs `f`; with `off` true the regions it registers are no Tab stops: what a virtualized host
+    /// builds outside its viewport can take a press or keep the focus, and Tab does not land there.
+    pub(crate) fn off_tab_order<R>(&mut self, off: bool, f: impl FnOnce(&mut Self) -> R) -> R {
+        let outer = self.off_tab_order;
+        self.off_tab_order = outer || off;
+        let r = f(self);
+        self.off_tab_order = outer;
         r
     }
 

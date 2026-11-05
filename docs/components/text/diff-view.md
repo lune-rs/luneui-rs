@@ -88,7 +88,7 @@ Rows never animate: the diff rows are virtualized, and recycled rows would tween
 
 - Pointer: click, Meta-click, Shift-click and drag as in Anatomy; the hunk action buttons take their own presses, a press that starts on a button or a scroll bar is not a row press [L src/Lunegit.Desktop/Views/SplitDiffView.axaml.cs:133-136,180-189]; wheel and trackpad scroll; right press opens the context menu [L src/Lunegit.Desktop/Views/UnifiedDiffView.axaml:57-77].
 - Keys: the copy shortcut copies the selected lines [L src/Lunegit.Desktop/Views/UnifiedDiffView.axaml:70-71]; Up and Down move the selection and PageUp and PageDown scroll, as in `layout.virtualized-list` [layout.virtualized-list].
-- Tab stops: the diff body is one stop; each visible hunk action is a stop in call order [core.focus]. Layer: the host's. Context menu: `Popup` [core.ui]. No focus scope.
+- Tab stops: the diff body is one stop; each visible hunk action is a stop in call order, a row in the list's margin is none, and a focus move brings its button into view (D200) [core.focus]. Layer: the host's. Context menu: `Popup` [core.ui]. No focus scope.
 
 ### Retained state
 
@@ -139,7 +139,7 @@ Hunk and line action labels (Lunegit: "Stage hunk", "Unstage hunk", "Stage line"
 
 ### Acceptance
 
-- Behaviour (scripted input): click selects one row; Meta-click toggles; Shift-click selects the range from the anchor; the copy shortcut puts the selected lines, in row order, in one clipboard request; in split form, a press in the other pane clears the first pane's selection [L src/Lunegit.Desktop/Views/SplitDiffView.axaml.cs:144-173].
+- Behaviour (scripted input): click selects one row; Meta-click toggles; Shift-click selects the range from the anchor; the copy shortcut puts the selected lines, in row order, in one clipboard request; in split form, a selection change in the other pane, by any input, clears the first pane's (D201) [L src/Lunegit.Desktop/Views/SplitDiffView.axaml.cs:144-173].
 - Hunk actions: a press on a hunk button reports `(hunk_index, action)` and does not select a row; with actions off the buttons are absent.
 - Preservation: replacing the lines with the same document key keeps the offset (clamped); a different key starts at the top [L src/Lunegit.Desktop/Views/SplitDiffView.axaml.cs:102-104].
 - Synced split scroll: scrolling the left pane to 120 px puts the right at 120 and does not echo [L src/Lunegit.Desktop/Views/SplitDiffView.axaml.cs:107-113].

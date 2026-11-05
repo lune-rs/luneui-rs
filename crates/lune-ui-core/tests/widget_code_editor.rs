@@ -1753,3 +1753,236 @@ fn at_scale_2_the_numbers_are_fg_faint_a_band_spans_the_view_and_the_text_is_mon
     let line = key("line 0", base());
     assert!(texts.iter().any(|t| t.key == line), "mono at font_base");
 }
+
+// A new identity, the link's catch-up, and what an edit does to the heights.
+
+fn other(identity: u64) -> CodeOptions<'static> {
+    CodeOptions {
+        identity: Some(identity),
+        ..plain()
+    }
+}
+
+#[test]
+fn a_new_identity_starts_at_the_top_with_the_caret_there_and_nothing_of_the_old_document() {
+    let mut doc = numbered(200);
+    let mut h = focused(&mut doc, &other(1));
+    with_mods(&mut h, META, Key::Named(NamedKey::End));
+    run(&mut h, &mut doc, &other(1));
+    let r = run(&mut h, &mut doc, &other(1));
+    assert!(offset(&r) > 0.0, "the instrument: it stood at the end");
+
+    doc.set_text(numbered(300).text());
+    let r = run(&mut h, &mut doc, &other(2));
+    assert_eq!(offset(&r), 0.0);
+    assert_eq!(node_text(&r.out).1, (0, 0), "the caret at the top");
+    assert_eq!(caret(&r.scene).expect("the caret shows")[1], RECT.y);
+
+    typed(&mut h, "X");
+    let r = run(&mut h, &mut doc, &other(2));
+    assert_eq!(
+        doc.line(0),
+        "Xline 0",
+        "the first key lands on the first line"
+    );
+    assert_eq!(offset(&r), 0.0, "and the view stays");
+}
+
+#[test]
+fn a_new_identity_drops_the_selection_and_the_undo() {
+    let mut doc = numbered(20);
+    let mut h = focused(&mut doc, &other(1));
+    typed(&mut h, "X");
+    run(&mut h, &mut doc, &other(1));
+    chord(&mut h, "a");
+    let r = run(&mut h, &mut doc, &other(1));
+    assert_ne!(node_text(&r.out).1, (0, 0), "the instrument: all selected");
+
+    doc.set_text("other\ndocument");
+    let r = run(&mut h, &mut doc, &other(2));
+    assert_eq!(node_text(&r.out).1, (0, 0));
+    assert!(fills(&r.scene, DARK.text_selection).is_empty());
+    chord(&mut h, "z");
+    run(&mut h, &mut doc, &other(2));
+    assert_eq!(
+        doc.text(),
+        "other\ndocument",
+        "the undo stayed with the old one"
+    );
+}
+
+#[test]
+fn a_new_identity_ends_a_composition_and_drops_a_pending_paste() {
+    let mut doc = numbered(20);
+    let mut h = focused(&mut doc, &other(1));
+    preedit(&mut h, "かな", Some((0, 0)));
+    let r = run(&mut h, &mut doc, &other(1));
+    assert!(!underlines(&r.scene, 1.0).is_empty(), "the instrument");
+
+    let r = run(&mut h, &mut doc, &other(2));
+    assert!(underlines(&r.scene, 1.0).is_empty(), "it ended");
+    typed(&mut h, "a");
+    run(&mut h, &mut doc, &other(2));
+    assert_eq!(doc.line(0), "aline 0", "the view takes keys again");
+
+    chord(&mut h, "v");
+    let r = run(&mut h, &mut doc, &other(2));
+    assert_eq!(r.out.clipboard, vec![ClipboardRequest::Read]);
+    let r = run(&mut h, &mut doc, &other(3));
+    assert!(r.out.clipboard.is_empty());
+    h.input.clipboard_text("stale");
+    run(&mut h, &mut doc, &other(3));
+    assert_eq!(doc.line(0), "aline 0", "the answer was the old document's");
+}
+
+#[test]
+fn the_same_identity_keeps_the_caret() {
+    let mut doc = numbered(20);
+    let mut h = focused(&mut doc, &other(1));
+    press(&mut h, NamedKey::ArrowDown);
+    let r = run(&mut h, &mut doc, &other(1));
+    let at = node_text(&r.out).1;
+    assert_ne!(at, (0, 0));
+    assert_eq!(node_text(&run(&mut h, &mut doc, &other(1)).out).1, at);
+}
+
+#[test]
+fn a_pane_alone_on_a_new_identity_takes_its_group_to_the_top() {
+    let (mut a, mut b) = (numbered(100), numbered(100));
+    let synced = |identity| CodeOptions {
+        scroll_group: Some("g"),
+        identity: Some(identity),
+        ..read_only()
+    };
+    let mut h = UiHarness::new(WIN);
+    let mut two = |h: &mut UiHarness, second: u64| {
+        let mut out = (0.0, 0.0);
+        h.frame(|ui| {
+            out.0 = ui.code_editor("a", A, &mut a, &synced(1)).offset.1;
+            out.1 = ui.code_editor("b", B, &mut b, &synced(second)).offset.1;
+        });
+        out
+    };
+    two(&mut h, 1);
+    h.input.pointer_to(50.0, 50.0).scroll_pixels(0.0, -300.0);
+    assert_eq!(two(&mut h, 1), (300.0, 300.0));
+    assert_eq!(two(&mut h, 2).1, 0.0);
+    assert_eq!(
+        two(&mut h, 2),
+        (0.0, 0.0),
+        "the group followed the new document"
+    );
+}
+
+#[test]
+fn a_line_wheel_on_the_second_pane_rests_with_both_panes_equal() {
+    let (mut a, mut b) = (numbered(100), numbered(100));
+    let synced = CodeOptions {
+        scroll_group: Some("g"),
+        ..read_only()
+    };
+    let mut h = UiHarness::new(WIN);
+    let mut two = |h: &mut UiHarness| {
+        let mut seen = (0.0, 0.0);
+        let (_, out) = h.frame(|ui| {
+            seen.0 = ui.code_editor("a", A, &mut a, &synced).offset.1;
+            seen.1 = ui.code_editor("b", B, &mut b, &synced).offset.1;
+        });
+        (seen, out.repaint)
+    };
+    two(&mut h);
+    h.input.pointer_to(170.0, 50.0).scroll_lines(0.0, -3.0);
+    let mut ms = 0;
+    for _ in 0..200 {
+        ms += 16;
+        h.at_ms(ms);
+        let (seen, repaint) = two(&mut h);
+        if repaint == Repaint::Idle {
+            assert!(seen.1 > 0.0, "the wheel moved it");
+            assert_eq!(seen.0, seen.1, "the panes rest equal");
+            return;
+        }
+    }
+    panic!("the page did not settle");
+}
+
+#[test]
+fn a_short_pane_clamped_by_a_pull_does_not_publish_its_clamped_value() {
+    let (mut long, mut short) = (numbered(100), numbered(12));
+    let synced = CodeOptions {
+        scroll_group: Some("g"),
+        ..read_only()
+    };
+    let mut h = UiHarness::new(WIN);
+    let mut two = |h: &mut UiHarness| {
+        let mut seen = (0.0, 0.0);
+        h.frame(|ui| {
+            seen.0 = ui.code_editor("a", A, &mut long, &synced).offset.1;
+            seen.1 = ui.code_editor("b", B, &mut short, &synced).offset.1;
+        });
+        seen
+    };
+    two(&mut h);
+    h.input.pointer_to(50.0, 50.0).scroll_pixels(0.0, -500.0);
+    assert_eq!(two(&mut h).0, 500.0);
+    assert_eq!(
+        two(&mut h),
+        (500.0, 40.0),
+        "the short pane stops at its end"
+    );
+    assert_eq!(two(&mut h), (500.0, 40.0));
+    assert_eq!(two(&mut h), (500.0, 40.0), "and the long one stays");
+}
+
+#[test]
+fn enter_on_the_last_line_shows_the_new_line_in_the_same_frame() {
+    let mut doc = numbered(30);
+    let mut h = focused(&mut doc, &plain());
+    with_mods(&mut h, META, Key::Named(NamedKey::End));
+    run(&mut h, &mut doc, &plain());
+    let before = offset(&run(&mut h, &mut doc, &plain()));
+    assert!(before > 0.0, "the instrument: the view is full");
+    press(&mut h, NamedKey::Enter);
+    let r = run(&mut h, &mut doc, &plain());
+    assert_eq!(offset(&r), before + f64::from(LINE));
+}
+
+#[test]
+fn a_set_value_draws_the_new_document_in_its_frame() {
+    let action = |text: &str| AccessAction {
+        target: id(),
+        action: Action::SetValue,
+        value: Some(AccessValue::Text(text.to_owned())),
+    };
+    // Shorter than where the view stands: its last lines draw, not an empty window.
+    let mut doc = numbered(200);
+    let mut h = focused(&mut doc, &plain());
+    with_mods(&mut h, META, Key::Named(NamedKey::End));
+    run(&mut h, &mut doc, &plain());
+    run(&mut h, &mut doc, &plain());
+    h.input.access(action("a\nb"));
+    let r = run(&mut h, &mut doc, &plain());
+    assert!(node_text(&r.out).0.contains('b'), "{:?}", node_text(&r.out));
+
+    // Longer than the document was, wrapped: the new lines take their place at once.
+    let text = vec!["w".repeat(150); 40].join("\n");
+    let mut doc = numbered(2);
+    let mut h = focused(&mut doc, &wrapped());
+    h.input.access(action(&text));
+    let r = run(&mut h, &mut doc, &wrapped());
+    assert!(
+        node_text(&r.out).0.lines().count() > 2,
+        "{:?}",
+        node_text(&r.out)
+    );
+}
+
+#[test]
+fn a_selection_ending_on_a_line_end_draws_no_sliver_there() {
+    let mut doc = CodeDoc::new("abc\ndef");
+    let mut h = focused(&mut doc, &plain());
+    with_mods(&mut h, SHIFT, Key::Named(NamedKey::End));
+    let r = run(&mut h, &mut doc, &plain());
+    let f = fills(&r.scene, DARK.text_selection);
+    assert_eq!(f.len(), 1, "the text and nothing past it: {f:?}");
+}

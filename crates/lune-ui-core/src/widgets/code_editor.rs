@@ -822,11 +822,15 @@ impl Ui<'_> {
         let advance = self.painter().measure(&Spec::plain("0", style)).0;
 
         let mut mem = std::mem::take(self.persistent::<CodeMem>(id));
+        // Another document: nothing of the last one carries over, a composition and a pending
+        // paste included. The offset it left is what a linked pane has to hear about.
+        let mut left_at = None;
         if mem.identity != opts.identity {
             mem = CodeMem {
                 identity: opts.identity,
                 ..CodeMem::default()
             };
+            left_at = Some(std::mem::take(self.persistent::<EditState>(id)).offset.1);
         }
         let number_width = digits(doc.line_count());
         let cols = Columns::of(opts, advance, doc.line_count());
@@ -1017,10 +1021,6 @@ impl Ui<'_> {
         if opts.read_only {
             st.reveal = false;
         }
-        // A far line's top was an estimate: the lines drawn around it may have moved it.
-        if reveal && host.tops.relaid {
-            st.reveal = true;
-        }
         if st.reveal || host.tops.relaid {
             self.request_catch_up();
         }
@@ -1040,7 +1040,7 @@ impl Ui<'_> {
         if let Some(g) = group
             && pulled == 0.0
         {
-            self.scroll_link_push(g, drawn.1, out.offset.1);
+            self.scroll_link_push(g, left_at.unwrap_or(drawn.1), out.offset.1);
         }
 
         let (now_focused, ring) = self.focus_state();

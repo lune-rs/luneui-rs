@@ -22,7 +22,7 @@ use super::text_lines::range_boxes;
 use crate::access::{AccessValue, Action, Node, Role, State, TextValue, Value};
 use crate::color::{Rgba, premul};
 use crate::icon;
-use crate::input::{CursorIcon, FocusEvent, ImeEvent};
+use crate::input::{CursorIcon, FocusEvent, ImeEvent, Key, Modifiers, NamedKey};
 use crate::motion::{Kind, Lerp, Motion};
 use crate::paint::{Painter, Rect};
 use crate::text::{CaretPos, Font, LineSpan, Spec, Style, TextSystem, Unit};
@@ -259,6 +259,9 @@ pub(super) struct EditConfig<'a> {
     pub(super) wrap: Option<f32>,
     /// How many lines a page motion crosses.
     pub(super) page_rows: usize,
+    /// Plain Page keys, Home and End are the scroll area's: text in a document has no caret to
+    /// show, so they page the document. With Shift they still extend the selection.
+    pub(super) page_keys_scroll: bool,
     /// The runs the text is drawn from when it is the joined text of this spec: a read-only rich
     /// text, selected by position (D11). Any other text takes one run of `style`.
     pub(super) rich: Option<&'a Spec>,
@@ -441,6 +444,12 @@ pub(super) trait EditHost {
     fn masked(&self) -> bool {
         false
     }
+
+    /// Whether `event` is left to the scroll area around the text, whatever the engine would make
+    /// of it.
+    fn leaves(&self, _event: &FocusEvent) -> bool {
+        false
+    }
 }
 
 /// The host of a `String`: [`begin_edit`] and [`edit_pointer`] run on it.
@@ -470,6 +479,23 @@ impl EditHost for TextHost<'_, '_> {
 
     fn masked(&self) -> bool {
         self.cfg.password
+    }
+
+    fn leaves(&self, event: &FocusEvent) -> bool {
+        let FocusEvent::Key {
+            key: Key::Named(key),
+            modifiers,
+            ..
+        } = event
+        else {
+            return false;
+        };
+        self.cfg.page_keys_scroll
+            && *modifiers == Modifiers::default()
+            && matches!(
+                key,
+                NamedKey::PageUp | NamedKey::PageDown | NamedKey::Home | NamedKey::End
+            )
     }
 }
 
@@ -566,6 +592,9 @@ fn run_events(
                 continue;
             }
             _ => {}
+        }
+        if host.leaves(event) {
+            continue;
         }
         let flags = st.edit.flags();
         let cmd = EditCommand::from_event(event, keymap, flags)
@@ -1024,6 +1053,7 @@ impl Ui<'_> {
             max_chars: opts.max_chars,
             wrap: None,
             page_rows: 1,
+            page_keys_scroll: false,
             rich: None,
         };
         let mut r = self.interact(id, rect, EDIT_SENSE);

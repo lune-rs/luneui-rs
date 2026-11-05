@@ -460,7 +460,7 @@ impl Ui<'_> {
                 self.clipboard_write(text);
             }
             changed |= list.response.changed;
-            if list.pressed && rows.is_some() {
+            if list.response.changed {
                 changed |= self.clear_other_pane(side);
             }
             response.get_or_insert(list.response);
@@ -484,8 +484,9 @@ impl Ui<'_> {
         }
     }
 
-    /// A press in `side` empties the other pane's selection; whether that changed it. When the other
-    /// pane drew before this one, it drew the old selection: a frame is asked.
+    /// A selection change in `side`, by any input, empties the other pane's: only one pane holds a
+    /// selection. Whether that changed it. When the other pane drew before this one, it drew the
+    /// old selection: a frame is asked.
     fn clear_other_pane(&mut self, side: Side) -> bool {
         let other = match side {
             Side::Left => Side::Right,

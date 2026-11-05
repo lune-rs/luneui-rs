@@ -1351,3 +1351,320 @@ fn a_rich_document_at_rest_reports_idle() {
     let r = at(&mut h, 1_000, &blocks, &live());
     assert_eq!(r.out.repaint, Repaint::Idle);
 }
+
+// ---- focus, the page keys and a width change on a long document ------------------------
+
+/// Tab, then frames until the document rests; the focused node's box, and the node's id.
+fn tab_to(h: &mut UiHarness, blocks: &[MdBlock<'_>], ms: &mut u64) -> (WidgetId, Rect) {
+    press(h, NamedKey::Tab);
+    let mut r = run(h, blocks, &live());
+    for _ in 0..30 {
+        *ms += 400;
+        r = at(h, *ms, blocks, &live());
+        if r.out.repaint == Repaint::Idle {
+            break;
+        }
+    }
+    let id = r.out.focused.expect("a stop");
+    (
+        id,
+        r.out.tree.get(id).expect("the focused node drew").bounds,
+    )
+}
+
+/// Tabs `n` times: every stop lands wholly in the view, and they are `stops` different ones.
+fn walk(blocks: &[MdBlock<'_>], n: usize, stops: usize) {
+    let mut h = drawn(blocks, &live());
+    let mut ms = 0;
+    let mut seen = Vec::new();
+    for i in 0..n {
+        let (id, b) = tab_to(&mut h, blocks, &mut ms);
+        assert!(
+            b.y >= RECT.y && b.bottom() <= RECT.bottom(),
+            "stop {i} at {b:?}"
+        );
+        if !seen.contains(&id) {
+            seen.push(id);
+        }
+    }
+    assert!(seen.len() >= stops, "{} stops", seen.len());
+}
+
+#[test]
+fn tab_brings_each_link_of_a_long_list_into_view() {
+    let urls: Vec<String> = (0..60).map(|i| format!("https://x.dev/{i}")).collect();
+    let inlines: Vec<[MdInline<'_>; 1]> = urls.iter().map(|u| [link("go", u)]).collect();
+    let paras: Vec<[MdBlock<'_>; 1]> = inlines.iter().map(|i| [MdBlock::Paragraph(i)]).collect();
+    let items: Vec<MdItem<'_>> = paras
+        .iter()
+        .map(|p| MdItem {
+            marker: "-",
+            blocks: p,
+            task: None,
+        })
+        .collect();
+    walk(&[MdBlock::List { items: &items }], 40, 40);
+}
+
+#[test]
+fn tab_brings_each_task_box_into_view() {
+    let text = [t("ship it")];
+    let para = [MdBlock::Paragraph(&text)];
+    let items: Vec<MdItem<'_>> = (0..40)
+        .map(|id| MdItem {
+            marker: "-",
+            blocks: &para,
+            task: Some(MdTask { checked: false, id }),
+        })
+        .collect();
+    walk(&[MdBlock::List { items: &items }], 30, 30);
+}
+
+#[test]
+fn tab_brings_a_link_in_a_tall_table_into_view_though_the_table_scrolls_only_sideways() {
+    let inlines = [link("go", "https://x.dev")];
+    let cell: [&[MdInline<'_>]; 1] = [&inlines];
+    let rows: Vec<MdRow<'_>> = (0..40)
+        .map(|_| MdRow {
+            header: false,
+            cells: &cell,
+        })
+        .collect();
+    let blocks = [MdBlock::Table {
+        rows: &rows,
+        align: &[],
+    }];
+    walk(&blocks, 30, 30);
+}
+
+#[test]
+fn tab_brings_a_code_blocks_copy_button_into_view() {
+    // Ten paragraphs of 28 from a margin of 12: the block starts 8 px above the view's end.
+    let text = [t("para")];
+    let mut blocks: Vec<MdBlock<'_>> = vec![MdBlock::Paragraph(&text); 10];
+    blocks.push(MdBlock::Code {
+        text: "let a = 1;\nlet b = 2;\nlet c = 3;",
+        spans: &[],
+    });
+    let mut h = drawn(&blocks, &live());
+    let mut ms = 0;
+    let (_, b) = tab_to(&mut h, &blocks, &mut ms);
+    assert!(b.y >= RECT.y && b.bottom() <= RECT.bottom(), "{b:?}");
+}
+
+#[test]
+fn a_focused_link_scrolled_out_of_the_window_keeps_the_focus_and_is_no_stop() {
+    let urls: Vec<String> = (0..80).map(|i| format!("https://x.dev/{i}")).collect();
+    // Two links a paragraph: the second must not be a stop while its block is out of the window.
+    let items: Vec<[MdInline<'_>; 3]> = urls
+        .iter()
+        .map(|u| [link("go", u), t(" and "), link("on", u)])
+        .collect();
+    let blocks: Vec<MdBlock<'_>> = items.iter().map(|i| MdBlock::Paragraph(i)).collect();
+    let mut h = drawn(&blocks, &live());
+    let mut ms = 0;
+    let (id, _) = tab_to(&mut h, &blocks, &mut ms);
+
+    // Away, far past the window: the block stays built, off the view.
+    h.input.pointer_to(100.0, 100.0).scroll_pixels(0.0, -600.0);
+    run(&mut h, &blocks, &live());
+    let r = run(&mut h, &blocks, &live());
+    assert_eq!(r.out.focused, Some(id));
+    let b = r
+        .out
+        .tree
+        .get(id)
+        .expect("the focused link stays built")
+        .bounds;
+    assert!(b.bottom() < RECT.y, "{b:?}");
+
+    // Nearly back: the wheel's place stands, no reveal takes it over.
+    h.input.scroll_pixels(0.0, 4.0);
+    run(&mut h, &blocks, &live());
+    ms += 2_000;
+    let moved = at(&mut h, ms, &blocks, &live());
+    let c = moved.out.tree.get(id).expect("built").bounds;
+    assert_eq!(c.y, b.y + 4.0);
+
+    // The next stop is in the view, not the block that was left behind.
+    let (next, n) = tab_to(&mut h, &blocks, &mut ms);
+    assert!(n.y >= RECT.y && n.bottom() <= RECT.bottom(), "{n:?}");
+    let r = run(&mut h, &blocks, &live());
+    let node = r.out.tree.get(next).expect("drew");
+    assert_ne!(node.description.as_deref(), Some(urls[0].as_str()));
+}
+
+/// The y of "para 0"'s text.
+fn top_of(h: &mut UiHarness, blocks: &[MdBlock<'_>], ms: u64) -> Option<f32> {
+    run(h, blocks, &live());
+    text_at(&at(h, ms, blocks, &live()).scene, body("para 0")).map(|p| p.1)
+}
+
+/// A press at `on`, then the Page keys, Home and End: each moves the document.
+fn page_keys_walk(blocks: &[MdBlock<'_>], on: (f32, f32)) {
+    let mut h = drawn(blocks, &live());
+    let home = top_of(&mut h, blocks, 100);
+    assert!(home.is_some(), "the instrument sees the first paragraph");
+    h.input.pointer_to(on.0, on.1).click(P);
+    run(&mut h, blocks, &live());
+    let focused = run(&mut h, blocks, &live()).out.focused;
+    assert!(focused.is_some(), "the press focused the text");
+
+    press(&mut h, NamedKey::PageDown);
+    let paged = top_of(&mut h, blocks, 2_000);
+    assert!(paged.is_none_or(|y| y < RECT.y), "PageDown moved past it");
+    press(&mut h, NamedKey::Home);
+    assert_eq!(top_of(&mut h, blocks, 4_000), home, "Home is the top");
+    press(&mut h, NamedKey::End);
+    run(&mut h, blocks, &live());
+    let last = text_at(&at(&mut h, 6_000, blocks, &live()).scene, body("para 79"));
+    assert!(last.is_some(), "End is the bottom");
+    press(&mut h, NamedKey::PageUp);
+    run(&mut h, blocks, &live());
+    let moved = text_at(&at(&mut h, 8_000, blocks, &live()).scene, body("para 79"));
+    assert_ne!(moved, last, "PageUp moved");
+}
+
+#[test]
+fn the_page_keys_scroll_the_document_around_a_focused_paragraph_heading_and_html_block() {
+    let texts: Vec<String> = (0..80).map(|i| format!("para {i}")).collect();
+    let items: Vec<[MdInline<'_>; 1]> = texts.iter().map(|s| [t(s)]).collect();
+    let paras = || items.iter().map(|i| MdBlock::Paragraph(i));
+
+    // A press on the first paragraph's text.
+    let on = (X + 5.0, RECT.y + MARGIN + 8.0);
+    page_keys_walk(&paras().collect::<Vec<_>>(), on);
+
+    let title = [t("Title")];
+    let mut blocks = vec![MdBlock::Heading {
+        level: 1,
+        inlines: &title,
+    }];
+    blocks.extend(paras());
+    page_keys_walk(&blocks, on);
+
+    let mut blocks = vec![MdBlock::Html("<b>raw</b>")];
+    blocks.extend(paras());
+    page_keys_walk(&blocks, (X + 14.0, RECT.y + MARGIN + 14.0));
+}
+
+#[test]
+fn the_page_keys_reach_the_document_from_a_text_cell_of_a_table_that_fits() {
+    let texts: Vec<String> = (0..80).map(|i| format!("para {i}")).collect();
+    let items: Vec<[MdInline<'_>; 1]> = texts.iter().map(|s| [t(s)]).collect();
+    let word = [t("cell")];
+    let cell: [&[MdInline<'_>]; 1] = [&word];
+    let rows = [MdRow {
+        header: false,
+        cells: &cell,
+    }];
+    let mut blocks = vec![MdBlock::Table {
+        rows: &rows,
+        align: &[],
+    }];
+    blocks.extend(items.iter().map(|i| MdBlock::Paragraph(i)));
+    let on = (X + 16.0, RECT.y + MARGIN + 14.0);
+    page_keys_walk(&blocks, on);
+}
+
+#[test]
+fn shift_with_the_page_keys_still_extends_the_selection_and_a_chord_stays_the_engines() {
+    let text = [t("para zero")];
+    let more = [t("next")];
+    let mut blocks = vec![MdBlock::Paragraph(&text)];
+    blocks.extend((0..60).map(|_| MdBlock::Paragraph(&more)));
+    let mut h = drawn(&blocks, &live());
+    h.input.pointer_to(X + 2.0, RECT.y + MARGIN + 8.0).click(P);
+    run(&mut h, &blocks, &live());
+    let shift = Modifiers {
+        shift: true,
+        ..Modifiers::default()
+    };
+    h.input.set_modifiers(shift);
+    h.input.key_down(Key::Named(NamedKey::End), None);
+    h.input.set_modifiers(Modifiers::default());
+    let r = run(&mut h, &blocks, &live());
+    let id = r.out.focused.expect("focused");
+    let node = r.out.tree.get(id).expect("the paragraph");
+    let (a, b) = node.text.as_ref().expect("text").selection;
+    assert!(b > a, "Shift+End selected: {a}..{b}");
+    let h0 = text_at(&r.scene, body("para zero"));
+    assert!(h0.is_some(), "and nothing scrolled");
+}
+
+/// The first text node in view of `out`: its name and top.
+fn top_node(out: &FrameOutput) -> (String, f32) {
+    let n = nodes(out, Role::StaticText)
+        .into_iter()
+        .find(|n| n.bounds.bottom() > RECT.y)
+        .expect("a text in view");
+    (n.name.clone(), n.bounds.y)
+}
+
+fn long_paras(n: usize) -> Vec<String> {
+    (0..n)
+        .map(|i| format!("para{i} {}", "word ".repeat(120)))
+        .collect()
+}
+
+#[test]
+fn a_width_change_keeps_the_readers_place() {
+    let texts = long_paras(200);
+    let items: Vec<[MdInline<'_>; 1]> = texts.iter().map(|s| [t(s)]).collect();
+    let blocks: Vec<MdBlock<'_>> = items.iter().map(|i| MdBlock::Paragraph(i)).collect();
+    let shown = |h: &mut UiHarness, w: f32| {
+        let mut out = None;
+        let rect = Rect { w, ..RECT };
+        for _ in 0..3 {
+            let (_, o) = h.frame(|ui| {
+                ui.markdown("m", rect, &blocks, &live());
+            });
+            out = Some(o);
+        }
+        top_node(&out.expect("ran"))
+    };
+    let mut h = UiHarness::new(WIN);
+    shown(&mut h, RECT.w);
+    h.input
+        .pointer_to(100.0, 100.0)
+        .scroll_pixels(0.0, -9_000.0);
+    let place = shown(&mut h, RECT.w);
+    assert_ne!(place.0, texts[0], "it scrolled");
+    for step in 1..=4 {
+        let now = shown(&mut h, RECT.w + 30.0 * step as f32);
+        assert_eq!(now, place, "after {step} width changes");
+    }
+}
+
+#[test]
+fn a_block_measured_above_the_window_shifts_the_area_so_what_shows_stays() {
+    let texts = long_paras(300);
+    let items: Vec<[MdInline<'_>; 1]> = texts.iter().map(|s| [t(s)]).collect();
+    let blocks: Vec<MdBlock<'_>> = items.iter().map(|i| MdBlock::Paragraph(i)).collect();
+    let mut h = drawn(&blocks, &live());
+    // Far down on estimates: going up, each block measures taller than its estimate.
+    h.input
+        .pointer_to(100.0, 100.0)
+        .scroll_pixels(0.0, -6_000.0);
+    run(&mut h, &blocks, &live());
+    run(&mut h, &blocks, &live());
+    let mut last = run(&mut h, &blocks, &live()).out;
+    let mut grown = false;
+    for _ in 0..60 {
+        h.input.scroll_pixels(0.0, 5.0);
+        run(&mut h, &blocks, &live());
+        let now = run(&mut h, &blocks, &live()).out;
+        for n in nodes(&now, Role::StaticText) {
+            if let Some(was) = nodes(&last, Role::StaticText)
+                .into_iter()
+                .find(|w| w.name == n.name)
+            {
+                assert_eq!(n.bounds.y, was.bounds.y + 5.0, "{:.8}", n.name);
+            } else {
+                grown = true;
+            }
+        }
+        last = now;
+    }
+    assert!(grown, "new blocks came into view");
+}

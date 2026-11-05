@@ -81,7 +81,8 @@ impl Ui<'_> {
         let ink = t.text_selection;
 
         if positioned {
-            self.selectable_positional(id, hit, &r, rect, spec, full, name, &[], focused, held);
+            let held = (focused, held);
+            self.selectable_positional(id, hit, &r, rect, spec, full, name, &[], held, false);
         } else {
             let mut selected = self.persistent::<WholeSelection>(id).0 && held;
             if r.press_started {
@@ -144,7 +145,8 @@ impl Ui<'_> {
     /// chars `pads` (sorted, apart) are padding the drawing needs and the text does not hold: a
     /// copy writes the selection without them and the node's name, value and selection leave
     /// them out, by offsets, so a char equal to a pad's outside the pads stays. The node is a
-    /// `StaticText`.
+    /// `StaticText`. It lives in a document: the plain Page keys, Home and End scroll that, and
+    /// with Shift they extend the selection.
     pub(super) fn selectable_padded(
         &mut self,
         key: impl Hash,
@@ -167,14 +169,17 @@ impl Ui<'_> {
         if spec.runs.is_empty() {
             return r;
         }
-        self.selectable_positional(id, hit, &r, rect, spec, &full, &name, pads, r.focused, held);
+        let held = (r.focused, held);
+        self.selectable_positional(id, hit, &r, rect, spec, &full, &name, pads, held, true);
         if r.hovered || r.pressed {
             self.set_cursor(CursorIcon::Text);
         }
         r
     }
 
-    /// The positional case: the engine over `full`, which is the spec's joined text.
+    /// The positional case: the engine over `full`, which is the spec's joined text. `focus` is
+    /// whether it is focused and enabled, and whether it holds the key focus; with `in_document`,
+    /// the plain Page keys, Home and End go to the scroll area around it.
     #[allow(clippy::too_many_arguments)]
     fn selectable_positional(
         &mut self,
@@ -186,8 +191,8 @@ impl Ui<'_> {
         full: &str,
         name: &str,
         pads: &[Range<usize>],
-        focused: bool,
-        held: bool,
+        (focused, held): (bool, bool),
+        in_document: bool,
     ) {
         let ink = self.theme().text_selection;
         let cfg = EditConfig {
@@ -198,6 +203,7 @@ impl Ui<'_> {
             max_chars: None,
             wrap: spec.wrap,
             page_rows: 1,
+            page_keys_scroll: in_document,
             rich: Some(spec),
         };
         let before = self.pending_clipboard().map(str::to_owned);

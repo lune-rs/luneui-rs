@@ -989,13 +989,30 @@ fn table(
     )
 }
 
+/// [`block`], and whether the focus is on something in it.
+fn focus_block(
+    ui: &mut Ui<'_>,
+    cx: &mut Cx,
+    id: WidgetId,
+    b: &MdBlock<'_>,
+    at: (f32, f32),
+    w: f32,
+) -> (f32, bool) {
+    let mark = ui.watch_mark();
+    let h = block(ui, cx, id, b, at, w);
+    let focused = ui.focus_state().0;
+    let holds = focused.is_some_and(|f| ui.watched_since(mark).iter().any(|(w, _)| *w == f));
+    (h, holds)
+}
+
 /// What a document keeps.
 #[derive(Debug, Default)]
 struct MdMem {
     heights: RowHeights,
     identity: Option<u64>,
-    /// The width the heights were measured at.
-    width: u32,
+    /// The block that holds the focus: it stays built when it leaves the window, or its child
+    /// would lose the focus, and the Page keys with it.
+    held: Option<usize>,
 }
 
 /// Heights changing while a frame measures them.
@@ -1039,11 +1056,10 @@ impl Ui<'_> {
         let usable = |v: f32| if v.is_finite() { v.max(0.0) } else { 0.0 };
         let vp = Rect::new(rect.x, rect.y, usable(rect.w), usable(rect.h));
         let mut mem = std::mem::take(self.persistent::<MdMem>(id));
-        let width = vp.w.to_bits();
-        if mem.identity != opts.identity || mem.width != width {
+        // A new width keeps the heights, so the reader's place stays: what is built re-measures.
+        if mem.identity != opts.identity {
             mem = MdMem {
                 identity: opts.identity,
-                width,
                 ..MdMem::default()
             };
         }
@@ -1077,27 +1093,55 @@ impl Ui<'_> {
         let out = self.node_container(doc, |ui| {
             ui.scroll_area_untranslated(AREA, vp, &scroll, |ui, view| {
                 let offset = view.offset.1;
-                let heights = &mut mem.heights;
+                let MdMem {
+                    heights,
+                    held: keep,
+                    ..
+                } = &mut mem;
                 let near = (offset - f64::from(MARGIN)).max(0.0);
                 let first = heights.row_at(near);
                 let bottom = offset + f64::from(vp.h);
                 let mut top = f64::from(MARGIN) + heights.top(first);
                 let mut i = first;
+                let kept = keep.take().filter(|k| *k < blocks.len());
+                let mut held = None;
+                let at = |heights: &RowHeights, k: usize| {
+                    let y = f64::from(MARGIN) + heights.top(k) - offset;
+                    (vp.x + MARGIN, vp.y + y as f32)
+                };
                 ui.painter().push_clip(vp);
+                // Outside the window it is no stop, and it keeps its place in the Tab order.
+                if let Some(k) = kept.filter(|k| *k < first) {
+                    let spot = at(heights, k);
+                    let b = &blocks[k];
+                    let (h, holds) = ui.off_tab_order(true, |ui| {
+                        focus_block(ui, &mut cx, id.with(k), b, spot, content_w)
+                    });
+                    tops.note(heights, k, first, h);
+                    held = holds.then_some(k);
+                }
                 while i < blocks.len() && top < bottom {
                     let y = vp.y + (top - offset) as f32;
-                    let h = block(
-                        ui,
-                        &mut cx,
-                        id.with(i),
-                        &blocks[i],
-                        (vp.x + MARGIN, y),
-                        content_w,
-                    );
+                    let spot = (vp.x + MARGIN, y);
+                    let (h, holds) =
+                        focus_block(ui, &mut cx, id.with(i), &blocks[i], spot, content_w);
                     tops.note(heights, i, first, h);
+                    if holds {
+                        held = Some(i);
+                    }
                     top += heights.height(i);
                     i += 1;
                 }
+                if let Some(k) = kept.filter(|k| *k >= i) {
+                    let spot = at(heights, k);
+                    let b = &blocks[k];
+                    let (h, holds) = ui.off_tab_order(true, |ui| {
+                        focus_block(ui, &mut cx, id.with(k), b, spot, content_w)
+                    });
+                    tops.note(heights, k, first, h);
+                    held = held.or(holds.then_some(k));
+                }
+                *keep = held;
                 ui.painter().pop_clip();
                 // The blocks just outside are measured and not drawn, so one that comes into view
                 // from above has shifted the area already.

@@ -1,6 +1,6 @@
 //! The diff view (`text.diff-view` acceptance, D15 and D16): the pairing, the rows and their colours,
 //! selection, keys and copy through the list frame in unified and in each split pane, the clear on a
-//! press in the other pane, hunk actions, the linked scroll, wrap and the horizontal offset,
+//! change in the other pane, hunk actions, the linked scroll, wrap and the horizontal offset,
 //! preservation by identity, marks, scale, the tree, the look at scale 2, and motion.
 
 use lune_ui_core::access::{AccessAction, Action, Role, SemanticTree, State};
@@ -1577,4 +1577,188 @@ fn spans_colour_runs_of_a_line() {
         wrap: None,
     };
     assert!(find(&r.scene, &want, 1.0).is_some());
+}
+
+// Keyboard focus and the window.
+
+/// Sixty context rows with a hunk row at 10 and at 11: at offset 10 the first shows in part, and
+/// once its button is revealed the second sits in the margin below the view.
+fn hunked() -> Vec<DiffLine<'static>> {
+    let mut lines = big(60);
+    lines[10] = hunk(0, "@@ -1 +1 @@");
+    lines[11] = hunk(1, "@@ -9 +9 @@");
+    lines
+}
+
+/// Tab, then frames until the view rests; the focused node's id and box.
+fn tab(h: &mut UiHarness, lines: &[DiffLine<'_>], s: &Setup, ms: &mut u64) -> (WidgetId, Rect) {
+    h.input.key_down(Key::Named(NamedKey::Tab), None);
+    run(h, lines, s);
+    let r = settle(h, lines, s, ms);
+    let id = r.out.focused.expect("a stop");
+    (id, r.out.tree.get(id).expect("the node drew").bounds)
+}
+
+#[test]
+fn tab_brings_a_hunk_button_into_view_and_a_margin_row_is_no_stop() {
+    let lines = hunked();
+    let s = Setup {
+        actions: 1,
+        ..setup()
+    };
+    let mut h = harness();
+    run(&mut h, &lines, &s);
+    run(&mut h, &lines, &s);
+    h.input
+        .pointer_to(DIFF.x + 100.0, DIFF.y + 50.0)
+        .scroll_pixels(0.0, -10.0);
+    run(&mut h, &lines, &s);
+    let mut ms = 0;
+    settle(&mut h, &lines, &s, &mut ms);
+
+    assert_eq!(tab(&mut h, &lines, &s, &mut ms).0, pane("u"));
+    let (button, b) = tab(&mut h, &lines, &s, &mut ms);
+    assert_ne!(button, pane("u"), "the hunk row in part is a stop");
+    assert!(b.y >= DIFF.y && b.bottom() <= DIFF.bottom(), "{b:?}");
+    let (next, _) = tab(&mut h, &lines, &s, &mut ms);
+    assert_eq!(next, pane("u"), "the margin row is not");
+}
+
+#[test]
+fn tab_brings_a_hunk_button_into_view_in_each_split_pane() {
+    let lines = hunked();
+    let s = Setup {
+        actions: 1,
+        ..split()
+    };
+    let mut h = harness();
+    run(&mut h, &lines, &s);
+    run(&mut h, &lines, &s);
+    h.input
+        .pointer_to(DIFF.x + 100.0, DIFF.y + 50.0)
+        .scroll_pixels(0.0, -10.0);
+    run(&mut h, &lines, &s);
+    let mut ms = 0;
+    settle(&mut h, &lines, &s, &mut ms);
+
+    let mut stops = Vec::new();
+    for _ in 0..4 {
+        let (id, b) = tab(&mut h, &lines, &s, &mut ms);
+        if id != pane("l") && id != pane("r") {
+            assert!(b.y >= DIFF.y && b.bottom() <= DIFF.bottom(), "{b:?}");
+        }
+        stops.push(id);
+    }
+    assert_eq!(stops[0], pane("l"));
+    assert_eq!(stops[2], pane("r"));
+    assert_ne!(stops[1], stops[3], "one button in each pane");
+    assert_eq!(
+        tab(&mut h, &lines, &s, &mut ms).0,
+        pane("l"),
+        "the margin rows are no stops in either pane"
+    );
+}
+
+// One selection across the panes.
+
+fn selected_rows(r: &Run) -> Vec<WidgetId> {
+    tree_nodes(&r.out.tree, Role::Row)
+        .iter()
+        .filter(|n| n.states.contains(State::Selected))
+        .map(|n| n.id)
+        .collect()
+}
+
+#[test]
+fn a_selection_made_by_keys_clears_the_other_pane_and_the_copy_reads_the_new_one() {
+    let lines = doc();
+    let rows = pair_rows(&lines);
+    let s = split();
+    let mut h = harness();
+    show(&mut h, &lines, &rows, &s);
+    key(&mut h, NamedKey::Tab, NONE);
+    show(&mut h, &lines, &rows, &s);
+    key(&mut h, NamedKey::ArrowDown, NONE);
+    show(&mut h, &lines, &rows, &s);
+    key(&mut h, NamedKey::ArrowDown, NONE);
+    show(&mut h, &lines, &rows, &s);
+    let left = selected(&mut h, "l");
+    assert_eq!(left.len(), 1, "the instrument saw the left pane select");
+
+    key(&mut h, NamedKey::Tab, NONE);
+    show(&mut h, &lines, &rows, &s);
+    assert_eq!(selected(&mut h, "l"), left, "Tab alone clears nothing");
+    key(&mut h, NamedKey::ArrowDown, NONE);
+    let r = show(&mut h, &lines, &rows, &s);
+    assert!(r.r.changed);
+    let right = selected(&mut h, "r");
+    assert_eq!(right.len(), 1);
+    assert_eq!(selected(&mut h, "l"), Vec::<u64>::new());
+    assert_eq!(
+        r.out.repaint,
+        Repaint::Now,
+        "the left pane drew it selected"
+    );
+    let r = show(&mut h, &lines, &rows, &s);
+    assert_eq!(selected_rows(&r), [row_id("r", right[0])]);
+    let want = lines[rows[right[0] as usize].right.expect("a right half")].text;
+    assert_eq!(selected_text(), want);
+}
+
+#[test]
+fn a_default_action_on_a_row_of_one_pane_clears_the_other() {
+    let lines = doc();
+    let rows = pair_rows(&lines);
+    let s = split();
+    let mut h = harness();
+    show(&mut h, &lines, &rows, &s);
+    click(&mut h, over_pane(0, 2), NONE);
+    show(&mut h, &lines, &rows, &s);
+    assert_eq!(selected(&mut h, "l"), [2]);
+    h.input.access(AccessAction {
+        target: row_id("r", 4),
+        action: Action::Default,
+        value: None,
+    });
+    show(&mut h, &lines, &rows, &s);
+    let r = show(&mut h, &lines, &rows, &s);
+    assert_eq!(selected(&mut h, "r"), [4]);
+    assert_eq!(selected_rows(&r), [row_id("r", 4)]);
+
+    // And the other way, where the pane that cleared draws after the change.
+    h.input.access(AccessAction {
+        target: row_id("l", 1),
+        action: Action::Default,
+        value: None,
+    });
+    let r = show(&mut h, &lines, &rows, &s);
+    assert_eq!(selected_rows(&r), [row_id("l", 1)]);
+}
+
+#[test]
+fn a_new_identity_leaves_no_group_value_behind() {
+    let lines = big(100);
+    let mut s = split();
+    let mut h = harness();
+    let mut ms = 0;
+    run(&mut h, &lines, &s);
+    run(&mut h, &lines, &s);
+    let (x, y) = over_pane(1, 3);
+    h.input.pointer_to(x, y).scroll_pixels(0.0, -300.0);
+    run(&mut h, &lines, &s);
+    settle(&mut h, &lines, &s, &mut ms);
+
+    s.identity = 2;
+    run(&mut h, &lines, &s);
+    settle(&mut h, &lines, &s, &mut ms);
+    // The same value again: the old document's must not read as already taken.
+    h.input.scroll_pixels(0.0, -300.0);
+    run(&mut h, &lines, &s);
+    let r = settle(&mut h, &lines, &s, &mut ms);
+    let shown: Vec<f32> = tree_nodes(&r.out.tree, Role::Cell)
+        .iter()
+        .filter(|n| n.name == "line 15")
+        .map(|n| n.bounds.y)
+        .collect();
+    assert_eq!(shown, [DIFF.y, DIFF.y], "row 15 tops both panes");
 }

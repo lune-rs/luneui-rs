@@ -165,8 +165,6 @@ pub struct ListResponse {
     pub offset: f64,
     /// The height of all rows this frame used.
     pub extent: f64,
-    /// A row was pressed this frame (the primary button went down on it).
-    pub pressed: bool,
 }
 
 /// A list's retained selection: persistent, so it outlives the rows it names.
@@ -547,7 +545,6 @@ struct RowMem {
 #[derive(Debug, Default)]
 struct Outcome {
     changed: bool,
-    pressed: bool,
     context: Option<RowKey>,
     copy: Option<Vec<RowKey>>,
 }
@@ -610,8 +607,10 @@ impl Ui<'_> {
             key: row_key,
         };
         let mut out = Outcome::default();
+        let mut left_at = None;
         if style.identity != mem.identity {
             // Another document: nothing of the last one carries over.
+            left_at = Some(mem.offset);
             mem = ListMem {
                 identity: style.identity,
                 ..ListMem::default()
@@ -666,7 +665,8 @@ impl Ui<'_> {
         if let Some(group) = style.link
             && pulled == 0.0
         {
-            self.scroll_link_push(group, drawn_at, scroll.offset.1);
+            // A new document moved the pane from where it stood, so the group's value goes too.
+            self.scroll_link_push(group, left_at.unwrap_or(drawn_at), scroll.offset.1);
         }
 
         let mut response = scroll.value;
@@ -679,7 +679,6 @@ impl Ui<'_> {
             copy: out.copy,
             offset: scroll.offset.1,
             extent: scroll.extent.1,
-            pressed: out.pressed,
         }
     }
 
@@ -794,7 +793,6 @@ impl Ui<'_> {
             if r.press_started {
                 let primary = keymap.is_primary(r.press_modifiers);
                 out.changed |= st.press(index, r.press_modifiers, primary, rows);
-                out.pressed = true;
                 mem.press = Some(key);
                 mem.drag_end = Some(index);
                 self.request_focus(id);
@@ -910,7 +908,11 @@ impl Ui<'_> {
             } else {
                 node.states.insert(State::Disabled);
             }
-            let height = self.node_container(node, |ui| ui.scope(ctx.key, |ui| draw(ui, &ctx)));
+            // A margin row is built and clipped: nothing on it is a Tab stop.
+            let hidden = ctx.rect.bottom() <= rect.y || ctx.rect.y >= rect.bottom();
+            let height = self.off_tab_order(hidden, |ui| {
+                ui.node_container(node, |ui| ui.scope(ctx.key, |ui| draw(ui, &ctx)))
+            });
             if ctx.focus_visible {
                 focus_ring::paint(self.painter(), highlight, RingKind::Button, 1.0);
             }
@@ -935,7 +937,7 @@ impl Ui<'_> {
 }
 
 /// The frame's crate-private fields (`ListStyle`'s `content_w`, `fill`, `identity` and `link`,
-/// `RowCtx::scroll_x`, `ListResponse::pressed`) at non-default values. The suites in `tests/` hold
+/// `RowCtx::scroll_x`) at non-default values. The suites in `tests/` hold
 /// the defaults; the diff view proves these again from outside.
 #[cfg(test)]
 mod tests {
@@ -1130,20 +1132,6 @@ mod tests {
         assert_eq!(selected(&mut h), 0, "and unselected");
     }
 
-    #[test]
-    fn pressed_is_true_on_the_frame_a_row_goes_down_only() {
-        let mut h = UiHarness::new(WIN);
-        let s = ListStyle::LIST;
-        frame(&mut h, s);
-        h.input.pointer_to(100.0, 30.0);
-        assert!(!frame(&mut h, s).0.resp.pressed);
-        h.input.press(PointerButton::Primary);
-        assert!(frame(&mut h, s).0.resp.pressed);
-        assert!(!frame(&mut h, s).0.resp.pressed, "held");
-        h.input.release(PointerButton::Primary);
-        assert!(!frame(&mut h, s).0.resp.pressed);
-    }
-
     fn linked() -> ListStyle {
         ListStyle {
             link: Some(WidgetId::ROOT.with("group")),
@@ -1207,6 +1195,111 @@ mod tests {
         assert_eq!(alone(&mut h), 160.0);
         let (a, b, _) = offsets(&mut h, styles);
         assert_eq!((a, b), (160.0, 160.0), "it caught up when drawn again");
+    }
+
+    #[test]
+    fn a_line_wheel_on_the_second_pane_rests_with_both_panes_equal() {
+        let mut h = UiHarness::new(WIN);
+        let styles = (linked(), linked());
+        offsets(&mut h, styles);
+        h.input.pointer_to(300.0, 60.0);
+        offsets(&mut h, styles);
+        h.input.scroll_lines(0.0, -3.0);
+        let mut ms = 0;
+        for _ in 0..200 {
+            ms += 16;
+            h.at_ms(ms);
+            let (a, b, repaint) = offsets(&mut h, styles);
+            if repaint == Repaint::Idle {
+                assert!(b > 0.0, "the wheel moved it");
+                assert_eq!(a, b, "the panes rest equal");
+                return;
+            }
+        }
+        panic!("the page did not settle");
+    }
+
+    /// One frame of a list whose rows `with_child` carry a focusable box; the rows' offset, the
+    /// focus and the child's box when it is focused.
+    fn child_frame(
+        h: &mut UiHarness,
+        with_child: &[usize],
+    ) -> (f64, Option<WidgetId>, Option<Rect>) {
+        let mut seen = (0.0, None);
+        let (_, out) = h.frame(|ui| {
+            let resp = ui.virtual_list(
+                "l",
+                RECT,
+                &opts(COUNT),
+                |i| RowKey(i as u64),
+                |ui, c| {
+                    if with_child.contains(&c.index) {
+                        let id = ui.id("child");
+                        let at = Rect::new(c.rect.x + 10.0, c.rect.y + 2.0, 40.0, 16.0);
+                        let r = ui.interact(id, at, Sense::CLICK_FOCUS);
+                        if r.focused {
+                            seen.1 = Some(at);
+                        }
+                    }
+                    ROW
+                },
+            );
+            seen.0 = resp.offset;
+        });
+        (seen.0, out.focused, seen.1)
+    }
+
+    fn resting(
+        h: &mut UiHarness,
+        ms: &mut u64,
+        rows: &[usize],
+    ) -> (f64, Option<WidgetId>, Option<Rect>) {
+        child_frame(h, rows);
+        *ms += 2_000;
+        h.at_ms(*ms);
+        child_frame(h, rows)
+    }
+
+    #[test]
+    fn tab_reveals_a_child_on_a_row_and_a_margin_rows_child_is_no_stop() {
+        let list = WidgetId::ROOT.with("l");
+        let rows = [5, 6];
+        let mut h = UiHarness::new(WIN);
+        let mut ms = 0;
+        resting(&mut h, &mut ms, &rows);
+        // At offset 10 of rows of 20 in a view of 100: row 5 shows in part, row 6 is in the margin.
+        h.input.pointer_to(100.0, 60.0).scroll_pixels(0.0, -10.0);
+        resting(&mut h, &mut ms, &rows);
+        h.input.key_down(Key::Named(NamedKey::Tab), None);
+        assert_eq!(resting(&mut h, &mut ms, &rows).1, Some(list));
+        h.input.key_down(Key::Named(NamedKey::Tab), None);
+        let (offset, _, child) = resting(&mut h, &mut ms, &rows);
+        let child = child.expect("the child on row 5 is a stop");
+        assert!(child.bottom() <= RECT.bottom(), "{child:?}");
+        assert_eq!(offset, 18.0, "the least movement");
+        h.input.key_down(Key::Named(NamedKey::Tab), None);
+        assert_eq!(resting(&mut h, &mut ms, &rows).1, Some(list), "not row 6's");
+    }
+
+    #[test]
+    fn tab_onto_the_list_in_a_wheels_flight_leaves_the_flight_alone() {
+        let mut h = UiHarness::new(WIN);
+        let s = ListStyle::LIST;
+        frame(&mut h, s);
+        h.input.pointer_to(100.0, 60.0);
+        frame(&mut h, s);
+        h.input.scroll_lines(0.0, -3.0);
+        frame(&mut h, s);
+        h.at_ms(30);
+        h.input.key_down(Key::Named(NamedKey::Tab), None);
+        frame(&mut h, s);
+        h.at_ms(5_000);
+        frame(&mut h, s);
+        assert_eq!(
+            frame(&mut h, s).0.resp.offset,
+            144.0,
+            "the wheel's whole step"
+        );
     }
 
     #[test]
