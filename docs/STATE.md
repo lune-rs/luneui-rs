@@ -1,7 +1,7 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-06 (M9 in progress, steps 1 and 2 of 9 done; M8 merged to main at 2474248)
+Last updated: 2026-11-06 (M9 in progress, steps 1 to 4 and 6 of 9 done; M8 merged to main at 2474248)
 
 ## Now
 
@@ -14,7 +14,9 @@ one way no longer swallows the other, and the M8 sideways-swipe limit is gone). 
 and `link` with the scroll link, stub modules for the four widgets and four empty gallery pages (70 pages, 332 scenes still).
 Step 6 (track B, part branch m9b) is in: `Ui::diff_view` unified and split on the list frame, `pair_rows`, `widest_chars`, hunk actions,
 marks, `Ui::diff_selected_text`, 14 scenes; a linked pane adds its own queued shift before it takes the group's value
-(`scroll_pending_shift`). Steps 3 to 5 and 7 to 9 follow the plan.
+(`scroll_pending_shift`). Step 3 is in: `EditText` and `EditBuffer`, `lines_near`, `CodeDoc`. Step 4 is in (D195): `Ui::code_editor` and
+`Ui::code_line_rect` on `EditHost` in `field.rs`, read-only and editable, wrap on measured heights, spans, bands, synced panes, plain Tab
+through `tab_taker`, 15 scenes (361 listed), a live document of 1,000,000 lines. Steps 5 and 7 to 9 follow the plan.
 
 M8 (data views: table, bar chart, pie chart, kanban board, lane graph) is merged to main at 2474248 (7 steps, DECISIONS
 D160 to D176) and closed: the cross-widget suite, the disabled-keys rows, the catalogue audit, the architecture notes and the

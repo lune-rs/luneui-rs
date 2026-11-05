@@ -249,6 +249,7 @@ impl<'a> Ui<'a> {
         // it still holds the capture at the key (D176); the flag is read once and cleared, so a host
         // that stops calling the gesture loses it.
         let gesture_live = std::mem::take(&mut store.gesture_live);
+        let tab_taker = std::mem::take(&mut store.tab_taker);
         let top_press = top_for(|o| o.dismiss_on_outside_press);
         let modal = modal_gate(store.overlays.iter());
         let eligible = move |h: &HitRecord| modal.is_none_or(|(t, l)| h.tag >= t || h.layer > l);
@@ -399,7 +400,13 @@ impl<'a> Ui<'a> {
                                     dismissed.entry(t.id).or_insert(D::Escape);
                                 }
                             }
-                            Key::Named(NamedKey::Tab) if !composing => {
+                            // A view that inserts tabs keeps a plain Tab: it falls through as a key.
+                            Key::Named(NamedKey::Tab)
+                                if !composing
+                                    && (tab_taker.is_none()
+                                        || tab_taker != store.focus.focused
+                                        || *modifiers != Modifiers::default()) =>
+                            {
                                 let scopes = active.iter().rev().map(|o| (o.tag, o.opts.modal));
                                 let mut to = None;
                                 for (tag, trap) in scopes.chain([(0, true)]) {
@@ -992,6 +999,13 @@ impl<'a> Ui<'a> {
     /// The running frame's number, which two frames never share.
     pub(crate) fn frame_number(&self) -> u64 {
         self.store.frame
+    }
+
+    /// The focused widget `id` takes a plain Tab next frame instead of it moving focus. Lasts one
+    /// frame, so a widget that stops being drawn frees the key (read in [`Ui::begin`], which runs
+    /// before any widget could say so).
+    pub(crate) fn take_tab_next_frame(&mut self, id: WidgetId) {
+        self.store.tab_taker = Some(id);
     }
 
     /// Asks for a frame after this one: the picture just drawn is one a state change this frame

@@ -5,7 +5,8 @@
 //! The Painter API draws a static box. The `Ui` form owns an [`EditState`] per id, and a frame runs
 //! in this order: sync the engine with the app's text, run the focus events through it, then the
 //! pointer, then draw. [`begin_edit`], [`edit_pointer`], [`Shown`] and [`draw_shown`] are shared
-//! with the [text area](super::text_area).
+//! with the [text area](super::text_area), and the code editor runs the same steps through
+//! [`EditHost`].
 //!
 //! Offsets are the engine's chars; `SpecLayout` is the one place they meet the text system's bytes.
 //! While composing, what is drawn is `TextEdit::display`'s string, which the selection offsets do
@@ -409,6 +410,69 @@ fn apply(
     })
 }
 
+/// What the shared frame steps ([`begin_edit_with`], [`edit_pointer_with`]) need of a text: one event
+/// loop and one press rule, whatever holds the text. A `String` is one host; the code editor's
+/// document is another, which shapes only the line it is asked about.
+pub(super) trait EditHost {
+    /// Brings the engine up to the text.
+    fn sync(&mut self, ui: &mut Ui<'_>, edit: &mut TextEdit);
+
+    /// Runs one command, on the text as it stands: an earlier command of the frame may have changed it.
+    fn apply(&mut self, ui: &mut Ui<'_>, edit: &mut TextEdit, cmd: EditCommand) -> EditOutcome;
+
+    /// The offset nearest to `pos`, from the text's top-left corner.
+    fn hit(&mut self, ui: &mut Ui<'_>, pos: (f32, f32)) -> usize;
+
+    /// Where the caret starts.
+    fn first_caret(&self) -> usize;
+
+    /// Whether a focus event's command reaches the engine; a command refused here stays free for
+    /// the widget around it and for a binding. A press is not a focus event, so it always runs.
+    fn admits(&self, _cmd: &EditCommand) -> bool {
+        true
+    }
+
+    /// The host's own command for an event the engine maps to nothing.
+    fn command(&self, _event: &FocusEvent, _flags: EditFlags) -> Option<EditCommand> {
+        None
+    }
+
+    /// The text is a mask: no composition, and a press selects all of it.
+    fn masked(&self) -> bool {
+        false
+    }
+}
+
+/// The host of a `String`: [`begin_edit`] and [`edit_pointer`] run on it.
+struct TextHost<'h, 'c> {
+    cfg: &'h EditConfig<'c>,
+    text: &'h mut String,
+}
+
+impl EditHost for TextHost<'_, '_> {
+    fn sync(&mut self, ui: &mut Ui<'_>, edit: &mut TextEdit) {
+        sync(ui, self.cfg, edit, self.text);
+    }
+
+    fn apply(&mut self, ui: &mut Ui<'_>, edit: &mut TextEdit, cmd: EditCommand) -> EditOutcome {
+        apply(ui, self.cfg, edit, self.text, cmd)
+    }
+
+    fn hit(&mut self, ui: &mut Ui<'_>, pos: (f32, f32)) -> usize {
+        let spec = self.cfg.spec(self.text);
+        let chars = self.text.chars().count();
+        with_layout(ui, self.cfg, &spec, chars, |l| l.hit(pos))
+    }
+
+    fn first_caret(&self) -> usize {
+        self.text.chars().count()
+    }
+
+    fn masked(&self) -> bool {
+        self.cfg.password
+    }
+}
+
 /// What the input of a frame did to the text.
 #[derive(Debug, Default)]
 pub(super) struct EditFrame {
@@ -426,26 +490,36 @@ pub(super) fn begin_edit(
     cfg: &EditConfig,
     text: &mut String,
 ) -> (EditState, EditFrame) {
+    begin_edit_with(ui, id, cfg.flags(), &mut TextHost { cfg, text })
+}
+
+/// [`begin_edit`] on any [`EditHost`].
+pub(super) fn begin_edit_with(
+    ui: &mut Ui<'_>,
+    id: WidgetId,
+    flags: EditFlags,
+    host: &mut dyn EditHost,
+) -> (EditState, EditFrame) {
     let mut st = std::mem::take(ui.persistent::<EditState>(id));
     let drawn = std::mem::replace(&mut ui.transient::<Drawn>(id).0, true);
     let key_focus = ui.focus_state().0 == Some(id);
     let focused = ui.is_enabled() && key_focus;
-    st.edit.set_flags(cfg.flags());
+    st.edit.set_flags(flags);
     if !st.started {
         st.started = true;
-        let end = text.chars().count();
-        st.edit.set_selection(end, end);
+        let first = host.first_caret();
+        st.edit.set_selection(first, first);
     }
-    sync(ui, cfg, &mut st.edit, text);
+    host.sync(ui, &mut st.edit);
     if !focused || !drawn {
         st.paste_pending = false;
         if st.edit.preedit().is_some() {
-            apply(ui, cfg, &mut st.edit, text, EditCommand::ImeCancel);
+            host.apply(ui, &mut st.edit, EditCommand::ImeCancel);
         }
     }
     let mut frame = EditFrame::default();
     if key_focus {
-        run_events(ui, id, cfg, &mut st, text, &mut frame, focused);
+        run_events(ui, id, host, &mut st, &mut frame, focused);
     }
     (st, frame)
 }
@@ -456,9 +530,8 @@ pub(super) fn begin_edit(
 fn run_events(
     ui: &mut Ui<'_>,
     id: WidgetId,
-    cfg: &EditConfig,
+    host: &mut dyn EditHost,
     st: &mut EditState,
-    text: &mut String,
     frame: &mut EditFrame,
     act: bool,
 ) {
@@ -488,14 +561,17 @@ fn run_events(
                 continue;
             }
             // A password shows no composition: a preedit would draw the real characters.
-            FocusEvent::Ime(ImeEvent::Preedit { .. }) if cfg.password => {
+            FocusEvent::Ime(ImeEvent::Preedit { .. }) if host.masked() => {
                 ui.consume_focus_event(*index);
                 continue;
             }
             _ => {}
         }
         let flags = st.edit.flags();
-        let Some(cmd) = EditCommand::from_event(event, keymap, flags) else {
+        let cmd = EditCommand::from_event(event, keymap, flags)
+            .or_else(|| host.command(event, flags))
+            .filter(|cmd| host.admits(cmd));
+        let Some(cmd) = cmd else {
             // The press behind typed text is the field's too: no binding on it may also fire.
             let types = matches!(event, FocusEvent::Key { .. })
                 && !flags.read_only
@@ -512,7 +588,7 @@ fn run_events(
             }
             continue;
         }
-        let out = apply(ui, cfg, &mut st.edit, text, cmd);
+        let out = host.apply(ui, &mut st.edit, cmd);
         if out.consumed {
             ui.consume_focus_event(*index);
             st.reveal = true;
@@ -566,6 +642,17 @@ pub(super) fn edit_pointer(
     text: &mut String,
     origin: (f32, f32),
 ) {
+    edit_pointer_with(ui, &mut TextHost { cfg, text }, st, r, origin);
+}
+
+/// [`edit_pointer`] on any [`EditHost`].
+pub(super) fn edit_pointer_with(
+    ui: &mut Ui<'_>,
+    host: &mut dyn EditHost,
+    st: &mut EditState,
+    r: &Response,
+    origin: (f32, f32),
+) {
     let at = ui
         .painter()
         .transformed(Rect::new(origin.0, origin.1, 0.0, 0.0));
@@ -576,18 +663,14 @@ pub(super) fn edit_pointer(
         st.drag_extends = !composing && (r.press_count <= 1 || shift);
         if let Some(pos) = r.press_pos.filter(|_| !composing) {
             let pos = local(pos);
-            let offset = |ui: &mut Ui<'_>, text: &str| {
-                let spec = cfg.spec(text);
-                with_layout(ui, cfg, &spec, text.chars().count(), |l| l.hit(pos))
-            };
             let cmd = match r.press_count {
                 _ if shift => EditCommand::ExtendTo(pos),
                 0 | 1 => EditCommand::PlaceCaret(pos),
-                _ if cfg.password => EditCommand::SelectAll,
-                2 => EditCommand::SelectWordAt(offset(ui, text)),
-                _ => EditCommand::SelectLineAt(offset(ui, text)),
+                _ if host.masked() => EditCommand::SelectAll,
+                2 => EditCommand::SelectWordAt(host.hit(ui, pos)),
+                _ => EditCommand::SelectLineAt(host.hit(ui, pos)),
             };
-            apply(ui, cfg, &mut st.edit, text, cmd);
+            host.apply(ui, &mut st.edit, cmd);
             st.reveal = true;
         }
     }
@@ -596,12 +679,12 @@ pub(super) fn edit_pointer(
         && let Some(pos) = ui.pointer_pos()
     {
         // The mask has no positions: dragging over it selects it.
-        let cmd = if cfg.password {
+        let cmd = if host.masked() {
             EditCommand::SelectAll
         } else {
             EditCommand::ExtendTo(local(pos))
         };
-        apply(ui, cfg, &mut st.edit, text, cmd);
+        host.apply(ui, &mut st.edit, cmd);
         st.reveal = true;
     }
     if r.hovered || r.pressed {
@@ -627,6 +710,26 @@ pub(super) struct Shown {
 }
 
 impl Shown {
+    /// One line of a longer text, whose host worked out the offsets: chars of `spec`'s text.
+    pub(super) fn line(
+        spec: Spec,
+        selection: Range<usize>,
+        preedit: Option<Range<usize>>,
+        clause: Option<Range<usize>>,
+        caret: Option<usize>,
+        focus_at: usize,
+    ) -> Shown {
+        Shown {
+            spec,
+            empty: false,
+            selection,
+            preedit,
+            clause,
+            caret,
+            focus_at,
+        }
+    }
+
     pub(super) fn new(cfg: &EditConfig, edit: &TextEdit, text: &str, focused: bool) -> Shown {
         if cfg.password {
             let spec = cfg.spec(text);
@@ -754,9 +857,19 @@ pub(super) fn end_edit(
     st: EditState,
     area: Option<Rect>,
 ) -> Option<Rect> {
+    end_edit_with(ui, id, !cfg.read_only && !cfg.password, st, area)
+}
+
+/// [`end_edit`] for a host, which says whether it takes composition.
+pub(super) fn end_edit_with(
+    ui: &mut Ui<'_>,
+    id: WidgetId,
+    takes_composition: bool,
+    st: EditState,
+    area: Option<Rect>,
+) -> Option<Rect> {
     ui.set_composing(id, st.edit.preedit().is_some());
     *ui.persistent::<EditState>(id) = st;
-    let takes_composition = !cfg.read_only && !cfg.password;
     let area = area.filter(|_| takes_composition);
     if area.is_some() {
         ui.set_ime_area(area);
@@ -804,19 +917,24 @@ pub(super) fn edit_node(
     if facts.error {
         node.states.insert(State::Invalid);
     }
-    if cfg.read_only {
+    edit_node_states(&mut node, cfg.read_only, facts.enabled);
+    ui.node(node);
+}
+
+/// The states and actions every edit's node has, by its mode.
+pub(super) fn edit_node_states(node: &mut Node, read_only: bool, enabled: bool) {
+    if read_only {
         node.states.insert(State::ReadOnly);
     }
-    if facts.enabled {
+    if enabled {
         node.states.insert(State::Focusable);
         node.actions.insert(Action::Focus);
-        if !cfg.read_only {
+        if !read_only {
             node.actions.insert(Action::SetValue);
         }
     } else {
         node.states.insert(State::Disabled);
     }
-    ui.node(node);
 }
 
 /// The look a focused or hovered edit has this frame, through the three motion rows.

@@ -26,7 +26,7 @@ the app's: every text widget needs it (decided by R-text-4 resolution, M3).
 
 ## Existing code
 
-Built in M5 (D103): `field` and `text_area` consume the events (`crates/lune-ui-core/src/widgets/field.rs`, `text_edit.rs`) and report `ime_area`. The input side existed first: events and output, with nothing consuming them: `ImeEvent` (`crates/lune-ui-core/src/input.rs:141-153`), `FrameOutput.ime_area` (`:156-163`), the winit translation
+Built in M5 (D103): `field` and `text_area` consume the events (`crates/lune-ui-core/src/widgets/field.rs`, `text_edit.rs`) and report `ime_area`; the editable code view (`text.code-editor-view`) does the same through `EditHost` on one line of many (M9, D195). The input side existed first: events and output, with nothing consuming them: `ImeEvent` (`crates/lune-ui-core/src/input.rs:141-153`), `FrameOutput.ime_area` (`:156-163`), the winit translation
 (`crates/lune-ui-winit/src/input.rs:149-161`) and the output side that enables the input method and sets the cursor area (`crates/lune-ui-winit/src/input.rs:278-312`); the scripted builder
 `ScriptedInput::ime` (`crates/lune-ui-core/src/testing/input.rs:148`); a translation test (`crates/lune-ui-winit/tests/input.rs:42-48`). No widget sets `ime_area`.
 
