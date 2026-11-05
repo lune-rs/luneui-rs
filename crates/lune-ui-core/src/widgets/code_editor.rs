@@ -36,7 +36,7 @@ use crate::text::{CaretPos, LineSpan, Spec, Style, TextSystem, Unit};
 use crate::text_edit::{
     EditBuffer, EditCommand, EditFlags, EditLayout, EditOutcome, EditText, SpecLayout, TextEdit,
 };
-use crate::ui::{Response, Ui, WidgetId};
+use crate::ui::{Response, Sense, Ui, WidgetId};
 
 /// The height of an unwrapped line, and a wrapped line's estimate until it is built.
 pub const LINE: f32 = 20.0;
@@ -48,7 +48,7 @@ const GUTTER_PAD: f32 = 4.0;
 /// From the numbers to the text column.
 const GUTTER_GAP: f32 = 8.0;
 /// From the text column's edges to the text.
-const TEXT_PAD: f32 = 2.0;
+pub(super) const TEXT_PAD: f32 = 2.0;
 /// The selection past a selected line's end.
 const SLIVER: f32 = 4.0;
 
@@ -146,6 +146,35 @@ struct CodeMem {
     offset: f64,
 }
 
+/// How a host differs from the editor in the way it draws the frame: the code block (D10) sets a
+/// size and a line of its own, scrolls only sideways and puts the ring round its box.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct Look {
+    /// The mono size and the line height.
+    pub size: f32,
+    pub line: f32,
+    /// The lines scroll vertically. Off, the area has no vertical extent, so the vertical wheel
+    /// goes past it.
+    pub scroll_y: bool,
+    /// Tab leaves the view without stopping on it.
+    pub skip_tab: bool,
+    /// Where the keyboard focus ring of a read-only view goes; the viewport when `None`.
+    pub ring: Option<Rect>,
+}
+
+impl Look {
+    /// The editor's own.
+    pub(super) fn editor(size: f32) -> Look {
+        Look {
+            size,
+            line: LINE,
+            scroll_y: true,
+            skip_tab: false,
+            ring: None,
+        }
+    }
+}
+
 /// A usable length: finite and not negative.
 fn usable(v: f32) -> f32 {
     if v.is_finite() { v.max(0.0) } else { 0.0 }
@@ -188,6 +217,8 @@ impl Columns {
 #[derive(Debug)]
 struct LineTops<'a> {
     heights: &'a mut RowHeights,
+    /// The height of a line of one row.
+    line: f32,
     first: usize,
     shift: f64,
     relaid: bool,
@@ -195,7 +226,7 @@ struct LineTops<'a> {
 
 impl LineTops<'_> {
     fn note(&mut self, line: usize, height: f32) {
-        let change = self.heights.set(line, height.max(LINE));
+        let change = self.heights.set(line, height.max(self.line));
         if change != 0.0 {
             self.relaid = true;
             if line < self.first {
@@ -283,11 +314,11 @@ impl DocLayout<'_, '_> {
                 start,
                 end: start + chars,
                 y: 0.0,
-                height: LINE,
+                height: self.tops.line,
             }];
         }
         let mut rows = self.on_line(line, |l| l.lines());
-        let height = rows.last().map_or(LINE, |r| r.y + r.height);
+        let height = rows.last().map_or(self.tops.line, |r| r.y + r.height);
         self.tops.note(line, height);
         for row in &mut rows {
             row.start += start;
@@ -701,7 +732,7 @@ fn draw_lines(
     ui.painter().pop_clip();
 
     if d.opts.gutter {
-        let style = Style::mono(t.font_base, LINE, t.fg_faint);
+        let style = Style::mono(host.style.size, host.style.line, t.fg_faint);
         let right = vp.x + d.cols.gutter - GUTTER_GAP;
         ui.painter()
             .push_clip(Rect::new(vp.x, vp.y, d.cols.gutter.min(vp.w), vp.h));
@@ -744,7 +775,8 @@ impl Ui<'_> {
         opts: &CodeOptions<'_>,
     ) -> CodeResponse {
         let group = opts.scroll_group.map(|g| self.id(("code-scroll", g)));
-        self.scope(key, |ui| ui.code_frame(rect, doc, opts, group))
+        let look = Look::editor(self.theme().font_base);
+        self.scope(key, |ui| ui.code_frame(rect, doc, opts, group, &look))
     }
 
     /// The rect of line `line` (from 1, as the gutter numbers it) of the view under `key`, in the
@@ -764,18 +796,20 @@ impl Ui<'_> {
         shows.then(|| Rect::new(vp.x, vp.y + top as f32, vp.w, height as f32))
     }
 
-    fn code_frame(
+    /// The frame of [`Self::code_editor`] under the current scope, drawn as `look` says.
+    pub(super) fn code_frame(
         &mut self,
         rect: Rect,
         doc: &mut CodeDoc,
         opts: &CodeOptions<'_>,
         group: Option<WidgetId>,
+        look: &Look,
     ) -> CodeResponse {
         let t = *self.theme();
         let id = self.scope_id();
         let viewport = Rect::new(rect.x, rect.y, usable(rect.w), usable(rect.h));
         let (vw, vh) = (f64::from(viewport.w), f64::from(viewport.h));
-        let style = Style::mono(t.font_base, LINE, opts.color.unwrap_or(t.fg_primary));
+        let style = Style::mono(look.size, look.line, opts.color.unwrap_or(t.fg_primary));
         let advance = self.painter().measure(&Spec::plain("0", style)).0;
 
         let mut mem = std::mem::take(self.persistent::<CodeMem>(id));
@@ -789,9 +823,11 @@ impl Ui<'_> {
         let cols = Columns::of(opts, advance, doc.line_count());
         let wrap_w = (viewport.w - cols.text - TEXT_PAD - CARET_ROOM).max(1.0);
         let heights = if opts.wrap {
-            Heights::Measured { estimate: LINE }
+            Heights::Measured {
+                estimate: look.line,
+            }
         } else {
-            Heights::Fixed(LINE)
+            Heights::Fixed(look.line)
         };
         mem.heights.sync(doc.line_count(), heights);
         let drawn = self.persistent::<EditState>(id).offset;
@@ -805,6 +841,7 @@ impl Ui<'_> {
             doc,
             tops: LineTops {
                 heights: &mut mem.heights,
+                line: look.line,
                 first,
                 shift: 0.0,
                 relaid: false,
@@ -812,7 +849,7 @@ impl Ui<'_> {
             heights,
             style,
             wrap: opts.wrap.then_some(wrap_w),
-            page_rows: (viewport.h / LINE).floor().max(1.0) as usize,
+            page_rows: (viewport.h / look.line).floor().max(1.0) as usize,
             read_only: opts.read_only,
             tab_inserts: opts.tab_inserts,
             base: drawn.1,
@@ -867,7 +904,7 @@ impl Ui<'_> {
         if let Some((line, pos)) = target {
             let y = host.tops.heights.top(line) + f64::from(pos.y);
             let oy = drawn.1 + pending + pulled;
-            let height = f64::from(pos.height.max(LINE));
+            let height = f64::from(pos.height.max(look.line));
             let by_y = reveal_offset(y, height, vh, oy, Reveal::Nearest) - oy;
             self.scroll_shift(AREA, by_y);
             if !opts.wrap {
@@ -887,7 +924,11 @@ impl Ui<'_> {
             } else {
                 f64::from(cols.text + CARET_ROOM + TEXT_PAD) + text_w
             },
-            host.tops.heights.total(),
+            if look.scroll_y {
+                host.tops.heights.total()
+            } else {
+                vh
+            },
         );
         let scroll = ScrollOptions {
             bars: (
@@ -896,7 +937,11 @@ impl Ui<'_> {
                 } else {
                     Bars::Auto.unless_fits(extent.0, vw)
                 },
-                Bars::Auto.unless_fits(extent.1, vh),
+                if look.scroll_y {
+                    Bars::Auto.unless_fits(extent.1, vh)
+                } else {
+                    Bars::Disabled
+                },
             ),
             extent: Some(extent),
             identity: opts.identity,
@@ -909,7 +954,11 @@ impl Ui<'_> {
         let out = self.scroll_area_untranslated(AREA, viewport, &scroll, |ui, view| {
             // The region registers inside the content, because the area's own would block one
             // under it.
-            let mut r = ui.interact(id, viewport, EDIT_SENSE);
+            let sense = Sense {
+                skip_tab: look.skip_tab,
+                ..EDIT_SENSE
+            };
+            let mut r = ui.interact(id, viewport, sense);
             if frame.changed {
                 r.mark_changed();
             }
@@ -987,7 +1036,12 @@ impl Ui<'_> {
         let (now_focused, ring) = self.focus_state();
         let holds = enabled && now_focused == Some(id);
         if holds && ring && opts.read_only {
-            focus_ring::paint(self.painter(), viewport, RingKind::Button, 1.0);
+            focus_ring::paint(
+                self.painter(),
+                look.ring.unwrap_or(viewport),
+                RingKind::Button,
+                1.0,
+            );
         }
         if holds && opts.tab_inserts && !opts.read_only {
             self.take_tab_next_frame(id);

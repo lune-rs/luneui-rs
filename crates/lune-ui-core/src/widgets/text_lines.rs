@@ -43,7 +43,6 @@ impl Highlighter for PlainHighlighter {
 /// equals `text`. Spans past the end are clamped to it, empty or inverted ones (after the clamp)
 /// are skipped, unsorted ones are sorted by start, and where two overlap the earlier keeps its
 /// chars. Empty `text` gives one empty run, so the line still carries its style.
-#[allow(dead_code, reason = "the code view draws its lines from it (step 4)")]
 pub(crate) fn line_spec(text: &str, base: Style, spans: &[HighlightSpan]) -> Vec<(String, Style)> {
     if text.is_empty() {
         return vec![(String::new(), base)];

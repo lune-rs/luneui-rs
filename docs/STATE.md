@@ -1,7 +1,7 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-06 (M9 in progress, steps 1 to 4 and 6 of 9 done; M8 merged to main at 2474248)
+Last updated: 2026-11-06 (M9 in progress, steps 1 to 6 of 9 done; M8 merged to main at 2474248)
 
 ## Now
 
@@ -16,7 +16,9 @@ Step 6 (track B, part branch m9b) is in: `Ui::diff_view` unified and split on th
 marks, `Ui::diff_selected_text`, 14 scenes; a linked pane adds its own queued shift before it takes the group's value
 (`scroll_pending_shift`). Step 3 is in: `EditText` and `EditBuffer`, `lines_near`, `CodeDoc`. Step 4 is in (D195): `Ui::code_editor` and
 `Ui::code_line_rect` on `EditHost` in `field.rs`, read-only and editable, wrap on measured heights, spans, bands, synced panes, plain Tab
-through `tab_taker`, 15 scenes (361 listed), a live document of 1,000,000 lines. Steps 5 and 7 to 9 follow the plan.
+through `tab_taker`, 15 scenes (361 listed), a live document of 1,000,000 lines. Step 5 is in (D196): `Ui::code_block`,
+`code_block::height`, `CodeBlockOptions`, on the code view's frame (read-only, sideways only), a copy button with the check-mark
+feedback, 12 scenes (373 listed). Steps 7 to 9 follow the plan.
 
 M8 (data views: table, bar chart, pie chart, kanban board, lane graph) is merged to main at 2474248 (7 steps, DECISIONS
 D160 to D176) and closed: the cross-widget suite, the disabled-keys rows, the catalogue audit, the architecture notes and the
@@ -125,7 +127,7 @@ frame 19.01 ms (`radio-group`).
 
 ## Next
 
-1. M9 steps 3 to 9 (plan: scaffold, then the editor chain and the diff, the visual step, the close).
+1. M9 steps 7 to 9 (plan: markdown preview, the visual step, the close).
 2. CI (fmt, clippy `-D warnings`, tests on macOS, Windows and Linux) now that there is code to run.
 3. An export script for Luneterm's vendored snapshot, before Luneterm M9. The migration
    map for M11 is "API changes since M1" in `docs/architecture.md`.
