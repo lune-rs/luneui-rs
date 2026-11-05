@@ -1724,3 +1724,32 @@ fn an_empty_document_shows_one_empty_line_and_takes_typing() {
     run(&mut h, &mut doc, &opts);
     assert_eq!(doc.text(), "x");
 }
+
+#[test]
+fn at_scale_2_the_numbers_are_fg_faint_a_band_spans_the_view_and_the_text_is_mono_13() {
+    let mut doc = numbered(5);
+    let color = [10, 20, 30, 40];
+    let bands = [LineBand { line: 2, color }];
+    let opts = CodeOptions {
+        gutter: true,
+        bands: &bands,
+        ..plain()
+    };
+    let mut h = UiHarness::new(WIN);
+    h.input = ScriptedInput::new(WIN, 2.0);
+    h.input.focus(true);
+    let r = run(&mut h, &mut doc, &opts);
+    let band = fills(&r.scene, color);
+    assert_eq!(band.len(), 1);
+    assert_eq!(band[0][2], 2.0 * RECT.w, "the band spans the viewport");
+    let key = |text: &str, style: Style| FakeText.prepare(&Spec::plain(text, style), 2.0).0;
+    let texts = &r.scene.layers[0].texts;
+    let number = key("1", Style::mono(DARK.font_base, LINE, DARK.fg_faint));
+    assert!(
+        texts.iter().any(|t| t.key == number),
+        "a number in fg_faint"
+    );
+    assert_eq!(DARK.font_base, 13.0);
+    let line = key("line 0", base());
+    assert!(texts.iter().any(|t| t.key == line), "mono at font_base");
+}
