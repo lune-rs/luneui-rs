@@ -49,6 +49,8 @@ struct App {
     /// Translates the whole strip, card and all.
     parent: (f32, f32),
     tint: bool,
+    /// The whole strip under `Ui::with_enabled`.
+    enabled: bool,
 }
 
 impl App {
@@ -67,6 +69,7 @@ impl App {
             apply: true,
             parent: (0.0, 0.0),
             tint: false,
+            enabled: true,
         }
     }
 
@@ -125,7 +128,9 @@ fn draw(ui: &mut Ui<'_>, app: &App) -> Vec<TabEvent> {
     if translated {
         ui.painter().push_translate(app.parent.0, app.parent.1);
     }
-    let events = ui.tab_strip("s", STRIP, &tabs, &opts).events;
+    let events = ui
+        .with_enabled(app.enabled, |ui| ui.tab_strip("s", STRIP, &tabs, &opts))
+        .events;
     if translated {
         ui.painter().pop_translate();
     }
@@ -1481,4 +1486,107 @@ fn at_scale_2_the_strip_keeps_its_measures_in_device_px() {
         g.strokes[0].style[1], 1.0,
         "the half width of a 2 px stroke"
     );
+}
+
+// A disabled strip.
+
+fn disabled_after_focus() -> (UiHarness, App) {
+    let mut app = App::of(3, Some(1));
+    let mut h = bench(&mut app);
+    tab_in(&mut h, &mut app);
+    assert_eq!(
+        focused(&run(&mut h, &mut app).out.tree).as_deref(),
+        Some("t1")
+    );
+    app.enabled = false;
+    run(&mut h, &mut app);
+    run(&mut h, &mut app);
+    (h, app)
+}
+
+#[test]
+fn a_disabled_strip_activates_nothing_from_enter_or_space_and_still_does_after_enabling() {
+    for k in [NamedKey::Enter, NamedKey::Space] {
+        let (mut h, mut app) = disabled_after_focus();
+        key(&mut h, k);
+        let r = run(&mut h, &mut app);
+        assert!(
+            r.events.is_empty(),
+            "{k:?} on a disabled strip: {:?}",
+            r.events
+        );
+        // The key was consumed while disabled: it is not held over to the frame that enables.
+        app.enabled = true;
+        let r = run(&mut h, &mut app);
+        assert!(r.events.is_empty(), "{k:?} fell through after enabling");
+        key(&mut h, k);
+        let r = run(&mut h, &mut app);
+        assert_eq!(activations(&r.events), 1, "{k:?} works again once enabled");
+    }
+}
+
+#[test]
+fn a_disabled_strip_nodes_are_disabled_and_offer_no_focus_or_action() {
+    let mut app = App::of(3, Some(1));
+    let mut h = bench(&mut app);
+    let tree = run(&mut h, &mut app).out.tree;
+    for n in nodes(&tree, Role::Tab) {
+        assert!(n.states.contains(State::Focusable) && !n.states.contains(State::Disabled));
+        assert!(n.actions.contains(Action::Default));
+    }
+    app.enabled = false;
+    let tree = run(&mut h, &mut app).out.tree;
+    let tabs = nodes(&tree, Role::Tab);
+    assert_eq!(tabs.len(), 3);
+    let buttons = nodes(&tree, Role::Button);
+    assert!(
+        buttons.iter().any(|n| n.name == "Close tab"),
+        "the active tab shows its close button"
+    );
+    assert!(buttons.iter().any(|n| n.name == "New tab"));
+    for n in tabs.into_iter().chain(buttons) {
+        assert!(n.states.contains(State::Disabled), "{} disabled", n.name);
+        assert!(!n.states.contains(State::Focusable), "{} focusable", n.name);
+        assert_eq!(n.actions, Default::default(), "{} has actions", n.name);
+    }
+    assert!(
+        tree.nodes
+            .iter()
+            .find(|n| n.role == Role::Tab && n.name == "t1")
+            .is_some_and(|n| n.states.contains(State::Selected)),
+        "the selection is still told"
+    );
+}
+
+#[test]
+fn disabling_the_strip_closes_an_open_menu() {
+    let mut app = App::of(3, Some(0));
+    let mut h = bench(&mut app);
+    assert_eq!(open_menu(&mut h, &mut app, "t2").len(), 4);
+    app.enabled = false;
+    h.at_ms(1000);
+    let r = run(&mut h, &mut app);
+    assert!(nodes(&r.out.tree, Role::MenuItem).is_empty());
+    // It stays closed once enabled again: the strip dropped it, it did not hide it.
+    app.enabled = true;
+    h.at_ms(2000);
+    let r = run(&mut h, &mut app);
+    assert!(nodes(&r.out.tree, Role::MenuItem).is_empty());
+}
+
+#[test]
+fn a_disabled_strip_pointer_input_reports_nothing() {
+    let mut app = App::of(3, Some(0));
+    app.enabled = false;
+    let mut h = bench(&mut app);
+    let tree = run(&mut h, &mut app).out.tree;
+    let at = mid(&tree, "t2");
+    h.input.pointer_to(at.0, at.1);
+    run(&mut h, &mut app);
+    h.input.click(PRIMARY);
+    assert!(run(&mut h, &mut app).events.is_empty());
+    h.input.click(PointerButton::Secondary);
+    run(&mut h, &mut app);
+    let r = run(&mut h, &mut app);
+    assert!(nodes(&r.out.tree, Role::MenuItem).is_empty());
 }

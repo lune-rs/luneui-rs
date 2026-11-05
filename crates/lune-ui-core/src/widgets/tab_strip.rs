@@ -406,6 +406,9 @@ impl Ui<'_> {
         }
 
         let enabled = self.is_enabled();
+        if !enabled {
+            st.menu = None;
+        }
         let roving: Vec<(WidgetId, bool)> = items.iter().map(|i| (i.id, enabled)).collect();
         let stop = self.rove_stop(&roving, active);
         self.rove_keys(&roving, RoveAxis::Horizontal, true);
@@ -505,20 +508,24 @@ impl Ui<'_> {
             let resp = self.interact(item.id, rect, sense);
             let mut node = Node::new(item.id, Role::Tab, tab.title, rect);
             node.description = Some(tab.title.to_owned());
-            node.states.insert(State::Focusable);
+            if resp.enabled {
+                node.states.insert(State::Focusable);
+                for action in [
+                    Action::Default,
+                    Action::Focus,
+                    Action::ShowMenu,
+                    Action::ScrollIntoView,
+                ] {
+                    node.actions.insert(action);
+                }
+            } else {
+                node.states.insert(State::Disabled);
+            }
             if f.active == Some(i) {
                 node.states.insert(State::Selected);
             }
             if tab.progress.is_some() || (f.active == Some(i) && f.opts.busy.is_some()) {
                 node.states.insert(State::Busy);
-            }
-            for action in [
-                Action::Default,
-                Action::Focus,
-                Action::ShowMenu,
-                Action::ScrollIntoView,
-            ] {
-                node.actions.insert(action);
             }
             self.node(node);
             // Registered after its tab, so it is on top. It is no tab stop: the list is one stop.
@@ -527,16 +534,22 @@ impl Ui<'_> {
                 let resp = self.interact(item.close_id, rect, Sense::CLICK);
                 let name = self.tr("luneui.tab-strip.close");
                 let mut node = Node::new(item.close_id, Role::Button, name, rect);
-                node.actions.insert(Action::Default);
+                if resp.enabled {
+                    node.actions.insert(Action::Default);
+                } else {
+                    node.states.insert(State::Disabled);
+                }
                 self.node(node);
                 resp
             });
 
             let pressed_here = st.pressed == Some(tab.key);
-            let activated = resp.press_started
-                || (resp.clicked && !pressed_here)
-                || self.consume_key(item.id, NamedKey::Enter)
-                || self.consume_key(item.id, NamedKey::Space);
+            // Both keys are consumed whether or not the strip is enabled, so a disabled strip does
+            // not let Enter or Space fall through to whatever handles them next.
+            let enter = self.consume_key(item.id, NamedKey::Enter);
+            let space = self.consume_key(item.id, NamedKey::Space);
+            let activated = resp.enabled
+                && (resp.press_started || (resp.clicked && !pressed_here) || enter || space);
             if activated {
                 events.push(TabEvent::Activate(tab.key));
             }

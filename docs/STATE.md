@@ -14,17 +14,19 @@ radio group, star rating, slider, filter bar, search picker, tab strip, toolbar,
 its page, scenes, tests and semantic nodes. DECISIONS D113 to D136 record the plan decisions and the visual
 rulings. The cross-widget suite `crates/lune-ui-core/tests/c4.rs` has an M6 section (roles, names and states of
 every interactive widget in one frame, default and increment actions, one tab stop per composite, idle at rest).
-The gallery has 50 pages and 231 scene names in `--list` (152 + 79); the workspace has 1,319 tests, 0 failed.
-The pixel gate against M5's merge (1aeaf1b) is expected to show the 15 legacy scenes identical, `focus-ring-kinds`
-allowed (the radio joins it, D120) and the new scenes new; the orchestrator runs it alongside review.
+The gallery has 50 pages and 231 scene names in `--list` (152 + 79); the workspace has 1,323 tests, 0 failed.
+The pixel gate against M5's merge (1aeaf1b), measured at aeb6cbf: exit 0, 151 scenes identical (the 15 legacy ones
+among them; `focus-ring-kinds` allowed, the radio joins it, D120; the new scenes are new).
 
-Bench at the tip (`cargo run --release -p gallery -- --bench`, 2080 x 1320, 5 runs, 50 pages, machine busy: load
-average 18 to 45 during the run, 42 at the end): 49 pages ok (`ui` and `focus` each over in 1 of 5 runs), 1 OVER by D85, `dialog` (p99 16.75 ms against
-16.6, worst frame 21.9 ms, over in 4 of 5 runs). The dialog page and widget files are unchanged since the M5 base (the
-dialog's buttons use `button`, which M6 extended), so this reads as the machine's load (the self-test: `cpu_p50` 4.29 ms in range, spread p99 +8.57 ms and max +52.91 ms at load 45.7,
-i.e. the instrument itself was disturbed by about half a frame). Reported, not refused (D85, the user's standing
-direction). Worst other page p99: `ui` 13.53 ms; the M6 pages are at or below 8.9 ms p99 (`tab-strip` 8.88,
-`banner` 8.33, `toolbar` 8.30). A rerun on a quiet machine would settle `dialog`.
+Bench at aeb6cbf (`cargo run --release -p gallery -- --bench`, 5 runs, 50 pages, machine busy: load average 22 to 47):
+0 pages over by D85; `dialog` p99 10.03 ms, over in 0 of 5 runs. The step 14 run had `dialog` over in 4 of 5 runs at
+load 18 to 45, and the reviewer's A/B showed the M5 base going over on that page too, so read that as the machine's
+load, not as settled on a quiet machine (D85, the user's standing direction: reported, not refused). The M6 pages
+were at or below 8.9 ms p99 in the step 14 run (`tab-strip` 8.88, `banner` 8.33, `toolbar` 8.30).
+
+M6 review fix round 1 (F1): a disabled tab strip (`with_enabled(false, ..)`) activates nothing from Enter or Space
+(both are still consumed), its tab and close nodes report `State::Disabled` with no `Focusable` and no actions, and an
+open tab menu closes. No drawing changed.
 
 Earlier milestones: M5 (foundations) is merged to main at 1aeaf1b on top of M4 (interaction and motion, d9fe71f), M3
 (catalogue specs) and M2 (seams and crate split). `docs/architecture.md` has the module map, the focus queue and the
