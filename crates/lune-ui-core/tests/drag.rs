@@ -1540,3 +1540,58 @@ fn a_free_gesture_in_a_scrolled_parent_reads_the_same_as_on_a_plain_page() {
     assert_eq!(plain, want);
     assert_eq!(free_result(true), plain);
 }
+
+// The edge zone, shared by the strip and the board.
+
+#[test]
+fn edge_step_is_the_strip_s_zone_on_any_viewport() {
+    use lune_ui_core::drag::edge_step;
+    // The acceptance table, on `0..500` and moved to `100..600`.
+    for lo in [0.0, 100.0] {
+        let hi = lo + 500.0;
+        assert_eq!(edge_step(lo, lo, hi, true, true), -12.0);
+        assert_eq!(edge_step(lo + 12.0, lo, hi, true, true), -6.0);
+        assert_eq!(edge_step(lo + 24.0, lo, hi, true, true), 0.0);
+        assert_eq!(edge_step(lo - 50.0, lo, hi, true, true), -12.0);
+        assert_eq!(edge_step(hi, lo, hi, true, true), 12.0);
+        assert_eq!(edge_step(hi - 12.0, lo, hi, true, true), 6.0);
+        assert_eq!(edge_step(hi - 24.0, lo, hi, true, true), 0.0);
+        assert_eq!(edge_step(hi + 50.0, lo, hi, true, true), 12.0);
+        assert_eq!(edge_step(lo, lo, hi, false, true), 0.0);
+        assert_eq!(edge_step(hi, lo, hi, true, false), 0.0);
+    }
+    assert_eq!(edge_step(f64::NAN, 0.0, 500.0, true, true), 0.0);
+    assert_eq!(edge_step(0.0, f64::INFINITY, 500.0, true, true), 0.0);
+}
+
+#[test]
+fn a_free_press_and_release_in_one_frame_is_a_click() {
+    let b = board();
+    let cols = columns(&b);
+    let card = WidgetId::ROOT.with("card");
+    let rect = Rect::new(10.0, 60.0, 80.0, 40.0);
+    let mut drag = FreeDrag::new();
+    let mut h = UiHarness::new(WIN);
+    let frame = |h: &mut UiHarness, ms: u64, drag: &mut FreeDrag| {
+        let mut out = None;
+        h.at_ms(ms).frame(|ui: &mut Ui<'_>| {
+            let r = ui.interact(card, rect, Sense::DRAG);
+            out = Some(ui.free_drag_gesture(card, &r, drag, 5, &cols));
+        });
+        out.expect("a frame")
+    };
+    frame(&mut h, 0, &mut drag);
+    h.input.pointer_to(50.0, 80.0);
+    frame(&mut h, 10, &mut drag);
+    h.input.press(P);
+    let armed = frame(&mut h, 20, &mut drag);
+    assert_eq!(armed.result, FreeResult::None);
+    assert_eq!(drag.pressed(), Some(5));
+    assert_eq!(drag.source(), None, "armed, no drag");
+    h.input.release(P);
+    assert_eq!(frame(&mut h, 30, &mut drag).result, FreeResult::Click);
+    assert_eq!(drag.pressed(), None);
+    h.input.click(P);
+    assert_eq!(frame(&mut h, 40, &mut drag).result, FreeResult::Click);
+    assert!(!drag.is_active());
+}
