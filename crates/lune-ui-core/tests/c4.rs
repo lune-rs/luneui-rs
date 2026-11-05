@@ -2948,6 +2948,561 @@ mod m8 {
     }
 }
 
+mod m9 {
+    use super::*;
+
+    use lune_ui_core::access::AccessValue;
+    use lune_ui_core::code_doc::CodeDoc;
+    use lune_ui_core::icon;
+    use lune_ui_core::shortcuts::{Binding, Chord, Scope};
+    use lune_ui_core::testing::disabled_violations;
+    use lune_ui_core::widgets::code_block::CodeBlockOptions;
+    use lune_ui_core::widgets::code_editor::CodeOptions;
+    use lune_ui_core::widgets::diff_view::{
+        DiffLine, DiffMode, DiffOptions, HunkAction, LineKind, pair_rows,
+    };
+    use lune_ui_core::widgets::markdown::{MdBlock, MdInline, MdItem, MdOptions, MdTask};
+
+    const M9_WIN: (f32, f32) = (1240.0, 900.0);
+    const BLOCK: Rect = Rect::new(10.0, 10.0, 480.0, 62.0);
+    const EDITOR: Rect = Rect::new(510.0, 10.0, 500.0, 200.0);
+    const DOC: Rect = Rect::new(10.0, 230.0, 480.0, 300.0);
+    const DIFF: Rect = Rect::new(510.0, 230.0, 700.0, 300.0);
+
+    const SNIPPET: &str = "let a = 1;\nlet b = 2;\nlet c = a + b;";
+    const HUNK: [HunkAction<'static>; 1] = [HunkAction {
+        glyph: icon::ADD,
+        label: "Stage hunk",
+    }];
+
+    /// A key a focused composite uses: a named key, or Command with a letter.
+    #[derive(Debug, Clone, Copy)]
+    enum Probe {
+        Named(NamedKey),
+        Cmd(&'static str),
+    }
+
+    const KEYS: [Probe; 12] = [
+        Probe::Named(NamedKey::ArrowUp),
+        Probe::Named(NamedKey::ArrowDown),
+        Probe::Named(NamedKey::ArrowLeft),
+        Probe::Named(NamedKey::ArrowRight),
+        Probe::Named(NamedKey::Home),
+        Probe::Named(NamedKey::End),
+        Probe::Named(NamedKey::PageUp),
+        Probe::Named(NamedKey::PageDown),
+        Probe::Named(NamedKey::Enter),
+        Probe::Named(NamedKey::Space),
+        Probe::Cmd("a"),
+        Probe::Cmd("c"),
+    ];
+
+    fn press(h: &mut UiHarness, p: Probe) {
+        match p {
+            Probe::Named(k) => key(h, k),
+            Probe::Cmd(c) => {
+                h.input.set_modifiers(Modifiers {
+                    logo: true,
+                    ..Modifiers::default()
+                });
+                h.input.key_down(Key::Character(c.to_owned()), None);
+                h.input.set_modifiers(Modifiers::default());
+            }
+        }
+    }
+
+    fn binding(p: Probe) -> Binding {
+        match p {
+            Probe::Named(k) => {
+                Binding::new(Scope::Global, Chord::key(Key::Named(k)), format!("g-{k:?}"))
+            }
+            Probe::Cmd(c) => Binding::new(
+                Scope::Global,
+                Chord::key(Key::Character(c.to_owned())).primary(),
+                format!("g-cmd-{c}"),
+            ),
+        }
+    }
+
+    /// The app side of the page: the editor's document, and what the frames reported.
+    #[derive(Debug, Clone)]
+    struct Page {
+        enabled: bool,
+        /// The diff side by side.
+        split: bool,
+        doc: CodeDoc,
+        // Reported.
+        copied: u32,
+        changed: u32,
+        links: Vec<String>,
+        tasks: Vec<u64>,
+        hunks: Vec<(u32, usize)>,
+    }
+
+    impl Page {
+        fn new() -> Self {
+            Page {
+                enabled: true,
+                split: false,
+                doc: CodeDoc::new("one\ntwo\nthree"),
+                copied: 0,
+                changed: 0,
+                links: Vec::new(),
+                tasks: Vec::new(),
+                hunks: Vec::new(),
+            }
+        }
+
+        /// Everything the keys of a composite could change.
+        fn state(&self) -> impl PartialEq + std::fmt::Debug + use<> {
+            (
+                self.doc.text().to_owned(),
+                self.copied,
+                self.changed,
+                self.links.clone(),
+                self.tasks.clone(),
+                self.hunks.clone(),
+            )
+        }
+    }
+
+    fn text(s: &str) -> MdInline<'_> {
+        MdInline::Text {
+            text: s,
+            bold: false,
+            italic: false,
+            strike: false,
+        }
+    }
+
+    fn page_frame(h: &mut UiHarness, p: &mut Page) -> FrameOutput {
+        let (enabled, split) = (p.enabled, p.split);
+        let (_, out) = h.frame(|ui: &mut Ui<'_>| {
+            ui.painter().on(LayerId::Page);
+            ui.with_enabled(enabled, |ui| {
+                let b = ui.code_block(
+                    "block",
+                    BLOCK,
+                    SNIPPET,
+                    &CodeBlockOptions {
+                        label: "Snippet",
+                        ..CodeBlockOptions::default()
+                    },
+                );
+                p.copied += u32::from(b.copied);
+
+                let e = ui.code_editor(
+                    "editor",
+                    EDITOR,
+                    &mut p.doc,
+                    &CodeOptions {
+                        label: "Notes",
+                        ..CodeOptions::default()
+                    },
+                );
+                p.changed += u32::from(e.changed);
+
+                let title = [text("Guide")];
+                let para = [
+                    text("See the "),
+                    MdInline::Link {
+                        label: "docs",
+                        url: "docs/a.md",
+                    },
+                ];
+                let step = [text("ship it")];
+                let step_blocks = [MdBlock::Paragraph(&step)];
+                let items = [MdItem {
+                    marker: "-",
+                    blocks: &step_blocks,
+                    task: Some(MdTask {
+                        checked: false,
+                        id: 7,
+                    }),
+                }];
+                let blocks = [
+                    MdBlock::Heading {
+                        level: 2,
+                        inlines: &title,
+                    },
+                    MdBlock::Paragraph(&para),
+                    MdBlock::List { items: &items },
+                    MdBlock::Code {
+                        text: "let x = 1;",
+                        spans: &[],
+                    },
+                ];
+                let m = ui.markdown(
+                    "md",
+                    DOC,
+                    &blocks,
+                    &MdOptions {
+                        label: "Guide",
+                        tasks_live: true,
+                        identity: None,
+                    },
+                );
+                p.links.extend(m.link);
+                p.tasks.extend(m.task);
+
+                let lines = [
+                    DiffLine {
+                        hunk: Some(0),
+                        ..DiffLine::new(LineKind::Hunk, "@@ -1,3 +1,3 @@")
+                    },
+                    DiffLine {
+                        old: Some(1),
+                        new: Some(1),
+                        ..DiffLine::new(LineKind::Context, "alpha")
+                    },
+                    DiffLine {
+                        old: Some(2),
+                        ..DiffLine::new(LineKind::Removed, "beta old")
+                    },
+                    DiffLine {
+                        new: Some(2),
+                        ..DiffLine::new(LineKind::Added, "beta new")
+                    },
+                ];
+                let rows = pair_rows(&lines);
+                let d = ui.diff_view(
+                    "diff",
+                    DIFF,
+                    &lines,
+                    &DiffOptions {
+                        mode: if split {
+                            DiffMode::Split(&rows)
+                        } else {
+                            DiffMode::Unified
+                        },
+                        wrap: false,
+                        label: "Changes",
+                        actions: &HUNK,
+                        identity: 1,
+                        widest_chars: 0,
+                    },
+                );
+                p.hunks.extend(d.hunk);
+            });
+        });
+        out
+    }
+
+    fn run(h: &mut UiHarness, p: &mut Page, at: u64) -> FrameOutput {
+        h.at_ms(at);
+        page_frame(h, p)
+    }
+
+    fn settled_with(mut p: Page) -> (UiHarness, Page) {
+        let mut h = UiHarness::new(M9_WIN);
+        for at in [0, 500, 1000] {
+            run(&mut h, &mut p, at);
+        }
+        (h, p)
+    }
+
+    fn by_name<'a>(out: &'a FrameOutput, role: Role, name: &str) -> &'a Node {
+        out.tree
+            .nodes
+            .iter()
+            .find(|n| n.role == role && n.name == name)
+            .unwrap_or_else(|| panic!("no {role:?} named {name:?}"))
+    }
+
+    fn inject(h: &mut UiHarness, target: WidgetId, action: Action, value: Option<AccessValue>) {
+        h.input.access(AccessAction {
+            target,
+            action,
+            value,
+        });
+    }
+
+    /// The unified pane's node (a split diff has `l` and `r`).
+    fn diff_pane() -> WidgetId {
+        id("diff").with("u")
+    }
+
+    fn block_copy() -> WidgetId {
+        id("block").with("copy")
+    }
+
+    #[test]
+    fn a_frame_of_every_m9_widget_yields_the_expected_roles_names_and_states() {
+        let (mut h, mut p) = settled_with(Page::new());
+        let out = run(&mut h, &mut p, 1100);
+
+        // The code block: read-only multiline text under its label, and a named copy button.
+        let body = by_name(&out, Role::MultilineText, "Snippet");
+        assert_eq!(body.id, id("block").with("body"));
+        assert!(body.states.contains(State::ReadOnly));
+        assert!(!body.actions.contains(Action::SetValue));
+        let copy = out.tree.get(block_copy()).expect("the copy button");
+        assert_eq!((copy.role, copy.name.as_str()), (Role::Button, "Copy code"));
+        assert!(copy.actions.contains(Action::Default));
+
+        // The editor: editable multiline text carrying its lines, with a set-value action.
+        let ed = by_name(&out, Role::MultilineText, "Notes");
+        assert_eq!(ed.id, id("editor"));
+        assert!(!ed.states.contains(State::ReadOnly));
+        assert!(ed.states.contains(State::Focusable));
+        assert!(ed.actions.contains(Action::SetValue));
+        assert_eq!(ed.value, Some(Value::Text("one\ntwo\nthree".to_owned())));
+
+        // The document: a group under its label; the heading is static text with its level, the
+        // link carries its URL, the task box is a checkbox named by its text, the fenced code is a
+        // block of its own.
+        let doc = by_name(&out, Role::Group, "Guide");
+        assert_eq!(doc.id, id("md"));
+        let heading = by_name(&out, Role::StaticText, "Guide");
+        assert_eq!(heading.level, Some(2));
+        let link = by_name(&out, Role::Link, "docs");
+        assert_eq!(link.description.as_deref(), Some("docs/a.md"));
+        assert!(link.states.contains(State::Focusable));
+        assert!(link.actions.contains(Action::Default));
+        let task = by_name(&out, Role::Checkbox, "ship it");
+        assert!(!task.states.contains(State::Checked));
+        assert!(task.actions.contains(Action::Default));
+        assert_eq!(
+            out.tree
+                .nodes
+                .iter()
+                .filter(|n| n.role == Role::MultilineText && n.name.is_empty())
+                .count(),
+            1,
+            "the fenced code is one more block"
+        );
+
+        // The diff: a table of rows with cells, and the hunk's action a named button.
+        let diff = by_name(&out, Role::Table, "Changes");
+        assert_eq!(diff.id, diff_pane());
+        let rows: Vec<&Node> = out
+            .tree
+            .nodes
+            .iter()
+            .filter(|n| n.role == Role::Row && diff.children.contains(&n.id))
+            .collect();
+        assert_eq!(rows.len(), 4, "a row per line");
+        assert!(rows.iter().all(|r| !r.children.is_empty()), "with cells");
+        let stage = by_name(&out, Role::Button, "Stage hunk");
+        assert!(stage.actions.contains(Action::Default));
+    }
+
+    #[test]
+    fn injected_actions_work_on_a_link_a_task_box_a_hunk_action_the_copy_button_and_a_set_value() {
+        let (mut h, mut p) = settled_with(Page::new());
+        let out = run(&mut h, &mut p, 1100);
+        let link = by_name(&out, Role::Link, "docs").id;
+        let task = by_name(&out, Role::Checkbox, "ship it").id;
+        let stage = by_name(&out, Role::Button, "Stage hunk").id;
+
+        inject(&mut h, link, Action::Default, None);
+        run(&mut h, &mut p, 1200);
+        assert_eq!(p.links, ["docs/a.md"]);
+        inject(&mut h, task, Action::Default, None);
+        run(&mut h, &mut p, 1300);
+        assert_eq!(p.tasks, [7]);
+        inject(&mut h, stage, Action::Default, None);
+        run(&mut h, &mut p, 1400);
+        assert_eq!(p.hunks, [(0, 0)]);
+        inject(&mut h, block_copy(), Action::Default, None);
+        let out = run(&mut h, &mut p, 1500);
+        assert_eq!(p.copied, 1);
+        assert!(
+            out.tree
+                .nodes
+                .iter()
+                .any(|n| n.role == Role::Status && n.live.is_some()),
+            "the copy says so politely"
+        );
+        let new = Some(AccessValue::Text("a\r\nb".to_owned()));
+        inject(&mut h, id("editor"), Action::SetValue, new);
+        run(&mut h, &mut p, 1600);
+        assert_eq!(p.doc.text(), "a\nb");
+        assert_eq!(p.changed, 1);
+        // Each acted once: none touched another's report.
+        assert_eq!((p.links.len(), p.tasks.len(), p.hunks.len()), (1, 1, 1));
+    }
+
+    #[test]
+    fn a_tab_cycle_over_all_four_visits_the_stops_in_order_once() {
+        let (mut h, mut p) = settled_with(Page::new());
+        let mut ms = 1000;
+        let mut seen: Vec<WidgetId> = Vec::new();
+        for _ in 0..40 {
+            key(&mut h, NamedKey::Tab);
+            ms += 100;
+            let out = run(&mut h, &mut p, ms);
+            let f = out.focused.expect("Tab focuses something");
+            if seen.contains(&f) {
+                break;
+            }
+            seen.push(f);
+        }
+        let out = run(&mut h, &mut p, ms + 100);
+        let roles: Vec<Role> = seen
+            .iter()
+            .map(|f| out.tree.get(*f).expect("a stop").role)
+            .collect();
+        // The block's text and copy button, the editor, the link, the task box, the fenced code's
+        // copy button (its text is off the Tab order), the diff's body and its hunk action.
+        assert_eq!(
+            roles,
+            [
+                Role::MultilineText,
+                Role::Button,
+                Role::MultilineText,
+                Role::Link,
+                Role::Checkbox,
+                Role::Button,
+                Role::Table,
+                Role::Button,
+            ],
+            "{seen:?}"
+        );
+        assert_eq!(seen[0], id("block").with("body"));
+        assert_eq!(seen[1], block_copy());
+        assert_eq!(seen[2], id("editor"));
+        assert_eq!(seen[6], diff_pane());
+    }
+
+    #[test]
+    fn every_m9_widget_in_a_disabled_scope_passes_the_walk() {
+        let p = Page {
+            enabled: false,
+            ..Page::new()
+        };
+        let (mut h, mut p) = settled_with(p);
+        let out = run(&mut h, &mut p, 1100);
+        for (name, root) in [
+            ("code block", id("block").with("body")),
+            ("code block copy", block_copy()),
+            ("editor", id("editor")),
+            ("markdown", id("md")),
+            ("diff", diff_pane()),
+        ] {
+            assert!(out.tree.get(root).is_some(), "{name}: no node");
+            assert_eq!(disabled_violations(&out.tree, root), [], "{name}");
+        }
+        // The diff side by side: both panes and their hunk actions.
+        let p = Page {
+            enabled: false,
+            split: true,
+            ..Page::new()
+        };
+        let (mut h, mut p) = settled_with(p);
+        let out = run(&mut h, &mut p, 1100);
+        for side in ["l", "r"] {
+            let root = id("diff").with(side);
+            assert!(out.tree.get(root).is_some(), "pane {side}: no node");
+            assert_eq!(disabled_violations(&out.tree, root), [], "pane {side}");
+        }
+    }
+
+    /// The first Tab stop `want` accepts, focused, on a page with a Global binding on every key
+    /// of `KEYS`; and the time.
+    fn focused_page(split: bool, want: impl Fn(&Node) -> bool) -> (UiHarness, Page, u64) {
+        let mut h = UiHarness::new(M9_WIN);
+        for k in KEYS {
+            h.shortcuts.add(binding(k));
+        }
+        let mut p = Page {
+            split,
+            ..Page::new()
+        };
+        for at in [0, 500, 1000] {
+            run(&mut h, &mut p, at);
+        }
+        let mut ms = 1000;
+        for _ in 0..12 {
+            key(&mut h, NamedKey::Tab);
+            ms += 100;
+            let out = run(&mut h, &mut p, ms);
+            if out.focused.and_then(|f| out.tree.get(f)).is_some_and(&want) {
+                return (h, p, ms);
+            }
+        }
+        panic!("no Tab stop of that kind");
+    }
+
+    #[test]
+    fn a_disabled_page_takes_every_key_a_focused_composite_takes_and_fires_no_global_binding() {
+        type Want = fn(&Node) -> bool;
+        // What each takes at least: a read-only text only Select all (the area leaves the rest of
+        // its keys to it while there is nothing to scroll), a button Enter and Space.
+        let stops: [(&str, Want, usize, bool); 9] = [
+            (
+                "code block text",
+                |n| n.id == id("block").with("body"),
+                1,
+                false,
+            ),
+            ("code block copy", |n| n.id == block_copy(), 2, false),
+            ("editor", |n| n.id == id("editor"), 8, false),
+            ("markdown link", |n| n.role == Role::Link, 2, false),
+            ("markdown task box", |n| n.role == Role::Checkbox, 1, false),
+            ("diff body", |n| n.id == diff_pane(), 4, false),
+            ("diff left pane", |n| n.id == id("diff").with("l"), 4, true),
+            ("diff right pane", |n| n.id == id("diff").with("r"), 4, true),
+            ("diff hunk action", |n| n.name == "Stage hunk", 2, false),
+        ];
+        // Every leak is listed, so a mutant of one reader names the stops it reaches.
+        let mut leaks: Vec<String> = Vec::new();
+        for (name, want, least, split) in stops {
+            // The instrument: the keys the composite uses are the ones that fire nothing while it
+            // is enabled; the rest stay shortcuts.
+            let mut used = Vec::new();
+            for k in KEYS {
+                let (mut h, mut p, ms) = focused_page(split, want);
+                press(&mut h, k);
+                if run(&mut h, &mut p, ms + 100).fired.is_empty() {
+                    used.push(k);
+                }
+            }
+            assert!(
+                used.len() >= least,
+                "{name} uses at least {least} of the keys: {used:?}"
+            );
+            for k in used {
+                let (mut h, mut p, mut ms) = focused_page(split, want);
+                p.enabled = false;
+                let before = p.state();
+                press(&mut h, k);
+                ms += 100;
+                let out = run(&mut h, &mut p, ms);
+                if !out.fired.is_empty() {
+                    leaks.push(format!("{name}: {k:?} reached {:?}", out.fired));
+                }
+                if p.state() != before {
+                    leaks.push(format!("{name}: {k:?} changed the page"));
+                }
+            }
+        }
+        assert_eq!(leaks, Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_page_of_them_all_at_rest_reports_idle() {
+        let (mut h, mut p) = settled_with(Page::new());
+        for at in [1100, 1200, 5000] {
+            assert_eq!(run(&mut h, &mut p, at).repaint, Repaint::Idle, "{at}");
+        }
+        // After a copy too, once its check mark has gone (1.5 s of app time).
+        for target in [block_copy()] {
+            inject(&mut h, target, Action::Default, None);
+        }
+        run(&mut h, &mut p, 5100);
+        // The frame that ends the feedback fades the check mark out, then rests.
+        run(&mut h, &mut p, 7000);
+        for at in [7500, 8000, 9000] {
+            assert_eq!(
+                run(&mut h, &mut p, at).repaint,
+                Repaint::Idle,
+                "after: {at}"
+            );
+        }
+    }
+}
+
 /// D176: a composite that nests an area and has nothing to scroll leaves the wheel to the area
 /// around it; one that overflows keeps it, under the single-topmost rule. The board's own cases are
 /// in `widget_kanban_board`.
@@ -2957,6 +3512,11 @@ mod nested_wheel {
 
     use super::*;
 
+    use lune_ui_core::code_doc::CodeDoc;
+    use lune_ui_core::widgets::code_block::CodeBlockOptions;
+    use lune_ui_core::widgets::code_editor::CodeOptions;
+    use lune_ui_core::widgets::diff_view::{DiffLine, DiffMode, DiffOptions, LineKind, pair_rows};
+    use lune_ui_core::widgets::markdown::{MdBlock, MdInline, MdOptions};
     use lune_ui_core::widgets::scroll_area::{Extent, ScrollOptions};
     use lune_ui_core::widgets::tab_strip::{Tab, TabKey, TabStripOptions};
     use lune_ui_core::widgets::table::{Cell, ColumnWidth, TableColumn, TableOptions};
@@ -3186,5 +3746,121 @@ mod nested_wheel {
             ui.virtual_list("l", INNER, &o, |i| RowKey(i as u64), |_, _| 30.0);
         };
         assert_eq!(swipe(list, (-60.0, -60.0)), (60.0, 0.0));
+    }
+    /// D178 and the M9 composites: the editor scrolls vertically (and sideways unwrapped), the
+    /// document and the diff vertically, so each keeps the wheel when it overflows and gives it to the
+    /// page when it fits. The block's own cases are `a_code_block_scrolls_only_sideways`.
+    #[test]
+    fn a_code_editor_wrapped_or_not() {
+        for wrap in [false, true] {
+            check("code editor", INNER, &|ui, lines| {
+                let mut doc = CodeDoc::new("a line\n".repeat(lines));
+                let o = CodeOptions {
+                    wrap,
+                    ..CodeOptions::default()
+                };
+                ui.code_editor("e", INNER, &mut doc, &o);
+            });
+        }
+    }
+
+    #[test]
+    fn a_markdown_document() {
+        let words = [MdInline::Text {
+            text: "a paragraph",
+            bold: false,
+            italic: false,
+            strike: false,
+        }];
+        check("markdown", INNER, &|ui, count| {
+            let blocks: Vec<MdBlock<'_>> = (0..count).map(|_| MdBlock::Paragraph(&words)).collect();
+            let o = MdOptions {
+                label: "Doc",
+                tasks_live: false,
+                identity: None,
+            };
+            ui.markdown("m", INNER, &blocks, &o);
+        });
+    }
+
+    #[test]
+    fn a_diff_unified_or_split() {
+        for split in [false, true] {
+            check("diff", INNER, &|ui, count| {
+                let texts: Vec<String> = (0..count).map(|i| format!("line {i}")).collect();
+                let lines: Vec<DiffLine<'_>> = texts
+                    .iter()
+                    .map(|t| DiffLine::new(LineKind::Context, t))
+                    .collect();
+                let rows = pair_rows(&lines);
+                let o = DiffOptions {
+                    mode: if split {
+                        DiffMode::Split(&rows)
+                    } else {
+                        DiffMode::Unified
+                    },
+                    wrap: false,
+                    label: "Changes",
+                    actions: &[],
+                    identity: 1,
+                    widest_chars: 0,
+                };
+                ui.diff_view("d", INNER, &lines, &o);
+            });
+        }
+    }
+
+    /// The page's offset after `delta` over the middle of `INNER`, with `draw` in a page that
+    /// scrolls both ways.
+    fn page_after(delta: (f32, f32), draw: &mut dyn FnMut(&mut Ui<'_>)) -> (f64, f64) {
+        let draw = RefCell::new(draw);
+        let frame = |h: &mut UiHarness, ms: u64| {
+            let mut off = (0.0, 0.0);
+            h.at_ms(ms).frame(|ui: &mut Ui<'_>| {
+                let o = ScrollOptions {
+                    extent: Some((2000.0, 3000.0)),
+                    ..ScrollOptions::default()
+                };
+                let rect = Rect::new(0.0, 0.0, 900.0, 700.0);
+                let page = ui.scroll_area("page", rect, &o, |ui, _| {
+                    (draw.borrow_mut())(ui);
+                    ((), Extent::new(2000.0, 3000.0))
+                });
+                off = page.offset;
+            });
+            off
+        };
+        let mut h = UiHarness::new(WIN);
+        frame(&mut h, 0);
+        h.input
+            .pointer_to(INNER.x + INNER.w / 2.0, INNER.y + INNER.h / 2.0);
+        frame(&mut h, 10);
+        h.input.scroll_pixels(delta.0, delta.1);
+        frame(&mut h, 20);
+        frame(&mut h, 400)
+    }
+
+    /// D178: the block has no vertical extent, so the vertical wheel is the page's whatever the line
+    /// count; the sideways one is the block's only when a line is wider than it.
+    #[test]
+    fn a_code_block_scrolls_only_sideways() {
+        for lines in [FEW, MANY] {
+            let text = "let a = 1;\n".repeat(lines);
+            let at = page_after((0.0, -60.0), &mut |ui| {
+                ui.code_block("b", INNER, &text, &CodeBlockOptions::default());
+            });
+            assert_eq!(
+                at,
+                (0.0, 60.0),
+                "{lines} lines: the page takes the vertical wheel"
+            );
+        }
+        for (width, page_x) in [(5, 60.0), (150, 0.0)] {
+            let text = "x".repeat(width);
+            let at = page_after((-60.0, 0.0), &mut |ui| {
+                ui.code_block("b", INNER, &text, &CodeBlockOptions::default());
+            });
+            assert_eq!(at, (page_x, 0.0), "a line of {width}: the sideways wheel");
+        }
     }
 }
