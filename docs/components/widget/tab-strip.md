@@ -94,6 +94,7 @@ Never animated: the strip's layout, tab widths changing as the close button show
 
 ### Input and focus
 
+- Wheel and swipe: a strip whose tabs fit registers no scroll sense while it has nothing to scroll, so the delta reaches the scroll area around it; one that overflows keeps it (D176).
 - Pointer: press on a tab activates it and arms a reorder; click on the close button closes (a separate click target); click on the new-tab button adds a tab; right press on a tab opens its context menu; wheel and trackpad scroll the strip [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:303-311,338-348,365-368], [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:244-247]. Double-click is not bound in the file read.
 - Reorder: through `infra.drag-and-drop` (threshold 4 horizontal, nearest-slot target, edge auto-scroll, Escape cancels) [infra.drag-and-drop].
 - Keys: Meta+T opens a new tab, which is the app's shortcut [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:17-19], [D122]; Escape cancels a drag [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml.cs:336-341]. No close or rename key [D122].

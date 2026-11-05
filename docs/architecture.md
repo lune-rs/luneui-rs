@@ -229,7 +229,8 @@ reports no press in a disabled scope, so the drag has ended and Escape has nothi
 the shortcuts by design. A drag inside an overlay (a dialog body) is a different case, fixed in M8 (D175): `Ui::begin` used to turn
 Escape into the overlay's dismissal and never queue it, so the drag could not take it. The three readers of
 `consume_key_while_pressed` (`drag_gesture`, `free_drag_gesture`, the splitter) now call `Ui::note_live_gesture` while they drag,
-and the next frame's Escape is queued for them; once the drag ends the next Escape dismisses the overlay.
+and the next frame's Escape is queued for them while they hold the capture at the key (D176); once the drag ends the next Escape
+dismisses the overlay.
 
 One item disabled in a live group holds too, by probe: a nav row, a rail button, a menu row, a `toolbar_action`, the
 dialog's disabled confirm. A disabled radio option takes its keys, and the arrows move on to a live sibling.
@@ -483,7 +484,12 @@ Since M8 (D160 to D174; nothing public was removed or changed in signature):
   `luneui.pie-chart.name` and four `luneui.kanban-board.*` keys; no `Theme` token was added;
 - Escape cancels a live pointer drag before the overlay around it dismisses (D175): `UiStore.gesture_live`, set through the
   crate-private `Ui::note_live_gesture` by `drag_gesture`, `free_drag_gesture` and the splitter while they drag, read and
-  cleared at each `begin`; the board's column list registers no scroll sense when its cards fit, so the wheel reaches the board;
+  cleared at each `begin`, and an Escape counts for it only while the capture holds at the key (D176);
+- a composite that nests an area and knows its extent disables an axis with nothing to scroll (`Bars::unless_fits`, D176), so it
+  registers no scroll sense and the delta reaches the area around it: the board and its columns, `virtual_list`, the table,
+  `tree_view`, `tab_strip`, `text_area`, `toast_history`. Not these, and why, in D176: `page`, `settings_page` (measured extent,
+  made to be the outermost area; nested, one that fits keeps the delta), the dropdown list, the search picker's rows, the palette's results, the toast log (overlays). The proof is
+  `tests/c4.rs` `nested_wheel` and the board's tests in `widget_kanban_board`;
 - no scene that existed before M8 changed: the pixel gate against the M7 tip reads 305 identical and 27 new.
 
 Since M7 (D137 to D154):

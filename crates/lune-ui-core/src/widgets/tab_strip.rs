@@ -419,7 +419,10 @@ impl Ui<'_> {
         // Window space, taken outside the area: inside it the transform holds the scroll too.
         let origin = f64::from(self.painter().transformed(viewport).x);
         let area = ScrollOptions {
-            bars: (Bars::Hidden, Bars::Disabled),
+            bars: (
+                Bars::Hidden.unless_fits(extent, f64::from(viewport.w)),
+                Bars::Disabled,
+            ),
             wheel_x: true,
             extent: Some((extent, f64::from(viewport.h))),
             ..ScrollOptions::default()

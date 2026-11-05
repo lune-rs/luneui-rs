@@ -84,6 +84,7 @@ Never animated: the per-row expand, virtualized rows during scroll [L .claude/do
 
 ### Input and focus
 
+- Wheel and swipe: a tree registers no scroll sense while it has nothing to scroll, so the delta reaches the scroll area around it; one that overflows keeps it (D176).
 - Pointer: a press on a row selects it and moves the cursor; a press on the chevron toggles and does neither; `toggle_on_row` toggles from anywhere on a row with children, as Lunegit's folder rows do [D151]. A double click on the row activates; its second press does not toggle (with `toggle_on_row` its first has), and two quick presses on a chevron are two toggles. A secondary click reports `context`. Hover fills the row [W docs/ui/components.md:263-276].
 - Keyboard [D151]: Up, Down, Home, End, PageUp and PageDown (by the rows the viewport holds) move the cursor, no wrap; Right expands, or moves to the first child; Left collapses, or moves to the parent; Enter activates; Space selects. Arrows select nothing. On a top row that is closed or a leaf, Left does nothing and is consumed. No type-ahead (no source). The cursor stays in view (nearest), also when it stands in a block still opening.
 - Cursor [D151]: `None` until the tree first holds the focus (it then takes the selected row, else the first in view) or a row is pressed. It is always on a row it can reach: a row hidden or removed gives it to the nearest visible ancestor, by the path it remembers if the row left `rows`, else to its last index. Rows of a closing block are out of reach from the toggle on.

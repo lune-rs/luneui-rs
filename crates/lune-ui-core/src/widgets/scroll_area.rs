@@ -51,6 +51,21 @@ pub enum Bars {
     Disabled,
 }
 
+impl Bars {
+    /// This bar while `extent` overflows `viewport`, else [`Bars::Disabled`]. A composite that nests
+    /// an area and knows its extent before the area runs passes its axes through this: an area with
+    /// no live axis registers no scroll sense, so the delta reaches the area around it, which the
+    /// single-topmost rule would otherwise end here (D176). The offset still clamps on a disabled
+    /// axis, so an area that shrinks to fit returns to 0.
+    pub(crate) fn unless_fits(self, extent: f64, viewport: f64) -> Self {
+        if extent > viewport {
+            self
+        } else {
+            Self::Disabled
+        }
+    }
+}
+
 /// What a scroll area is given besides its rect.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ScrollOptions {

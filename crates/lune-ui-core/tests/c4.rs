@@ -2947,3 +2947,185 @@ mod m8 {
         }
     }
 }
+
+/// D176: a composite that nests an area and has nothing to scroll leaves the wheel to the area
+/// around it; one that overflows keeps it, under the single-topmost rule. The board's own cases are
+/// in `widget_kanban_board`.
+mod nested_wheel {
+    use std::cell::RefCell;
+    use std::time::Duration;
+
+    use super::*;
+
+    use lune_ui_core::widgets::scroll_area::{Extent, ScrollOptions};
+    use lune_ui_core::widgets::tab_strip::{Tab, TabKey, TabStripOptions};
+    use lune_ui_core::widgets::table::{Cell, ColumnWidth, TableColumn, TableOptions};
+    use lune_ui_core::widgets::text_area::AreaOptions;
+    use lune_ui_core::widgets::toast::{ToastKind, ToastSpec, Toasts};
+    use lune_ui_core::widgets::tone::Tone;
+    use lune_ui_core::widgets::tree_view::{TreeOptions, TreeRow};
+    use lune_ui_core::widgets::virtual_list::{Heights, ListOptions, RowKey, SelectionMode};
+
+    const INNER: Rect = Rect::new(40.0, 40.0, 400.0, 200.0);
+    const FEW: usize = 2;
+    const MANY: usize = 100;
+
+    /// The page's offset after a 60 px wheel step over the middle of `at`, with `draw` in the page.
+    fn page_after_a_wheel_step(at: Rect, draw: &mut dyn FnMut(&mut Ui<'_>)) -> f64 {
+        let draw = RefCell::new(draw);
+        let frame = |h: &mut UiHarness, ms: u64| {
+            let mut off = 0.0;
+            h.at_ms(ms).frame(|ui: &mut Ui<'_>| {
+                let o = ScrollOptions {
+                    extent: Some((900.0, 3000.0)),
+                    ..ScrollOptions::default()
+                };
+                let rect = Rect::new(0.0, 0.0, 900.0, 700.0);
+                let page = ui.scroll_area("page", rect, &o, |ui, _| {
+                    (draw.borrow_mut())(ui);
+                    ((), Extent::new(900.0, 3000.0))
+                });
+                off = page.offset.1;
+            });
+            off
+        };
+        let mut h = UiHarness::new(WIN);
+        frame(&mut h, 0);
+        h.input.pointer_to(at.x + at.w / 2.0, at.y + at.h / 2.0);
+        frame(&mut h, 10);
+        h.input.scroll_pixels(0.0, -60.0);
+        frame(&mut h, 20);
+        frame(&mut h, 400)
+    }
+
+    /// `draw(n)` is the composite with `n` things: few fit, many overflow.
+    fn check(name: &str, at: Rect, draw: &dyn Fn(&mut Ui<'_>, usize)) {
+        let fits = page_after_a_wheel_step(at, &mut |ui| draw(ui, FEW));
+        assert_eq!(fits, 60.0, "{name}: nothing to scroll, the page moves");
+        let overflows = page_after_a_wheel_step(at, &mut |ui| draw(ui, MANY));
+        assert_eq!(overflows, 0.0, "{name}: it keeps the delta");
+    }
+
+    #[test]
+    fn a_virtual_list() {
+        check("list", INNER, &|ui, count| {
+            let o = ListOptions {
+                count,
+                heights: Heights::Fixed(30.0),
+                selection: SelectionMode::Single,
+                index_of: None,
+                label: "rows",
+            };
+            ui.virtual_list("l", INNER, &o, |i| RowKey(i as u64), |_, _| 30.0);
+        });
+    }
+
+    #[test]
+    fn a_table() {
+        const COLUMNS: [TableColumn<'static>; 1] = [TableColumn {
+            key: 1,
+            title: "Route",
+            width: ColumnWidth::Fill(1.0),
+            num: false,
+            sortable: false,
+        }];
+        check("table", INNER, &|ui, count| {
+            let o = TableOptions {
+                columns: &COLUMNS,
+                count,
+                selection: SelectionMode::Single,
+                wrap: false,
+                index_of: None,
+                label: "Routes",
+            };
+            ui.table(
+                "t",
+                INNER,
+                &o,
+                |i| RowKey(i as u64),
+                |_, _| Cell::text("ok"),
+            );
+        });
+    }
+
+    #[test]
+    fn a_tree_view() {
+        check("tree", INNER, &|ui, count| {
+            let rows: Vec<TreeRow<'_>> = (0..count as u64)
+                .map(|key| TreeRow {
+                    key,
+                    depth: 0,
+                    text: "row",
+                    glyph: None,
+                    has_children: false,
+                })
+                .collect();
+            let o = TreeOptions {
+                rows: &rows,
+                label: "Files",
+                guides: false,
+                toggle_on_row: false,
+            };
+            ui.tree_view("t", INNER, &o, |_, _| {});
+        });
+    }
+
+    #[test]
+    fn a_tab_strip() {
+        let strip = Rect::new(40.0, 40.0, 400.0, 32.0);
+        let card = Rect::new(40.0, 40.0, 400.0, 200.0);
+        check("tab strip", strip, &|ui, count| {
+            let tabs: Vec<Tab<'_>> = (0..count as u64)
+                .map(|k| Tab {
+                    key: TabKey(k),
+                    title: "A tab",
+                    closable: false,
+                    progress: None,
+                })
+                .collect();
+            let o = TabStripOptions {
+                active: Some(TabKey(0)),
+                panel_focused: false,
+                busy: None,
+                busy_tone: Tone::Neutral,
+                card,
+                menu_extra: &[],
+                name: "Sessions",
+                header_tint: None,
+            };
+            ui.tab_strip("s", strip, &tabs, &o);
+        });
+    }
+
+    #[test]
+    fn a_text_area_wrapped_or_not() {
+        for wrap in [false, true] {
+            check("text area", INNER, &|ui, lines| {
+                let mut text = "a line\n".repeat(lines);
+                let o = AreaOptions {
+                    wrap,
+                    ..AreaOptions::default()
+                };
+                ui.text_area("a", INNER, &mut text, &o);
+            });
+        }
+    }
+
+    #[test]
+    fn a_toast_history() {
+        let now = Duration::ZERO;
+        let filled = |n: usize| {
+            let mut toasts = Toasts::default();
+            for _ in 0..n {
+                let id = toasts.push(ToastSpec::new(ToastKind::Info, "Saved"), now);
+                toasts.dismiss(id, now);
+            }
+            RefCell::new(toasts)
+        };
+        let (few, many) = (filled(FEW), filled(MANY));
+        check("toast history", INNER, &|ui, n| {
+            let toasts = if n == FEW { &few } else { &many };
+            ui.toast_history("hist", INNER, &mut toasts.borrow_mut());
+        });
+    }
+}

@@ -1,6 +1,7 @@
-//! Key routing: Escape and Tab are handled at begin; every other key press, typed text, IME event
-//! and clipboard answer waits in the frame's queue, in arrival order, for the focused widget of the
-//! active scope (or, for an accessibility action's synthetic key, its target) to take it with
+//! Key routing: Escape and Tab are handled at begin (an Escape a live pointer gesture takes queues
+//! for it instead, D175); every other key press, typed text, IME event and clipboard answer waits
+//! in the frame's queue, in arrival order, for the focused widget of the active scope (or, for an
+//! accessibility action's synthetic key, its target) to take it with
 //! [`Ui::consume_key`] or [`Ui::consume_focus_event`].
 
 use crate::input::{FocusEvent, Key, Keymap, NamedKey};
@@ -137,8 +138,9 @@ impl Ui<'_> {
     /// Says that a pointer gesture which Escape cancels (a drag, a resize) is live at the end of this
     /// frame. The next frame's Escape is then queued for it, through
     /// [`Self::consume_key_while_pressed`], instead of dismissing the overlay on top; once the gesture
-    /// ends nothing sets the flag and the next Escape dismisses (D175). Call it only while dragging,
-    /// not while a press is merely armed.
+    /// ends nothing sets the flag and the next Escape dismisses (D175). An Escape in the frame the
+    /// capture ends, after the release or the capture's loss, is the overlay's too (D176). Call it
+    /// only while dragging, not while a press is merely armed.
     pub(crate) fn note_live_gesture(&mut self) {
         self.store.gesture_live = true;
     }

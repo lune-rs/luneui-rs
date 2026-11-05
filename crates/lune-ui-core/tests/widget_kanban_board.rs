@@ -22,6 +22,7 @@ use lune_ui_core::widgets::kanban_board::{
     COLUMN_GAP, COLUMN_W, CardMove, FOOTER, HEADER_GAP, KanbanCard, KanbanColumn, MARGIN,
     STACK_GAP, card_height, landed_index,
 };
+use lune_ui_core::widgets::scroll_area::{Extent, ScrollOptions};
 
 const WIN: (f32, f32) = (900.0, 600.0);
 const BOARD: Rect = Rect::new(10.0, 10.0, 880.0, 560.0);
@@ -1870,6 +1871,107 @@ fn a_wheel_over_the_cards_of_a_column_that_fits_scrolls_the_board() {
     let r = settle(&mut h, &m, 30, 30);
     let x1 = r.out.tree.get(col_id(2)).expect("a column").bounds.x;
     assert_eq!(x0 - x1, 60.0, "over a card the delta reaches the board");
+}
+
+/// One frame of the board in a scrolling page; the page's offset.
+fn in_page(h: &mut UiHarness, m: &Model, ms: u64) -> (f64, FrameOutput) {
+    h.at_ms(ms);
+    let mut off = 0.0;
+    let (_, out) = h.frame(|ui| {
+        let o = ScrollOptions {
+            extent: Some((880.0, 2000.0)),
+            ..ScrollOptions::default()
+        };
+        let page = ui.scroll_area("page", Rect::new(0.0, 0.0, 900.0, 600.0), &o, |ui, _| {
+            show(ui, m, BOARD);
+            ((), Extent::new(880.0, 2000.0))
+        });
+        off = page.offset.1;
+    });
+    (off, out)
+}
+
+/// A 60 px wheel step over `key`'s card of a board in a page: where the page and the second column
+/// went.
+fn wheel_in_page(h: &mut UiHarness, m: &Model, key: u64, ms: u64) -> (f64, f32) {
+    let (_, out) = in_page(h, m, ms);
+    let x0 = out.tree.get(col_id(2)).expect("a column").bounds.x;
+    let (cx, cy) = center(&out, key);
+    h.input.pointer_to(cx, cy);
+    in_page(h, m, ms + 10);
+    h.input.scroll_pixels(0.0, -60.0);
+    in_page(h, m, ms + 20);
+    let (off, out) = in_page(h, m, ms + 400);
+    let x1 = out.tree.get(col_id(2)).expect("a column").bounds.x;
+    (off, x0 - x1)
+}
+
+#[test]
+fn a_board_whose_columns_fit_leaves_the_wheel_to_the_page_around_it() {
+    let m = Model {
+        cols: vec![(1, vec![11, 12]), (2, vec![21])],
+        ..model()
+    };
+    let mut h = UiHarness::new(WIN);
+    assert_eq!(wheel_in_page(&mut h, &m, 11, 0), (60.0, 0.0));
+}
+
+#[test]
+fn a_board_that_overflows_keeps_the_wheel_from_the_page_around_it() {
+    let mut h = UiHarness::new(WIN);
+    assert_eq!(wheel_in_page(&mut h, &wide(), 11, 0), (0.0, 60.0));
+}
+
+/// The disabled axis still clamps: a board scrolled sideways that comes to fit returns to 0, and
+/// from then on the wheel is the page's.
+#[test]
+fn a_scrolled_board_that_shrinks_to_fit_returns_to_zero_and_leaves_the_wheel_to_the_page() {
+    let mut h = UiHarness::new(WIN);
+    let mut m = wide();
+    let (_, out) = in_page(&mut h, &m, 0);
+    let x0 = out.tree.get(col_id(2)).expect("a column").bounds.x;
+    assert_eq!(wheel_in_page(&mut h, &m, 11, 10), (0.0, 60.0));
+    m.cols.truncate(2);
+    let (_, out) = in_page(&mut h, &m, 1000);
+    let x1 = out.tree.get(col_id(2)).expect("a column").bounds.x;
+    assert_eq!(x1, x0, "on the frame it fits");
+    let (off, out) = in_page(&mut h, &m, 1010);
+    assert_eq!(off, 0.0);
+    assert_eq!(out.repaint, Repaint::Idle);
+    assert_eq!(wheel_in_page(&mut h, &m, 11, 1020), (60.0, 0.0));
+    // The offset itself went: a board that overflows again starts at 0, not where it was.
+    let again = wide();
+    let (_, out) = in_page(&mut h, &again, 2000);
+    let x2 = out.tree.get(col_id(2)).expect("a column").bounds.x;
+    assert_eq!(x2, x0);
+}
+
+/// The same with a wheel step in flight when the board comes to fit: no frame shows the old offset.
+#[test]
+fn a_board_that_shrinks_to_fit_during_a_wheel_step_returns_to_zero() {
+    let mut h = UiHarness::new(WIN);
+    let mut m = wide();
+    let (_, out) = in_page(&mut h, &m, 0);
+    let x0 = out.tree.get(col_id(2)).expect("a column").bounds.x;
+    let (cx, cy) = center(&out, 11);
+    h.input.pointer_to(cx, cy);
+    in_page(&mut h, &m, 10);
+    h.input.scroll_lines(0.0, -4.0);
+    in_page(&mut h, &m, 20);
+    let (_, out) = in_page(&mut h, &m, 40);
+    assert!(
+        out.tree.get(col_id(2)).expect("a column").bounds.x < x0,
+        "under way"
+    );
+    m.cols.truncate(2);
+    let (_, out) = in_page(&mut h, &m, 60);
+    assert_eq!(out.tree.get(col_id(2)).expect("a column").bounds.x, x0);
+    // The card's hover fade from the pointer's arrival is what may still run; the board holds still.
+    for ms in (70..600).step_by(10) {
+        let (_, out) = in_page(&mut h, &m, ms);
+        assert_eq!(out.tree.get(col_id(2)).expect("a column").bounds.x, x0);
+    }
+    assert_eq!(in_page(&mut h, &m, 600).1.repaint, Repaint::Idle);
 }
 
 #[test]

@@ -592,7 +592,10 @@ impl Ui<'_> {
         self.list_keys(&mut st, &mem, &rows, enabled, &mut out);
 
         let area = ScrollOptions {
-            bars: (Bars::Disabled, Bars::Auto),
+            bars: (
+                Bars::Disabled,
+                Bars::Auto.unless_fits(mem.heights.total(), f64::from(rect.h)),
+            ),
             extent: Some((f64::from(rect.w), mem.heights.total())),
             ..ScrollOptions::default()
         };

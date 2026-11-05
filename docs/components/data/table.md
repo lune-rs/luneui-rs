@@ -67,6 +67,7 @@ The sorted header's text colour and arrow opacity fade over `selection` (`table:
 
 ### Input and focus
 
+- Wheel and swipe: the body registers no scroll sense while it has nothing to scroll, so the delta reaches the scroll area around it; one that overflows keeps it (D176).
 - Pointer: a click on a row selects it, as the list frame (Meta toggles, Shift ranges and a drag ranges under `Multi`); a press on a control in a cell reaches the control and not the row. A click on a sortable header reports a sort: ascending on a new column, flipped on the sorted one; there is no unsorted third click (the app may clear `TableState.sort`) [D162].
 - Keys: the body is the list frame's one stop (Up, Down, Home, End, PageUp, PageDown, Shift extends, Command+C copies). The sortable headers are one roving stop (Left, Right, Home, End move over the sortable ones without wrapping; Enter and Space sort), so a table with a sortable column has two stops, and one with none has one. A Control, Alt or Command chord on any of these stays a shortcut; focused and then disabled, the keys are taken and act on nothing.
 - No cell focus: a control in a cell is its own tab stop and has its own keys; one that is not yet hardened for disabled keys or chords (stepper, slider, search picker, text fields) inherits the limit listed in `docs/architecture.md`, "Disabled keys".

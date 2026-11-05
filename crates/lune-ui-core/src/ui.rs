@@ -243,8 +243,9 @@ impl<'a> Ui<'a> {
                 .copied()
         };
         let top_escape = top_for(|o| o.dismiss_on_escape);
-        // A live gesture takes this frame's Escape before any overlay dismisses on it (D175); the
-        // flag is read once and cleared, so a host that stops calling the gesture loses it.
+        // A live gesture takes this frame's Escape before any overlay dismisses on it (D175), while
+        // it still holds the capture at the key (D176); the flag is read once and cleared, so a host
+        // that stops calling the gesture loses it.
         let gesture_live = std::mem::take(&mut store.gesture_live);
         let top_press = top_for(|o| o.dismiss_on_outside_press);
         let modal = modal_gate(store.overlays.iter());
@@ -389,7 +390,7 @@ impl<'a> Ui<'a> {
                         match key {
                             Key::Named(NamedKey::Escape)
                                 if !composing
-                                    && !gesture_live
+                                    && (!gesture_live || !store.pointer.captured())
                                     && top_escape.is_some_and(|t| t.opts.dismiss_on_escape) =>
                             {
                                 if let Some(t) = top_escape {
