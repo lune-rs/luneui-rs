@@ -32,6 +32,7 @@ use crate::access::State;
 use crate::input::NamedKey;
 use crate::motion::{Easing, Kind, Motion, Reduce, Time, Token};
 use crate::paint::{Painter, Rect};
+use crate::scene::LayerId;
 use crate::theme::Theme;
 use crate::ui::{Response, Ui, WidgetId};
 
@@ -391,14 +392,7 @@ impl ReorderDrag {
         }
         let can_left = offset > 0.0;
         let can_right = offset < extent - viewport - 0.5;
-        let x = self.vx;
-        if x < AUTO_SCROLL_ZONE && can_left {
-            return -AUTO_SCROLL_MAX * ramp((AUTO_SCROLL_ZONE - x) / AUTO_SCROLL_ZONE);
-        }
-        if x > viewport - AUTO_SCROLL_ZONE && can_right {
-            return AUTO_SCROLL_MAX * ramp((x - (viewport - AUTO_SCROLL_ZONE)) / AUTO_SCROLL_ZONE);
-        }
-        0.0
+        edge_step(self.vx, 0.0, viewport, can_left, can_right)
     }
 
     /// Sanitises the metrics into the scratch buffers and returns the usable item count (0 when
@@ -437,6 +431,23 @@ impl ReorderDrag {
 /// Linear and clamped to `[0, 1]`, deliberately not eased: an auto-scroll wants to be predictable.
 fn ramp(u: f64) -> f64 {
     if finite(u) { u.clamp(0.0, 1.0) } else { 0.0 }
+}
+
+/// The auto-scroll delta per [`AUTO_SCROLL_TICK`] of a pointer at `p` over the viewport `lo..hi`:
+/// negative within [`AUTO_SCROLL_ZONE`] of `lo` while `can_lo`, positive within it of `hi` while
+/// `can_hi`, ramping linearly to [`AUTO_SCROLL_MAX`] at the edge and past it; else 0, also for a
+/// coordinate that is not finite.
+pub fn edge_step(p: f64, lo: f64, hi: f64, can_lo: bool, can_hi: bool) -> f64 {
+    if !finite(p) || !finite(lo) || !finite(hi) {
+        return 0.0;
+    }
+    if p < lo + AUTO_SCROLL_ZONE && can_lo {
+        return -AUTO_SCROLL_MAX * ramp((lo + AUTO_SCROLL_ZONE - p) / AUTO_SCROLL_ZONE);
+    }
+    if p > hi - AUTO_SCROLL_ZONE && can_hi {
+        return AUTO_SCROLL_MAX * ramp((p - (hi - AUTO_SCROLL_ZONE)) / AUTO_SCROLL_ZONE);
+    }
+    0.0
 }
 
 /// One column of a board: its horizontal extent and its cards' vertical midpoints.
@@ -527,6 +538,11 @@ impl FreeDrag {
     /// The item being dragged, while dragging.
     pub fn source(&self) -> Option<u64> {
         self.dragging.then_some(self.source)
+    }
+
+    /// The item pressed, armed or dragging.
+    pub fn pressed(&self) -> Option<u64> {
+        self.is_active().then_some(self.source)
     }
 
     /// The column and insertion index under the pointer, while dragging; `None` outside every
@@ -784,9 +800,31 @@ impl Ui<'_> {
         self.animate_f32(id.with("drag-dim"), target, &DIM)
     }
 
+    /// Runs `f` to draw a dragged item's ghost above the current layer group (`Base` and `Page` to
+    /// `Popup`, `Popup` and `Modal` to `Raised`, `Raised` to `Toast`, so text under it cannot show
+    /// through): no clip or transform applies, `f` draws in window coordinates, and what it draws
+    /// belongs to no open recording. The caller's painter state is back afterwards.
+    pub(crate) fn drag_ghost(&mut self, f: impl FnOnce(&mut Ui<'_>)) {
+        let (layer, tag) = self.painter().hit_context();
+        let above = match layer {
+            l if l <= LayerId::Page as usize => LayerId::Popup,
+            l if l <= LayerId::Modal as usize => LayerId::Raised,
+            _ => LayerId::Toast,
+        };
+        let paused = self.painter().pause_recording();
+        let saved = self.painter().save_state();
+        self.painter().enter(above, tag);
+        f(self);
+        self.painter().restore_state(saved);
+        self.painter().resume_recording(paused);
+    }
+
     /// [`Self::drag_gesture`] for a [`FreeDrag`]: item `id` carries `source`; `columns` are in
     /// window coordinates. Escape, a change of the column count and a capture that ends without a
-    /// release cancel it.
+    /// release cancel it. A press and its release inside one frame are a [`FreeResult::Click`].
+    ///
+    /// The gesture only sees an item that still calls it: when `source` leaves the items, the
+    /// caller cancels `drag` itself, or it stays live with nobody to end it.
     pub fn free_drag_gesture(
         &mut self,
         id: WidgetId,
@@ -802,6 +840,13 @@ impl Ui<'_> {
                 if drag.armed {
                     drag.owner = Some(id);
                     drag.count = columns.len();
+                }
+            }
+            if !resp.pressed {
+                if resp.clicked {
+                    out.result = drag.release();
+                } else {
+                    drag.cancel();
                 }
             }
             out.dragging = drag.dragging;
