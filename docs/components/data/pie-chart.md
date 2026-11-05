@@ -51,8 +51,7 @@ Conflicts: none (no Wane or moved pie). The highlight alpha is 38 of 255 (about 
 
 ### Transitions
 
-n/a — the control has no motion; a value change redraws. Lunegit's never-animate list covers it: the chart is
-continuously updating content when it changes often ([L .claude/docs/animation-rules.md:148]).
+Value transitions (D166, D5 of M8): each slice's share tweens with `Kind::Value` (fast, quad-out; Reduced and Off snap) under the app's slice `key`; the shares drawn are divided by their sum every frame, so the sweeps total 2π in flight and after a retarget. `PieOptions.live` snaps. A slice removed leaves at once and the rest take the turn; from no slice to some, and a slice new to a chart that has others, appear at once. Corrects the earlier "n/a" under D40.
 
 ### Input and focus
 
@@ -65,39 +64,37 @@ continuously updating content when it changes often ([L .claude/docs/animation-r
 
 ### Retained state
 
-- Transient: none.
+- Transient: one tween per slice key.
 - Persistent: none.
 - App-owned: the slices (size in bytes, colour key) [L src/Lunegit.Desktop/Controls/StoragePieChartControl.cs:32-33,84].
 - Exit retention: no.
 
 ### Accessibility
 
-- Role `image`; name = the chart's title (app text); description = the slice list as text (open question: the slice text is not in the control).
+- Role `image` named by `label` (fallback `luneui.pie-chart.name`), `description` the app's slice list as text; no children.
 - Live region: none.
 
 ### Strings
 
-None: the control draws no text; the legend and values are app text.
+One toolkit key, `luneui.pie-chart.name` ("Pie chart"), the fallback name. The control draws no text.
 
 ### Gallery scenes
 
-- `pie-chart-three` (new): three slices of different sizes, settled.
-- `pie-chart-empty` (new): no slices, settled (nothing drawn).
-- `pie-chart-half` (new): one slice larger than half the total (large-arc case), settled.
+- `pie-chart-three`: three slices, settled.
+- `pie-chart-empty`: no slices, settled (nothing drawn).
+- `pie-chart-half`: one slice above half the total.
+- `pie-chart-full`: one slice of the whole.
+- `pie-chart-value-mid`: the data retargets; captured in the middle of the tween (`Moving`).
 
 ### Painter primitives
 
-- Existing: fill, ring. [R crates/lune-ui-core/src/paint.rs:215,231]
-- New: sector, path-fill, arc.
-- Sector: each slice is `MoveTo(centre)`, `LineTo(arcStart)`, an arc to `arcEnd`, `LineTo(centre)` [L src/Lunegit.Desktop/Controls/StoragePieChartControl.cs:113-137].
-- Path-fill: the top half-circle highlight [L src/Lunegit.Desktop/Controls/StoragePieChartControl.cs:140-158].
-- Arc: the arc segment inside the sector [L src/Lunegit.Desktop/Controls/StoragePieChartControl.cs:132].
+- Existing: `sector` (each slice and the highlight, as one fan, no seam at the centre). The earlier "new: sector, path-fill, arc" is out of date: they exist. New: none.
 
 ### Acceptance
 
 - Behaviour (scripted input, injected time): slice sweeps sum to 2π for any positive total; an empty input draws nothing; a zero slice is skipped. None exists.
 - Pixel probes at scale 2: diameter 320 px; the first slice starts at the top centre; highlight alpha 38 over the top half.
-- Conformance: none (no motion).
+- Conformance: the `Kind::Value` row on Full, Reduced and Off, and the sweeps totalling 2π in every frame (`widget_pie_chart.rs`).
 - Semantic node: `image` with a name; no per-slice nodes in the control.
 
 ### Build
@@ -107,11 +104,13 @@ None: the control draws no text; the legend and values are app text.
 
 ## Open questions
 
-- Single-slice full circle: the arc from a point to the same point is not verified in the control; open.
-- Slice labels and a legend: none in the control; open (the app or a new entry).
-- Colour keys: the toolkit adds the chart series colour `data` (token to add, M4, [D58], [data.bar-chart]); slice colours beyond it are app-supplied per slice, as Lunegit looks them up at render [L src/Lunegit.Desktop/Controls/StoragePieChartControl.cs:165-173].
-- Hover on a slice: none in the control; open.
+All answered in M8:
+- Single-slice full circle: `Painter::sector` at a sweep of 2π is the whole disc (one fan); tested at the four quarter points.
+- Slice labels and a legend: none; the app draws its own.
+- Colours: the app passes one colour per slice.
+- Hover on a slice: none.
 
 ## Notes for the planner
 
-The painter has no sector, arc or path-fill yet (paint.rs has fill, fill_radii, fill_over, ring, acrylic, backdrop, custom, text and stroke); M8 adds them under `core.painter`'s primitive table (step 15).
+Built in M8 (D164, D166). API: `Ui::pie_chart(key, rect, &PieOptions)` drawn at 160 px from the rect's top left, `pie_chart::sweeps(&[f32])`, `HIGHLIGHT`. The highlight is one `sector` from -π over π, drawn after the slices and only when a slice shows. A total that overflows f64 draws nothing. The page's button retargets the data; the bench presses it.
+
