@@ -87,13 +87,14 @@ None: title, meta, note and button labels are app text (Wane mock content, [W do
 
 - `panel-flush` (new): flush body with a list, settled.
 - `panel-strip` (new): strip of three `data.stat` cells, settled.
-- `panel-card` (new): a card panel nested in a panel with a pinned footer button, settled.
+- `panel-card` (new, at 2x and at 1x): a card panel nested in a panel with a pinned footer button, settled.
 - `panel-unavailable` (new): the unavailable line in the body, settled.
 
 ### Painter primitives
 
 - Existing: ring, text, fill. [R crates/lune-ui-core/src/theme.rs:63; crates/lune-ui-core/src/paint.rs:215,231,274]
-- New: clip-rounded (children clip to the 8 px radius, [W docs/ui/components.md:249-262]; Lunegit clips a rounded inner border with `ClipToBounds`, [L src/Lunegit.Desktop/App.axaml:769-770]).
+- clip-rounded: built in M5 (`Painter::push_clip_rounded`); children clip to the 8 px radius ([W docs/ui/components.md:249-262]; Lunegit clips a rounded inner border with `ClipToBounds`, [L src/Lunegit.Desktop/App.axaml:769-770]). It cuts fills and images, not text, so the panel keeps its own text 16 px in and a flush body's text is the caller's to inset by `panel::TEXT_INSET` (8) [D148].
+- New: none.
 
 ### Acceptance
 
@@ -109,9 +110,7 @@ None: title, meta, note and button labels are app text (Wane mock content, [W do
 
 ## Open questions
 
-- The panel's `--card` variant uses the same `clip-rounded` primitive as the page: one row in the `core.painter` table.
-- Whether this is a toolkit component or app code composed from the painter: the planner decides (Wane needs it either way).
-- Native rendering: outline only, so nothing to approximate; the panel must clip children to the radius.
+None. Closed by [D148]: the panel is a toolkit component (`Ui::panel`, one closure called for the `Body` and `Footer` slots). The `--card` and `--flush` variants use the `clip-rounded` primitive the page uses, built in M5 (`Painter::push_clip_rounded`), in one row of the `core.painter` table. The outline is the only paint, drawn last; it needs no approximation. With `fit: true` the clip is the rect given, since the final height is known only after the body ran; `fit: false` fills the rect and pins the footer, which is how panels in a row share a bottom edge. A kind with no header gets a top padding of its own (16 plain, 8 rows, 12 card, none flush or strip) so the body does not touch the outline.
 
 ## Notes for the planner
 

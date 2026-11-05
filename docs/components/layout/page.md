@@ -96,15 +96,17 @@ None: title, subtitle and actions are app text.
 
 ### Gallery scenes
 
-- `page-header-footer` (new): card with title, subtitle, two header actions and a footer with a secondary and primary button, settled.
-- `page-body-scroll` (new): body taller than the card, scrolled to the middle, settled.
+- `page-header-footer` (new, at 2x and at 1x): card with title, subtitle, two header actions, a short body and a footer with a secondary and a primary button, settled.
+- `page-body-scroll` (new): body taller than the card with no footer, scrolled 300 px, settled; the zebra rows run edge to edge and the card's rounded clip cuts them at the bottom corners.
 - `page-inactive` (new): the same card with the window inactive (solid fill), settled.
 - `page-swap-opacity` (new): page content swap at t = 175 ms (half of moderate, 350 ms) [L src/Lunegit.Desktop/Themes/Animations.axaml:300], [L src/Lunegit.Desktop/App.axaml:154].
+- `page-swap-reduced` (new): the same swap under Reduced at t = 90 ms (half of the mapped `fast`): the opacity in flight, no slide.
 
 ### Painter primitives
 
 - Existing: acrylic, ring, fill, text, clip-rect. [R crates/lune-ui-core/src/paint.rs:243,231,215,274,167]
-- New: clip-rounded (the body clips its children to the card's radius; Lunegit does the same with `ClipToBounds` on a radius-11 inner border, [L src/Lunegit.Desktop/App.axaml:769-770]).
+- clip-rounded: built in M5 (`Painter::push_clip_rounded`); the body clips fills and images to the card's radius (Lunegit does the same with `ClipToBounds` on a radius-11 inner border, [L src/Lunegit.Desktop/App.axaml:769-770]). Text takes the bounding rect only, so the page keeps its own text at least 8 px from the card's edge (title, subtitle and the padded body are inset 16) [D148].
+- New: none.
 
 ### Acceptance
 
@@ -120,9 +122,7 @@ None: title, subtitle and actions are app text.
 
 ## Open questions
 
-- Whether the page owns focus on a page change (first control) or the app does: open.
-- Whether this is a toolkit component or app code composed from the painter: the planner decides (Wane needs it either way).
-- Native rendering: CSS `--glass-card` flattens Lunegit's content acrylic (black tint 0.8, material 0.7; derivation in `mocks/css/tokens.css`), not lune-ui's denser CARD layer (rgba 37 37 37 .89); luneui-rs paints the real layer (`core.acrylic`) and takes these Lunegit levels (the PANEL values) for the page card, [D53]. The card needs scroll clipping with the radius.
+None. Closed by [D148]: the page is a toolkit component (`Ui::page`, one closure called for the `Actions`, `Body` and `Footer` slots) and the app owns focus on a page change (the page moves none: it does not know the first control). The rounded clip is `Painter::push_clip_rounded` (built in M5); text cannot be cut by it, so the page insets its own text at least the radius, and a body's text that reaches the corners is the caller's to inset. The glass layer, `under` and the active flag are arguments, as the toolbar's [D128]. Swap: `SWAP_OPACITY` (kept under Reduced) and `SWAP_SLIDE` (6 px, dropped under Reduced) from the frame `swap_key` changes; a swap in flight restarts from the look it has; the first frame of a page does not animate. The footer is a fixed 56 px (12 + a 32 px row + 12) so the body's room is known before the closure runs.
 
 ## Notes for the planner
 
