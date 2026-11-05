@@ -1000,8 +1000,15 @@ impl Ui<'_> {
                 CARD_W,
                 lane.list_h,
             );
+            // A list with nothing to scroll registers no scroll sense, so the wheel over its cards
+            // reaches the board's own area (an area with nothing to scroll does not pass a delta up).
+            let vertical = if lane.content_h > lane.list_h {
+                Bars::Auto
+            } else {
+                Bars::Disabled
+            };
             let opts = ScrollOptions {
-                bars: (Bars::Disabled, Bars::Auto),
+                bars: (Bars::Disabled, vertical),
                 extent: Some((f64::from(CARD_W), f64::from(lane.content_h))),
                 ..ScrollOptions::default()
             };

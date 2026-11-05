@@ -319,6 +319,9 @@ impl Ui<'_> {
                     }
                 }
             }
+            if r.pressed && !grab.cancelled {
+                self.note_live_gesture();
+            }
             self.transient::<Hold>(hold).0 = (r.pressed || r.press_started).then_some(grab);
         }
 

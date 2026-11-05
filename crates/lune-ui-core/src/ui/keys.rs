@@ -134,6 +134,15 @@ impl Ui<'_> {
         true
     }
 
+    /// Says that a pointer gesture which Escape cancels (a drag, a resize) is live at the end of this
+    /// frame. The next frame's Escape is then queued for it, through
+    /// [`Self::consume_key_while_pressed`], instead of dismissing the overlay on top; once the gesture
+    /// ends nothing sets the flag and the next Escape dismisses (D175). Call it only while dragging,
+    /// not while a press is merely armed.
+    pub(crate) fn note_live_gesture(&mut self) {
+        self.store.gesture_live = true;
+    }
+
     /// The frame's unconsumed input for `id`, in arrival order, each with the index
     /// [`Self::consume_focus_event`] takes it by: keys (named and character, with modifiers and
     /// the repeat flag), typed text, IME events and clipboard answers. Empty unless `id` holds the

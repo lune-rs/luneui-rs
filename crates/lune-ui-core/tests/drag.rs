@@ -19,6 +19,7 @@ use lune_ui_core::scene::{Scene, Shape};
 use lune_ui_core::testing::UiHarness;
 use lune_ui_core::theme::DARK;
 use lune_ui_core::ui::{Sense, Ui, WidgetId};
+use lune_ui_core::widgets::dialog::{Cancel, Dialog, DialogGlass};
 use lune_ui_core::widgets::scroll_area::{Extent, ScrollOptions};
 
 const SPACING: f64 = 5.0;
@@ -728,6 +729,10 @@ struct Model {
     extent: f64,
     /// Items drawn disabled this frame.
     disabled: bool,
+    /// The items are the body of a dialog.
+    dialog: bool,
+    /// The dialog reported a cancel in the last frame.
+    dialog_cancelled: bool,
 }
 
 impl Model {
@@ -740,6 +745,8 @@ impl Model {
             viewport: 300.0,
             extent: 410.0,
             disabled: false,
+            dialog: false,
+            dialog_cancelled: false,
         }
     }
 
@@ -769,52 +776,80 @@ fn run(h: &mut UiHarness, m: &mut Model, ms: u64) -> Run {
     let mut gestures = Vec::new();
     let mut offsets = Vec::new();
     let mut escape_left = Vec::new();
+    let mut cancelled = false;
+    let in_dialog = m.dialog;
     let (_, fo) = h.frame(|ui| {
-        let mut resps = Vec::new();
-        for (i, key) in m.keys.iter().enumerate() {
-            let rect = Rect::new(
-                (ORIGIN + x[i] - m.offset) as f32,
-                ROW_Y,
-                widths[i] as f32,
-                ITEM_H,
-            );
-            let id = item(*key);
-            let resp = ui.with_enabled(!m.disabled, |ui| {
-                let r = ui.interact(id, rect, Sense::DRAG);
-                ui.node(Node::new(id, Role::Tab, "tab", rect));
-                r
-            });
-            resps.push(resp);
-        }
-        let strip_metrics = Metrics {
-            widths: &widths,
-            spacing: SPACING,
-            viewport: m.viewport,
-            offset: m.offset,
-            extent: m.extent,
-        };
-        for (i, key) in m.keys.iter().enumerate() {
-            let strip = Strip {
-                index: i,
-                origin: ORIGIN,
-                metrics: strip_metrics,
+        let mut body = |ui: &mut Ui<'_>| {
+            let mut resps = Vec::new();
+            for (i, key) in m.keys.iter().enumerate() {
+                let rect = Rect::new(
+                    (ORIGIN + x[i] - m.offset) as f32,
+                    ROW_Y,
+                    widths[i] as f32,
+                    ITEM_H,
+                );
+                let id = item(*key);
+                let resp = ui.with_enabled(!m.disabled, |ui| {
+                    let r = ui.interact(id, rect, Sense::DRAG);
+                    ui.node(Node::new(id, Role::Tab, "tab", rect));
+                    r
+                });
+                resps.push(resp);
+            }
+            let strip_metrics = Metrics {
+                widths: &widths,
+                spacing: SPACING,
+                viewport: m.viewport,
+                offset: m.offset,
+                extent: m.extent,
             };
-            gestures.push(ui.drag_gesture(item(*key), &resps[i], &mut m.drag, &strip));
-        }
-        for (i, key) in m.keys.iter().enumerate() {
-            offsets.push(ui.drag_offset(item(*key), &m.drag, i, x[i] as f32));
-        }
-        // Whether an Escape press is still unconsumed (taken by `consume_key_while_pressed`).
-        for key in &m.keys {
-            escape_left.push(ui.consume_key_while_pressed(item(*key), NamedKey::Escape));
+            for (i, key) in m.keys.iter().enumerate() {
+                let strip = Strip {
+                    index: i,
+                    origin: ORIGIN,
+                    metrics: strip_metrics,
+                };
+                gestures.push(ui.drag_gesture(item(*key), &resps[i], &mut m.drag, &strip));
+            }
+            for (i, key) in m.keys.iter().enumerate() {
+                offsets.push(ui.drag_offset(item(*key), &m.drag, i, x[i] as f32));
+            }
+            // Whether an Escape press is still unconsumed (taken by `consume_key_while_pressed`).
+            for key in &m.keys {
+                escape_left.push(ui.consume_key_while_pressed(item(*key), NamedKey::Escape));
+            }
+        };
+        if in_dialog {
+            cancelled = ui
+                .dialog("dlg", &DIALOG, &dialog_glass(), |ui, _, _, _| body(ui))
+                .cancelled;
+        } else {
+            body(ui);
         }
     });
+    m.dialog_cancelled = cancelled;
     Run {
         gestures,
         offsets,
         repaint: fo.repaint,
         tree: fo.tree,
         escape_left,
+    }
+}
+
+const DIALOG: Dialog<'static> = Dialog {
+    title: "Tabs",
+    message: "m",
+    extra_h: 100.0,
+    confirm: "OK",
+    cancel: Cancel::Default,
+};
+
+fn dialog_glass() -> DialogGlass {
+    DialogGlass {
+        panel: [0.0; 4],
+        fill: [0.0; 4],
+        noise: false,
     }
 }
 
@@ -982,6 +1017,79 @@ fn escape_cancels_a_drag_and_is_taken_only_then() {
     h.input.release(P);
     let r = run(&mut h, &mut m, 60);
     assert_eq!(result_of(&r), DropResult::None);
+}
+
+#[test]
+fn in_a_dialog_the_first_escape_cancels_a_reorder_drag_and_only_the_second_closes_the_dialog() {
+    let mut m = Model::new();
+    m.dialog = true;
+    let mut h = start(&mut m);
+    // The dialog opens before the strip takes a press.
+    run(&mut h, &mut m, 1000);
+    let end = drag_first_to_the_end(&mut h, &mut m, 1010);
+    assert!(m.drag.is_dragging(), "dragging to {end}");
+    h.input.key_down(Key::Named(NamedKey::Escape), None);
+    let r = run(&mut h, &mut m, 1100);
+    assert!(cancelled(&r), "the drag is cancelled");
+    assert!(!m.dialog_cancelled, "and the dialog stays");
+    assert!(!m.drag.is_active());
+    h.input.key_down(Key::Named(NamedKey::Escape), None);
+    run(&mut h, &mut m, 1110);
+    assert!(m.dialog_cancelled, "the second Escape closes the dialog");
+}
+
+#[test]
+fn in_a_dialog_an_armed_press_does_not_take_escape_from_the_dialog() {
+    let mut m = Model::new();
+    m.dialog = true;
+    let mut h = start(&mut m);
+    run(&mut h, &mut m, 1000);
+    // Armed, not dragging: Escape is the dialog's (the flag means dragging).
+    press_at(&mut h, point(&m, 1, 50.0));
+    run(&mut h, &mut m, 1010);
+    assert!(m.drag.is_armed() && !m.drag.is_dragging());
+    h.input.key_down(Key::Named(NamedKey::Escape), None);
+    run(&mut h, &mut m, 1020);
+    assert!(m.dialog_cancelled);
+}
+
+#[test]
+fn in_a_dialog_the_first_escape_cancels_a_free_drag_and_only_the_second_closes_the_dialog() {
+    let b = board();
+    let cols = columns(&b);
+    let card = |k: u32| WidgetId::ROOT.with("card").with(k);
+    let rect = Rect::new(10.0, 60.0, 80.0, 40.0);
+    let mut drag = FreeDrag::new();
+    let mut h = UiHarness::new(WIN);
+    let frame = |h: &mut UiHarness, ms: u64, drag: &mut FreeDrag| {
+        let mut out = Vec::new();
+        let mut cancelled = false;
+        h.at_ms(ms).frame(|ui: &mut Ui<'_>| {
+            cancelled = ui
+                .dialog("dlg", &DIALOG, &dialog_glass(), |ui, _, _, _| {
+                    let r = ui.interact(card(5), rect, Sense::DRAG);
+                    ui.node(Node::new(card(5), Role::ListItem, "card", rect));
+                    out.push(ui.free_drag_gesture(card(5), &r, drag, 5, &cols));
+                })
+                .cancelled;
+        });
+        (out[0], cancelled)
+    };
+    frame(&mut h, 0, &mut drag);
+    frame(&mut h, 1000, &mut drag);
+    h.input.pointer_to(50.0, 80.0);
+    h.input.press(P);
+    frame(&mut h, 1010, &mut drag);
+    h.input.pointer_to(300.0, 80.0);
+    frame(&mut h, 1020, &mut drag);
+    assert!(drag.is_dragging());
+    h.input.key_down(Key::Named(NamedKey::Escape), None);
+    let (f, cancelled) = frame(&mut h, 1030, &mut drag);
+    assert!(f.cancelled && !drag.is_active(), "the drag is cancelled");
+    assert!(!cancelled, "and the dialog stays");
+    h.input.key_down(Key::Named(NamedKey::Escape), None);
+    let (_, cancelled) = frame(&mut h, 1040, &mut drag);
+    assert!(cancelled, "the second Escape closes the dialog");
 }
 
 #[test]

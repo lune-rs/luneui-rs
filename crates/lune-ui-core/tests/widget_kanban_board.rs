@@ -185,11 +185,14 @@ struct Run {
     scene: Scene,
     out: FrameOutput,
     r: BoardResponse,
+    /// The dialog around the board (if any) reported a cancel this frame.
+    dialog_cancelled: bool,
 }
 
 fn run(h: &mut UiHarness, m: &Model, ms: u64) -> Run {
     h.at_ms(ms);
     let mut r = None;
+    let mut dialog_cancelled = false;
     let (scene, out) = h.frame(|ui| {
         ui.painter().on(LayerId::Page);
         match m.in_dialog {
@@ -201,9 +204,11 @@ fn run(h: &mut UiHarness, m: &Model, ms: u64) -> Run {
             }
             Some(open) => {
                 if open {
-                    ui.dialog("d", &dialog(), &glass(), |ui, x, y, _| {
-                        r = Some(show(ui, m, Rect::new(x, y, 400.0, 300.0)));
-                    });
+                    dialog_cancelled = ui
+                        .dialog("d", &dialog(), &glass(), |ui, x, y, _| {
+                            r = Some(show(ui, m, Rect::new(x, y, 400.0, 300.0)));
+                        })
+                        .cancelled;
                 }
             }
         }
@@ -215,7 +220,12 @@ fn run(h: &mut UiHarness, m: &Model, ms: u64) -> Run {
         h2.frame(|ui| r = Some(show(ui, &model(), BOARD)));
         r.expect("a response")
     });
-    Run { scene, out, r }
+    Run {
+        scene,
+        out,
+        r,
+        dialog_cancelled,
+    }
 }
 
 fn bid() -> WidgetId {
@@ -1670,6 +1680,46 @@ fn inside_a_dialog_the_ghost_is_raised_and_a_close_replays_none() {
     assert_eq!(last.out.repaint, Repaint::Idle);
 }
 
+#[test]
+fn in_a_dialog_the_first_escape_cancels_the_drag_and_only_the_second_closes_the_dialog() {
+    let mut h = UiHarness::new(WIN);
+    let m = Model {
+        in_dialog: Some(true),
+        cols: vec![(1, vec![11, 12])],
+        ..model()
+    };
+    run(&mut h, &m, 0);
+    settle(&mut h, &m, 10, 40);
+    let r = run(&mut h, &m, 1000);
+    let b = bounds(&r.out, 11);
+    h.input.pointer_to(b.x + 20.0, b.y + 10.0);
+    run(&mut h, &m, 1010);
+    h.input.press(P);
+    run(&mut h, &m, 1020);
+    h.input.pointer_to(b.x + 60.0, b.y + 30.0);
+    let r = run(&mut h, &m, 1030);
+    assert!(ghost_on(&r.scene, LayerId::Raised).is_some(), "dragging");
+    press_key(&mut h, NamedKey::Escape);
+    let r = run(&mut h, &m, 1040);
+    assert!(!r.dialog_cancelled, "the first Escape is the drag's");
+    assert!(
+        !r.out
+            .tree
+            .get(cid(11))
+            .is_some_and(|n| n.states.contains(State::Dragging)),
+        "not dragging"
+    );
+    // The ghost lands in its slot (the cancel is the landing's path) and the frames go idle.
+    let r = settle(&mut h, &m, 1045, 40);
+    assert!(
+        ghost_on(&r.scene, LayerId::Raised).is_none() && r.out.repaint == Repaint::Idle,
+        "no ghost past its landing"
+    );
+    press_key(&mut h, NamedKey::Escape);
+    let r = run(&mut h, &m, 2000);
+    assert!(r.dialog_cancelled, "the second Escape is the dialog's");
+}
+
 // The auto-scroll.
 
 #[test]
@@ -1794,6 +1844,63 @@ fn a_drop_on_a_scrolled_board_targets_what_is_under_the_pointer() {
     drag_to(&mut h, &m, 600, at);
     let mv = release(&mut h, &m, 610).r.moved.expect("a move");
     assert_eq!((mv.column, mv.index), (3, 0));
+}
+
+/// A column whose cards fit leaves a wheel over them to the board; one that overflows keeps it.
+#[test]
+fn a_wheel_over_the_cards_of_a_column_that_fits_scrolls_the_board() {
+    let mut h = UiHarness::new(WIN);
+    let m = wide();
+    let r = run(&mut h, &m, 0);
+    let x0 = r.out.tree.get(col_id(2)).expect("a column").bounds.x;
+    let (cx, cy) = center(&r.out, 11);
+    h.input.pointer_to(cx, cy);
+    run(&mut h, &m, 10);
+    h.input.scroll_pixels(0.0, -60.0);
+    run(&mut h, &m, 20);
+    let r = settle(&mut h, &m, 30, 30);
+    let x1 = r.out.tree.get(col_id(2)).expect("a column").bounds.x;
+    assert_eq!(x0 - x1, 60.0, "over a card the delta reaches the board");
+}
+
+#[test]
+fn a_wheel_over_the_cards_of_a_column_that_overflows_scrolls_the_column_and_not_the_board() {
+    let mut h = UiHarness::new(WIN);
+    let m = Model {
+        cols: (1..=6)
+            .map(|c| {
+                (
+                    c,
+                    if c == 1 {
+                        (100..130).collect()
+                    } else {
+                        vec![c * 10 + 1]
+                    },
+                )
+            })
+            .collect(),
+        ..model()
+    };
+    let r = run(&mut h, &m, 0);
+    let x0 = r.out.tree.get(col_id(2)).expect("a column").bounds.x;
+    let y0 = bounds(&r.out, 101).y;
+    h.input.pointer_to(CARD_X + 20.0, LIST_Y + 100.0);
+    run(&mut h, &m, 10);
+    h.input.scroll_pixels(0.0, -60.0);
+    run(&mut h, &m, 20);
+    let r = settle(&mut h, &m, 30, 30);
+    assert_eq!(bounds(&r.out, 101).y, y0 - 60.0, "the column scrolled");
+    assert_eq!(
+        r.out.tree.get(col_id(2)).expect("a column").bounds.x,
+        x0,
+        "the board did not"
+    );
+    // A sideways swipe over an overflowing column stays with it (the topmost area takes the
+    // delta), so the board does not move either: the entry says so.
+    h.input.scroll_pixels(-60.0, 0.0);
+    run(&mut h, &m, 600);
+    let r = settle(&mut h, &m, 610, 30);
+    assert_eq!(r.out.tree.get(col_id(2)).expect("a column").bounds.x, x0);
 }
 
 // The probes at scale 2.

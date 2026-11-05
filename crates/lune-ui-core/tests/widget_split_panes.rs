@@ -18,6 +18,7 @@ use lune_ui_core::testing::{UiHarness, disabled_violations};
 use lune_ui_core::theme::DARK;
 use lune_ui_core::ui::WidgetId;
 use lune_ui_core::widgets::button::{ButtonKind, ButtonOptions};
+use lune_ui_core::widgets::dialog::{Cancel, Dialog, DialogGlass};
 use lune_ui_core::widgets::split_panes::{
     FOCUS, HIT, KEY_STEP, Pane, STRIP, SplitOptions, SplitResponse, SplitSide, bounds, geometry,
 };
@@ -51,6 +52,8 @@ struct Cfg {
     buttons: bool,
     /// The split sits in a keep-alive scope, drawn or only kept alive.
     keep: Keep,
+    /// The split is the body of a dialog.
+    dialog: bool,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -75,6 +78,7 @@ fn cfg() -> Cfg {
         enabled: true,
         buttons: false,
         keep: Keep::No,
+        dialog: false,
     }
 }
 
@@ -128,6 +132,8 @@ struct Out {
     stored: Option<Option<f32>>,
     /// Whether any frame of the call changed the size (set by `Clock::two`).
     changed_any: bool,
+    /// The dialog around the split (if any) reported a cancel this frame.
+    dialog_cancelled: bool,
 }
 
 impl Out {
@@ -150,6 +156,7 @@ fn frame_with(h: &mut UiHarness, c: &Cfg, write: Option<Option<f32>>) -> Out {
     let mut panes = Vec::new();
     let mut clicks = Vec::new();
     let mut stored = None;
+    let mut dialog_cancelled = false;
     let (scene, out) = h.frame(|ui| {
         let opts = c.opts();
         let mut run = |ui: &mut lune_ui_core::ui::Ui<'_>| {
@@ -175,6 +182,23 @@ fn frame_with(h: &mut UiHarness, c: &Cfg, write: Option<Option<f32>>) -> Out {
             split = Some(r);
         };
         match c.keep {
+            Keep::No if c.dialog => {
+                let d = Dialog {
+                    title: "Panes",
+                    message: "m",
+                    extra_h: 100.0,
+                    confirm: "OK",
+                    cancel: Cancel::Default,
+                };
+                let glass = DialogGlass {
+                    panel: [0.0; 4],
+                    fill: [0.0; 4],
+                    noise: false,
+                };
+                dialog_cancelled = ui
+                    .dialog("dlg", &d, &glass, |ui, _, _, _| run(ui))
+                    .cancelled;
+            }
             Keep::No => run(ui),
             Keep::Drawn => ui.keep_alive("page", |ui| run(ui)),
             Keep::Marked => ui.mark_alive("page"),
@@ -189,6 +213,7 @@ fn frame_with(h: &mut UiHarness, c: &Cfg, write: Option<Option<f32>>) -> Out {
         clicks,
         stored,
         changed_any: false,
+        dialog_cancelled,
     }
 }
 
@@ -1033,6 +1058,30 @@ fn escape_during_a_drag_restores_the_press_size_and_is_consumed_and_a_release_en
     let out = clock.drag(&mut h, &c, from, moved(&c, from, 40.0));
     near(out.size(), 240.0);
     clock.release(&mut h, &c);
+}
+
+#[test]
+fn in_a_dialog_the_first_escape_restores_the_size_and_only_the_second_closes_the_dialog() {
+    let (mut h, mut clock) = start();
+    let c = Cfg {
+        dialog: true,
+        ..cfg()
+    };
+    // The dialog opens, then the strip is dragged.
+    clock.settle(&mut h, &c);
+    let from = strip_at(&c, 200.0);
+    let out = clock.drag(&mut h, &c, from, moved(&c, from, 80.0));
+    near(out.size(), 280.0);
+    h.input.key_down(Key::Named(NamedKey::Escape), None);
+    h.input.key_up(Key::Named(NamedKey::Escape));
+    let out = clock.frame(&mut h, &c);
+    assert!(!out.dialog_cancelled, "the first Escape is the drag's");
+    near(out.size(), 200.0);
+    // The drag is over (the button is still down): the next Escape closes the dialog.
+    h.input.key_down(Key::Named(NamedKey::Escape), None);
+    h.input.key_up(Key::Named(NamedKey::Escape));
+    let out = clock.frame(&mut h, &c);
+    assert!(out.dialog_cancelled, "the second Escape is the dialog's");
 }
 
 #[test]

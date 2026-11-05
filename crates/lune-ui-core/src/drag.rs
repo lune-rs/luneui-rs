@@ -756,6 +756,9 @@ impl Ui<'_> {
     /// Marks `id`'s node pressed while `drag` is active, and fills `out.dragging`.
     fn pressed_node(&mut self, id: WidgetId, drag: &ReorderDrag, mut out: DragFrame) -> DragFrame {
         out.dragging = drag.dragging;
+        if drag.dragging {
+            self.note_live_gesture();
+        }
         if drag.is_active() && drag.glue.owner == Some(id) {
             self.patch_node(id, |n| {
                 n.states.insert(State::Pressed);
@@ -877,6 +880,9 @@ impl Ui<'_> {
             drag.update(f64::from(px), f64::from(py), columns);
         }
         out.dragging = drag.dragging;
+        if drag.dragging {
+            self.note_live_gesture();
+        }
         if drag.is_active() {
             self.patch_node(id, |n| {
                 n.states.insert(State::Pressed);
