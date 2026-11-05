@@ -10,8 +10,9 @@
 use std::hash::Hash;
 
 use crate::access::{Node, Role, Value};
-use crate::paint::Rect;
+use crate::paint::{Painter, Rect};
 use crate::text::{Spec, Style};
+use crate::theme::Theme;
 use crate::ui::Ui;
 
 /// A row's height in the default mode.
@@ -46,6 +47,82 @@ pub struct KvOptions {
     pub mono: bool,
 }
 
+/// The key text's style.
+fn key_style(t: &Theme) -> Style {
+    Style {
+        line: LINE,
+        ..Style::ui(t.font_base, t.fg_tertiary)
+    }
+}
+
+/// The value text's style.
+fn value_style(t: &Theme, mono: bool) -> Style {
+    Style {
+        line: LINE,
+        ..if mono {
+            Style::mono(t.font_base, LINE, t.fg_primary)
+        } else {
+            Style::ui(t.font_base, t.fg_primary)
+        }
+    }
+}
+
+/// The key column's width: the longest key measured.
+fn key_column<H: Copy + PartialEq>(p: &mut Painter<'_, H>, pairs: &[(&str, &str)]) -> f32 {
+    let style = key_style(&p.theme);
+    let mut w = 0.0_f32;
+    for (k, _) in pairs {
+        w = w.max(p.measure(&Spec::plain(*k, style)).0);
+    }
+    w
+}
+
+/// A wrapped value at `value_w`: its spec and its text height (at least one line).
+fn wrapped_value<H: Copy + PartialEq>(
+    p: &mut Painter<'_, H>,
+    value: &str,
+    style: Style,
+    value_w: f32,
+) -> (Spec, f32) {
+    let s = Spec::plain(value, style).wrapped(value_w);
+    let h = p.measure(&s).1.max(LINE);
+    (s, h)
+}
+
+/// A wrap row's height for a text `text_h` high.
+fn wrap_row(text_h: f32) -> f32 {
+    (text_h + 2.0 * WRAP_PAD).max(ROW)
+}
+
+/// The height [`Ui::kv_list`] returns for `pairs` in a list `w` wide, without drawing.
+pub(crate) fn height<H: Copy + PartialEq>(
+    p: &mut Painter<'_, H>,
+    pairs: &[(&str, &str)],
+    opts: &KvOptions,
+    w: f32,
+) -> f32 {
+    if pairs.is_empty() {
+        return 0.0;
+    }
+    match opts.mode {
+        KvMode::Default => pairs.len() as f32 * ROW,
+        KvMode::Stacked => {
+            let rows = pairs.len().div_ceil(2);
+            (rows - 1) as f32 * (STACKED_KEY_LINE + LINE + STACKED_ROW_GAP)
+                + STACKED_KEY_LINE
+                + LINE
+        }
+        KvMode::Wrap => {
+            let value_w = (w - key_column(p, pairs) - GAP).max(0.0);
+            let style = value_style(&p.theme, opts.mono);
+            pairs
+                .iter()
+                .map(|(_, v)| wrap_row(wrapped_value(p, v, style, value_w).1))
+                .sum()
+        }
+    }
+}
+
 impl Ui<'_> {
     /// Key and value `pairs` under `key` with their top left at that of `rect`, wide as `rect`
     /// (its height is ignored). Returns the height drawn. Each pair is a `Group` named by its key
@@ -58,27 +135,12 @@ impl Ui<'_> {
         opts: &KvOptions,
     ) -> f32 {
         let t = *self.theme();
-        let value_font = |mono: bool| Style {
-            line: LINE,
-            ..if mono {
-                Style::mono(t.font_base, LINE, t.fg_primary)
-            } else {
-                Style::ui(t.font_base, t.fg_primary)
-            }
-        };
-        let key_style = Style {
-            line: LINE,
-            ..Style::ui(t.font_base, t.fg_tertiary)
-        };
+        let key_style = key_style(&t);
         let stacked = opts.mode == KvMode::Stacked;
         let key_w = if stacked {
             0.0
         } else {
-            let mut w = 0.0_f32;
-            for (k, _) in pairs {
-                w = w.max(self.painter().measure(&Spec::plain(*k, key_style)).0);
-            }
-            w
+            key_column(self.painter(), pairs)
         };
         let col_w = ((rect.w - GAP) / 2.0).max(0.0);
         let value_x = rect.x + key_w + GAP;
@@ -99,7 +161,7 @@ impl Ui<'_> {
                             ..Style::ui(t.font_s, t.fg_tertiary)
                         };
                         let key_spec = ui.painter().elide(&Spec::plain(*k, ks), col_w);
-                        let vs = value_font(true);
+                        let vs = value_style(&t, true);
                         let val_spec = ui.painter().elide(&Spec::plain(*v, vs), col_w);
                         let cell = Rect::new(x, top, col_w, STACKED_KEY_LINE + LINE);
                         ui.node_container(Node::new(gid, Role::Group, k, cell), |ui| {
@@ -111,19 +173,13 @@ impl Ui<'_> {
                         bottom = bottom.max(top + STACKED_KEY_LINE + LINE);
                     } else {
                         let wrap = opts.mode == KvMode::Wrap;
-                        let vs = value_font(opts.mono);
+                        let vs = value_style(&t, opts.mono);
                         let (val_spec, text_h) = if wrap {
-                            let s = Spec::plain(*v, vs).wrapped(value_w);
-                            let h = ui.painter().measure(&s).1.max(LINE);
-                            (s, h)
+                            wrapped_value(ui.painter(), v, vs, value_w)
                         } else {
                             (ui.painter().elide(&Spec::plain(*v, vs), value_w), LINE)
                         };
-                        let row_h = if wrap {
-                            (text_h + 2.0 * WRAP_PAD).max(ROW)
-                        } else {
-                            ROW
-                        };
+                        let row_h = if wrap { wrap_row(text_h) } else { ROW };
                         let top = y + WRAP_PAD;
                         let cell = Rect::new(rect.x, y, rect.w, row_h);
                         ui.node_container(Node::new(gid, Role::Group, k, cell), |ui| {
@@ -147,4 +203,46 @@ fn key_node(ui: &mut Ui<'_>, group: crate::ui::WidgetId, key: &str, at: Rect) {
     let mut node = Node::new(group.with("key"), Role::StaticText, key, at);
     node.value = Some(Value::Text(key.to_owned()));
     ui.node(node);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::testing::UiHarness;
+
+    const LONG: &str = "a value long enough to wrap onto several lines in a narrow column of text";
+
+    /// The measure is the height the draw returns, in every mode, mono or not, with values that
+    /// wrap at several widths, for an even and an odd count and for none.
+    #[test]
+    fn height_is_what_the_list_draws() {
+        let pairs: [(&str, &str); 5] = [
+            ("Opus", "corp-claude-opus"),
+            ("Sonnet", LONG),
+            ("A much longer key", "x"),
+            ("Haiku", "qwen3-coder-30b-a3b"),
+            ("Id", LONG),
+        ];
+        let mut h = UiHarness::new((600.0, 400.0));
+        h.at_ms(0).frame(|ui| {
+            for mode in [KvMode::Default, KvMode::Stacked, KvMode::Wrap] {
+                for mono in [false, true] {
+                    let opts = KvOptions { mode, mono };
+                    for w in [90.0, 200.0, 312.0, 480.0] {
+                        for n in [0, 1, 2, 4, 5] {
+                            let pairs = &pairs[..n];
+                            let measured = height(ui.painter(), pairs, &opts, w);
+                            let drawn = ui.kv_list(
+                                format!("{mode:?}-{mono}-{w}-{n}"),
+                                Rect::new(10.0, 10.0, w, 0.0),
+                                pairs,
+                                &opts,
+                            );
+                            assert_eq!(measured, drawn, "{mode:?} mono {mono} width {w} pairs {n}");
+                        }
+                    }
+                }
+            }
+        });
+    }
 }

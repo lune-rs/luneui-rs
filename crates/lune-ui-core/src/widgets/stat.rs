@@ -16,7 +16,7 @@ use super::progress;
 use super::tone::Tone;
 use crate::access::{Node, Role, Value};
 use crate::motion::{Easing, Kind, Motion, Reduce};
-use crate::paint::Rect;
+use crate::paint::{Painter, Rect};
 use crate::text::{Spec, Style};
 use crate::ui::Ui;
 
@@ -84,6 +84,42 @@ impl fmt::Debug for StatOptions<'_> {
             .field("no_data", &self.no_data)
             .finish()
     }
+}
+
+/// The height of the cell `opts` describes, as [`Ui::stat`] returns it: padding, label, value,
+/// sub-line and meter. It reads no text (a value elides, it never wraps), so the width is not
+/// needed.
+fn cell_height(opts: &StatOptions<'_>) -> f32 {
+    let (pad_y, _) = if opts.compact { COMPACT_PAD } else { PAD };
+    let value_line = if opts.text {
+        24.0
+    } else if opts.compact {
+        20.0
+    } else {
+        28.0
+    };
+    let gap = if opts.compact { 0.0 } else { VALUE_GAP };
+    let sub = if opts.no_data || opts.sub.is_some() {
+        SMALL_LINE
+    } else {
+        0.0
+    };
+    let meter = if opts.meter.is_some() {
+        METER_GAP + progress::HEIGHT
+    } else {
+        0.0
+    };
+    2.0 * pad_y + SMALL_LINE + gap + value_line + sub + meter
+}
+
+/// The height [`Ui::stat_strip`] returns for `cells` in a strip `w` wide, without drawing: the
+/// tallest cell, or 0 for none. The painter is the one that would draw it.
+pub(crate) fn strip_height<H: Copy + PartialEq>(
+    _p: &mut Painter<'_, H>,
+    cells: &[StatOptions<'_>],
+    _w: f32,
+) -> f32 {
+    cells.iter().map(cell_height).fold(0.0, f32::max)
 }
 
 impl Ui<'_> {
@@ -257,5 +293,85 @@ impl Ui<'_> {
             }
             tallest
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::testing::UiHarness;
+
+    fn cells() -> Vec<StatOptions<'static>> {
+        let base = StatOptions {
+            label: "Label",
+            value: "12",
+            ..StatOptions::default()
+        };
+        vec![
+            base,
+            StatOptions {
+                compact: true,
+                ..base
+            },
+            StatOptions { text: true, ..base },
+            StatOptions {
+                text: true,
+                compact: true,
+                ..base
+            },
+            StatOptions {
+                sub: Some("up"),
+                sub_tone: Tone::Ok,
+                ..base
+            },
+            StatOptions {
+                no_data: true,
+                ..base
+            },
+            StatOptions {
+                no_data: true,
+                compact: true,
+                ..base
+            },
+            StatOptions {
+                meter: Some(0.4),
+                ..base
+            },
+            StatOptions {
+                sub: Some("sub"),
+                meter: Some(0.4),
+                compact: true,
+                gold: true,
+                ..base
+            },
+        ]
+    }
+
+    /// The measure is the height the draw returns, for each cell alone, for the cells together in
+    /// a strip, and for none.
+    #[test]
+    fn strip_height_is_what_the_strip_draws() {
+        let all = cells();
+        let mut h = UiHarness::new((600.0, 400.0));
+        h.at_ms(0).frame(|ui| {
+            for w in [120.0, 328.0, 500.0] {
+                for (i, cell) in all.iter().enumerate() {
+                    let one = std::slice::from_ref(cell);
+                    let measured = strip_height(ui.painter(), one, w);
+                    let drawn = ui.scope(format!("one-{w}-{i}"), |ui| {
+                        ui.stat("cell", Rect::new(10.0, 10.0, w, 0.0), cell)
+                    });
+                    assert_eq!(measured, drawn, "cell {i} at {w}: {cell:?}");
+                }
+                let measured = strip_height(ui.painter(), &all, w);
+                let drawn = ui.stat_strip(format!("all-{w}"), Rect::new(10.0, 10.0, w, 0.0), &all);
+                assert_eq!(measured, drawn, "the strip at {w}");
+            }
+            assert_eq!(strip_height(ui.painter(), &[], 300.0), 0.0);
+            assert_eq!(
+                ui.stat_strip("none", Rect::new(0.0, 0.0, 300.0, 0.0), &[]),
+                0.0
+            );
+        });
     }
 }

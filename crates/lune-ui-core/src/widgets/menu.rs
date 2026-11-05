@@ -4,7 +4,7 @@
 
 use std::hash::Hash;
 
-use super::popover::{PlaceAlign, PlaceRequest, Side, place};
+use super::popover::{PlaceAlign, PlaceRequest, Side, glass_panel, place};
 use super::status_dot;
 use super::tone::Tone;
 use crate::access::{Action, Node, Role, State};
@@ -109,7 +109,7 @@ impl<'s> MenuRow<'s> {
         }
     }
 
-    fn height(&self) -> f32 {
+    pub(crate) fn height(&self) -> f32 {
         match self {
             MenuRow::Item { .. } | MenuRow::Entry(_) => ROW,
             MenuRow::Header { .. } => HEADER,
@@ -136,10 +136,10 @@ impl<'s, H> From<&MenuEntry<'s, H>> for MenuRow<'s> {
     }
 }
 
-const PAD: f32 = 6.0;
+/// The inset of a menu's rows from its panel.
+pub(crate) const PAD: f32 = 6.0;
 const ROW: f32 = 28.0;
 const SEP: f32 = 11.0;
-const RADIUS: f32 = 9.0;
 /// A header row's height: 6 px of padding around a 20 px and a 16 px line.
 pub const HEADER: f32 = 48.0;
 const HEADER_PAD: f32 = 6.0;
@@ -338,20 +338,31 @@ fn paint_header<H: Copy + PartialEq>(
     p.text_in(&status, below, 0.0);
 }
 
-/// Draws the glass panel and its rows, untransformed and without hit regions. `looks[i]` is row
-/// `i`'s look (a missing entry is the look at rest).
-pub fn menu_paint<H: Copy + PartialEq>(
+/// Draws a separator row `r` of a menu whose panel is `panel`.
+pub(crate) fn paint_separator<H: Copy + PartialEq>(p: &mut Painter<'_, H>, panel: Rect, r: Rect) {
+    let t = p.theme;
+    p.fill(
+        Rect::new(
+            panel.x + PAD + 2.0,
+            r.y + 5.0,
+            panel.w - 2.0 * PAD - 4.0,
+            1.0,
+        ),
+        0.0,
+        t.menu_separator,
+    );
+}
+
+/// Draws the rows of a menu whose panel is `panel`, at `rects` (the surface is the caller's).
+/// `looks[i]` is row `i`'s look (a missing entry is the look at rest).
+pub(crate) fn menu_paint_rows<H: Copy + PartialEq>(
     p: &mut Painter<'_, H>,
     rows: &[MenuRow<'_>],
-    layout: &MenuLayout,
+    panel: Rect,
+    rects: &[Rect],
     looks: &[RowLook],
 ) {
-    let t = p.theme;
-    let panel = layout.panel;
-    p.backdrop(panel, RADIUS);
-    p.fill(panel, RADIUS, t.menu_glass);
-    p.ring(panel, RADIUS, 1.0, t.menu_popup_border, false);
-    for (i, (e, r)) in rows.iter().zip(&layout.rows).enumerate() {
+    for (i, (e, r)) in rows.iter().zip(rects).enumerate() {
         match e {
             MenuRow::Item { .. } | MenuRow::Entry(_) => {
                 if let Some(item) = e.item() {
@@ -360,20 +371,21 @@ pub fn menu_paint<H: Copy + PartialEq>(
                 }
             }
             MenuRow::Header { name, status, tone } => paint_header(p, *r, name, status, *tone),
-            MenuRow::Separator => {
-                p.fill(
-                    Rect::new(
-                        panel.x + PAD + 2.0,
-                        r.y + 5.0,
-                        panel.w - 2.0 * PAD - 4.0,
-                        1.0,
-                    ),
-                    0.0,
-                    t.menu_separator,
-                );
-            }
+            MenuRow::Separator => paint_separator(p, panel, *r),
         }
     }
+}
+
+/// Draws the glass panel and its rows, untransformed and without hit regions. `looks[i]` is row
+/// `i`'s look (a missing entry is the look at rest).
+pub fn menu_paint<H: Copy + PartialEq>(
+    p: &mut Painter<'_, H>,
+    rows: &[MenuRow<'_>],
+    layout: &MenuLayout,
+    looks: &[RowLook],
+) {
+    glass_panel(p, layout.panel);
+    menu_paint_rows(p, rows, layout.panel, &layout.rows, looks);
 }
 
 /// A glass menu at `at` (kept inside the window), the content under it blurred (30 px,

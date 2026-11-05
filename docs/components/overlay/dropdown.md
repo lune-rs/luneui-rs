@@ -11,7 +11,7 @@ summary: Combo drop-down option list that flips above its anchor near the window
 
 ## What it is
 
-`dropdown`: an option list under its `anchor`, flipped above it near the window bottom [R crates/lune-ui-core/src/widgets/dropdown.rs:7-24]. Rows are 32 high; a check mark marks the selected option [R crates/lune-ui-core/src/widgets/dropdown.rs:17,46-49].
+`Ui::dropdown` and `Ui::dropdown_with`: an option list under its `anchor`, flipped above it near the window bottom. Rows are 32 high; a check mark marks the selected option. `DropdownOptions { glass, max_rows }` [D143] draws the menu's glass surface and scrolls a long list; both are off by default, so `dropdown` draws what it drew. The Painter-API `dropdown` stays for the legacy scenes.
 
 ## Needs
 
@@ -22,7 +22,7 @@ summary: Combo drop-down option list that flips above its anchor near the window
 
 ## Existing code
 
-`crates/lune-ui-core/src/widgets/dropdown.rs:9` (`dropdown`); 54 lines.
+`crates/lune-ui-core/src/widgets/dropdown.rs` (`dropdown`, `Ui::dropdown`, `Ui::dropdown_with`, `DropdownOptions`); tests in `crates/lune-ui-core/tests/widget_dropdown.rs`.
 
 ## Spec
 
@@ -34,7 +34,7 @@ Pinned: Lunegit 33a1dd41, Wane 69931d6, this repo fa2958b. Read: `crates/lune-ui
 selector), `src/Lunegit.Desktop/App.axaml:720-745` (ComboBox item states), `src/Lunegit.Desktop/App.axaml:757-763`
 (popup corner 12); Wane `docs/ui/components.md:529-542`.
 Conflicts (winner):
-- Surface: Wane `--menu-glass` blur 30 [W docs/ui/components.md:529-542] vs opaque `dropdown_bg` #000000F0 [R crates/lune-ui-core/src/theme.rs:68, crates/lune-ui-core/src/widgets/dropdown.rs:26]. The moved code wins (pixel gate); the glass look is an Open question for a DECISIONS row.
+- Surface: Wane `--menu-glass` blur 30 [W docs/ui/components.md:529-542] vs opaque `dropdown_bg` #000000F0 [R crates/lune-ui-core/src/theme.rs:68]. Both ship [D143]: the opaque list is the default (zero pixel delta), `DropdownOptions.glass` draws the menu's surface (`popover::glass_panel`: radius 9, the blurred scene, `menu_glass`, the `menu_popup_border` ring) and Wane opts in.
 - Radius: Wane 9, Lunegit popup 12 [L src/Lunegit.Desktop/App.axaml:761], code 8 [R crates/lune-ui-core/src/widgets/popup_panel.rs:8-9]. The code wins.
 - Panel inset: Wane 4 and code 4 agree [R crates/lune-ui-core/src/widgets/dropdown.rs:28-29].
 
@@ -46,6 +46,8 @@ Conflicts (winner):
 - Label: 10 px inset, `fg_primary` when enabled, `fg_tertiary` when disabled [R crates/lune-ui-core/src/widgets/dropdown.rs:40-45, crates/lune-ui-core/src/theme.rs:56,58].
 - Check mark (selected): 12 px glyph, `fg_secondary`, in a 20 px box 26 px from the row's right edge [R crates/lune-ui-core/src/widgets/dropdown.rs:46-48].
 - Row radius 4 [R crates/lune-ui-core/src/widgets/dropdown.rs:36,38].
+- Glass: the same panel with the menu's surface at radius 9; the rows, the check and the fills are unchanged [D143].
+- Long list: `max_rows` shows at most that many rows (at least one) and the panel is `max_rows` × 32 + 8 high; the rows scroll in the 32-high-row viewport between the 4 px paddings through `Ui::scroll_area` (wheel, trackpad and the overlay thumb on the right edge; no horizontal bar). The list opens with the selected row in view, centred when it was below the fold; a key that moves the highlight brings that row into view (`Reveal::Nearest`). The cost is the unscrolled list's: every row is drawn each frame and clipped, so a list of thousands wants the search picker or a virtual list.
 
 ### States
 
@@ -78,7 +80,7 @@ No transition is given for row hover or selection; open question.
 ### Retained state
 
 - Transient: row hover; keyboard row highlight [D76].
-- Persistent: none. Scroll offset for long lists is not in the moved code [layout.scroll-area].
+- Persistent: the scroll offset of a long list, kept by the scroll area for the list's id.
 - App-owned: options (text and enabled flag), selected index, the anchor rect, the open flag [R crates/lune-ui-core/src/widgets/dropdown.rs:9-15].
 - Exit retention: no (no motion).
 
@@ -99,6 +101,8 @@ None: option texts come from the app (dropdown.rs:9-12).
 - `dropdown-flipped` (existing): list open above the combo near the bottom edge, settled. [R apps/gallery/src/scenes.rs:444-454]
 - `dropdown-hover`: an enabled row hovered, settled (new).
 - `dropdown-disabled`: one option disabled, settled (new).
+- `dropdown-glass`: the glass surface, settled.
+- `dropdown-scroll`: thirty options in eight rows, glass, opened on the twenty-first, a row hovered, settled.
 
 ### Painter primitives
 
@@ -107,7 +111,7 @@ None: option texts come from the app (dropdown.rs:9-12).
 
 ### Acceptance
 
-- Behaviour (scripted input, injected time): Up, Down and Enter choose the enabled row; Esc and an outside click close; a disabled row never fires. None exists yet.
+- Behaviour (scripted input, injected time): Up, Down and Enter choose the enabled row; Esc and an outside click close; a disabled row never fires; the glass list emits the backdrop and the glass fill; thirty options with `max_rows` 8 scroll, Down past the last visible row reveals it, a selected row 20 opens in view, a click after a wheel step picks the row under the pointer; in a disabled scope the keys are taken, nothing is picked and `disabled_violations` is empty (`tests/widget_dropdown.rs`).
 - Placement: when `below + h > window h − 8` the list flips above the anchor (dropdown.rs:20-24).
 - Pixel probes at scale 2: row 64 px high, panel radius 16 px, check glyph 24 px, row radius 8 px. Source values in Anatomy.
 - Conformance: none (no motion).
@@ -115,14 +119,14 @@ None: option texts come from the app (dropdown.rs:9-12).
 
 ### Build
 
-- Milestone: M4 (retrofit), M7 (variants, keyboard, anchored menus).
+- Milestone: M4 (retrofit), M7 (the glass surface and the scrolling list, step 4).
 - Depends on: core.focus, infra.accessibility, overlay.popup-panel, widget.combo, layout.scroll-area.
 
 ## Open questions
 
-- Glass look (Wane `--menu-glass`, blur 30) vs the moved opaque `dropdown_bg`: a look change needs a DECISIONS row (hard rule 8); open.
-- Long option lists scroll: not in the moved code and not mocked (W docs/ui/components.md:529-542); open for layout.scroll-area.
-- Type-ahead: not mocked; open.
+- Resolved [D143]: glass look: both, the opaque list by default and `glass` for the menu's surface.
+- Resolved [D143]: long option lists scroll through `max_rows`.
+- Type-ahead: no source; not built [D143].
 - Resolved [D76]: the list takes focus; a keyboard row highlight (Up and Down skip disabled rows, Enter picks, it starts at the selected row) is drawn with the hover fill.
 
 ## Notes for the planner

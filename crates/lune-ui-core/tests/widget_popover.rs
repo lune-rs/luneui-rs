@@ -3,6 +3,7 @@
 //! at scale 2 and the semantic tree.
 
 use lune_ui_core::access::{AccessAction, Action, Node, Role, State};
+use lune_ui_core::color::premul;
 use lune_ui_core::input::{Key, NamedKey, PointerButton, Repaint};
 use lune_ui_core::motion::{MotionTier, conformance};
 use lune_ui_core::paint::{LayerId, Painter, Rect};
@@ -488,4 +489,43 @@ fn a_popover_anchored_on_a_response_in_a_scrolled_area_opens_at_it_on_screen() {
     let placed = frame(&mut h, 10);
     // Content y 150 at offset 100 is screen y 50; 32 high, gap 4.
     assert_eq!((placed.rect.x, placed.rect.y), (10.0, 86.0));
+}
+
+#[test]
+fn a_glass_popover_blurs_what_is_under_it_and_replays_the_blur_while_it_closes() {
+    let glass = |o: &mut PopoverOptions| o.surface = Surface::Glass;
+    let popup = LayerId::Popup as usize;
+    let mut h = UiHarness::new(WIN);
+    run(&mut h, 0, &[("pop", ANCHOR)], glass);
+    let out = run(&mut h, 400, &[("pop", ANCHOR)], glass);
+    let pl = out.placement.expect("placed");
+    let under = &out.scene.layers[popup].geometry.under;
+    assert_eq!(under[0].color, premul(DARK.menu_glass));
+    assert_eq!(under[0].radii, [9.0; 4]);
+    assert_eq!(under[1].color, premul(DARK.menu_popup_border), "the ring");
+    let open = out.scene.backdrop.expect("the blur request");
+    assert_eq!(open.layer, popup);
+    assert_eq!(open.rect, [pl.rect.x, pl.rect.y, pl.rect.w, pl.rect.h]);
+    assert_eq!(open.radius, 9.0);
+    // The app stops calling it: the blur is replayed with the fade, then gone.
+    run(&mut h, 1000, &[], |_| {});
+    let closing = run(&mut h, 1060, &[], |_| {});
+    let blur = closing.scene.backdrop.expect("blur while it fades");
+    assert!(
+        blur.alpha < open.alpha,
+        "{} against {}",
+        blur.alpha,
+        open.alpha
+    );
+    assert!(
+        blur.rect[2] < open.rect[2] && blur.rect[2] > 0.97 * open.rect[2],
+        "scaled with the close"
+    );
+    assert_eq!(closing.repaint, Some(Repaint::Now));
+    let idle = run(&mut h, 1300, &[], |_| {});
+    assert!(idle.scene.backdrop.is_none());
+    // The default surface asks for no blur.
+    let mut h = UiHarness::new(WIN);
+    open_one(&mut h, 0);
+    assert!(open_one(&mut h, 400).scene.backdrop.is_none());
 }

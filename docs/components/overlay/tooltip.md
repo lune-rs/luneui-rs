@@ -117,7 +117,7 @@ None: the text is supplied by the app (Lunegit's are app strings such as `termin
 
 ### Build
 
-- Milestone: M5. Built in M5 (steps 9 and 10; the page is `tooltip`, 8 scenes). Open for `done` (D47): M11 re-checks the whole bar on every entry; the Windows and Linux run time is unverified (the Linux and Windows lint is `scripts/check-targets.sh`).
+- Milestone: M5. Built in M5 (steps 9 and 10; the page is `tooltip`, 8 scenes). A tooltip over a dialog draws on the `Raised` layer, chosen once at open [D137]; a third level that overlaps its parent shares `Raised` and interleaves (fills under text). Open for `done` (D47): M11 re-checks the whole bar on every entry; the Windows and Linux run time is unverified (the Linux and Windows lint is `scripts/check-targets.sh`).
 - Depends on: overlay.popover, core.ui, core.focus, infra.accessibility, motion.transitions
 
 ## Open questions
