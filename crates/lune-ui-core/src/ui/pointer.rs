@@ -24,6 +24,9 @@ pub(crate) struct HitRecord {
     pub(crate) sense: Sense,
     pub(crate) tag: u32,
     pub(crate) enabled: bool,
+    /// The axes a scroll region is live on, `(x, y)`: a wheel delta on an axis goes only to a region
+    /// live on it (D178). Both for every other region.
+    pub(crate) scroll_axes: (bool, bool),
 }
 
 /// The topmost region of `hits` at `pos` that `eligible` admits: highest layer, then latest call.
@@ -240,8 +243,9 @@ impl PointerState {
         None
     }
 
-    /// A scroll gesture at `pos`: to the topmost scroll region not on a layer below the topmost
-    /// region's.
+    /// A scroll gesture at `pos`: each axis of the delta goes to the topmost scroll region live on
+    /// that axis that is not on a layer below the topmost region's (D178). A region live on both
+    /// axes takes both components, as one live on one takes its own.
     pub(crate) fn scroll(
         &mut self,
         pos: (f32, f32),
@@ -254,14 +258,24 @@ impl PointerState {
             return;
         };
         let layer = top.layer;
-        let Some(to) = topmost(cx.hits, pos, &|h| {
-            (cx.eligible)(h) && h.enabled && h.sense.scroll && h.layer >= layer
-        }) else {
-            return;
+        let region = |on: fn(&HitRecord) -> bool| {
+            topmost(cx.hits, pos, &|h| {
+                (cx.eligible)(h) && h.enabled && h.sense.scroll && h.layer >= layer && on(h)
+            })
         };
-        match delta {
-            ScrollDelta::Lines { x, y } => add(&mut out.scroll_lines, to.id, (x, y)),
-            ScrollDelta::Pixels { x, y } => add(&mut out.scroll_pixels, to.id, (x, y)),
+        let (map, x, y) = match delta {
+            ScrollDelta::Lines { x, y } => (&mut out.scroll_lines, x, y),
+            ScrollDelta::Pixels { x, y } => (&mut out.scroll_pixels, x, y),
+        };
+        if x != 0.0
+            && let Some(to) = region(|h| h.scroll_axes.0)
+        {
+            add(map, to.id, (x, 0.0));
+        }
+        if y != 0.0
+            && let Some(to) = region(|h| h.scroll_axes.1)
+        {
+            add(map, to.id, (0.0, y));
         }
     }
 

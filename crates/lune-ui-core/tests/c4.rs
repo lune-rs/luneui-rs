@@ -3128,4 +3128,63 @@ mod nested_wheel {
             ui.toast_history("hist", INNER, &mut toasts.borrow_mut());
         });
     }
+
+    /// D178: a sideways swipe over a composite that scrolls only vertically goes to the area around
+    /// it, whether the composite overflows or not; the vertical wheel keeps going to it when it does.
+    #[test]
+    fn a_sideways_swipe_over_a_vertical_composite_moves_the_page() {
+        let swipe = |draw: &mut dyn FnMut(&mut Ui<'_>), delta: (f32, f32)| -> (f64, f64) {
+            let draw = RefCell::new(draw);
+            let frame = |h: &mut UiHarness, ms: u64| {
+                let mut off = (0.0, 0.0);
+                h.at_ms(ms).frame(|ui: &mut Ui<'_>| {
+                    let o = ScrollOptions {
+                        extent: Some((2000.0, 3000.0)),
+                        ..ScrollOptions::default()
+                    };
+                    let rect = Rect::new(0.0, 0.0, 900.0, 700.0);
+                    let page = ui.scroll_area("page", rect, &o, |ui, _| {
+                        (draw.borrow_mut())(ui);
+                        ((), Extent::new(2000.0, 3000.0))
+                    });
+                    off = page.offset;
+                });
+                off
+            };
+            let mut h = UiHarness::new(WIN);
+            frame(&mut h, 0);
+            h.input
+                .pointer_to(INNER.x + INNER.w / 2.0, INNER.y + INNER.h / 2.0);
+            frame(&mut h, 10);
+            h.input.scroll_pixels(delta.0, delta.1);
+            frame(&mut h, 20);
+            frame(&mut h, 400)
+        };
+        for count in [FEW, MANY] {
+            let list = &mut |ui: &mut Ui<'_>| {
+                let o = ListOptions {
+                    count,
+                    heights: Heights::Fixed(30.0),
+                    selection: SelectionMode::Single,
+                    index_of: None,
+                    label: "rows",
+                };
+                ui.virtual_list("l", INNER, &o, |i| RowKey(i as u64), |_, _| 30.0);
+            };
+            assert_eq!(swipe(list, (-60.0, 0.0)), (60.0, 0.0), "list of {count}");
+        }
+        // A diagonal gesture over an overflowing list: the list keeps its vertical part, the page
+        // takes the sideways one.
+        let list = &mut |ui: &mut Ui<'_>| {
+            let o = ListOptions {
+                count: MANY,
+                heights: Heights::Fixed(30.0),
+                selection: SelectionMode::Single,
+                index_of: None,
+                label: "rows",
+            };
+            ui.virtual_list("l", INNER, &o, |i| RowKey(i as u64), |_, _| 30.0);
+        };
+        assert_eq!(swipe(list, (-60.0, -60.0)), (60.0, 0.0));
+    }
 }

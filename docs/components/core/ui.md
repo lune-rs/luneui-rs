@@ -101,7 +101,7 @@ Retention length follows the tier: Full 180 ms (`fast`), Reduced 120 ms (`instan
 
 ### Input and focus
 
-- Pointer: hover, click, double-click, drag per `Sense`; the wheel scrolls the topmost scrollable under the pointer; buttons other than primary are reported by `PointerButton` [R crates/lune-ui-core/src/input.rs:67-76,80-85].
+- Pointer: hover, click, double-click, drag per `Sense`; the wheel scrolls the topmost scrollable under the pointer, each axis of the delta to the topmost one live on that axis (D178); buttons other than primary are reported by `PointerButton` [R crates/lune-ui-core/src/input.rs:67-76,80-85].
 - Keys: routed in this order: the top overlay's dismiss rule (Escape; while a pointer gesture is live and holds its capture, the gesture takes it first, D175, D176), the focused widget, then the shortcut registry; Tab and Shift+Tab are `core.focus`; text (`Event::Text`) and IME go to the focused text widget only [core.focus], [infra.shortcut-routing], [R crates/lune-ui-core/src/input.rs:57-60].
 - `AccessAction` events are routed as the matching pointer or key input [infra.accessibility].
 - Layer: the layer a hit is registered on; overlays use `Popup`, `Modal` or `Raised` (chosen by the `Ui`, [D137]); toasts use `Toast` ([D54]). Focus scope: an overlay pushes one on open and pops it on close; a modal traps Tab [core.focus].

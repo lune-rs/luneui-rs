@@ -588,6 +588,38 @@ impl TextEdit {
         self.snapped = true;
     }
 
+    /// Whether [`Self::apply`] would consume `cmd` from this state, without running it: exactly
+    /// `apply(cmd).consumed`, for a state that is synced (a caret and anchor on boundaries, as the
+    /// widgets keep it). A widget that must take a key and act on none (a disabled scope, D140)
+    /// asks this instead of applying.
+    pub fn takes(&self, cmd: &EditCommand) -> bool {
+        if self.preedit.is_some() && !cmd.runs_while_composing() {
+            return false;
+        }
+        let edits = !self.flags.read_only;
+        match cmd {
+            EditCommand::Move { .. }
+            | EditCommand::SelectAll
+            | EditCommand::SelectWordAt(_)
+            | EditCommand::SelectLineAt(_)
+            | EditCommand::PlaceCaret(_)
+            | EditCommand::ExtendTo(_)
+            | EditCommand::ImeCancel => true,
+            EditCommand::Copy => !self.selection().is_empty(),
+            EditCommand::Cut => edits && !self.selection().is_empty(),
+            EditCommand::Enter => !self.flags.multiline || edits,
+            EditCommand::Insert(_)
+            | EditCommand::PasteText(_)
+            | EditCommand::Backspace { .. }
+            | EditCommand::Delete { .. }
+            | EditCommand::Undo
+            | EditCommand::Redo
+            | EditCommand::Paste
+            | EditCommand::ImePreedit { .. }
+            | EditCommand::ImeCommit(_) => edits,
+        }
+    }
+
     /// Runs one command on `text`. It syncs first, so a text changed behind the engine is an
     /// external change here too. While a preedit exists only IME commands and a clipboard answer
     /// run; anything else does nothing and is not consumed.

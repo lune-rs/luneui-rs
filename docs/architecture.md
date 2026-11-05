@@ -209,6 +209,10 @@ Holds, for the keys listed:
 | `kanban_board`, the cards (one roving stop) | Up, Down, Left, Right, Home, End, each also with Shift, Enter, Space | Test (M8): `widget_kanban_board::a_focused_card_turned_disabled_keeps_its_keys_and_acts_on_none`, the same c4 test (card stop). The arrow loop's own gate is masked by the `rove_keys` that follows it, which takes the same keys, so the mutant gates both: it fails both tests. Chords: `a_chord_on_a_card_stays_a_shortcut_enabled_and_disabled` |
 | `kanban_board`, the column area, PageUp and PageDown (`scroll_area`) | PageUp, PageDown | Test (M8): `widget_kanban_board::page_keys_scroll_a_column_and_die_disabled` |
 | Hosts of `Ui::icon_button`: the board's add column, add card and column actions | Enter, Space | Test (M8): `c4::m8::the_boards_buttons_focused_then_disabled_keep_enter_and_space_from_the_shortcuts`; mutant: `activation_keys` leaving a disabled key fails it |
+| `text_field`, and the filter bar's box (`begin_edit`, M9 D177) | Enter, Space, Backspace, Delete, Left, Right, Home, End, a typed character, Command+A, V, Z; Command+C, X with a selection | Test (M9): `widget_text_field::disabled_keys::a_text_field_focused_then_disabled_takes_its_keys_and_changes_nothing`, `a_filter_bar_focused_then_disabled_...`, `a_key_the_engine_declines_still_fires_its_binding`, `a_clipboard_answer_in_a_disabled_frame_does_not_insert`; mutants: `run_events` gated on `focused` again, and acting while disabled (both fail the three box tests). `TextEdit::takes` is `apply(..).consumed` for every command and state (`text_edit::takes_is_what_apply_consumes_for_every_command_and_state`, mutant: Enter always taken) |
+| `text_area` (`begin_edit`) | those, and Up, Down, PageUp, PageDown | Test (M9): `widget_text_field::disabled_keys::a_text_area_focused_then_disabled_takes_its_keys_and_changes_nothing`, the same mutants |
+| `command_palette`, its search box (a filter bar) | Space, Backspace, Delete, Left, Right, Home, End, a typed character, Command+A, V, Z; Command+C, X with a selection (Up, Down, Enter by the palette's own keys, above) | Test (M9): `widget_command_palette::a_search_box_focused_then_disabled_takes_its_keys_and_changes_nothing` (`Scope::Overlay`); mutant: `run_events` gated on `focused` fails it |
+| `selectable_text`, so `kv_list` values and the flyout's routes (each run), positioned and elided | Enter, Left, Right, Home, End, Command+A; Command+C with a selection. Elided text (`spec` differs from `full`): Command+A, C | Test (M9): `widget_kv_list::a_value_focused_then_disabled_takes_its_keys_and_changes_nothing`, `select_all_on_an_elided_value_focused_then_disabled_selects_nothing`; mutants: the whole-selection loop gated on `focused`, Select all acting while disabled, the positioned selection cleared while disabled (each fails one of the two) |
 
 Does not hold: each key listed fired nothing enabled and fired its binding disabled, with focus kept. All by probe;
 nothing acted. Each gates on `enabled` or a focus that is false in a disabled scope before it takes the key.
@@ -218,10 +222,6 @@ nothing acted. Each gates on `enabled` or a focus that is false in a disabled sc
 | `stepper` | Up, Down |
 | `slider` | arrows |
 | `search_picker`, the trigger | Enter, Space. An open picker closes when disabled and focus returns to the trigger, so this row is what is left of its box |
-| `text_field`, and the filter bar's box | Enter, Space, Backspace, Delete, Left, Right, Home, End, a typed character, Command+A, V, Z; Command+C, X with a selection (run on the field) |
-| `text_area` | those, and Up, Down, PageUp, PageDown |
-| `command_palette`, its search box (a filter bar) | Space, Backspace, Delete, Left, Right, Home, End, a typed character, Command+A, V, Z; Command+C, X with a selection. Only Up, Down and Enter hold, by the palette's own keys |
-| `selectable_text`, so `kv_list` values and the flyout's routes (each run) | Enter, Left, Right, Home, End, Command+A; Command+C with a selection. Elided text (`spec` differs from `full`): Command+A, C |
 
 Not a leak: Escape in a pointer drag (`consume_key_while_pressed`: the splitter, `drag_gesture`) fired nothing enabled
 and fired its binding once the scope turned disabled mid-drag (probe, splitter and tab strip). From reading: `Ui::interact`

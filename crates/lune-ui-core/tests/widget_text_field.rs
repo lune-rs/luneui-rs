@@ -1224,3 +1224,241 @@ fn a_press_picks_the_line_in_a_text_area_inside_a_scrolled_parent() {
     let out = in_parent(&mut h, 40, |ui| draw(ui, &mut text));
     assert_eq!(selection_of(&out, "a"), (7, 7));
 }
+
+/// Class 1 of D177: a text field, area or filter bar that holds the key focus when its scope turns
+/// disabled takes the keys it takes enabled and changes nothing.
+mod disabled_keys {
+    use super::*;
+    use lune_ui_core::input::Modifiers;
+    use lune_ui_core::shortcuts::{Binding, Chord, Scope};
+    use lune_ui_core::ui::Ui;
+    use lune_ui_core::widgets::filter_bar::FilterOptions;
+
+    type Draw = fn(&mut Ui<'_>, &mut String);
+
+    /// A key to press: its name, the key, the text it types, and whether the primary modifier is
+    /// held.
+    type Probe = (&'static str, Key, Option<&'static str>, bool);
+
+    const AREA: Rect = Rect::new(20.0, 20.0, 200.0, 100.0);
+
+    fn field(ui: &mut Ui<'_>, text: &mut String) {
+        ui.text_field_with("f", RECT, text, &FieldOptions::default());
+    }
+
+    fn area(ui: &mut Ui<'_>, text: &mut String) {
+        ui.text_area("f", AREA, text, &AreaOptions::default());
+    }
+
+    fn bar(ui: &mut Ui<'_>, text: &mut String) {
+        ui.filter_bar("f", RECT, text, &FilterOptions::default());
+    }
+
+    fn named(name: &'static str, key: NamedKey, typed: Option<&'static str>) -> Probe {
+        (name, Key::Named(key), typed, false)
+    }
+
+    /// Command plus a letter.
+    fn primary(name: &'static str, letter: &'static str) -> Probe {
+        (name, Key::Character(letter.to_owned()), None, true)
+    }
+
+    /// The "Does not hold" keys of a one-line box.
+    fn line_keys() -> Vec<Probe> {
+        vec![
+            named("Enter", NamedKey::Enter, None),
+            named("Space", NamedKey::Space, Some(" ")),
+            named("Backspace", NamedKey::Backspace, None),
+            named("Delete", NamedKey::Delete, None),
+            named("Left", NamedKey::ArrowLeft, None),
+            named("Right", NamedKey::ArrowRight, None),
+            named("Home", NamedKey::Home, None),
+            named("End", NamedKey::End, None),
+            ("a typed j", Key::Character("j".into()), Some("j"), false),
+            primary("Command+A", "a"),
+            primary("Command+C", "c"),
+            primary("Command+X", "x"),
+            primary("Command+V", "v"),
+            primary("Command+Z", "z"),
+        ]
+    }
+
+    fn area_keys() -> Vec<Probe> {
+        let mut keys = line_keys();
+        keys.extend([
+            named("Up", NamedKey::ArrowUp, None),
+            named("Down", NamedKey::ArrowDown, None),
+            named("PageUp", NamedKey::PageUp, None),
+            named("PageDown", NamedKey::PageDown, None),
+        ]);
+        keys
+    }
+
+    fn frame(h: &mut UiHarness, draw: Draw, text: &mut String, enabled: bool) -> FrameOutput {
+        h.frame(|ui| {
+            if enabled {
+                draw(ui, text);
+            } else {
+                ui.with_enabled(false, |ui| draw(ui, text));
+            }
+        })
+        .1
+    }
+
+    fn press(h: &mut UiHarness, (_, key, typed, primary): &Probe) {
+        if *primary {
+            h.input.set_modifiers(Modifiers {
+                logo: true,
+                ..Modifiers::default()
+            });
+        }
+        h.input.key_down(key.clone(), *typed);
+        h.input.set_modifiers(Modifiers::default());
+    }
+
+    fn selection_in(out: &FrameOutput) -> (usize, usize) {
+        out.tree
+            .get(id())
+            .and_then(|n| n.text.as_ref())
+            .expect("the field's text")
+            .selection
+    }
+
+    fn binding(probe: &Probe) -> Binding {
+        let (name, key, _, primary) = probe;
+        let chord = Chord::key(key.clone());
+        Binding::new(
+            Scope::Global,
+            if *primary { chord.primary() } else { chord },
+            *name,
+        )
+    }
+
+    /// A box focused with all its text selected, bound on `probe`'s key and on F5.
+    fn start(draw: Draw, probe: &Probe, text: &mut String) -> UiHarness {
+        let mut h = UiHarness::new(WIN);
+        frame(&mut h, draw, text, true);
+        h.input.key_down(Key::Named(NamedKey::Tab), None);
+        frame(&mut h, draw, text, true);
+        press(&mut h, &primary("select all", "a"));
+        frame(&mut h, draw, text, true);
+        h.shortcuts.add(binding(probe)).add(Binding::new(
+            Scope::Global,
+            Chord::key(Key::Named(NamedKey::F5)),
+            "f5",
+        ));
+        h
+    }
+
+    fn hold(draw: Draw, probes: &[Probe]) {
+        for probe in probes {
+            let name = probe.0;
+            // The same key, enabled: the box takes it, so the probe proves something.
+            let mut text = String::from("one two\nthree");
+            let mut h = start(draw, probe, &mut text);
+            press(&mut h, probe);
+            let out = frame(&mut h, draw, &mut text, true);
+            assert!(out.fired.is_empty(), "{name}: enabled, it fired");
+
+            let mut text = String::from("one two\nthree");
+            let mut h = start(draw, probe, &mut text);
+            let before = selection_in(&frame(&mut h, draw, &mut text, false));
+            assert_eq!(before, (0, 13), "{name}: the selection survives disabling");
+            press(&mut h, probe);
+            let out = frame(&mut h, draw, &mut text, false);
+            assert!(out.fired.is_empty(), "{name}: disabled, it fired a binding");
+            assert_eq!(text, "one two\nthree", "{name}: the text changed");
+            assert_eq!(selection_in(&out), before, "{name}: the selection moved");
+            assert!(out.clipboard.is_empty(), "{name}: the clipboard was used");
+            assert_eq!(out.focused, Some(id()), "{name}: focus left");
+            h.input.key_down(Key::Named(NamedKey::F5), None);
+            let out = frame(&mut h, draw, &mut text, false);
+            assert_eq!(out.fired.len(), 1, "{name}: F5 no longer fires");
+        }
+    }
+
+    #[test]
+    fn a_text_field_focused_then_disabled_takes_its_keys_and_changes_nothing() {
+        hold(field, &line_keys());
+    }
+
+    #[test]
+    fn a_text_area_focused_then_disabled_takes_its_keys_and_changes_nothing() {
+        hold(area, &area_keys());
+    }
+
+    #[test]
+    fn a_filter_bar_focused_then_disabled_takes_its_keys_and_changes_nothing() {
+        hold(bar, &line_keys());
+    }
+
+    /// A key the engine declines still fires its binding, enabled and disabled.
+    #[test]
+    fn a_key_the_engine_declines_still_fires_its_binding() {
+        for draw in [field as Draw, area, bar] {
+            for enabled in [true, false] {
+                // Command+C with nothing selected.
+                let mut text = String::from("abc");
+                let mut h = UiHarness::new(WIN);
+                frame(&mut h, draw, &mut text, true);
+                h.input.key_down(Key::Named(NamedKey::Tab), None);
+                frame(&mut h, draw, &mut text, true);
+                let copy = primary("Command+C", "c");
+                h.shortcuts.add(binding(&copy));
+                frame(&mut h, draw, &mut text, enabled);
+                press(&mut h, &copy);
+                let out = frame(&mut h, draw, &mut text, enabled);
+                assert_eq!(out.fired.len(), 1, "enabled={enabled}");
+                assert!(out.clipboard.is_empty());
+            }
+        }
+    }
+
+    /// A clipboard answer that arrives in a disabled frame inserts nothing, and the text stays
+    /// what it was after the scope is enabled again.
+    #[test]
+    fn a_clipboard_answer_in_a_disabled_frame_does_not_insert() {
+        for draw in [field as Draw, area, bar] {
+            let mut text = String::from("abc");
+            let paste = primary("Command+V", "v");
+            let mut h = start(draw, &paste, &mut text);
+            press(&mut h, &paste);
+            frame(&mut h, draw, &mut text, true);
+            h.input.clipboard_text("zzz");
+            let out = frame(&mut h, draw, &mut text, false);
+            assert_eq!(text, "abc");
+            assert!(out.fired.is_empty());
+            frame(&mut h, draw, &mut text, true);
+            assert_eq!(text, "abc", "the answer is not kept for later");
+        }
+    }
+
+    /// A read-only box declines edits even disabled, so their bindings fire.
+    #[test]
+    fn a_read_only_box_disabled_still_declines_an_edit() {
+        let mut text = String::from("abc");
+        let opts = FieldOptions {
+            read_only: true,
+            ..FieldOptions::default()
+        };
+        let mut h = UiHarness::new(WIN);
+        let go = |h: &mut UiHarness, text: &mut String, enabled: bool| {
+            h.frame(|ui| {
+                ui.with_enabled(enabled, |ui| {
+                    ui.text_field_with("f", RECT, text, &opts);
+                });
+            })
+            .1
+        };
+        go(&mut h, &mut text, true);
+        h.input.key_down(Key::Named(NamedKey::Tab), None);
+        go(&mut h, &mut text, true);
+        let back = named("Backspace", NamedKey::Backspace, None);
+        h.shortcuts.add(binding(&back));
+        go(&mut h, &mut text, false);
+        press(&mut h, &back);
+        let out = go(&mut h, &mut text, false);
+        assert_eq!(out.fired.len(), 1);
+        assert_eq!(text, "abc");
+    }
+}

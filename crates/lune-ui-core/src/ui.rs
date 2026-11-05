@@ -84,6 +84,8 @@ struct Registration {
     index: usize,
     sense: Sense,
     enabled: bool,
+    /// The axes a scroll region is live on, `(x, y)` (D178).
+    scroll_axes: (bool, bool),
 }
 
 /// An active overlay as the previous frame left it, for begin's input rules.
@@ -619,9 +621,9 @@ impl<'a> Ui<'a> {
             input_acted |= fired.len() > before;
         }
 
-        let mut senses: Vec<Option<(Sense, bool)>> = vec![None; painter.hits.len()];
+        let mut senses: Vec<Option<Registration>> = vec![None; painter.hits.len()];
         for r in &registered {
-            senses[r.index] = Some((r.sense, r.enabled));
+            senses[r.index] = Some(*r);
         }
         let mut hits = Vec::with_capacity(painter.hits.len());
         let mut rects = BTreeMap::new();
@@ -631,11 +633,14 @@ impl<'a> Ui<'a> {
             if tag == SUPPRESSED {
                 continue;
             }
-            let (sense, enabled) = senses
-                .get(i)
-                .copied()
-                .flatten()
-                .unwrap_or_else(|| (Sense::CLICK, !disabled.iter().any(|d| d.contains(&i))));
+            let (sense, enabled, scroll_axes) = match senses.get(i).copied().flatten() {
+                Some(r) => (r.sense, r.enabled, r.scroll_axes),
+                None => (
+                    Sense::CLICK,
+                    !disabled.iter().any(|d| d.contains(&i)),
+                    (true, true),
+                ),
+            };
             hits.push(HitRecord {
                 id,
                 rect,
@@ -643,6 +648,7 @@ impl<'a> Ui<'a> {
                 sense,
                 tag,
                 enabled,
+                scroll_axes,
             });
             rects.insert(id, rect);
         }
@@ -882,6 +888,7 @@ impl<'a> Ui<'a> {
             index,
             sense,
             enabled: self.enabled,
+            scroll_axes: (true, true),
         });
         if !self.enabled {
             return Response::inert(id, rect, false);
@@ -923,6 +930,14 @@ impl<'a> Ui<'a> {
             self.watch.push((id, content_rect));
         }
         r
+    }
+
+    /// Tells the region the last `interact` registered which axes a wheel delta may reach it on
+    /// (D178): a scroll area calls this right after its own `interact`.
+    pub(crate) fn set_scroll_axes(&mut self, axes: (bool, bool)) {
+        if let Some(r) = self.registered.last_mut() {
+            r.scroll_axes = axes;
+        }
     }
 
     /// The length of the watch list now: a scroll area's mark before it runs its content.

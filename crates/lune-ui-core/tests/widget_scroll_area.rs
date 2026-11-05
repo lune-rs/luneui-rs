@@ -382,6 +382,107 @@ fn the_wheel_goes_to_the_topmost_area_and_an_area_at_its_end_does_not_pass_it_up
     assert_eq!(draw(&mut h), (0.0, 300.0));
 }
 
+/// D178: an inner area and the one around it, both over a content that overflows both ways. Returns
+/// the inner area's offset and the outer's after `gesture` over the inner one.
+fn nested(
+    inner_bars: (Bars, Bars),
+    wheel_x: bool,
+    lines: bool,
+    gesture: (f32, f32),
+) -> ((f64, f64), (f64, f64)) {
+    let mut h = UiHarness::new(WIN);
+    let outer = Rect::new(0.0, 0.0, 400.0, 600.0);
+    let inner = Rect::new(20.0, 20.0, 200.0, 200.0);
+    let oo = opts(None);
+    let io = ScrollOptions {
+        bars: inner_bars,
+        wheel_x,
+        ..opts(None)
+    };
+    let draw = |h: &mut UiHarness| {
+        let mut res = ((0.0, 0.0), (0.0, 0.0));
+        h.frame(|ui| {
+            let r = ui.scroll_area("outer", outer, &oo, |ui, _| {
+                let i = ui.scroll_area("inner", inner, &io, |_, _| ((), Extent::new(900.0, 900.0)));
+                (i.offset, Extent::new(2000.0, 2000.0))
+            });
+            res = (r.value, r.offset);
+        });
+        res
+    };
+    draw(&mut h);
+    h.input.pointer_to(100.0, 100.0);
+    at(&mut h, 10.0);
+    draw(&mut h);
+    if lines {
+        h.input.scroll_lines(gesture.0, gesture.1);
+    } else {
+        h.input.scroll_pixels(gesture.0, gesture.1);
+    }
+    at(&mut h, 20.0);
+    draw(&mut h);
+    // Past the wheel's animation.
+    at(&mut h, 1000.0);
+    draw(&mut h)
+}
+
+#[test]
+fn an_inner_area_live_only_on_x_takes_the_horizontal_wheel_and_leaves_the_vertical_to_the_outer() {
+    for lines in [false, true] {
+        let x_only = (Bars::Auto, Bars::Disabled);
+        // Vertical: the outer alone.
+        let (inner, outer) = nested(x_only, false, lines, (0.0, -50.0));
+        assert_eq!(inner, (0.0, 0.0), "lines={lines}");
+        assert!(outer.1 > 0.0 && outer.0 == 0.0, "lines={lines}: {outer:?}");
+        // Horizontal: the inner alone.
+        let (inner, outer) = nested(x_only, false, lines, (-50.0, 0.0));
+        assert!(inner.0 > 0.0 && inner.1 == 0.0, "lines={lines}: {inner:?}");
+        assert_eq!(outer, (0.0, 0.0), "lines={lines}");
+        // Diagonal: each by its own component.
+        let (inner, outer) = nested(x_only, false, lines, (-50.0, -50.0));
+        assert!(inner.0 > 0.0 && inner.1 == 0.0, "lines={lines}: {inner:?}");
+        assert!(outer.1 > 0.0 && outer.0 == 0.0, "lines={lines}: {outer:?}");
+    }
+}
+
+#[test]
+fn an_inner_area_live_only_on_y_takes_the_vertical_wheel_and_leaves_the_horizontal_to_the_outer() {
+    for lines in [false, true] {
+        let y_only = (Bars::Disabled, Bars::Auto);
+        let (inner, outer) = nested(y_only, false, lines, (-50.0, 0.0));
+        assert_eq!(inner, (0.0, 0.0), "lines={lines}");
+        assert!(outer.0 > 0.0 && outer.1 == 0.0, "lines={lines}: {outer:?}");
+        let (inner, outer) = nested(y_only, false, lines, (0.0, -50.0));
+        assert!(inner.1 > 0.0 && inner.0 == 0.0, "lines={lines}: {inner:?}");
+        assert_eq!(outer, (0.0, 0.0), "lines={lines}");
+        let (inner, outer) = nested(y_only, false, lines, (-50.0, -50.0));
+        assert!(inner.1 > 0.0 && inner.0 == 0.0, "lines={lines}: {inner:?}");
+        assert!(outer.0 > 0.0 && outer.1 == 0.0, "lines={lines}: {outer:?}");
+    }
+}
+
+#[test]
+fn an_inner_sideways_wheel_strip_keeps_a_vertical_wheel() {
+    for lines in [false, true] {
+        let (inner, outer) = nested((Bars::Auto, Bars::Disabled), true, lines, (0.0, -50.0));
+        assert!(inner.0 > 0.0 && inner.1 == 0.0, "lines={lines}: {inner:?}");
+        assert_eq!(outer, (0.0, 0.0), "lines={lines}: the outer did not move");
+    }
+}
+
+#[test]
+fn an_inner_area_live_on_both_axes_takes_both_and_no_delta_is_doubled() {
+    let (inner, outer) = nested((Bars::Auto, Bars::Auto), false, false, (-30.0, -50.0));
+    assert_eq!(inner, (30.0, 50.0));
+    assert_eq!(outer, (0.0, 0.0));
+}
+
+#[test]
+fn a_diagonal_pixel_delta_is_split_exactly_between_the_two_areas() {
+    let (inner, outer) = nested((Bars::Auto, Bars::Disabled), false, false, (-30.0, -50.0));
+    assert_eq!((inner, outer), ((30.0, 0.0), (0.0, 50.0)));
+}
+
 #[test]
 fn a_disabled_area_ignores_the_wheel() {
     let o = opts(None);

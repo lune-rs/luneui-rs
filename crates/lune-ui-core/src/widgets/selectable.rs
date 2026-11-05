@@ -73,6 +73,8 @@ impl Ui<'_> {
         );
         let r = self.interact(id, hit, SELECT_SENSE);
         let focused = r.focused;
+        // The key focus, kept in a disabled scope: the keys are taken there and nothing acts (D140).
+        let held = self.focus_state().0 == Some(id);
         let single = spec.runs.len() == 1;
         let positioned = single && joined_text(spec) == full;
         let ink = t.text_selection;
@@ -89,7 +91,7 @@ impl Ui<'_> {
             };
             let mut text = full.to_owned();
             let (mut st, _) = begin_edit(self, id, &cfg, &mut text);
-            if !focused {
+            if !held {
                 let c = st.edit.caret();
                 st.edit.set_selection(c, c);
             }
@@ -111,11 +113,12 @@ impl Ui<'_> {
             edit_node(self, id, hit, &cfg, &st.edit, &text, facts);
             end_edit(self, id, &cfg, st, None);
         } else {
-            let mut selected = self.persistent::<WholeSelection>(id).0 && focused;
+            let mut selected = self.persistent::<WholeSelection>(id).0 && held;
             if r.press_started {
                 selected = true;
             }
-            if focused {
+            if held {
+                let act = r.enabled;
                 let keymap = self.keymap();
                 let flags = EditFlags {
                     read_only: true,
@@ -124,12 +127,14 @@ impl Ui<'_> {
                 for (index, event) in self.focus_events(id) {
                     match EditCommand::from_event(&event, keymap, flags) {
                         Some(EditCommand::SelectAll) => {
-                            selected = true;
+                            selected |= act;
                             self.consume_focus_event(index);
                         }
                         // As the engine does: Copy with nothing selected is declined.
                         Some(EditCommand::Copy) if selected => {
-                            self.clipboard_write(full.to_owned());
+                            if act {
+                                self.clipboard_write(full.to_owned());
+                            }
                             self.consume_focus_event(index);
                         }
                         _ => {}
@@ -137,7 +142,8 @@ impl Ui<'_> {
                 }
             }
             self.persistent::<WholeSelection>(id).0 = selected;
-            if selected {
+            let shown = selected && focused;
+            if shown {
                 self.painter()
                     .fill(Rect::new(rect.x, rect.y, w, h), 0.0, ink);
             }
@@ -147,7 +153,7 @@ impl Ui<'_> {
             let n = full.chars().count();
             node.text = Some(TextValue {
                 text: full.to_owned(),
-                selection: if selected { (0, n) } else { (0, 0) },
+                selection: if shown { (0, n) } else { (0, 0) },
             });
             node.states.insert(State::ReadOnly);
             if r.enabled {

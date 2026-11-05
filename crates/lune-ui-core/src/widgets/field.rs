@@ -405,7 +405,8 @@ pub(super) struct EditFrame {
 
 /// Starts an edit's frame: takes the state of `id` (hand it back with [`end_edit`]), syncs it with
 /// the app's text, ends what focus loss ends, and runs this frame's focus events through the
-/// engine, consuming what it consumed.
+/// engine, consuming what it consumed. A widget that holds the key focus in a disabled scope takes
+/// the keys it takes enabled and runs none of them (D140, D177).
 pub(super) fn begin_edit(
     ui: &mut Ui<'_>,
     id: WidgetId,
@@ -414,7 +415,8 @@ pub(super) fn begin_edit(
 ) -> (EditState, EditFrame) {
     let mut st = std::mem::take(ui.persistent::<EditState>(id));
     let drawn = std::mem::replace(&mut ui.transient::<Drawn>(id).0, true);
-    let focused = ui.is_enabled() && ui.focus_state().0 == Some(id);
+    let key_focus = ui.focus_state().0 == Some(id);
+    let focused = ui.is_enabled() && key_focus;
     st.edit.set_flags(cfg.flags());
     if !st.started {
         st.started = true;
@@ -429,12 +431,15 @@ pub(super) fn begin_edit(
         }
     }
     let mut frame = EditFrame::default();
-    if focused {
-        run_events(ui, id, cfg, &mut st, text, &mut frame);
+    if key_focus {
+        run_events(ui, id, cfg, &mut st, text, &mut frame, focused);
     }
     (st, frame)
 }
 
+/// Runs the focus events of `id` through the engine. With `act` false (a disabled scope) the engine
+/// only says what it takes: those events are consumed and nothing else happens, no command, no
+/// clipboard call, no change to the pending paste.
 fn run_events(
     ui: &mut Ui<'_>,
     id: WidgetId,
@@ -442,10 +447,20 @@ fn run_events(
     st: &mut EditState,
     text: &mut String,
     frame: &mut EditFrame,
+    act: bool,
 ) {
     let keymap = ui.keymap();
     let events = ui.focus_events(id);
     for (n, (index, event)) in events.iter().enumerate() {
+        // Not acting: a clipboard answer is nobody's to insert, and the pending paste stays as it is.
+        if !act
+            && matches!(
+                event,
+                FocusEvent::ClipboardText(_) | FocusEvent::ClipboardUnavailable
+            )
+        {
+            continue;
+        }
         match event {
             // Another widget's answer, or a stale one.
             FocusEvent::ClipboardText(_) | FocusEvent::ClipboardUnavailable
@@ -478,6 +493,12 @@ fn run_events(
             }
             continue;
         };
+        if !act {
+            if st.edit.takes(&cmd) {
+                ui.consume_focus_event(*index);
+            }
+            continue;
+        }
         let out = apply(ui, cfg, &mut st.edit, text, cmd);
         if out.consumed {
             ui.consume_focus_event(*index);

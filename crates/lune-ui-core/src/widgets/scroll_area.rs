@@ -449,6 +449,13 @@ impl Ui<'_> {
                 Sense::default()
             },
         );
+        // A sideways-wheel strip reads the whole delta as its own axis (`sideways`), so it takes
+        // both; any other area takes an axis only where it is live (D178).
+        self.set_scroll_axes(if opts.wheel_x {
+            (live[0], live[0])
+        } else {
+            (live[0], live[1])
+        });
         let vp = [f64::from(rect.w), f64::from(rect.h)];
         let mut st = std::mem::take(self.persistent::<ScrollState>(id));
         let Requests {

@@ -1,9 +1,14 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-05 (M8 merged to main at 2474248, review rounds 1 to 3 closed; a pause point, M9 waits for the user)
+Last updated: 2026-11-06 (M9 in progress, step 1 of 9 done; M8 merged to main at 2474248)
 
 ## Now
+
+M9 (text views: code block, code editor view, markdown preview, diff view) in progress. Step 1 is in: text readers consume then
+gate (D177: `begin_edit` and `selectable_text` take the keys while disabled and act on none, `TextEdit::takes`; the filter bar and
+the palette's box with them) and a wheel delta routes per axis (D178: `HitRecord.scroll_axes`, so a code block or column that scrolls
+one way no longer swallows the other, and the M8 sideways-swipe limit is gone). Steps 2 to 9 follow the plan.
 
 M8 (data views: table, bar chart, pie chart, kanban board, lane graph) is merged to main at 2474248 (7 steps, DECISIONS
 D160 to D176) and closed: the cross-widget suite, the disabled-keys rows, the catalogue audit, the architecture notes and the
@@ -91,8 +96,7 @@ frame 19.01 ms (`radio-group`).
   `CHEVRON_GAP` and `GLYPH_GAP` have no source (the director accepted them). Split panes: the panes draw with the size the
   frame began with, so a size a frame's input changed shows in the panes on the catch-up frame.
 - M8 limits (entries and D173, D174): the table has no horizontal scroll (`Fill` columns shrink, then the last columns clip),
-  a sideways swipe over a board column that overflows moves nothing (the topmost scroll area takes the delta; a vertical wheel over
-  the cards of a column that fits scrolls the board, D175), `page` and `settings_page` nested in another area keep a delta even when they fit (measured extent; the other composites pass it, D176), an Escape before the release in one frame is lost and the drop commits (the next Escape dismisses, D176), a `Measured` row height after a sort takes effect on the next frame, a control in a row scrolled out of view loses the
+  `page` and `settings_page` nested in another area keep a delta even when they fit (measured extent; the other composites pass it, D176), an Escape before the release in one frame is lost and the drop commits (the next Escape dismisses, D176), a `Measured` row height after a sort takes effect on the next frame, a control in a row scrolled out of view loses the
   focus (rows out of view are not built; by construction, not probed), a wrapping cell ignores `num`, and the sorted header's
   focus ring snaps. Bars are keyed by column index, so a rolling window morphs in place with no slide. The board moves one
   card a frame by Shift and arrow, takes no landing in a disabled scope, and an app that applies a move later than the next
@@ -113,7 +117,7 @@ frame 19.01 ms (`radio-group`).
 
 ## Next
 
-1. M8 is a pause point: M9 (text views) waits for the user.
+1. M9 steps 2 to 9 (plan: scaffold, then the editor chain and the diff, the visual step, the close).
 2. CI (fmt, clippy `-D warnings`, tests on macOS, Windows and Linux) now that there is code to run.
 3. An export script for Luneterm's vendored snapshot, before Luneterm M9. The migration
    map for M11 is "API changes since M1" in `docs/architecture.md`.
