@@ -26,7 +26,8 @@ were at or below 8.9 ms p99 in the step 14 run (`tab-strip` 8.88, `banner` 8.33,
 
 M6 review fix round 1 (F1): a disabled tab strip (`with_enabled(false, ..)`) activates nothing from Enter or Space
 (both are still consumed), its tab and close nodes report `State::Disabled` with no `Focusable` and no actions, and an
-open tab menu closes. No drawing changed.
+open tab menu closes. No drawing changed. Round 2 (F5, F6): the `TabList` node reports `State::Disabled` too, the test
+walks every node of the tree, and a Global binding proves Enter and Space on a focused tab do not reach the shortcuts.
 
 Earlier milestones: M5 (foundations) is merged to main at 1aeaf1b on top of M4 (interaction and motion, d9fe71f), M3
 (catalogue specs) and M2 (seams and crate split). `docs/architecture.md` has the module map, the focus queue and the

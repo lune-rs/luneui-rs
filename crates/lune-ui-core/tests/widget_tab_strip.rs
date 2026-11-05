@@ -12,6 +12,7 @@ use lune_ui_core::input::{FrameOutput, Key, NamedKey, PointerButton, Repaint};
 use lune_ui_core::motion::{MotionTier, Token, conformance};
 use lune_ui_core::paint::{Rect, polyline_length};
 use lune_ui_core::scene::{Scene, StrokeVertex};
+use lune_ui_core::shortcuts::{Binding, Chord, Scope};
 use lune_ui_core::testing::UiHarness;
 use lune_ui_core::text::{Spec, Style};
 use lune_ui_core::theme::DARK;
@@ -1508,6 +1509,9 @@ fn disabled_after_focus() -> (UiHarness, App) {
 fn a_disabled_strip_activates_nothing_from_enter_or_space_and_still_does_after_enabling() {
     for k in [NamedKey::Enter, NamedKey::Space] {
         let (mut h, mut app) = disabled_after_focus();
+        // An unconsumed key bubbles to the shortcuts, so this fires if the tab lets the key by.
+        h.shortcuts
+            .add(Binding::new(Scope::Global, Chord::key(Key::Named(k)), "go"));
         key(&mut h, k);
         let r = run(&mut h, &mut app);
         assert!(
@@ -1515,10 +1519,12 @@ fn a_disabled_strip_activates_nothing_from_enter_or_space_and_still_does_after_e
             "{k:?} on a disabled strip: {:?}",
             r.events
         );
-        // The key was consumed while disabled: it is not held over to the frame that enables.
+        assert!(
+            r.out.fired.is_empty(),
+            "{k:?} fell through a disabled strip: {:?}",
+            r.out.fired
+        );
         app.enabled = true;
-        let r = run(&mut h, &mut app);
-        assert!(r.events.is_empty(), "{k:?} fell through after enabling");
         key(&mut h, k);
         let r = run(&mut h, &mut app);
         assert_eq!(activations(&r.events), 1, "{k:?} works again once enabled");
@@ -1534,6 +1540,11 @@ fn a_disabled_strip_nodes_are_disabled_and_offer_no_focus_or_action() {
         assert!(n.states.contains(State::Focusable) && !n.states.contains(State::Disabled));
         assert!(n.actions.contains(Action::Default));
     }
+    assert!(
+        !nodes(&tree, Role::TabList)[0]
+            .states
+            .contains(State::Disabled)
+    );
     app.enabled = false;
     let tree = run(&mut h, &mut app).out.tree;
     let tabs = nodes(&tree, Role::Tab);
@@ -1545,9 +1556,18 @@ fn a_disabled_strip_nodes_are_disabled_and_offer_no_focus_or_action() {
     );
     assert!(buttons.iter().any(|n| n.name == "New tab"));
     for n in tabs.into_iter().chain(buttons) {
-        assert!(n.states.contains(State::Disabled), "{} disabled", n.name);
         assert!(!n.states.contains(State::Focusable), "{} focusable", n.name);
         assert_eq!(n.actions, Default::default(), "{} has actions", n.name);
+    }
+    // Every node the strip builds, by walking the tree: a list of roles is how the group was missed.
+    assert_eq!(nodes(&tree, Role::TabList).len(), 1);
+    for n in &tree.nodes {
+        assert!(
+            n.states.contains(State::Disabled),
+            "{:?} {} disabled",
+            n.role,
+            n.name
+        );
     }
     assert!(
         tree.nodes

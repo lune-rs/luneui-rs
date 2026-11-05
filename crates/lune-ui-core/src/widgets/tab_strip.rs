@@ -335,7 +335,10 @@ impl Ui<'_> {
         let id = self.id(&key);
         let mut st = mem::take(self.transient::<StripState>(id));
         let mut events = Vec::new();
-        let node = Node::new(id, Role::TabList, opts.name, rect);
+        let mut node = Node::new(id, Role::TabList, opts.name, rect);
+        if !self.is_enabled() {
+            node.states.insert(State::Disabled);
+        }
         self.scope(&key, |ui| {
             ui.node_container(node, |ui| {
                 ui.strip_frame(rect, tabs, opts, &mut st, &mut events);
@@ -544,8 +547,9 @@ impl Ui<'_> {
             });
 
             let pressed_here = st.pressed == Some(tab.key);
-            // Both keys are consumed whether or not the strip is enabled, so a disabled strip does
-            // not let Enter or Space fall through to whatever handles them next.
+            // Both keys are consumed whether or not the strip is enabled, so a focused tab of a
+            // disabled strip does not let Enter or Space fall through to whatever handles them
+            // next. This is the tabs only: the new-tab button gates first, as every button does.
             let enter = self.consume_key(item.id, NamedKey::Enter);
             let space = self.consume_key(item.id, NamedKey::Space);
             let activated = resp.enabled
