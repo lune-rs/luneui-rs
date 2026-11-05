@@ -511,6 +511,20 @@ impl Ui<'_> {
         link: Option<WidgetId>,
         acc: &mut Acc,
     ) -> ListResponse {
+        // The two panes are two tables: each says which half it is.
+        let label = match side {
+            Side::Unified => view.opts.label.to_owned(),
+            Side::Left => format!(
+                "{} ({})",
+                view.opts.label,
+                self.tr("luneui.diff-view.pane-old")
+            ),
+            Side::Right => format!(
+                "{} ({})",
+                view.opts.label,
+                self.tr("luneui.diff-view.pane-new")
+            ),
+        };
         let opts = view.opts;
         let mem_id = self.id(side.key()).with("pane");
         let mem = self.persistent::<PaneMem>(mem_id);
@@ -541,7 +555,7 @@ impl Ui<'_> {
             },
             selection: SelectionMode::Multi,
             index_of: None,
-            label: opts.label,
+            label: &label,
         };
         let widest = Flag::new(0.0f32);
         let resp = self.list_styled(

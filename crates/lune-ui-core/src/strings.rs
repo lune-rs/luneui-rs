@@ -84,6 +84,8 @@ pub const DEFAULTS: &[(&str, &str)] = &[
         "luneui.diff-view.copy-selected-lines",
         "Copy selected lines",
     ),
+    ("luneui.diff-view.pane-old", "old"),
+    ("luneui.diff-view.pane-new", "new"),
     ("luneui.diff-view.row-added", "Added"),
     ("luneui.diff-view.row-removed", "Removed"),
     ("luneui.diff-view.row-context", "Unchanged"),

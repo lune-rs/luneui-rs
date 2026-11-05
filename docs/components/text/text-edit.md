@@ -27,7 +27,7 @@ selection or clipboard. Lunegit gets all of it from Avalonia's `TextBox`; the to
 
 ## Existing code
 
-Built in M5 (D87, D88, D92, D94, D95, D103): `crates/lune-ui-core/src/text_edit.rs` (`TextEdit`, `EditCommand`, `SpecLayout`) drives `field` and `text_area` (`widgets/field.rs`, `widgets/text_area.rs`). Before it, the only editing code was `field` (`crates/lune-ui-core/src/widgets/mod.rs:120-144`): placeholder, text, a 1.5 px caret after the text. Input events exist
+Since M9 (D179, D180) the engine is generic over the text it edits: `TextEdit` reads through the `EditText` trait (`char_len`, `fingerprint`, `window`, `slice`) and changes through `EditBuffer` (`replace`), implemented for `str` and `String` (the whole text is the window, so every rule is as before) and for `CodeDoc`, whose window is a line, so an edit costs O(log lines) instead of the whole text. `EditLayout` gained the provided `lines_near`, and `TextEdit::takes(&cmd)` says what `apply(cmd)` would consume, for a widget that must take a key and act on none (a disabled scope, D177). The M9 code view (`text.code-editor-view`) is its second host. A word motion on a `CodeDoc` stops at its window's edge (Q16). Built in M5 (D87, D88, D92, D94, D95, D103): `crates/lune-ui-core/src/text_edit.rs` (`TextEdit`, `EditCommand`, `SpecLayout`) drives `field` and `text_area` (`widgets/field.rs`, `widgets/text_area.rs`). Before it, the only editing code was `field` (`crates/lune-ui-core/src/widgets/mod.rs:120-144`): placeholder, text, a 1.5 px caret after the text. Input events exist
 (`crates/lune-ui-core/src/input.rs:32-67`), including `Text`, `Key`, `Ime`; `TextSystem` has `prepare` and `measure` only (`crates/lune-ui-core/src/text.rs:110-118`).
 
 ## Spec

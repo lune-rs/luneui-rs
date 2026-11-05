@@ -3487,9 +3487,7 @@ mod m9 {
             assert_eq!(run(&mut h, &mut p, at).repaint, Repaint::Idle, "{at}");
         }
         // After a copy too, once its check mark has gone (1.5 s of app time).
-        for target in [block_copy()] {
-            inject(&mut h, target, Action::Default, None);
-        }
+        inject(&mut h, block_copy(), Action::Default, None);
         run(&mut h, &mut p, 5100);
         // The frame that ends the feedback fades the check mark out, then rests.
         run(&mut h, &mut p, 7000);

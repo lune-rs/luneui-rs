@@ -1542,6 +1542,21 @@ fn rows_never_animate_a_selection_change_is_there_in_its_frame() {
 }
 
 #[test]
+fn each_split_pane_says_which_half_it_is_and_the_unified_one_keeps_the_label() {
+    let lines = doc();
+    let rows = pair_rows(&lines);
+    let mut h = harness();
+    let r = show(&mut h, &lines, &rows, &split());
+    let names: Vec<String> = ["l", "r"]
+        .iter()
+        .map(|side| r.out.tree.get(pane(side)).expect("a pane").name.clone())
+        .collect();
+    assert_eq!(names, ["Changes (old)", "Changes (new)"]);
+    let r = run(&mut harness(), &lines, &setup());
+    assert_eq!(r.out.tree.get(pane("u")).expect("the pane").name, "Changes");
+}
+
+#[test]
 fn spans_colour_runs_of_a_line() {
     const SPANS: &[HighlightSpan] = &[HighlightSpan {
         start: 0,

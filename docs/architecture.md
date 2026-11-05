@@ -1,6 +1,6 @@
 # Architecture
 
-State after M8 (data views): the toolkit is five crates. A pure core (`lune-ui-core`, no
+State after M9 (text views): the toolkit is five crates. A pure core (`lune-ui-core`, no
 dependencies) holds the painter, the display list, the per-window `Ui` frame, the motion system,
 the string table, the semantic tree, widgets, the theme and the four seam types; three adapter
 crates implement the seams on wgpu/glyphon, winit and the OS glass; the facade `lune-ui` re-exports
@@ -12,7 +12,9 @@ in-window drag and drop, the shortcut registry, seven painter primitives and the
 controls and chrome (D113 to D136); M7 the overlays and containers: a sixth layer for an overlay above a dialog, the
 flyout, toasts, the command palette, the page, panel, sidebar, side panel, icon rail, split panes, tree view and settings
 page (D137 to D154). M8 added the data views: the table on the list frame, the bar and pie charts with value
-transitions, the lane graph row and the kanban board with its drag across columns (D160 to D174).
+transitions, the lane graph row and the kanban board with its drag across columns (D160 to D174). M9 added the text views: a
+code editor over a line-indexed document (`CodeDoc`, one editing engine generic over the text it edits), the code block, the markdown
+preview on virtual blocks and the diff view, unified and split on the list frame (D177 to D199).
 
 ## Workspace layout
 
@@ -52,7 +54,8 @@ app passes time, sizes, fonts, theme, scale and hit values in), so frames are de
 | `image` (`image.rs`) | The picture seam: the app decodes, registers by id, releases explicitly; fit geometry | `ImageStore`, `ImageData`, `ImageId`, `ImageError`, `Fit`, `ImageAlign`, `image_rect` |
 | `layout` (`layout.rs`) | Pure stack, row, column and grid helpers: rects out, nothing drawn or stored (D108) | `stack`, `row`, `column`, `grid`, `Size`, `Align`, `Insets`, `Track` |
 | `shortcuts` (`shortcuts.rs`) | The scoped chord registry, resolved by the frame (D93) | `Shortcuts`, `Binding`, `Chord`, `Scope`, `CommandId`, `Chord::hint` |
-| `text_edit` (`text_edit.rs`) | The pure text editing engine: caret, selection, undo, clipboard commands, preedit; offsets in chars (D95) | `TextEdit`, `EditCommand`, `EditOutcome`, `EditFlags`, `EditLayout`, `SpecLayout` |
+| `text_edit` (`text_edit.rs`) | The pure text editing engine: caret, selection, undo, clipboard commands, preedit; offsets in chars (D95) | `TextEdit` (`takes`), `EditCommand`, `EditOutcome`, `EditFlags`, `EditLayout` (`lines_near`), `SpecLayout`; since M9 the engine edits through `EditText` and `EditBuffer`, implemented for `str`, `String` and `CodeDoc` (D180) |
+| `code_doc` (`code_doc.rs`) | The code editor's document (D179): one `String` and a line index, verbatim, with `\n`, `\r\n` and a lone `\r` ending a line; an edit costs O(log lines) | `CodeDoc` (`new`, `text`, `set_text`, `line_count`, `line`, `line_of`), implements `EditText` and `EditBuffer` |
 | `drag` (`drag.rs`) | The in-window drag machines and their `Ui` glue (D89, D104) | `ReorderDrag`, `FreeDrag` (with `pressed`), `Metrics`, `Strip`, `Column`, `DropResult`, `FreeResult`, `paint_drop_line`, `edge_step` (the auto-scroll zone math, shared by the strip and the board; D168) |
 | `backdrop` (`backdrop.rs`) | The material seam | `Backdrop`, `Material`, `BackdropKind`, `GlassLayer` |
 | `window` (`window.rs`) | Edge resize, double click, caption buttons (no windowing type) | `ResizeEdge`, `edge_at`, `DoubleClick`, `caption_buttons` |
@@ -61,14 +64,14 @@ app passes time, sizes, fonts, theme, scale and hit values in), so frames are de
 | `access` (`access.rs`) | The semantic tree and the actions that come back; plain data the `Ui` fills and routes | `Node`, `SemanticTree`, `Role` (36), `State` (15), `Action` (10), `Value`, `AccessAction`; `Node.level` (a tree row's depth + 1) |
 | `motion` (`motion.rs`, `motion/{easing,tween,transition,tokens,conformance}.rs`) | Closed-form motion: every value is a function of the app's `Time` and stored parameters; the 60 Hz conformance harness | `Time`, `Easing`, `Tween`, `Spring`, `Keyframes`, `Transition`, `Token`, `Kind`, `Motion`, `MotionTier`, `MOTION`, `conformance` |
 | `strings` (`strings.rs`) | The string table: keys, `{n}` and `{n:spec}` placeholders, the toolkit's defaults | `StringTable`, `DEFAULTS`, `ArgFormat`, `DisplayFormat`, `format_template` |
-| `widgets` (`widgets/<name>.rs`, `widgets/mod.rs`) | One file per control, generic over `H` for the Painter API; each has a `Look`, a `paint` function, the old function as a wrapper and a `Ui` method (D60) | `button`, `toggle`, `checkbox`, `label`, `combo`, `stepper`, `field` (text field with its variants), `text_area`, `input_box` (shared look), `focus_ring`, `popup_panel`, `scroll_area`, `scrollbar`, `virtual_list`, `popover`, `tooltip`; M6 added `badge`, `status_dot`, `verdict_row`, `progress`, `spinner`, `callout`, `stat`, `kv_list` (with `selectable`, the read-only selectable text of D125), `row`, `list_row`, `form_field`, `steps`, `nav_item` (`Ui::nav_list`), `radio_group`, `star_rating`, `slider`, `filter_bar`, `search_picker`, `tab_strip`, `toolbar`, `banner` (with the empty state) and `tone` (the one tone recipe, D129); `button` gained `Ghost`, `ButtonOptions` (`Ui::button_with`) and `IconButton` (`Ui::icon_button`, D116); M7 added `flyout` (`Ui::flyout`), `toast` (the `Toasts` model, `Ui::toasts`, `Ui::toast_history`), `command_palette` (`Ui::command_palette`), `page` and `panel` (`Ui::page`, `Ui::panel`: one closure called per slot), `sidebar`, `side_panel` and `icon_rail` (`Ui::sidebar`, `Ui::side_panel`, `Ui::icon_rail`), `split_panes` (`Ui::split_panes`, `Ui::split_state`), `tree_view` (`Ui::tree_view`, `Ui::tree_state`) and `settings_page` (`Ui::settings_page`); M8 added `table` (`Ui::table`, `Ui::table_state`, `Ui::table_selection`: the list frame with a header, sort requests and tones; `virtual_list` gained a crate-private `ListStyle`, D161), `bar_chart` (`Ui::bar_chart`), `pie_chart` (`Ui::pie_chart`), `lane_graph` (`Ui::lane_graph_row`, a stateless `paint`) and `kanban_board` (`Ui::kanban_board`, `landed_index`) |
+| `widgets` (`widgets/<name>.rs`, `widgets/mod.rs`) | One file per control, generic over `H` for the Painter API; each has a `Look`, a `paint` function, the old function as a wrapper and a `Ui` method (D60) | `button`, `toggle`, `checkbox`, `label`, `combo`, `stepper`, `field` (text field with its variants), `text_area`, `input_box` (shared look), `focus_ring`, `popup_panel`, `scroll_area`, `scrollbar`, `virtual_list`, `popover`, `tooltip`; M6 added `badge`, `status_dot`, `verdict_row`, `progress`, `spinner`, `callout`, `stat`, `kv_list` (with `selectable`, the read-only selectable text of D125), `row`, `list_row`, `form_field`, `steps`, `nav_item` (`Ui::nav_list`), `radio_group`, `star_rating`, `slider`, `filter_bar`, `search_picker`, `tab_strip`, `toolbar`, `banner` (with the empty state) and `tone` (the one tone recipe, D129); `button` gained `Ghost`, `ButtonOptions` (`Ui::button_with`) and `IconButton` (`Ui::icon_button`, D116); M7 added `flyout` (`Ui::flyout`), `toast` (the `Toasts` model, `Ui::toasts`, `Ui::toast_history`), `command_palette` (`Ui::command_palette`), `page` and `panel` (`Ui::page`, `Ui::panel`: one closure called per slot), `sidebar`, `side_panel` and `icon_rail` (`Ui::sidebar`, `Ui::side_panel`, `Ui::icon_rail`), `split_panes` (`Ui::split_panes`, `Ui::split_state`), `tree_view` (`Ui::tree_view`, `Ui::tree_state`) and `settings_page` (`Ui::settings_page`); M8 added `table` (`Ui::table`, `Ui::table_state`, `Ui::table_selection`: the list frame with a header, sort requests and tones; `virtual_list` gained a crate-private `ListStyle`, D161), `bar_chart` (`Ui::bar_chart`), `pie_chart` (`Ui::pie_chart`), `lane_graph` (`Ui::lane_graph_row`, a stateless `paint`) and `kanban_board` (`Ui::kanban_board`, `landed_index`); M9 added `text_lines` (`HighlightSpan`, `Highlighter`, `PlainHighlighter`, the rich-line spec and `range_boxes` across runs), `code_editor` (`Ui::code_editor`, `Ui::code_line_rect`: lines on `RowHeights` and the scroll area, read-only or editable, wrapped or not, synced panes), `code_block` (`Ui::code_block`, `code_block::height`: the same frame read-only with a copy button), `markdown` (`Ui::markdown` over the `MdBlock` model: top-level blocks as virtual rows) and `diff_view` (`Ui::diff_view`, `pair_rows`, `widest_chars`: the list frame, twice for split) |
 | `widgets::menu`, `dropdown`, `dialog` | The overlays: the old Painter functions and `Ui::menu`, `Ui::dropdown`, `Ui::dialog` on the overlay stack; M7 added `menu_with` (`MenuOptions`, `MenuPlace`: anchored menus and the node name; rows `MenuRow::Entry` and `Header`; one highlight), `dropdown_with` (`DropdownOptions`: glass, `max_rows`), `dialog_with` (`DialogOptions`: `DialogWidth::{Confirm, Form}`, scrim blur, disabled confirm) and `dialog::modal_host`, which the palette shares | `menu`, `MenuRow`, `MenuItem`, `menu_open_anim`; `dropdown`; `dialog`, `Dialog`, `DialogGlass`, `Cancel` |
 | `chrome` (`chrome.rs`) | Tab chrome outline geometry | `outline`, `TabSpan` |
 | `testing` (`testing/`) | Fakes and contract suites of the seams, public so apps can use them | `RecordingRenderer`, `FakeText`, `text_system_contract`, `FakeImages`, `image_store_contract`, `ScriptedInput`, `NullMaterial`, `backdrop_contract`, `UiHarness` |
 
 `lib.rs` re-exports `Backdrop`, `BackdropKind`, `GlassLayer` and `theme::lunegit_dark`. Tests: unit
 tests in the modules and the files under `tests/` (`window`, `painter`, `motion`, `strings`, `ui_*`,
-one `widget_*` file per control, and `c4`, the cross-widget contract suite, with a section for the M6 set, one for the M7 set and one for the M8 set (the table, both charts, a lane graph row and the board in one frame): roles, names and states of every interactive widget in one frame, accessibility actions, one tab stop per composite, the disabled walk, idle at rest, and the overlays over a dialog); none needs a
+one `widget_*` file per control, and `c4`, the cross-widget contract suite, with a section for the M6 set, one for the M7 set, one for the M8 set (the table, both charts, a lane graph row and the board in one frame) and one for the M9 set (the block, the editor, the document and the diff in one frame, unified and split): roles, names and states of every interactive widget in one frame, accessibility actions, one tab stop per composite, the disabled walk, idle at rest, and the overlays over a dialog); none needs a
 GPU or a window.
 
 ### The `Ui` frame
@@ -177,6 +180,16 @@ at the M8 tip, the search first run on a known-absent name to see it report noth
 calls) and `kanban_board.rs` (four) are new, and `combo.rs` went from three calls to one (D160). `bar_chart.rs`, `pie_chart.rs`
 and `lane_graph.rs` have none. The new rows below come from those calls, each with a test and a mutant, not from reading.
 
+Re-run for M9 (the same call patterns over `crates/lune-ui-core/src` at the M9 tip, per-file counts by `rg -c` against a
+`git archive` of the M8 tip 2474248; the search first run on a known-absent name, `consume_zzq_absent_key`, which printed 0
+lines, and on `rove_keys`, which printed its files): `field.rs` went from 5 calls to 6 (`run_events`, D177) and `markdown.rs` from
+none to 2 (`activation_keys` in the link regions, Enter and Space, and in the task box, Space). `code_editor.rs`, `code_block.rs`
+and `diff_view.rs` call none: the editor and the block's text run on `begin_edit_with`, so on `run_events`; the copy buttons and
+the hunk actions are hosts of `icon_button`; the diff's panes are `virtual_list`'s (`list_keys`). The rows below come from
+`c4::m9`'s page with a `Global` binding on 12 keys, each stop focused, then disabled, with a mutant each. The widget files'
+own disabled tests for these (`widget_markdown`, `widget_code_editor`, `widget_diff_view`) bind no shortcut on the key, so none of
+them fails under any of those mutants: they hold the walk and the reports, not the keys.
+
 A new reader, or a change to one, gets its row here. **Test** means a named test fails when that reader is made to leak
 (a mutant of it, run at 406f780). **Probe** means only the scratch probe showed it: nothing in the repo holds it.
 
@@ -213,6 +226,11 @@ Holds, for the keys listed:
 | `text_area` (`begin_edit`) | those, and Up, Down, PageUp, PageDown | Test (M9): `widget_text_field::disabled_keys::a_text_area_focused_then_disabled_takes_its_keys_and_changes_nothing`, the same mutants |
 | `command_palette`, its search box (a filter bar) | Space, Backspace, Delete, Left, Right, Home, End, a typed character, Command+A, V, Z; Command+C, X with a selection (Up, Down, Enter by the palette's own keys, above) | Test (M9): `widget_command_palette::a_search_box_focused_then_disabled_takes_its_keys_and_changes_nothing` (`Scope::Overlay`); mutant: `run_events` gated on `focused` fails it |
 | `selectable_text`, so `kv_list` values and the flyout's routes (each run), positioned and elided | Enter, Left, Right, Home, End, Command+A; Command+C with a selection. Elided text (`spec` differs from `full`): Command+A, C | Test (M9): `widget_kv_list::a_value_focused_then_disabled_takes_its_keys_and_changes_nothing`, `select_all_on_an_elided_value_focused_then_disabled_selects_nothing`; mutants: the whole-selection loop gated on `focused`, Select all acting while disabled, the positioned selection cleared while disabled (each fails one of the two) |
+| `code_editor` editable, and the code block's text (read-only), through `begin_edit_with` (`run_events`) | Editable: Up, Down, Left, Right, Home, End, PageUp, PageDown, Enter, Command+A (typed text arrives as `Text`). Read-only: Command+A (the arrows are free, D181; its Page keys and Home and End are the area's, the `scroll_area` row) | Test (M9): `c4::m9::a_disabled_page_takes_every_key_a_focused_composite_takes_and_fires_no_global_binding` (the editor and block-text stops); mutant: a disabled box not consuming what `takes` says it takes leaks `code block text: Command+A`, `editor: Command+A` and the editor's named keys |
+| `markdown`, the links (`activation_keys`) | Enter, Space | Test (M9): the same c4 test (link stop); mutant: the reader gated on `enabled` leaks `markdown link` |
+| `markdown`, the task boxes (`activation_keys`) | Space | Test (M9): the same (task stop); mutant: the reader gated on `enabled` leaks `markdown task box` |
+| Hosts of `Ui::icon_button`: the copy buttons of the code block and of markdown's fenced code, the diff's hunk actions | Enter, Space | Test (M9): the same (copy and hunk stops); mutant: `activation_keys` leaving a disabled key leaks `code block copy`, `diff hunk action`, `markdown link` and `markdown task box` |
+| `diff_view`, the unified pane and each split pane, through `virtual_list` | Up, Down, Home, End, PageUp, PageDown | Test (M9): the same (body, left and right stops); mutant: `virtual_list` consuming only when enabled leaks all three. Command+C with a selection is the `virtual_list` row above, run on a list, not on a diff pane |
 
 Does not hold: each key listed fired nothing enabled and fired its binding disabled, with focus kept. All by probe;
 nothing acted. Each gates on `enabled` or a focus that is false in a disabled scope before it takes the key.
@@ -394,15 +412,16 @@ functions; mid-transition and interaction scenes are live scripted `Ui` frames. 
 `verdict_row`, `progress`, `spinner`, `callout`, `stat`, `kv_list`, `row`, `list_row`, `form_field`, `steps`,
 `nav_item`, `radio_group`, `star_rating`, `slider`, `filter_bar`, `search_picker`, `tab_strip`, `toolbar` and `banner`, and from M7
 `flyout`, `toast-notifications`, `command-palette`, `page`, `panel`, `sidebar`, `side-panel`, `icon-rail`, `split-panes`,
-`tree-view` and `settings-page`, and from M8 `table`, `bar-chart`, `pie-chart`, `kanban-board` and `lane-graph`
-(66 pages in all, 332 scene names; every page of the same pattern: a live state, scripted scenes, a bench timeline); `apps/gallery/src/pages/controls_ui.rs` is the shared composition of every M4 widget that the
+`tree-view` and `settings-page`, from M8 `table`, `bar-chart`, `pie-chart`, `kanban-board` and `lane-graph`, and from M9 `code-block`,
+`code-editor-view`, `markdown-preview` and `diff-view`
+(70 pages in all, 389 scene names; every page of the same pattern: a live state, scripted scenes, a bench timeline); `apps/gallery/src/pages/controls_ui.rs` is the shared composition of every M4 widget that the
 core pages draw. Window mode builds a `Ui` per frame over the page's live state; dump and bench
 drive the same state through a `Player` (a scripted input, the retained store and the page state). A scene's `Expect` is `Settled` (`Idle`),
 `Moving` (`Now`) or, for a pending tooltip, `Waiting` (`At`). `Ev` scripts pointer, scroll, typed text, keys
 with modifiers, IME preedit and commit, and the clipboard's answer; the window answers a clipboard
 request from an in-process string until M10 (D107). The bundled fonts have no CJK glyph, so the IME scenes'
 "かな" draws as boxes (D90). A shown overlay fades from the first frame that draws it, so a scene that wants
-it visible needs a frame at the due time. Window mode and the bench draw the list page with 1,000,000 rows, and the table and lane graph pages with 100,000.
+it visible needs a frame at the due time. Window mode and the bench draw the list page with 1,000,000 rows, the code editor page with a 1,000,000-line document, the table, lane graph and diff pages with 100,000 rows or lines, and the markdown page with a document of 2,800 blocks (400 sections).
 
 `gallery --bench [--runs N] [--frames N] [--size WxH]` times offscreen frames: a timeline per page,
 cost probes (text fades, a scaling and fading dialog over a blurred stripe page) and a 4 ms-sleep
@@ -468,6 +487,30 @@ facade keeps those paths):
 - `theme::DARK`, a neutral alias of `lunegit_dark::THEME`;
 - new: `RawInput`, `FrameOutput`, `Translator`, `OutputState`, `Backdrop::apply`, `WindowBackdrop`,
   the `testing` module.
+
+Since M9 (D177 to D199; nothing public was removed or changed in signature):
+
+- new widgets with a `Ui` method each: `code_editor` (`Ui::code_editor`, `code_line_rect`; `CodeOptions`, `LineBand`), `code_block`
+  (`Ui::code_block`, `code_block::height`; `CodeBlockOptions`), `markdown` (`Ui::markdown`, `is_actionable`; `MdBlock`, `MdInline`,
+  `MdItem`, `MdTask`, `MdRow`, `MdAlign`, `MdImage`, `MdOptions`, `MdResponse`) and `diff_view` (`Ui::diff_view`, `diff_selected_text`,
+  `pair_rows`, `widest_chars`; `DiffLine`, `LineKind`, `DiffMark`, `SplitRow`, `DiffMode`, `HunkAction`, `DiffOptions`,
+  `DiffResponse`); `widgets::text_lines` (`HighlightSpan`, `Highlighter`, `PlainHighlighter`); core gains `code_doc::CodeDoc`;
+- `Style.italic` and `Style::italic()` (D189, additive to C2): hashed in the text key, mapped to the face's style in
+  `lune-ui-wgpu`, ignored by `FakeText`; no italic face ships, so the shaper skews;
+- `TextEdit` is generic over the text: `EditText` and `EditBuffer`, implemented for `str`, `String` and `CodeDoc`;
+  `EditLayout::lines_near` (provided) and `TextEdit::takes(&cmd)` are new (D180, D177);
+- text readers consume then gate (D177): `begin_edit` and `selectable_text` take their keys in a disabled scope and act on none,
+  so `text_field`, the filter bar's and the palette's box, `text_area` and the selectable text hold D140's rule;
+- a wheel delta routes per axis (D178, C4): the topmost scroll region live on that axis takes it (`HitRecord.scroll_axes`),
+  so a sideways-only code block or table inside a document no longer swallows the vertical wheel, and a sideways swipe over a
+  vertical composite reaches the area around it (the M8 limit is closed);
+- the list frame gains `RowCtx.scroll_x`, `ListResponse.pressed` and, crate-private, `ListStyle.fill`, `identity` and `link`
+  (the pixel scroll link of two panes, D184); `selectable_text` selects by position whenever the joined spec equals the full
+  text, multi-run too (D187);
+- six `Theme` tokens: `link`, `code_inline`, `diff_added`, `diff_removed`, `diff_added_mark`, `diff_removed_mark` (D190); `icon`
+  gains `REMOVE`; `strings` gains the `luneui.code-block.*`, `luneui.code-editor.*`, `luneui.markdown.*` and
+  `luneui.diff-view.*` keys, among them `pane-old` and `pane-new`, the suffix of a split diff pane's table name (D199);
+- no scene that existed before M9 changed: the pixel gate against the M8 tip reads 332 identical and 57 new.
 
 Since M8 (D160 to D176; nothing public was removed or changed in signature):
 
@@ -604,7 +647,7 @@ only under `target/`, except that `scripts/pixel-gate.sh` extracts its base sour
 | `scripts/check-targets.sh [--skip-linux]` | The workspace lints and builds beyond the host: Windows `clippy` (needs the `x86_64-pc-windows-msvc` target) and Linux fmt, clippy and tests in a `rust:1.92` container. Not a pixel gate; it covers the code the host `cfg` hides | `windows: passed`, `linux: passed` or `skipped (<reason>)` | 0 every half that ran passed; 1 a check failed; 2 usage |
 
 Dump file names: the gallery writes `<id>@<scale>x.png` (logical 1040x660; `gallery --list` prints
-the 15 legacy names first, then the Ui pages' scenes: 62 names after M4, 152 after M5, 231 after M6, 305 after M7, 332 after M8); Luneterm's spike writes `NN-<name>@<scale>x.png` (18 scenes). `tools/dump-compare`
+the 15 legacy names first, then the Ui pages' scenes: 62 names after M4, 152 after M5, 231 after M6, 305 after M7, 332 after M8, 389 after M9); Luneterm's spike writes `NN-<name>@<scale>x.png` (18 scenes). `tools/dump-compare`
 (`cargo run -p dump-compare -- <baseline> <candidate> [--max-delta N] [--allow-new]`) compares per
 pixel, max channel delta including alpha; a file missing from the candidate, a file only in the
 candidate (unless `--allow-new`), a size or colour-type mismatch or a delta above `N` (default 0)

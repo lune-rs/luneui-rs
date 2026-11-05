@@ -1,26 +1,46 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-06 (M9 in progress, steps 1 to 8 of 9 done; M8 merged to main at 2474248)
+Last updated: 2026-11-06 (M9 built and closed on the program branch, steps 1 to 9 done; M8 merged to main at 2474248)
 
 ## Now
 
-M9 (text views: code block, code editor view, markdown preview, diff view) in progress. Step 1 is in: text readers consume then
-gate (D177: `begin_edit` and `selectable_text` take the keys while disabled and act on none, `TextEdit::takes`; the filter bar and
-the palette's box with them) and a wheel delta routes per axis (D178: `HitRecord.scroll_axes`, so a code block or column that scrolls
-one way no longer swallows the other, and the M8 sideways-swipe limit is gone). Step 2 is in (the scaffold, D179 to D194):
-`Style.italic` (the GPU test shows the skew), six theme tokens, `icon::REMOVE`, the strings, `widgets::text_lines` (spans,
-`line_spec`, `range_boxes` across runs), rich selectable text by position (D187), the list frame's x axis, `fill`, `identity`
-and `link` with the scroll link, stub modules for the four widgets and four empty gallery pages (70 pages, 332 scenes still).
-Step 6 (track B, part branch m9b) is in: `Ui::diff_view` unified and split on the list frame, `pair_rows`, `widest_chars`, hunk actions,
-marks, `Ui::diff_selected_text`, 14 scenes; a linked pane adds its own queued shift before it takes the group's value
-(`scroll_pending_shift`). Step 3 is in: `EditText` and `EditBuffer`, `lines_near`, `CodeDoc`. Step 4 is in (D195): `Ui::code_editor` and
-`Ui::code_line_rect` on `EditHost` in `field.rs`, read-only and editable, wrap on measured heights, spans, bands, synced panes, plain Tab
-through `tab_taker`, 15 scenes (361 listed), a live document of 1,000,000 lines. Step 5 is in (D196): `Ui::code_block`,
-`code_block::height`, `CodeBlockOptions`, on the code view's frame (read-only, sideways only), a copy button with the check-mark
-feedback, 12 scenes (373 listed). Step 7 is in (D197): `Ui::markdown` and the model (`MdBlock`, `MdInline`, `MdItem`, `MdRow`),
-`is_actionable`, blocks as virtual rows, inline code pills with pads left out of Copy (`selectable_padded`), links as Tab stops, task
-boxes, tables, images, 16 scenes (389 listed). Step 8 (visual, both batches accepted by the director, D198): the code block's text clip ends 4 px before the copy button, its bar lies in the bottom padding and shows with the pointer anywhere over the block (crate-private `Look.frame`); the diff's hunk text is `fg_quaternary`, `diff-view-hunk-focus` reaches the first action; markdown's underline `(h * 0.87).round()`, strike `(h * 0.6).round()`, pill to the row's bottom, link ring `Offset { radius: 3 }`. Step 9 (close) follows the plan.
+M9 (text views: code block, code editor view, markdown preview, diff view) is built, visually accepted and closed on the program
+branch (steps 1 to 9; DECISIONS D177 to D199), waiting on review and the merge to main. `docs/architecture.md` has the module map,
+the pages, "Disabled keys" and "API changes since M1" (the M9 block).
+
+What M9 added:
+- Carried limits paid first: text readers consume then gate (D177: `begin_edit` and `selectable_text`, so `text_field`, the filter
+  bar's and the palette's box, `text_area` and the selectable text; `TextEdit::takes`), and a wheel delta routes per axis (D178), which
+  closed the M8 limit of a sideways swipe over a board column.
+- One engine, generic over the text (D179, D180): `TextEdit` edits through `EditText` and `EditBuffer`, implemented for `str`,
+  `String` and `CodeDoc` (one `String` and a line index; at 11 MB and 1,000,000 lines an edit measures 0.9 ms).
+- `text.code-editor-view` (D181 to D185, D195): `Ui::code_editor`, `Ui::code_line_rect`, lines on `RowHeights`, read-only or
+  editable, wrapped or not, spans, bands, synced panes, plain Tab through `tab_taker`, IME; 15 scenes.
+- `text.code-block` (D186, D196): the same frame read-only with a copy button and the check-mark feedback; the text's clip ends 4 px
+  before the button and the bar lies in the bottom padding (step 8); 12 scenes.
+- `text.markdown-preview` (D188, D197, D198): `Ui::markdown` over the `MdBlock` model, blocks as virtual rows, inline code pills with
+  pads left out of Copy, links as Tab stops, task boxes, tables, images, fenced code through the block; 16 scenes.
+- `text.diff-view` (D191, D192, D199): `Ui::diff_view`, unified and split on the list frame (a pixel scroll link between panes),
+  `pair_rows`, hunk actions, intra-line marks, `Ui::diff_selected_text`; 14 scenes; each split pane names its table "(old)" or "(new)".
+- Scaffold: `Style.italic` (D189), six theme tokens (D190), `widgets::text_lines`, rich selectable text by position (D187), the list
+  frame's x axis, `fill`, `identity` and `link`.
+- Step 8 (visual): the director accepted both batches (Wane's code block against its mock, Lunegit's values for the other three);
+  the fixes are in D196 and D198 (hunk text `fg_quaternary`, the underline, strike and pill places, the link ring).
+- Step 9: `c4::m9` (roles, names and states of the four in one frame, injected actions on a link, a task box, a hunk action, the copy
+  button and a set-value, tab stops, the disabled walk, Global-binding silence for nine stops with a mutant each, idle at rest) and
+  one `nested_wheel` case per composite; the "Disabled keys" rows; the catalogue audit (every scene name of the four entries in
+  `--list`, both ways).
+
+Counts at the tip: gallery 70 pages, 389 scene names in `--list`; `cargo test --workspace` 2,217 passed, 0 failed.
+
+Final gate at the M9 tip: fmt, clippy `-D warnings`, `cargo test --workspace`, boundaries, component index; `LUNEUI_REQUIRE_GPU=1 cargo
+test -p lune-ui-wgpu` 63 passed; pixel gate against 2474248 (the M8 merge) 332 identical, 57 new, nothing allowed; Windows and Linux (Docker) pass. Bench
+(`cargo run --release -p gallery -- --bench`, verdict per D85, 2080 x 1320, 5 runs, 70 pages, M1 Pro; load 2.71 at the start and 2.98 at
+the end; self-test in range, cpu p50 4.09, spread p99 +1.13, max +3.41; a short `cargo test` overlapped the first minutes): 0 over, every
+page 0 of 5 runs over; highest page p99 8.36 ms (`dialog`), then `flyout` 6.30 and `code-editor-view` 6.28 (the new page with the
+highest p99; plan assumption D41, per-line shaping, holds: the editor's p99 is 38 percent of the budget); worst frame of any page
+19.59 ms (`diff-view`, one frame, under the 33 ms limit), `code-block` p99 1.08, `markdown-preview` 1.38, `diff-view` 2.61.
 
 M8 (data views: table, bar chart, pie chart, kanban board, lane graph) is merged to main at 2474248 (7 steps, DECISIONS
 D160 to D176) and closed: the cross-widget suite, the disabled-keys rows, the catalogue audit, the architecture notes and the
@@ -113,6 +133,13 @@ frame 19.01 ms (`radio-group`).
   focus ring snaps. Bars are keyed by column index, so a rolling window morphs in place with no slide. The board moves one
   card a frame by Shift and arrow, takes no landing in a disabled scope, and an app that applies a move later than the next
   frame sees the landing retarget with a step; an empty card footer leaves 6 px under the last row.
+- M9 limits (entries, D194, D183, Q16): a very long single line costs in proportion to its length, slow to first draw then cached (no
+  windowing inside a line); a line inserted into a wrapped editor leaves stale heights below it until they are built, so the bar may
+  shift; a word motion in the editor stops at its window's edge (a line, so on single-blank-line text one window past); the markdown's
+  nested block (a table, a list, a quote) is built whole, and only the blocks in view are Tab stops; the editor's node carries the
+  lines in view, so the `role-gap` full-text query stays open for M10's bridge; no folding and no in-editor search (D181, Lunegit has
+  neither); a one-line code block scrolled fully right has its thumb under the copy button by about 4 px (the button is hit first);
+  the markdown's inline underline, strike and pill are fills from row boxes, not a seam feature (D188); no italic face ships, so italic is the shaper's skew (D189).
 - `role-gap: tab to panel association` of the tab strip stays open (D122). The real pointer feel of the tab drag, the
   slider, the splitter and the tree in window mode is not testable with scripted input.
 - Review nits left open (M6 `review.md`): `toolbar_label` repeats `button_inner_colored` (F2); colour helpers exist twice
@@ -129,7 +156,7 @@ frame 19.01 ms (`radio-group`).
 
 ## Next
 
-1. M9 steps 8 and 9 (plan: the visual step, the close).
+1. M9 review and merge to main; then M10 (platform bridges) per the roadmap.
 2. CI (fmt, clippy `-D warnings`, tests on macOS, Windows and Linux) now that there is code to run.
 3. An export script for Luneterm's vendored snapshot, before Luneterm M9. The migration
    map for M11 is "API changes since M1" in `docs/architecture.md`.

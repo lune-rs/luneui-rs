@@ -111,6 +111,7 @@ Rows never animate: the diff rows are virtualized, and recycled rows would tween
 - `luneui.diff-view.options`: "Diff options" [L src/Lunegit.Infrastructure/Localization/en.json:246].
 - `luneui.diff-view.word-wrap`: "Word wrap" [L src/Lunegit.Infrastructure/Localization/en.json:247].
 - `luneui.diff-view.copy-selected-lines`: "Copy selected lines" [L src/Lunegit.Infrastructure/Localization/en.json:252].
+- `luneui.diff-view.pane-old`, `luneui.diff-view.pane-new`: "old" and "new", the suffix of a split pane's table name (`Changes (old)`); the toolkit's own, no Lunegit source (D199).
 
 Hunk and line action labels (Lunegit: "Stage hunk", "Unstage hunk", "Stage line", "Unstage line", [L src/Lunegit.Infrastructure/Localization/en.json:248-251]) and the empty-state texts [L src/Lunegit.Infrastructure/Localization/en.json:253-254] are app strings.
 
@@ -128,6 +129,8 @@ Hunk and line action labels (Lunegit: "Stage hunk", "Unstage hunk", "Stage line"
 - `diff-view-scrolled`: offset 4000 px, settled.
 - `diff-view-hunk-hover-fade`: a hunk action entered, t = 60 ms (half of `instant`).
 - `diff-view-hunk-press-fade`: a hunk action pressed, t = 90 ms (half of `fast`).
+- `diff-view-hunk-focus`: Tab through the header's three stops and the body to the first hunk action: its ring, settled (D198).
+- `diff-view-hunk-disabled`: the hunk actions in a disabled scope, settled.
 
 ### Painter primitives
 
@@ -148,7 +151,7 @@ Hunk and line action labels (Lunegit: "Stage hunk", "Unstage hunk", "Stage line"
 
 ### Build
 
-- Milestone: M9
+- Milestone: M9. Built in M9 step 6: `Ui::diff_view`, `Ui::diff_selected_text`, `DiffLine`, `LineKind`, `DiffMark`, `SplitRow`, `DiffMode`, `HunkAction`, `DiffOptions`, `DiffResponse`, `pair_rows`, `widest_chars`, 14 scenes on the page `diff-view`.
 - Depends on: text.code-editor-view, layout.virtualized-list, layout.scroll-area, widget.scrollbar, overlay.menu, widget.toolbar, platform.clipboard, core.ui, core.focus, infra.accessibility, motion.transitions
 
 ## Open questions
@@ -165,7 +168,7 @@ Built as the entry's contract, with these notes:
 - A hunk row keeps the 20 px row; the 18 px buttons sit 1 px from its edges (Lunegit grows the row to 22).
 - The hunk action is an `icon_button` host: its 0.98 press scale reaches what the host draws, not the ring the diff paints, and on 18 px moves an edge by under 0.2 px, so it cannot be seen.
 - Number and prefix columns stay put while the text scrolls sideways (Lunegit's list moves them).
-- A split pane's table node carries the same label; the diff's `context` is the pane's line index, `None` over an empty half. `Ui::diff_selected_text` gives the text Command+C writes, for the app's "Copy selected lines" row.
+- A split pane's table node is named `<label> (old)` and `<label> (new)` from two toolkit strings, so a screen reader tells the two tables apart (D199); the unified pane keeps `label`. The diff's `context` is the pane's line index, `None` over an empty half. `Ui::diff_selected_text` gives the text Command+C writes, for the app's "Copy selected lines" row.
 
 ## Notes for the planner
 
