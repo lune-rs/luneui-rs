@@ -504,7 +504,7 @@ Since M9 (D177 to D199; nothing public was removed or changed in signature):
 - a wheel delta routes per axis (D178, C4): the topmost scroll region live on that axis takes it (`HitRecord.scroll_axes`),
   so a sideways-only code block or table inside a document no longer swallows the vertical wheel, and a sideways swipe over a
   vertical composite reaches the area around it (the M8 limit is closed);
-- the list frame gains `RowCtx.scroll_x`, `ListResponse.pressed` and, crate-private, `ListStyle.fill`, `identity` and `link`
+- the list frame gains `RowCtx.scroll_x` and, crate-private, `ListStyle.fill`, `identity` and `link`
   (the pixel scroll link of two panes, D184); `selectable_text` selects by position whenever the joined spec equals the full
   text, multi-run too (D187);
 - six `Theme` tokens: `link`, `code_inline`, `diff_added`, `diff_removed`, `diff_added_mark`, `diff_removed_mark` (D190); `icon`
