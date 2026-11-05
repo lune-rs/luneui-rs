@@ -45,6 +45,8 @@ struct Model {
     in_dialog: Option<bool>,
     /// A modal opened over the board: its regions fall out of reach and the capture ends.
     modal: bool,
+    /// The board is drawn under a translation of this many px (a parent that moves its content).
+    shift: Option<(f32, f32)>,
 }
 
 /// Three columns and an empty fourth.
@@ -61,6 +63,7 @@ fn model() -> Model {
         long: None,
         in_dialog: None,
         modal: false,
+        shift: None,
     }
 }
 
@@ -197,7 +200,13 @@ fn run(h: &mut UiHarness, m: &Model, ms: u64) -> Run {
         ui.painter().on(LayerId::Page);
         match m.in_dialog {
             None => {
+                if let Some((dx, dy)) = m.shift {
+                    ui.painter().push_translate(dx, dy);
+                }
                 r = Some(show(ui, m, BOARD));
+                if m.shift.is_some() {
+                    ui.painter().pop_translate();
+                }
                 if m.modal {
                     ui.dialog("over", &dialog(), &glass(), |_, _, _, _| {});
                 }
@@ -1901,6 +1910,281 @@ fn a_wheel_over_the_cards_of_a_column_that_overflows_scrolls_the_column_and_not_
     run(&mut h, &m, 600);
     let r = settle(&mut h, &m, 610, 30);
     assert_eq!(r.out.tree.get(col_id(2)).expect("a column").bounds.x, x0);
+}
+
+// Contract lines a mutant of the code left standing (fix round 1, F3): each test below names the
+// line it holds.
+
+/// The accent line of the page layer, if one is drawn.
+fn line_of(r: &Run) -> Option<Shape> {
+    fills(&r.scene, LayerId::Page, DARK.accent).first().copied()
+}
+
+/// A card of column 1 dragged over a list scrolled down: the line sits in the gap above the card
+/// the pointer is on, wherever the list has scrolled to.
+#[test]
+fn the_drop_line_follows_a_column_list_scrolled_down() {
+    let mut h = UiHarness::new(WIN);
+    let m = tall();
+    let first = run(&mut h, &m, 0);
+    h.input.pointer_to(CARD_X + 20.0, LIST_Y + 100.0);
+    run(&mut h, &m, 10);
+    h.input.scroll_pixels(0.0, -300.0);
+    run(&mut h, &m, 20);
+    let r = settle(&mut h, &m, 30, 30);
+    let target = bounds(&r.out, 108);
+    assert!(
+        target.y > LIST_Y + 30.0 && target.bottom() < LIST_Y + 400.0,
+        "in view"
+    );
+    let (cx, cy) = center(&first.out, 21);
+    h.input.pointer_to(cx, cy);
+    run(&mut h, &m, 500);
+    h.input.press(P);
+    run(&mut h, &m, 510);
+    h.input.pointer_to(cx, cy + 10.0);
+    run(&mut h, &m, 520);
+    // Above the middle of card 108: the gap above it.
+    h.input.pointer_to(CARD_X + 20.0, target.y + 2.0);
+    run(&mut h, &m, 530);
+    let r = settle(&mut h, &m, 540, 40);
+    let line = line_of(&r).expect("a line");
+    assert_eq!(
+        line.rect[1],
+        target.y - CARD_GAP + 2.0,
+        "in the gap above card 108"
+    );
+    assert_eq!(line.rect[0], target.x);
+    let mv = release(&mut h, &m, 1000).r.moved.expect("a move");
+    assert_eq!((mv.column, mv.index), (1, 8));
+}
+
+/// The board scrolled sideways: the line is in the column's place now, and cut to the viewport.
+#[test]
+fn the_drop_line_follows_a_scrolled_board_and_is_cut_to_its_viewport() {
+    let mut h = UiHarness::new(WIN);
+    let m = wide();
+    let first = run(&mut h, &m, 0);
+    let bar = first.out.tree.get(col_id(1)).expect("a column").bounds;
+    h.input.pointer_to(bar.x + 100.0, bar.y + 5.0);
+    h.input.scroll_pixels(-100.0, 0.0);
+    run(&mut h, &m, 10);
+    let r = settle(&mut h, &m, 20, 30);
+    let cut = r.out.tree.get(col_id(1)).expect("a column").bounds;
+    assert_eq!(cut.x, bar.x - 100.0);
+    // Card 21 onto the cut column, at a point still inside the viewport.
+    let (cx, cy) = center(&r.out, 21);
+    h.input.pointer_to(cx, cy);
+    run(&mut h, &m, 500);
+    h.input.press(P);
+    run(&mut h, &m, 510);
+    h.input.pointer_to(cx, cy + 10.0);
+    run(&mut h, &m, 520);
+    h.input.pointer_to(120.0, LIST_Y + 2.0);
+    run(&mut h, &m, 530);
+    let r = settle(&mut h, &m, 540, 40);
+    let line = line_of(&r).expect("a line");
+    let card = bounds(&r.out, 11);
+    assert!(card.x < bar.x, "the column is scrolled: {card:?}");
+    assert_eq!(line.rect[0], card.x, "the line is at the scrolled column");
+    // Cut to the viewport: from the board's inner left edge to the column's right edge.
+    assert_eq!(line.clip[0], bar.x, "the clip starts at the viewport");
+    assert_eq!(line.clip[0] + line.clip[2], cut.x + cut.w);
+}
+
+/// A column the viewport cuts is no target where it is cut away.
+#[test]
+fn a_column_is_a_drop_target_only_where_the_viewport_shows_it() {
+    let mut h = UiHarness::new(WIN);
+    let m = wide();
+    let first = run(&mut h, &m, 0);
+    let bar = first.out.tree.get(col_id(1)).expect("a column").bounds;
+    h.input.pointer_to(bar.x + 100.0, bar.y + 5.0);
+    h.input.scroll_pixels(-100.0, 0.0);
+    run(&mut h, &m, 10);
+    let r = settle(&mut h, &m, 20, 30);
+    let (cx, cy) = center(&r.out, 21);
+    h.input.pointer_to(cx, cy);
+    run(&mut h, &m, 500);
+    h.input.press(P);
+    run(&mut h, &m, 510);
+    h.input.pointer_to(cx, cy + 10.0);
+    run(&mut h, &m, 520);
+    // Left of the viewport, over where the cut column's rect would still reach.
+    let r = drag_to(&mut h, &m, 530, (bar.x - 6.0, LIST_Y + 2.0));
+    assert!(line_of(&r).is_none(), "the cut-away part is no column");
+}
+
+/// The board under a parent's translation: pointer, columns and ghost all agree.
+#[test]
+fn a_board_under_a_translation_drops_where_the_pointer_is() {
+    let at_origin = {
+        let mut h = UiHarness::new(WIN);
+        let m = model();
+        grab(&mut h, &m, 11, 0);
+        drag_to(
+            &mut h,
+            &m,
+            100,
+            (CARD_X + LANE_PITCH + 50.0, LIST_Y + PITCH - 3.0),
+        );
+        release(&mut h, &m, 110).r.moved.expect("a move")
+    };
+    let mut h = UiHarness::new(WIN);
+    let m = Model {
+        shift: Some((40.0, 60.0)),
+        ..model()
+    };
+    grab(&mut h, &m, 11, 0);
+    let r = drag_to(
+        &mut h,
+        &m,
+        100,
+        (
+            CARD_X + LANE_PITCH + 50.0 + 40.0,
+            LIST_Y + PITCH - 3.0 + 60.0,
+        ),
+    );
+    let g = ghost(&r.scene).expect("a ghost");
+    let (cx, cy) = center(&r.out, 11);
+    assert!(
+        cx > CARD_X + 39.0 && cy > LIST_Y + 59.0,
+        "drawn at the shift"
+    );
+    assert!(g.rect[0] > 0.0);
+    let moved = release(&mut h, &m, 110).r.moved.expect("a move");
+    assert_eq!(moved, at_origin, "the same drop as on an untranslated page");
+}
+
+/// Two Shift moves in one frame report the first only: the second would count on a list the app
+/// has not changed (D173).
+#[test]
+fn one_shift_move_a_frame_reports_the_first_key_only() {
+    let mut h = UiHarness::new(WIN);
+    let m = model();
+    focus(&mut h, &m, 12, 0);
+    shift_key(&mut h, NamedKey::ArrowDown);
+    shift_key(&mut h, NamedKey::ArrowRight);
+    let r = run(&mut h, &m, 10);
+    let mv = r.r.moved.expect("a move");
+    assert_eq!(
+        (mv.card, mv.column, mv.index),
+        (12, 1, 3),
+        "Down: past card 13"
+    );
+}
+
+/// A card landing when the window loses its focus lands on its slot from where the ghost was.
+#[test]
+fn a_window_lost_mid_drag_lands_the_card_from_the_ghost() {
+    let mut h = UiHarness::new(WIN);
+    let m = model();
+    let from = dragged_to(&mut h, &m, 11, (CARD_X + LANE_PITCH + 50.0, LIST_Y + 120.0));
+    h.input.focus(false);
+    let end = assert_lands(&mut h, &m, 11, 10, from);
+    assert_eq!(end, (CARD_X + TEXT, LIST_Y + TEXT), "back in its slot");
+}
+
+/// A landing in flight ends at once when its scope turns disabled: no ghost is drawn.
+#[test]
+fn a_landing_ends_at_once_when_the_scope_turns_disabled() {
+    let mut h = UiHarness::new(WIN);
+    let mut m = model();
+    dragged_to(&mut h, &m, 11, (CARD_X + LANE_PITCH + 50.0, LIST_Y + 120.0));
+    h.input.release(P);
+    run(&mut h, &m, frame_ms(10));
+    let r = run(&mut h, &m, frame_ms(11));
+    assert!(ghost(&r.scene).is_some(), "landing");
+    m.enabled = false;
+    let r = run(&mut h, &m, frame_ms(12));
+    assert!(ghost(&r.scene).is_none(), "no ghost in a disabled scope");
+    assert_eq!(
+        drawn(&r.scene, 11, 1.0).len(),
+        1,
+        "the card draws in its slot"
+    );
+    assert_eq!(
+        settle(&mut h, &m, frame_ms(13), 30).out.repaint,
+        Repaint::Idle
+    );
+}
+
+/// A drag held through the error state is gone when the board is back.
+#[test]
+fn a_drag_does_not_survive_the_error_state_with_the_pointer_held() {
+    let mut h = UiHarness::new(WIN);
+    let mut m = model();
+    grab(&mut h, &m, 11, 0);
+    drag_to(&mut h, &m, 100, (CARD_X + LANE_PITCH + 50.0, LIST_Y + 10.0));
+    m.error = true;
+    run(&mut h, &m, 110);
+    m.error = false;
+    let r = run(&mut h, &m, 120);
+    assert!(
+        !r.out
+            .tree
+            .nodes
+            .iter()
+            .any(|n| n.states.contains(State::Dragging)),
+        "no card is dragging"
+    );
+    assert!(ghost(&r.scene).is_none() && line_of(&r).is_none());
+    let r = release(&mut h, &m, 130);
+    assert_eq!((r.r.moved, r.r.opened), (None, None));
+}
+
+/// A press the window's loss cancelled opens nothing when it is released.
+#[test]
+fn a_press_cancelled_by_a_lost_window_opens_nothing_on_its_release() {
+    let mut h = UiHarness::new(WIN);
+    let m = model();
+    let first = run(&mut h, &m, 0);
+    let (x, y) = center(&first.out, 12);
+    h.input.pointer_to(x, y);
+    run(&mut h, &m, 10);
+    h.input.press(P);
+    run(&mut h, &m, 20);
+    h.input.focus(false);
+    run(&mut h, &m, 30);
+    h.input.focus(true);
+    h.input.release(P);
+    let r = run(&mut h, &m, 40);
+    assert_eq!((r.r.opened, r.r.moved), (None, None));
+}
+
+/// A card carried through a keyboard move keeps its focus ring on the ghost while it lands: the
+/// ring, which the key just made visible, goes on fading in on the ghost.
+#[test]
+fn the_ghost_of_a_focused_card_carries_the_focus_ring() {
+    let mut h = UiHarness::new(WIN);
+    let mut m = model();
+    focus(&mut h, &m, 11, 0);
+    run(&mut h, &m, 1000);
+    shift_key(&mut h, NamedKey::ArrowRight);
+    let r = run(&mut h, &m, 1016);
+    apply(&mut m, r.r.moved.expect("a move"));
+    // The card's border is one ring; the focus ring is a second, white at a rising alpha.
+    let mut alphas = Vec::new();
+    for ms in [1032, 1048, 1064, 1080] {
+        let r = run(&mut h, &m, ms);
+        assert!(ghost(&r.scene).is_some(), "landing at {ms}");
+        let rings: Vec<f32> = r.scene.layers[LayerId::Popup as usize]
+            .geometry
+            .under
+            .iter()
+            .filter(|s| s.params[0] == 1.0)
+            .map(|s| s.color[3])
+            .collect();
+        assert_eq!(rings.len(), 2, "the border and the focus ring at {ms}");
+        alphas.push(rings[1]);
+    }
+    assert!(
+        alphas.windows(2).all(|w| w[1] > w[0]),
+        "the focus ring fades in on the ghost: {alphas:?}"
+    );
+    // At the ghost's own pace (the ring's level is the ghost's to set: 0.235 here, and 0.11 when
+    // the ghost asks for no ring).
+    assert!(alphas[3] > 0.2, "{alphas:?}");
 }
 
 // The probes at scale 2.
