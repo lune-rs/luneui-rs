@@ -82,6 +82,7 @@ n/a — typing, caret movement, selection, scrolling and line bands are high-fre
 - Keys: the engine's navigation and edit keys in the editable mode; PageUp, PageDown, Home, End scroll; select-all and copy in the read-only mode [text.text-edit], [layout.scroll-area].
 - Tab stop: the view (to scroll and select by keyboard) in the viewer; the engine's Tab rule applies when editable (an app option: insert a tab or move focus) [core.focus].
 - Layer: the host's; overlay anchors above it on the same layer in call order [core.ui]. No focus scope.
+- Word motions: the document is a `CodeDoc` (D179), and a word motion reads the lines either side of the caret's, one line further where the line past that edge holds text. It crosses one blank line as a `String` does; across two or more blank lines it stops at the blank line, a stated difference from `text.text-edit` on a `String` (D180).
 
 ### Retained state
 
