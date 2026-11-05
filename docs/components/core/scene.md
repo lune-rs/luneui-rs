@@ -11,7 +11,7 @@ summary: Plain-data Scene the painter builds and a renderer consumes; the draw-o
 
 ## What it is
 
-`Scene` (four `Layer`s and an optional `BackdropRequest`), `LayerGeometry` (acrylic, under, over shapes and strokes), `Shape`, `StrokeVertex`, `TextItem`, `CustomItem`, `LayerId`, `LAYER_COUNT`, `SCENE_LAYERS` and `FrameParams`. Std only, in physical pixels; the records mirror the GPU's field by field and the wgpu adapter copies them into its own Pod structs. This is the renderer seam: the data, not a trait. The draw-order contract is in the module doc: layers back to front; in a layer acrylic, under shapes, custom items, text, over shapes, strokes; layers under `SCENE_LAYERS` render offscreen, which a backdrop request blurs.
+`Scene` (six `Layer`s and an optional `BackdropRequest`), `LayerGeometry` (acrylic, under, over shapes and strokes), `Shape`, `StrokeVertex`, `TextItem`, `CustomItem`, `LayerId`, `LAYER_COUNT`, `SCENE_LAYERS` and `FrameParams`. Std only, in physical pixels; the records mirror the GPU's field by field and the wgpu adapter copies them into its own Pod structs. This is the renderer seam: the data, not a trait. The draw-order contract is in the module doc: layers back to front; in a layer acrylic, under shapes, custom items, text, over shapes, strokes; layers under `SCENE_LAYERS` render offscreen, which a backdrop request blurs.
 
 ## Needs
 
@@ -32,16 +32,16 @@ Conflicts: none.
 
 ### Anatomy
 
-- Layers in draw order: `Base` 0, `Page` 1, `Popup` 2, `Modal` 3 [R crates/lune-ui-core/src/scene.rs:17-22].
-- `LAYER_COUNT` 4 [R crates/lune-ui-core/src/scene.rs:24].
-- `SCENE_LAYERS` 2: the layers under a popup draw to an offscreen scene so a glass menu can blur them [R crates/lune-ui-core/src/scene.rs:26-27].
+- Layers in draw order: `Base` 0, `Page` 1, `Popup` 2, `Modal` 3, `Raised` 4, `Toast` 5 [R crates/lune-ui-core/src/scene.rs `LayerId`]. `Raised` holds an overlay opened above an active modal; the `Ui` chooses it at open ([D137]).
+- `LAYER_COUNT` 6 [R crates/lune-ui-core/src/scene.rs].
+- `SCENE_LAYERS` 2: the layers under a popup draw to an offscreen scene so a glass menu can blur them. `Scene::split()` is `SCENE_LAYERS`, or the backdrop request's `layer` when that is higher, so a glass surface blurs everything under it; `BackdropRequest` carries `layer`, `sigma` and `saturation` (0 means the frame's). One backdrop per frame: of two, the lower layer keeps it ([D138]).
 - Items per layer: `Shape` (31), `StrokeVertex` (43), `LayerGeometry` (55), `TextItem` (63), `CustomItem` (74), `Layer` (82), `BackdropRequest` (91), `Scene` (99), `FrameParams` (107) [R crates/lune-ui-core/src/scene.rs:31-107].
 
 ### States
 
 | state | look | cite |
 |---|---|---|
-| layer on (Base, Page, Popup, Modal) | items land on the current layer | [R crates/lune-ui-core/src/paint.rs:162] |
+| layer on (Base, Page, Popup, Modal, Raised, Toast) | items land on the current layer | [R crates/lune-ui-core/src/paint.rs:162] |
 
 ### Transitions
 
@@ -88,7 +88,7 @@ n/a — text items carry strings from the caller.
 
 ## Open questions
 
-- A fifth layer `Toast` above `Modal` is added by M4 ([D54]): `LAYER_COUNT` becomes 5 and `SCENE_LAYERS` stays 2; no existing scene draws on it, so the pixel gate stays at zero delta.
+- Layers added after M2, each at zero pixel delta for the scenes that existed: `Toast` above `Modal` by M4 ([D54], `LAYER_COUNT` 5), and `Raised` between `Modal` and `Toast` by M7 ([D137], `LAYER_COUNT` 6, `Toast` is 5). `SCENE_LAYERS` stays 2.
 - A second renderer (a software one, say) is the real test of the data shape; none exists. No renderer trait on purpose (DECISIONS D25).
 
 ## Notes for the planner

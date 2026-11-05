@@ -1245,3 +1245,1039 @@ mod m6 {
         assert_eq!(run(&mut h, &mut p, 1200).repaint, Repaint::Idle);
     }
 }
+
+// ---------------------------------------------------------------------------------------------
+// M7: the overlay, container and navigation set together. One page holds every interactive M7
+// widget; the per-widget suites own the behaviour, this section owns what only holds side by
+// side: the semantic tree, accessibility actions, one tab stop per composite, the disabled walk,
+// the idle report, and the overlays that rise above a dialog.
+// ---------------------------------------------------------------------------------------------
+
+mod m7 {
+    use super::*;
+    use std::time::Duration;
+
+    use lune_ui_core::GlassLayer;
+    use lune_ui_core::access::{AccessValue, Live};
+    use lune_ui_core::icon;
+    use lune_ui_core::layout::Axis;
+    use lune_ui_core::shortcuts::{Binding, Chord, Scope};
+    use lune_ui_core::testing::disabled_violations;
+    use lune_ui_core::widgets::command_palette::{Palette, PaletteRow, PaletteSection};
+    use lune_ui_core::widgets::flyout::Flyout;
+    use lune_ui_core::widgets::icon_rail::RailItem;
+    use lune_ui_core::widgets::menu::{MenuItem, MenuOptions, MenuPlace};
+    use lune_ui_core::widgets::nav_item::NavEntry;
+    use lune_ui_core::widgets::page::{PageOptions, PageSlot};
+    use lune_ui_core::widgets::panel::PanelOptions;
+    use lune_ui_core::widgets::popover::{PlaceAlign, Side};
+    use lune_ui_core::widgets::row::SettingRow;
+    use lune_ui_core::widgets::settings_page::SettingsPage;
+    use lune_ui_core::widgets::side_panel::SidePanelOptions;
+    use lune_ui_core::widgets::sidebar::{Sidebar, SidebarBody, SidebarFooter};
+    use lune_ui_core::widgets::split_panes::{Pane, SplitOptions, SplitSide};
+    use lune_ui_core::widgets::toast::{ToastAction, ToastKind, ToastSpec, Toasts};
+    use lune_ui_core::widgets::tone::Tone;
+    use lune_ui_core::widgets::tree_view::{TreeOptions, TreeRow};
+
+    const M7_WIN: (f32, f32) = (1240.0, 900.0);
+    const RAIL: Rect = Rect::new(0.0, 0.0, 48.0, 420.0);
+    const NAV: Rect = Rect::new(60.0, 10.0, 170.0, 0.0);
+    const TREE: Rect = Rect::new(250.0, 10.0, 280.0, 200.0);
+    const SPLIT: Rect = Rect::new(550.0, 10.0, 400.0, 200.0);
+    const SIDEBAR: Rect = Rect::new(60.0, 240.0, 180.0, 180.0);
+    const PAGE: Rect = Rect::new(250.0, 240.0, 400.0, 300.0);
+    const SIDE_PANEL: Rect = Rect::new(670.0, 240.0, 200.0, 150.0);
+    const SETTINGS: Rect = Rect::new(890.0, 240.0, 340.0, 300.0);
+    const MENU_AT: (f32, f32) = (300.0, 620.0);
+    const ANCHOR: Rect = Rect::new(1180.0, 860.0, 24.0, 24.0);
+    const GLASS: GlassLayer = GlassLayer {
+        tint: [10, 20, 30, 255],
+        tint_opacity: 0.8,
+        material_opacity: 0.7,
+    };
+    const UNDER: [f32; 4] = [0.05, 0.06, 0.07, 1.0];
+    const SPLIT_DEFAULT: f32 = 200.0;
+    /// The splitter's largest size: the rect less the strip less the other pane's smallest.
+    const SPLIT_MAX: f32 = 400.0 - 4.0 - 100.0;
+
+    const NAVS: [NavEntry<'static>; 2] = [
+        NavEntry {
+            key: 1,
+            label: "General",
+            icon: None,
+            enabled: true,
+        },
+        NavEntry {
+            key: 2,
+            label: "Network",
+            icon: None,
+            enabled: true,
+        },
+    ];
+
+    const fn tree_row(key: u64, depth: u16, text: &'static str, kids: bool) -> TreeRow<'static> {
+        TreeRow {
+            key,
+            depth,
+            text,
+            glyph: None,
+            has_children: kids,
+        }
+    }
+
+    /// `src` (open at the start) holds two files; `docs` is closed and holds one.
+    const TREE_ROWS: [TreeRow<'static>; 5] = [
+        tree_row(1, 0, "src", true),
+        tree_row(2, 1, "main.rs", false),
+        tree_row(3, 1, "lib.rs", false),
+        tree_row(4, 0, "docs", true),
+        tree_row(5, 1, "readme.md", false),
+    ];
+
+    /// A header, an enabled row, a disabled one and a danger one: the picks are 1 and 3.
+    const MENU_ROWS: [MenuRow<'static>; 4] = [
+        MenuRow::Header {
+            name: "Atlas",
+            status: "Serving",
+            tone: Tone::Ok,
+        },
+        MenuRow::Entry(MenuItem {
+            glyph: Some(icon::ADD),
+            text: "Open",
+            shortcut: "",
+            disabled: false,
+            danger: false,
+            chevron: false,
+        }),
+        MenuRow::Entry(MenuItem {
+            glyph: None,
+            text: "Pause",
+            shortcut: "",
+            disabled: true,
+            danger: false,
+            chevron: false,
+        }),
+        MenuRow::Entry(MenuItem {
+            glyph: None,
+            text: "Quit",
+            shortcut: "",
+            disabled: false,
+            danger: true,
+            chevron: false,
+        }),
+    ];
+
+    const fn palette_row(key: u64, text: &'static str) -> PaletteRow<'static> {
+        PaletteRow {
+            key,
+            text,
+            detail: None,
+            icon: None,
+            hint: None,
+            destructive: false,
+        }
+    }
+
+    const PALETTE_ROWS: [PaletteRow<'static>; 2] =
+        [palette_row(10, "Reload"), palette_row(11, "Rename")];
+
+    fn rail_item(key: u64, glyph: &'static str, name: &'static str) -> RailItem<'static> {
+        RailItem {
+            key,
+            glyph,
+            name,
+            active: false,
+            enabled: true,
+            dot: false,
+            badge: None,
+            note: None,
+        }
+    }
+
+    fn ms(n: u64) -> Duration {
+        Duration::from_millis(n)
+    }
+
+    fn prompt(message: &str) -> ToastSpec {
+        ToastSpec {
+            actions: vec![
+                ToastAction {
+                    label: "Open".into(),
+                    primary: true,
+                    id: 2,
+                },
+                ToastAction {
+                    label: "Later".into(),
+                    primary: false,
+                    id: 1,
+                },
+            ],
+            ..ToastSpec::new(ToastKind::Info, message)
+        }
+    }
+
+    /// The app side of the page: what is open, and what the frames reported.
+    #[derive(Debug)]
+    struct Page {
+        enabled: bool,
+        started: bool,
+        nav: u64,
+        restart: bool,
+        menu_open: bool,
+        flyout_open: bool,
+        palette_open: bool,
+        query: String,
+        toasts: Toasts,
+        // Reported.
+        rail_picked: Vec<u64>,
+        tree_toggled: Vec<u64>,
+        tree_activated: Vec<u64>,
+        split_size: f32,
+        menu_picked: Vec<usize>,
+        palette_activated: Vec<u64>,
+    }
+
+    impl Page {
+        fn new() -> Self {
+            Page {
+                enabled: true,
+                started: false,
+                nav: 1,
+                restart: true,
+                menu_open: false,
+                flyout_open: false,
+                palette_open: false,
+                query: String::new(),
+                toasts: Toasts::default(),
+                rail_picked: Vec::new(),
+                tree_toggled: Vec::new(),
+                tree_activated: Vec::new(),
+                split_size: 0.0,
+                menu_picked: Vec::new(),
+                palette_activated: Vec::new(),
+            }
+        }
+    }
+
+    fn page_frame(h: &mut UiHarness, p: &mut Page) -> FrameOutput {
+        let enabled = p.enabled;
+        let (_, out) = h.frame(|ui: &mut Ui<'_>| {
+            ui.painter().on(LayerId::Page);
+            if !p.started {
+                p.started = true;
+                ui.tree_state("tree").expanded.insert(1);
+            }
+            ui.with_enabled(enabled, |ui| {
+                // The rail: the first item is open and dirty, the second counts, the third is off.
+                let top = [
+                    RailItem {
+                        active: true,
+                        dot: true,
+                        note: Some("Uncommitted changes"),
+                        ..rail_item(1, icon::EDIT, "Files")
+                    },
+                    RailItem {
+                        badge: Some(3),
+                        note: Some("3 unread"),
+                        ..rail_item(2, icon::SEARCH, "Search")
+                    },
+                    RailItem {
+                        enabled: false,
+                        ..rail_item(3, icon::INFO, "Hidden")
+                    },
+                ];
+                let bottom = [rail_item(4, icon::GEAR, "Settings")];
+                if let Some(k) = ui.icon_rail("rail", RAIL, &top, &bottom, "Panels") {
+                    p.rail_picked.push(k);
+                }
+                ui.nav_list("nav", NAV, &NAVS, &mut p.nav, "Sections");
+                let t = ui.tree_view(
+                    "tree",
+                    TREE,
+                    &TreeOptions {
+                        rows: &TREE_ROWS,
+                        label: "Project",
+                        guides: true,
+                        toggle_on_row: false,
+                    },
+                    |_, _| {},
+                );
+                p.tree_toggled.extend(t.toggled);
+                p.tree_activated.extend(t.activated);
+                let s = ui.split_panes(
+                    "split",
+                    SPLIT,
+                    &SplitOptions {
+                        axis: Axis::Horizontal,
+                        sized: SplitSide::First,
+                        default: SPLIT_DEFAULT,
+                        min: 120.0,
+                        max: 300.0,
+                        min_other: 100.0,
+                        hidden: false,
+                        name: "Side panel width",
+                    },
+                    |ui, pane, r| {
+                        if pane == Pane::First {
+                            ui.panel(
+                                "panel",
+                                r,
+                                &PanelOptions {
+                                    title: Some("Changes"),
+                                    meta: Some("3 files"),
+                                    ..PanelOptions::default()
+                                },
+                                |_, _| 0.0,
+                            );
+                        }
+                    },
+                );
+                p.split_size = s.size;
+                ui.sidebar(
+                    "sb",
+                    SIDEBAR,
+                    Sidebar {
+                        body: SidebarBody::Steps {
+                            labels: &["Connect", "Review"],
+                            current: 0,
+                        },
+                        footer: Some(SidebarFooter {
+                            tone: Tone::Ok,
+                            text: "Connected",
+                            mono: false,
+                        }),
+                        name: "Setup",
+                    },
+                );
+                ui.page(
+                    "page",
+                    PAGE,
+                    &PageOptions {
+                        title: "Overview",
+                        subtitle: Some("The project at a glance"),
+                        active: true,
+                        glass: GLASS,
+                        under: UNDER,
+                        actions_w: 0.0,
+                        footer: false,
+                        swap_key: 1,
+                        name: "",
+                    },
+                    |_, slot| match slot {
+                        PageSlot::Body(..) => 40.0,
+                        _ => 0.0,
+                    },
+                );
+                ui.side_panel(
+                    "sp",
+                    SIDE_PANEL,
+                    &SidePanelOptions {
+                        panel: 1,
+                        keys: &[1, 2],
+                        active: true,
+                        glass: GLASS,
+                        under: UNDER,
+                        name: "History",
+                    },
+                    |_, _| {},
+                );
+                ui.settings_page(
+                    "settings",
+                    SETTINGS,
+                    &SettingsPage {
+                        active: true,
+                        glass: GLASS,
+                        under: UNDER,
+                        restart: p.restart,
+                        name: "General",
+                    },
+                    |ui, r| {
+                        let row = SettingRow {
+                            title: "Updates",
+                            description: None,
+                            off: false,
+                            control_w: 0.0,
+                        };
+                        ui.setting_row("row", Rect::new(r.x, r.y, r.w, 0.0), &row, |_, _| {})
+                    },
+                );
+                if p.menu_open {
+                    let r = ui.menu_with(
+                        "menu",
+                        &MENU_ROWS,
+                        &MenuOptions {
+                            place: MenuPlace::At(MENU_AT),
+                            anchor_id: None,
+                            name: "Actions",
+                        },
+                    );
+                    p.menu_picked.extend(r.picked);
+                }
+                if p.flyout_open {
+                    ui.flyout(
+                        "flyout",
+                        &Flyout {
+                            anchor: ANCHOR,
+                            anchor_id: None,
+                            side: Side::Top,
+                            align: PlaceAlign::End,
+                            mark: None,
+                            wordmark: "Atlas",
+                            state: "Serving",
+                            tone: Tone::Ok,
+                            stats: &[],
+                            routes: &[("Opus", "route-one")],
+                            rows: &MENU_ROWS[1..],
+                            name: "Tray",
+                        },
+                    );
+                }
+                if p.palette_open {
+                    let secs = [PaletteSection {
+                        title: "COMMANDS",
+                        rows: &PALETTE_ROWS,
+                        more: false,
+                    }];
+                    let r = ui.command_palette(
+                        "palette",
+                        &mut p.query,
+                        &Palette {
+                            sections: &secs,
+                            placeholder: "Search",
+                            footer_left: "Up/Down",
+                            error: None,
+                            name: "Commands",
+                        },
+                        &glass(),
+                    );
+                    p.palette_activated.extend(r.activated);
+                }
+                ui.toasts("toasts", &mut p.toasts);
+            });
+        });
+        out
+    }
+
+    fn run(h: &mut UiHarness, p: &mut Page, at: u64) -> FrameOutput {
+        h.at_ms(at);
+        page_frame(h, p)
+    }
+
+    /// Two frames to open, one more to settle.
+    fn settled_with(mut p: Page) -> (UiHarness, Page) {
+        let mut h = UiHarness::new(M7_WIN);
+        for at in [0, 500, 1000] {
+            run(&mut h, &mut p, at);
+        }
+        (h, p)
+    }
+
+    fn by_name<'a>(out: &'a FrameOutput, role: Role, name: &str) -> &'a Node {
+        out.tree
+            .nodes
+            .iter()
+            .find(|n| n.role == role && n.name == name)
+            .unwrap_or_else(|| panic!("no {role:?} named {name:?}"))
+    }
+
+    fn inject(h: &mut UiHarness, target: WidgetId, action: Action, value: Option<AccessValue>) {
+        h.input.access(AccessAction {
+            target,
+            action,
+            value,
+        });
+    }
+
+    #[test]
+    fn a_frame_of_every_m7_widget_yields_the_expected_roles_names_and_states() {
+        let mut p = Page::new();
+        p.menu_open = true;
+        p.flyout_open = true;
+        p.toasts
+            .push(ToastSpec::new(ToastKind::Error, "Build failed"), ms(0));
+        p.toasts
+            .push(ToastSpec::new(ToastKind::Info, "Saved"), ms(0));
+        let (mut h, mut p) = settled_with(p);
+        let out = run(&mut h, &mut p, 1100);
+
+        // The rail: a toolbar of buttons; the open one reads pressed, the notes describe the
+        // dot and the badge, the off one is disabled and has no stop.
+        assert_eq!(by_name(&out, Role::Toolbar, "Panels").id, id("rail"));
+        let files = by_name(&out, Role::Button, "Files");
+        assert!(files.states.contains(State::Pressed));
+        assert_eq!(files.description.as_deref(), Some("Uncommitted changes"));
+        let search = by_name(&out, Role::Button, "Search");
+        assert!(!search.states.contains(State::Pressed));
+        assert_eq!(search.description.as_deref(), Some("3 unread"));
+        let off = by_name(&out, Role::Button, "Hidden");
+        assert!(off.states.contains(State::Disabled) && !off.states.contains(State::Focusable));
+        // The nav list.
+        assert_eq!(by_name(&out, Role::List, "Sections").id, id("nav"));
+        // The tree: the rows in view with their level and open state, the hidden row absent.
+        let tree = by_name(&out, Role::Tree, "Project");
+        assert_eq!(tree.id, id("tree"));
+        assert!(tree.states.contains(State::Focusable));
+        let rows: Vec<&str> = out
+            .tree
+            .nodes
+            .iter()
+            .filter(|n| n.role == Role::TreeItem)
+            .map(|n| n.name.as_str())
+            .collect();
+        assert_eq!(rows, ["src", "main.rs", "lib.rs", "docs"]);
+        let src = by_name(&out, Role::TreeItem, "src");
+        assert_eq!(src.level, Some(1));
+        assert!(src.states.contains(State::Expanded));
+        assert!(src.actions.contains(Action::Collapse));
+        assert_eq!(by_name(&out, Role::TreeItem, "main.rs").level, Some(2));
+        let docs = by_name(&out, Role::TreeItem, "docs");
+        assert!(!docs.states.contains(State::Expanded));
+        assert!(docs.actions.contains(Action::Expand));
+        // The splitter: a separator whose value is the sized pane's size.
+        let split = by_name(&out, Role::Separator, "Side panel width");
+        assert!(split.states.contains(State::Focusable));
+        // The largest size is the room: 400 less the 4 px strip less the other pane's 100.
+        assert!(
+            matches!(split.value, Some(Value::Number { value, min, max, .. })
+            if value == f64::from(SPLIT_DEFAULT) && min == 120.0 && max == f64::from(SPLIT_MAX))
+        );
+        for a in [Action::Increment, Action::Decrement, Action::SetValue] {
+            assert!(split.actions.contains(a), "{a:?}");
+        }
+        // The containers: a group each, the panel described by its meta, the page by its subtitle.
+        assert_eq!(
+            by_name(&out, Role::Group, "Changes").description.as_deref(),
+            Some("3 files")
+        );
+        assert_eq!(
+            by_name(&out, Role::Group, "Overview")
+                .description
+                .as_deref(),
+            Some("The project at a glance")
+        );
+        by_name(&out, Role::Group, "History");
+        by_name(&out, Role::Group, "General");
+        // The sidebar's steps are a navigation named by it, its footer a polite status.
+        assert_eq!(
+            by_name(&out, Role::Navigation, "Setup").id,
+            id("sb").with("steps")
+        );
+        by_name(&out, Role::Status, "Connected");
+        // The settings page's restart banner: a status over an action button.
+        assert!(
+            out.tree
+                .nodes
+                .iter()
+                .any(|n| n.role == Role::Button && SETTINGS.contains(centre(n.bounds)))
+        );
+        // The menu: rows by name, the disabled one off, the header text only.
+        by_name(&out, Role::Menu, "Actions");
+        by_name(&out, Role::MenuItem, "Open");
+        let pause = by_name(&out, Role::MenuItem, "Pause");
+        assert!(pause.states.contains(State::Disabled) && !pause.states.contains(State::Focusable));
+        by_name(&out, Role::StaticText, "Atlas");
+        // The flyout's rows are a menu of their own.
+        by_name(&out, Role::Menu, "Tray");
+        // The toasts: an error is assertive, an info is polite.
+        let err = by_name(&out, Role::Alert, "Build failed");
+        assert_eq!(err.live, Some(Live::Assertive));
+        let info = by_name(&out, Role::Status, "Saved");
+        assert_eq!(info.live, Some(Live::Polite));
+    }
+
+    #[test]
+    fn a_palette_over_the_page_is_a_dialog_of_rows_with_a_search_box() {
+        let mut p = Page::new();
+        p.palette_open = true;
+        p.query = "r".into();
+        let (mut h, mut p) = settled_with(p);
+        let out = run(&mut h, &mut p, 1100);
+        assert_eq!(by_name(&out, Role::Dialog, "Commands").id, id("palette"));
+        by_name(&out, Role::TextInput, "Search");
+        for name in ["Reload", "Rename"] {
+            let n = by_name(&out, Role::ListItem, name);
+            assert!(n.actions.contains(Action::Default), "{name}");
+        }
+    }
+
+    #[test]
+    fn injected_actions_work_on_a_menu_item_tree_rows_the_splitter_a_rail_button_and_a_palette_row()
+    {
+        let mut p = Page::new();
+        p.menu_open = true;
+        let (mut h, mut p) = settled_with(p);
+        let out = run(&mut h, &mut p, 1100);
+        assert_eq!(p.split_size, SPLIT_DEFAULT);
+
+        // A rail button, a closed tree row (expand) and a menu item, in one frame.
+        inject(
+            &mut h,
+            by_name(&out, Role::Button, "Search").id,
+            Action::Default,
+            None,
+        );
+        inject(
+            &mut h,
+            by_name(&out, Role::TreeItem, "docs").id,
+            Action::Expand,
+            None,
+        );
+        inject(
+            &mut h,
+            by_name(&out, Role::MenuItem, "Open").id,
+            Action::Default,
+            None,
+        );
+        run(&mut h, &mut p, 1200);
+        assert_eq!(p.rail_picked, [2], "rail button");
+        assert_eq!(p.tree_toggled, [4], "tree expand");
+        assert_eq!(p.menu_picked, [1], "menu item (the header is row 0)");
+
+        // An open row collapses, a leaf's default selects it.
+        p.menu_open = false;
+        let out = run(&mut h, &mut p, 1300);
+        inject(
+            &mut h,
+            by_name(&out, Role::TreeItem, "src").id,
+            Action::Collapse,
+            None,
+        );
+        run(&mut h, &mut p, 1400);
+        assert_eq!(p.tree_toggled, [4, 1], "tree collapse");
+        let out = run(&mut h, &mut p, 2000);
+        inject(
+            &mut h,
+            by_name(&out, Role::TreeItem, "docs").id,
+            Action::Default,
+            None,
+        );
+        run(&mut h, &mut p, 2100);
+        let out = run(&mut h, &mut p, 2200);
+        assert!(
+            by_name(&out, Role::TreeItem, "docs")
+                .states
+                .contains(State::Selected)
+        );
+
+        // The splitter steps by 16 and takes a value, clamped.
+        let split = by_name(&out, Role::Separator, "Side panel width").id;
+        inject(&mut h, split, Action::Increment, None);
+        run(&mut h, &mut p, 2300);
+        assert_eq!(p.split_size, SPLIT_DEFAULT + 16.0, "increment");
+        inject(
+            &mut h,
+            split,
+            Action::SetValue,
+            Some(AccessValue::Number(250.0)),
+        );
+        run(&mut h, &mut p, 2400);
+        assert_eq!(p.split_size, 250.0, "set value");
+        inject(
+            &mut h,
+            split,
+            Action::SetValue,
+            Some(AccessValue::Number(9e9)),
+        );
+        run(&mut h, &mut p, 2500);
+        assert_eq!(p.split_size, SPLIT_MAX, "clamped to the room");
+        inject(&mut h, split, Action::Decrement, None);
+        run(&mut h, &mut p, 2600);
+        assert_eq!(p.split_size, SPLIT_MAX - 16.0, "decrement");
+
+        // A palette row.
+        let mut p = Page::new();
+        p.palette_open = true;
+        p.query = "r".into();
+        let (mut h, mut p) = settled_with(p);
+        let out = run(&mut h, &mut p, 1100);
+        inject(
+            &mut h,
+            by_name(&out, Role::ListItem, "Rename").id,
+            Action::Default,
+            None,
+        );
+        run(&mut h, &mut p, 1200);
+        assert_eq!(p.palette_activated, [11], "palette row");
+    }
+
+    #[test]
+    fn a_tab_cycle_over_the_rail_nav_tree_and_splitter_visits_each_once() {
+        let (mut h, mut p) = settled_with(Page::new());
+        let mut ms = 1000;
+        let mut seen: Vec<(WidgetId, Rect)> = Vec::new();
+        for _ in 0..30 {
+            key(&mut h, NamedKey::Tab);
+            ms += 100;
+            let out = run(&mut h, &mut p, ms);
+            let f = out.focused.expect("Tab focuses something");
+            if seen.iter().any(|&(s, _)| s == f) {
+                break;
+            }
+            seen.push((f, node(&out, f).bounds));
+        }
+        let inside = |outer: Rect| {
+            seen.iter()
+                .filter(|&&(_, b)| {
+                    let (cx, cy) = centre(b);
+                    outer.contains((cx, cy))
+                })
+                .map(|&(f, _)| f)
+                .collect::<Vec<_>>()
+        };
+        // The rail's one stop is its open item; the nav's is its current one; the tree and the
+        // splitter are one each.
+        assert_eq!(inside(RAIL), [id("rail").with(1_u64)], "rail");
+        assert_eq!(
+            inside(Rect::new(NAV.x, NAV.y, NAV.w, 80.0)),
+            [id("nav").with(1_u64)],
+            "nav"
+        );
+        assert_eq!(inside(TREE), [id("tree")], "tree");
+        assert_eq!(inside(SPLIT), [id("split")], "splitter");
+    }
+
+    /// The keys a focused composite uses.
+    const KEYS: [NamedKey; 10] = [
+        NamedKey::ArrowUp,
+        NamedKey::ArrowDown,
+        NamedKey::ArrowLeft,
+        NamedKey::ArrowRight,
+        NamedKey::Home,
+        NamedKey::End,
+        NamedKey::PageUp,
+        NamedKey::PageDown,
+        NamedKey::Enter,
+        NamedKey::Space,
+    ];
+
+    #[test]
+    fn every_interactive_m7_widget_in_a_disabled_scope_passes_the_walk() {
+        let mut p = Page::new();
+        p.menu_open = true;
+        p.flyout_open = true;
+        p.toasts
+            .push(ToastSpec::new(ToastKind::Error, "Build failed"), ms(0));
+        p.toasts.push(prompt("Update?"), ms(0));
+        p.enabled = false;
+        let (mut h, mut p) = settled_with(p);
+        let out = run(&mut h, &mut p, 1100);
+        let toast = |n: u64| id("toasts").with(n);
+        // A flyout has no node of its own: its rows, state and routes are the roots.
+        let fly = |role: Role, name: &str| by_name(&out, role, name).id;
+        for (name, root) in [
+            ("rail", id("rail")),
+            ("nav", id("nav")),
+            ("tree", id("tree")),
+            ("splitter", id("split")),
+            ("sidebar", id("sb").with("steps")),
+            ("page", id("page")),
+            ("side panel", id("sp")),
+            ("settings page", id("settings")),
+            ("menu", id("menu")),
+            ("flyout rows", fly(Role::Menu, "Tray")),
+            ("flyout state", fly(Role::Status, "Serving")),
+            ("flyout routes", fly(Role::Group, "Opus")),
+            ("error toast", toast(1)),
+            ("prompt toast", toast(2)),
+        ] {
+            assert!(out.tree.get(root).is_some(), "{name}: no node");
+            assert_eq!(disabled_violations(&out.tree, root), [], "{name}");
+        }
+        // And the palette, which is modal.
+        let mut p = Page::new();
+        p.palette_open = true;
+        p.query = "r".into();
+        p.enabled = false;
+        let (mut h, mut p) = settled_with(p);
+        let out = run(&mut h, &mut p, 1100);
+        assert_eq!(disabled_violations(&out.tree, id("palette")), [], "palette");
+    }
+
+    /// A page with a Global binding on every key of `KEYS`, the `stop`th composite focused by Tab
+    /// (the rail, the nav, the tree, the splitter), and the time it is at.
+    fn focused_page(stop: usize) -> (UiHarness, Page, u64) {
+        let mut h = UiHarness::new(M7_WIN);
+        for k in KEYS {
+            h.shortcuts.add(Binding::new(
+                Scope::Global,
+                Chord::key(Key::Named(k)),
+                format!("g-{k:?}"),
+            ));
+        }
+        let mut p = Page::new();
+        for at in [0, 500, 1000] {
+            run(&mut h, &mut p, at);
+        }
+        let mut ms = 1000;
+        for _ in 0..=stop {
+            key(&mut h, NamedKey::Tab);
+            ms += 100;
+            run(&mut h, &mut p, ms);
+        }
+        (h, p, ms)
+    }
+
+    #[test]
+    fn a_disabled_page_takes_every_key_a_focused_composite_takes_and_fires_no_global_binding() {
+        let names = ["rail", "nav", "tree", "splitter"];
+        for (stop, name) in names.into_iter().enumerate() {
+            // The instrument: the keys the composite uses are the ones that fire nothing while it
+            // is enabled; the rest stay shortcuts.
+            let mut used = Vec::new();
+            for k in KEYS {
+                let (mut h, mut p, ms) = focused_page(stop);
+                key(&mut h, k);
+                if run(&mut h, &mut p, ms + 100).fired.is_empty() {
+                    used.push(k);
+                }
+            }
+            assert!(
+                used.len() >= 4,
+                "{name} uses at least four of the keys: {used:?}"
+            );
+            for k in used {
+                let (mut h, mut p, mut ms) = focused_page(stop);
+                p.enabled = false;
+                let before = (p.nav, p.split_size);
+                key(&mut h, k);
+                ms += 100;
+                let out = run(&mut h, &mut p, ms);
+                assert!(
+                    out.fired.is_empty(),
+                    "{name}: {k:?} reached {:?}",
+                    out.fired
+                );
+                assert!(p.rail_picked.is_empty(), "{name}: {k:?}");
+                assert!(
+                    p.tree_toggled.is_empty() && p.tree_activated.is_empty(),
+                    "{name}: {k:?}"
+                );
+                assert_eq!((p.nav, p.split_size), before, "{name}: {k:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn a_page_of_them_all_at_rest_reports_idle_once_the_loops_are_off() {
+        let mut p = Page::new();
+        // A toast with no timeout and no loop: an error.
+        p.toasts
+            .push(ToastSpec::new(ToastKind::Error, "Build failed"), ms(0));
+        let (mut h, mut p) = settled_with(p);
+        for at in [1100, 1200, 5000] {
+            assert_eq!(run(&mut h, &mut p, at).repaint, Repaint::Idle, "{at}");
+        }
+        // With a menu, a flyout and the palette open too.
+        let mut q = Page::new();
+        q.menu_open = true;
+        q.flyout_open = true;
+        let (mut h, mut q) = settled_with(q);
+        assert_eq!(run(&mut h, &mut q, 1100).repaint, Repaint::Idle, "overlays");
+        let mut r = Page::new();
+        r.palette_open = true;
+        let (mut h, mut r) = settled_with(r);
+        assert_eq!(run(&mut h, &mut r, 1100).repaint, Repaint::Idle, "palette");
+    }
+
+    // A dialog holding a combo, with a toast up and a tooltip above: the overlays that open over
+    // the dialog rise above it (C4's Raised layer), the toast takes only its own presses, and Tab
+    // and Escape go to the top.
+
+    const DIALOG: Dialog<'static> = Dialog {
+        title: "Fonts",
+        message: "Pick a font.",
+        extra_h: 80.0,
+        confirm: "Apply",
+        cancel: Cancel::Default,
+    };
+
+    #[derive(Debug)]
+    struct Bed {
+        combo_open: bool,
+        dialog: bool,
+        cancelled: u32,
+        dismissed: u32,
+        toast_actions: Vec<u64>,
+        toasts: Toasts,
+        /// The dialog body's origin, where the combo and the info button sit.
+        origin: (f32, f32),
+    }
+
+    const COMBO_AT: (f32, f32, f32, f32) = (0.0, 0.0, 180.0, 32.0);
+    const INFO_AT: (f32, f32, f32, f32) = (200.0, 0.0, 90.0, 32.0);
+
+    impl Bed {
+        fn rect(&self, (dx, dy, w, h): (f32, f32, f32, f32)) -> Rect {
+            Rect::new(self.origin.0 + dx, self.origin.1 + dy, w, h)
+        }
+    }
+
+    fn bed_frame(h: &mut UiHarness, b: &mut Bed, at: u64) -> Frame {
+        h.at_ms(at);
+        h.frame(|ui: &mut Ui<'_>| {
+            ui.painter().on(LayerId::Page);
+            ui.button("page-button", PAGE_BTN, "Page", ButtonKind::Secondary);
+            if b.dialog {
+                let r = ui.dialog("dialog", &DIALOG, &glass(), |ui: &mut Ui<'_>, x, y, _| {
+                    b.origin = (x, y);
+                    let combo = ui.combo(
+                        "combo",
+                        Rect::new(x, y, 180.0, 32.0),
+                        "RznSans",
+                        &mut b.combo_open,
+                        "Font",
+                    );
+                    let info = ui.button(
+                        "info",
+                        Rect::new(x + 200.0, y, 90.0, 32.0),
+                        "Info",
+                        ButtonKind::Secondary,
+                    );
+                    ui.tooltip(&info, "More about fonts");
+                    if b.combo_open {
+                        let d = ui.dropdown("dropdown", combo.rect, combo.id, &OPTIONS, 0);
+                        if d.picked.is_some() || d.dismissed {
+                            b.combo_open = false;
+                        }
+                        b.dismissed += u32::from(d.dismissed);
+                    }
+                });
+                if r.cancelled {
+                    b.cancelled += 1;
+                    b.dialog = false;
+                }
+            }
+            let t = ui.toasts("toasts", &mut b.toasts);
+            b.toast_actions.extend(t.action.map(|(_, a)| a));
+        })
+    }
+
+    /// The dialog open and settled with a prompt toast up and the combo's list open over it.
+    fn open_bed() -> (UiHarness, Bed) {
+        let mut h = UiHarness::new(WIN);
+        let mut b = Bed {
+            combo_open: false,
+            dialog: true,
+            cancelled: 0,
+            dismissed: 0,
+            toast_actions: Vec::new(),
+            toasts: Toasts::default(),
+            origin: (0.0, 0.0),
+        };
+        b.toasts.push(prompt("Update?"), ms(0));
+        for at in [0, 300, 600, 900, 1200] {
+            bed_frame(&mut h, &mut b, at);
+        }
+        let (x, y) = centre(b.rect(COMBO_AT));
+        h.input.pointer_to(x, y);
+        bed_frame(&mut h, &mut b, 1300);
+        h.input.click(P);
+        bed_frame(&mut h, &mut b, 1310);
+        let mut last = bed_frame(&mut h, &mut b, 1400);
+        for at in [1700, 2000] {
+            last = bed_frame(&mut h, &mut b, at);
+        }
+        assert!(b.combo_open, "the click opened the list");
+        let raised = &last.0.layers[LayerId::Raised as usize];
+        assert!(
+            !raised.geometry.under.is_empty() || !raised.texts.is_empty(),
+            "the list is drawn on the raised layer, over the dialog"
+        );
+        (h, b)
+    }
+
+    fn name_of(out: &FrameOutput) -> Option<String> {
+        out.focused
+            .and_then(|f| out.tree.get(f))
+            .map(|n| n.name.clone())
+    }
+
+    #[test]
+    fn a_press_on_the_toast_works_over_the_open_list_and_a_press_outside_closes_only_the_list() {
+        let (mut h, mut b) = open_bed();
+        let (_, out) = bed_frame(&mut h, &mut b, 2100);
+        let open = by_name(&out, Role::Button, "Open").bounds;
+        let (x, y) = centre(open);
+        h.input.pointer_to(x, y);
+        bed_frame(&mut h, &mut b, 2200);
+        h.input.click(P);
+        bed_frame(&mut h, &mut b, 2210);
+        bed_frame(&mut h, &mut b, 2300);
+        assert_eq!(b.toast_actions, [2], "the toast's action");
+        assert!(
+            b.combo_open,
+            "a press on a toast is no outside press for the list"
+        );
+        assert!(b.dialog && b.cancelled == 0 && b.dismissed == 0);
+
+        // A press on the page, outside the card and the list: the list closes, the dialog stays.
+        h.input.pointer_to(5.0, 5.0);
+        bed_frame(&mut h, &mut b, 2400);
+        h.input.click(P);
+        bed_frame(&mut h, &mut b, 2410);
+        bed_frame(&mut h, &mut b, 2500);
+        assert_eq!(b.dismissed, 1, "the list closed");
+        assert!(!b.combo_open);
+        assert!(b.dialog && b.cancelled == 0, "the dialog stays");
+    }
+
+    #[test]
+    fn tab_over_the_open_list_never_reaches_the_toast_or_the_page() {
+        let (mut h, mut b) = open_bed();
+        let mut at = 2100;
+        for i in 0..12 {
+            at += 100;
+            if i % 4 == 3 {
+                shift_tab(&mut h);
+            } else {
+                key(&mut h, NamedKey::Tab);
+            }
+            let (_, out) = bed_frame(&mut h, &mut b, at);
+            let name = name_of(&out);
+            assert!(
+                !matches!(name.as_deref(), Some("Page" | "Open" | "Later" | "Dismiss")),
+                "press {i}: {name:?}"
+            );
+        }
+        assert!(b.dialog && b.cancelled == 0);
+    }
+
+    #[test]
+    fn escape_closes_the_tooltip_then_the_list_then_the_dialog() {
+        let (mut h, mut b) = open_bed();
+        // Rest on the info button until its tooltip shows (above the list, on the raised layer).
+        let (x, y) = centre(b.rect(INFO_AT));
+        h.input.pointer_to(x, y);
+        let mut shown = false;
+        for at in [2100, 2500, 3000, 3200] {
+            let (_, out) = bed_frame(&mut h, &mut b, at);
+            shown = out.tree.nodes.iter().any(|n| n.role == Role::Tooltip);
+        }
+        assert!(shown, "the tooltip shows after its delay");
+
+        let mut at = 3300;
+        let mut esc = |h: &mut UiHarness, b: &mut Bed| {
+            key(h, NamedKey::Escape);
+            at += 100;
+            let (_, out) = bed_frame(h, b, at);
+            at += 100;
+            bed_frame(h, b, at);
+            out
+        };
+        esc(&mut h, &mut b);
+        let (_, out) = bed_frame(&mut h, &mut b, 3600);
+        assert!(
+            out.tree.nodes.iter().all(|n| n.role != Role::Tooltip),
+            "the tooltip first"
+        );
+        assert!(b.combo_open && b.cancelled == 0 && b.dismissed == 0);
+
+        esc(&mut h, &mut b);
+        assert_eq!((b.dismissed, b.cancelled), (1, 0), "then the list");
+        assert!(!b.combo_open);
+
+        esc(&mut h, &mut b);
+        assert_eq!(b.cancelled, 1, "then the dialog");
+    }
+}

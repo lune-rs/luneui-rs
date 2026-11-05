@@ -19,7 +19,7 @@ use crate::color::{over, premul};
 use crate::motion::{Easing, Kind, Motion, Reduce, Token};
 use crate::paint::{LayerId, Ops, Painter, Rect, Xform};
 use crate::text::{Spec, Style};
-use crate::ui::{OverlayFrame, OverlayOptions, OverlayPhase, Sense, Ui, WidgetId};
+use crate::ui::{DISABLED_ALPHA, OverlayFrame, OverlayOptions, OverlayPhase, Sense, Ui, WidgetId};
 
 /// What the dialog says.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -59,8 +59,6 @@ const FORM_W: f32 = 600.0;
 /// The scrim blur's Gaussian sigma and saturation (the window content behind a Wane dialog).
 const SCRIM_SIGMA: f32 = 8.0;
 const SCRIM_SATURATION: f32 = 1.0;
-/// The opacity a disabled scope draws at (`Ui::with_enabled`'s), for the closing confirm button.
-const DISABLED_ALPHA: f32 = 0.4;
 /// The card's scale at the start of the open and the end of the close.
 const SCALE_FROM: f32 = 0.96;
 /// What the card's scale gains from `SCALE_FROM` to rest.
