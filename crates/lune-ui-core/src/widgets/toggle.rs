@@ -152,7 +152,7 @@ impl Ui<'_> {
     pub fn toggle(&mut self, key: impl Hash, rect: Rect, on: &mut bool, name: &str) -> Response {
         let id = self.id(key);
         let mut r = self.interact(id, hit_rect(rect), Sense::CLICK_FOCUS);
-        if r.enabled && (r.clicked || self.consume_key(id, NamedKey::Space)) {
+        if (r.clicked || self.activation_keys(id, r.enabled, &[NamedKey::Space])) && r.enabled {
             *on = !*on;
             r.mark_changed();
         }

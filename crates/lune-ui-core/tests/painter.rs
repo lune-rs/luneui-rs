@@ -1,7 +1,7 @@
 //! The painter's transform stack, op recorder and faded acrylic records.
 
 use lune_ui_core::paint::{LayerId, Painter, Rect, StrokeStyle, Xform};
-use lune_ui_core::scene::{Acrylic, FrameParams, Scene};
+use lune_ui_core::scene::{Acrylic, BackdropRequest, FrameParams, Scene};
 use lune_ui_core::testing::{DrawCall, FakeText, RecordingRenderer};
 use lune_ui_core::text::{Spec, Style};
 use lune_ui_core::theme::DARK as THEME;
@@ -311,4 +311,151 @@ fn text_queries_forward_to_the_text_system() {
     assert_eq!(lines.len(), 2);
     assert_eq!((lines[1].start, lines[1].end), (3, 5));
     assert_eq!(p.segments("a\u{301}b", Unit::Grapheme), [0, 3, 4]);
+}
+
+fn backdrop_of(f: impl Fn(&mut P<'_>)) -> Option<BackdropRequest> {
+    scene_of(f).backdrop
+}
+
+const LOW: Rect = Rect::new(10.0, 10.0, 40.0, 30.0);
+const HIGH: Rect = Rect::new(60.0, 10.0, 40.0, 30.0);
+
+#[test]
+fn of_two_backdrops_the_lower_layer_keeps_it_in_either_draw_order() {
+    let low_first = backdrop_of(|p| {
+        p.on(LayerId::Popup);
+        p.backdrop(LOW, 4.0);
+        p.on(LayerId::Raised);
+        p.backdrop(HIGH, 4.0);
+    });
+    let high_first = backdrop_of(|p| {
+        p.on(LayerId::Raised);
+        p.backdrop(HIGH, 4.0);
+        p.on(LayerId::Popup);
+        p.backdrop(LOW, 4.0);
+    });
+    let want = LOW.phys(2.0);
+    assert_eq!(low_first.expect("one").rect, want);
+    assert_eq!(low_first, high_first);
+    assert_eq!(low_first.expect("one").layer, LayerId::Popup as usize);
+}
+
+#[test]
+fn on_one_layer_the_last_backdrop_wins() {
+    let b = backdrop_of(|p| {
+        p.on(LayerId::Popup);
+        p.backdrop(LOW, 4.0);
+        p.backdrop(HIGH, 4.0);
+    });
+    assert_eq!(b.expect("one").rect, HIGH.phys(2.0));
+}
+
+#[test]
+fn a_backdrop_carries_the_current_layer_and_its_own_numbers() {
+    for layer in [
+        LayerId::Base,
+        LayerId::Popup,
+        LayerId::Raised,
+        LayerId::Toast,
+    ] {
+        let plain = backdrop_of(|p| {
+            p.on(layer);
+            p.backdrop(LOW, 4.0);
+        })
+        .expect("asked");
+        assert_eq!(plain.layer, layer as usize);
+        assert_eq!((plain.sigma, plain.saturation), (0.0, 0.0), "the frame's");
+    }
+    let own = backdrop_of(|p| p.backdrop_with(LOW, 4.0, 8.0, 1.5)).expect("asked");
+    assert_eq!((own.sigma, own.saturation), (8.0, 1.5));
+}
+
+#[test]
+fn a_replayed_backdrop_is_the_same_request() {
+    let draw = |p: &mut P<'_>| {
+        p.on(LayerId::Raised);
+        p.push_xform(xf((10.0, 10.0), 0.5, 3.0, 0.5));
+        p.backdrop_with(LOW, 4.0, 8.0, 1.5);
+        p.pop_xform();
+    };
+    let mut t1 = FakeText;
+    let mut rec = painter(&mut t1);
+    rec.start_recording();
+    draw(&mut rec);
+    let ops = rec.take_recording();
+    let mut t2 = FakeText;
+    let mut replayed = painter(&mut t2);
+    replayed.replay(&ops);
+    assert!(rec.scene.backdrop.is_some());
+    assert_eq!(rec.scene.backdrop, replayed.scene.backdrop);
+}
+
+/// Where the backdrop falls in the recorded calls: the layers drawn before it and after it.
+fn around_backdrop(scene: &Scene) -> (Vec<usize>, Vec<usize>) {
+    let mut rec = RecordingRenderer::new();
+    rec.render(scene, &FrameParams::default());
+    let calls = &rec.last().expect("one frame").calls;
+    let at = calls
+        .iter()
+        .position(|c| matches!(c, DrawCall::Backdrop(_)))
+        .unwrap_or(calls.len());
+    let layers = |c: &[DrawCall]| {
+        let mut l: Vec<usize> = c.iter().filter_map(DrawCall::layer).collect();
+        l.dedup();
+        l
+    };
+    (layers(&calls[..at]), layers(&calls[at..]))
+}
+
+fn every_layer(p: &mut P<'_>) {
+    let layers = [
+        LayerId::Base,
+        LayerId::Page,
+        LayerId::Popup,
+        LayerId::Modal,
+        LayerId::Raised,
+        LayerId::Toast,
+    ];
+    for l in layers {
+        p.on(l);
+        p.fill(LOW, 0.0, THEME.fg_primary);
+    }
+}
+
+#[test]
+fn the_recording_renderer_puts_the_backdrop_at_the_split() {
+    let at = |layer: LayerId| {
+        around_backdrop(&scene_of(|p| {
+            every_layer(p);
+            p.on(layer);
+            p.backdrop(LOW, 4.0);
+        }))
+    };
+    assert_eq!(at(LayerId::Base), (vec![0, 1], vec![2, 3, 4, 5]));
+    assert_eq!(at(LayerId::Popup), (vec![0, 1], vec![2, 3, 4, 5]));
+    assert_eq!(at(LayerId::Modal), (vec![0, 1, 2], vec![3, 4, 5]));
+    assert_eq!(at(LayerId::Raised), (vec![0, 1, 2, 3], vec![4, 5]));
+}
+
+#[test]
+fn acrylic_radii_keeps_each_corner_and_acrylic_is_the_even_case() {
+    let radii = [8.0, 0.0, 2.0, 0.0];
+    let colour = [0.1, 0.2, 0.3, 1.0];
+    let scene = scene_of(|p| {
+        p.acrylic_radii(LOW, radii, colour, [0.0; 4], true);
+        p.acrylic(LOW, 5.0, colour, [0.0; 4], true);
+    });
+    let a = &scene.layers[0].geometry.acrylic;
+    assert_eq!(a[0].shape.radii, radii.map(|r| r * 2.0), "scale 2");
+    assert_eq!(a[1].shape.radii, [10.0; 4]);
+
+    let mut t1 = FakeText;
+    let mut rec = painter(&mut t1);
+    rec.start_recording();
+    rec.acrylic_radii(LOW, radii, colour, [0.0; 4], true);
+    let ops = rec.take_recording();
+    let mut t2 = FakeText;
+    let mut replayed = painter(&mut t2);
+    replayed.replay(&ops);
+    assert_eq!(rec.scene, replayed.scene);
 }

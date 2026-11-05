@@ -217,6 +217,8 @@ pub struct Node {
     pub states: States,
     pub actions: Actions,
     pub sort: Option<Sort>,
+    /// The depth in a hierarchy, 1 at its top (a tree item's level); `None` outside one.
+    pub level: Option<u32>,
 }
 
 impl Node {
@@ -237,6 +239,7 @@ impl Node {
             states: States::default(),
             actions: Actions::default(),
             sort: None,
+            level: None,
         }
     }
 }
@@ -319,6 +322,7 @@ mod tests {
             states,
             actions,
             sort: None,
+            level: None,
         }
     }
 

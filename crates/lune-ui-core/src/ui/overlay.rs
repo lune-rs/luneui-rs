@@ -91,6 +91,19 @@ impl std::fmt::Debug for OverlayRec {
     }
 }
 
+/// The layer of an overlay opening with `tag` that asks for `requested`: [`LayerId::Raised`] for a
+/// popup or a modal above an active modal, else `requested`.
+fn open_layer(overlays: &[OverlayRec], requested: LayerId, tag: u32) -> LayerId {
+    let above_modal = overlays
+        .iter()
+        .any(|o| o.tag < tag && o.active() && o.opts.modal);
+    if above_modal && matches!(requested, LayerId::Popup | LayerId::Modal) {
+        LayerId::Raised
+    } else {
+        requested
+    }
+}
+
 /// `r` unless the motion is absent or takes no time.
 fn usable(r: Option<Resolved>) -> Option<Resolved> {
     r.filter(|r| !r.duration.is_zero())
@@ -211,6 +224,11 @@ impl<'a> Ui<'a> {
     /// it from where its close got to), runs `content` on `options.layer` with its hits tagged to
     /// the overlay and its own focus scope, and keeps `exit` to draw its closing frames once the
     /// app stops calling it. `exit` gets the linear close progress and `transforms`.
+    ///
+    /// A `Popup` or `Modal` overlay opened above an active modal draws on [`LayerId::Raised`]
+    /// instead. That is settled at open or reopen and holds until it closes, whatever later frames
+    /// pass as `layer`, so the overlay draws, hits and exits on one layer. What `content` draws is
+    /// the overlay's alone: a surrounding [`Self::record`] does not get it.
     pub fn overlay<R>(
         &mut self,
         key: impl std::hash::Hash,
@@ -228,10 +246,11 @@ impl<'a> Ui<'a> {
                 // Base content is tag 0; overlays count up from 1 in open order.
                 let tag = self.store.next_tag.saturating_add(1).min(SUPPRESSED - 1);
                 self.store.next_tag = tag;
+                let layer = open_layer(&self.store.overlays, options.layer, tag);
                 self.store.overlays.push(OverlayRec {
                     id,
                     tag,
-                    opts: *options,
+                    opts: OverlayOptions { layer, ..*options },
                     phase: RecPhase::Opening {
                         start: now,
                         p0: 0.0,
@@ -244,13 +263,20 @@ impl<'a> Ui<'a> {
                 self.store.overlays.len() - 1
             }
         };
+        let reopened = !self.store.overlays[index].active();
+        let layer = if reopened {
+            let tag = self.store.overlays[index].tag;
+            open_layer(&self.store.overlays, options.layer, tag)
+        } else {
+            self.store.overlays[index].opts.layer
+        };
         let rec = &mut self.store.overlays[index];
-        if !rec.active() {
+        if reopened {
             rec.reopen(now, &tokens, tier);
             rec.saved_focus = focused;
             self.opened.push(id);
         }
-        rec.opts = *options;
+        rec.opts = OverlayOptions { layer, ..*options };
         rec.exit = Some(Box::new(exit));
         rec.called = true;
         let tag = rec.tag;
@@ -262,11 +288,13 @@ impl<'a> Ui<'a> {
             transforms,
         };
         let saved = self.painter.save_state();
-        self.painter.enter(options.layer, tag);
+        self.painter.enter(layer, tag);
         let first_hit = self.painter.hits.len();
         // Scopes opened by the caller are outside the overlay for `Scope::Within`.
         let floor = std::mem::replace(&mut self.scope_floor, self.scopes.len());
+        let paused = self.painter.pause_recording();
         let r = content(self, &frame);
+        self.painter.resume_recording(paused);
         self.scope_floor = floor;
         self.painter.restore_state(saved);
         if self.opened.contains(&id) {
@@ -276,7 +304,8 @@ impl<'a> Ui<'a> {
     }
 
     /// Runs `f` and returns what it drew as owned painter calls, for an exit painter to replay.
-    /// Nests: inside another `record` the outer recording also gets what `f` drew.
+    /// Nests: inside another `record` the outer recording also gets what `f` drew. An overlay
+    /// opened in `f` is not part of it: it exits through its own painter.
     pub fn record<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> (R, crate::paint::Ops) {
         let outer = self.painter.nest_recording();
         let r = f(self);

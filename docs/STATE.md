@@ -1,9 +1,18 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-05 (M6 merged to main at a75a708; M7 detail plan next)
+Last updated: 2026-11-05 (M7 in progress: step 1, overlay plumbing, done)
 
 ## Now
+
+M7 (overlays and containers) is in progress on `orch/toolkit-v1`. Step 1 (plumbing) is done: a sixth layer
+`LayerId::Raised` (`Toast` is 5 now, `LAYER_COUNT` 6), chosen once in `Ui::overlay` when a popup or modal opens above
+an active modal and held to its close, so no widget changed; overlay content is out of any enclosing `record`; a
+`BackdropRequest` carries `layer`, `sigma` and `saturation`, the offscreen split follows it (`Scene::split`), of two
+requests the lower layer keeps it, and `Painter::backdrop_with` sets the numbers; `Painter::acrylic_radii`; `Node.level`;
+`Ui::node` marks every node in a disabled scope; `Ui::activation_keys` consumes before it gates (button, toolbar label,
+checkbox, toggle, radio group); `icon_button_sensed`; `testing::disabled_violations`. No drawing changed. Next: step 2,
+the scaffolding, then the three tracks.
 
 M6 (widgets) is merged to main at a75a708 (14 steps, review passed in 3 rounds): roving focus (`Sense.skip_tab`,
 `Sense::CLICK_ROVE`, `RoveAxis`, `Ui::rove_stop`, `rove_keys`, `rove_focus`), `text::elide` and `Painter::elide`,
@@ -37,8 +46,8 @@ still has no dependency). The gallery has a page registry (two legacy pages, 48 
 
 ## Carried limits
 
-- An overlay above a modal is unsupported: a popover or tooltip inside a dialog draws under it, and so does
-  a combo inside one (flagged to M7, with the menu's node name).
+- Overlays above a modal go one level deep: those stacked further share `Raised`, so a third level that overlaps its
+  parent interleaves (fills under text). One blur per frame: a glass menu over a blurred scrim has none of its own.
 - Text cannot be cut by a rounded clip (it gets the clip's bounding rect): M7's page and panel keep text out of the
   corners. Text draws above every fill of its layer, so labels show through a sliding tab during `dnd-slide`
   and `dnd-settle`.
@@ -54,9 +63,7 @@ still has no dependency). The gallery has a page registry (two legacy pages, 48 
   and the slider in window mode is not testable with scripted input.
 
 - Review nits left open (M6 `review.md`): `toolbar_label` repeats `button_inner_colored` (F2); colour helpers exist twice
-  (F3); a per-frame `to_owned` of a tab name (F4); a press held across a disabled frame activates a tab twice (F7);
-  a disabled `Ui::button` does not consume Enter or Space, so they reach the shortcuts (F8, on every button); no test
-  holds that a disabled strip consumes the arrows, Home and End (F9).
+  (F3); a per-frame `to_owned` of a tab name (F4); a press held across a disabled frame activates a tab twice (F7).
 
 ## Unverified here
 
@@ -66,14 +73,13 @@ still has no dependency). The gallery has a page registry (two legacy pages, 48 
 
 ## Next
 
-1. M7 (page, panel, flyout, toast, command palette), which uses `stat`, `kv_list`, `progress` and the roving rule.
+1. M7 steps 2 to 15 (`m07-overlays/plan.md`): scaffolding, then tracks A, B and C, two visual batches, close.
 2. CI (fmt, clippy `-D warnings`, tests on macOS, Windows and Linux) now that there is code to run.
 3. An export script for Luneterm's vendored snapshot, before Luneterm M9. The migration
    map for M11 is "API changes since M1" in `docs/architecture.md`.
 
 ## Blockers / open questions
 
-- None. D74's deferral (button variants and the radio) was paid in M6 (D116, D120). Nested popups above a modal are
-  listed under the carried limits.
+- None. D74's deferral (button variants and the radio) was paid in M6 (D116, D120).
 - Wane's OS behaviours (close-to-tray, single instance, autostart, notifications) are assumed
   app-side and documented (answer 2026-11-03, reversible).

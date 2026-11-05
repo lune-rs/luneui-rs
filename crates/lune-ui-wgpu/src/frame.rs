@@ -14,7 +14,7 @@ use crate::blur::Blur;
 use crate::custom::{CustomDraw, CustomFrame, CustomItem};
 use crate::gpu::{Globals, Gpu};
 use crate::text_cache::TextCache;
-use lune_ui_core::scene::{LAYER_COUNT, SCENE_LAYERS, Scene};
+use lune_ui_core::scene::{LAYER_COUNT, Scene};
 
 pub use lune_ui_core::scene::FrameParams;
 
@@ -98,9 +98,9 @@ impl FrameRenderer {
         &self.blur
     }
 
-    /// Draws one painted `scene` into `target`: the scene layers go to the offscreen scene,
-    /// which is blitted to `target` (blurred under the backdrop request if one is set), then the
-    /// popup layers are drawn over it.
+    /// Draws one painted `scene` into `target`: the layers below [`Scene::split`] go to the
+    /// offscreen scene, which is blitted to `target` (blurred under the backdrop request if one is
+    /// set), then the remaining layers are drawn over it.
     pub fn draw(
         &mut self,
         gpu: &mut Gpu,
@@ -134,6 +134,7 @@ impl FrameRenderer {
         }
         let layers = &scene.layers;
         let backdrop = scene.backdrop;
+        let split = scene.split();
         if let Some(bad) = layers
             .iter()
             .flat_map(|l| &l.customs)
@@ -154,9 +155,12 @@ impl FrameRenderer {
         let FrameParams {
             size,
             scale: s,
-            blur_sigma: sigma,
+            blur_sigma,
             saturation,
         } = params;
+        // A request's own numbers win; 0 means the frame's.
+        let own = |v: f32, frame: f32| if v > 0.0 { v } else { frame };
+        let sigma = backdrop.map_or(blur_sigma, |b| own(b.sigma, blur_sigma));
         // Disjoint borrows: the format's atlas and the rasterizer cache are the only shared state
         // this draw writes.
         let Gpu {
@@ -240,7 +244,7 @@ impl FrameRenderer {
         pass_desc(
             scene_view,
             &mut |pass| {
-                for (i, layer) in layers.iter().enumerate().take(SCENE_LAYERS) {
+                for (i, layer) in layers.iter().enumerate().take(split) {
                     fs.draw_below_text(pass, globals, &uploaded, i);
                     draw_customs(pass, &layer.customs, customs, &custom_frame);
                     fs.draw_images(pass, globals, &uploaded, i);
@@ -254,7 +258,8 @@ impl FrameRenderer {
             &mut encoder,
         )?;
         if let Some(b) = backdrop {
-            self.blur.set_backdrop(&gpu.queue, b, saturation);
+            self.blur
+                .set_backdrop(&gpu.queue, b, own(b.saturation, saturation));
             self.blur.run(&mut encoder, &fs.blur);
         }
         pass_desc(
@@ -264,7 +269,7 @@ impl FrameRenderer {
                 if backdrop.is_some() {
                     self.blur.draw_backdrop(pass, &fs.blur);
                 }
-                for (i, layer) in layers.iter().enumerate().skip(SCENE_LAYERS) {
+                for (i, layer) in layers.iter().enumerate().skip(split) {
                     fs.draw_below_text(pass, globals, &uploaded, i);
                     draw_customs(pass, &layer.customs, customs, &custom_frame);
                     fs.draw_images(pass, globals, &uploaded, i);

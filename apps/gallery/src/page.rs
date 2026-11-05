@@ -543,6 +543,7 @@ mod tests {
                 states: States::default(),
                 actions: Actions::default(),
                 sort: None,
+                level: None,
             });
             let tint = ui.animate_f32(a, f32::from(ra.hovered as u8), &Motion::of(Kind::Hover));
             let p = ui.painter();

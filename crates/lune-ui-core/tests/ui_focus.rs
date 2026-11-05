@@ -744,6 +744,7 @@ fn labelled(ui: &mut Ui<'_>, id: WidgetId, at: Rect) {
         states,
         actions: Actions::default(),
         sort: None,
+        level: None,
     });
 }
 

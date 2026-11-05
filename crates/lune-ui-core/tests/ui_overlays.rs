@@ -1,19 +1,24 @@
 //! The overlay stack (C4): modal capture, Escape and outside-press dismissal on the top overlay,
-//! phases, exit retention per tier through the exit painter, reopening a closing overlay, and
-//! replaying recorded content.
+//! phases, exit retention per tier through the exit painter, reopening a closing overlay,
+//! replaying recorded content, and overlays above a modal: the `Raised` layer, chosen at open.
 
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
-use lune_ui_core::input::{Key, NamedKey, PointerButton, Repaint};
+use lune_ui_core::access::Role;
+use lune_ui_core::input::{FrameOutput, Key, NamedKey, PointerButton, Repaint};
 use lune_ui_core::motion::{Easing, Kind, Motion, MotionTier, Reduce, Token};
 use lune_ui_core::paint::{LayerId, Rect};
 use lune_ui_core::scene::Scene;
 use lune_ui_core::testing::UiHarness;
 use lune_ui_core::ui::{
-    Dismissal, OverlayFrame, OverlayOptions, OverlayPhase, Response, Sense, Ui,
+    Dismissal, OverlayFrame, OverlayOptions, OverlayPhase, Response, Sense, Ui, WidgetId,
 };
+use lune_ui_core::widgets::button::ButtonKind;
+use lune_ui_core::widgets::dialog::{Cancel, Dialog, DialogGlass};
+use lune_ui_core::widgets::menu::MenuRow;
+use lune_ui_core::widgets::popover::PopoverOptions;
 
 const P: PointerButton = PointerButton::Primary;
 const PAGE_BTN: Rect = Rect::new(10.0, 10.0, 80.0, 30.0);
@@ -500,4 +505,651 @@ fn a_nested_record_keeps_the_outer_recording_whole() {
         assert_eq!(inner.len(), 1);
         assert_eq!(outer.len(), 3);
     });
+}
+
+// Overlays above a modal: real widgets inside a real dialog's body.
+
+const WIN: (f32, f32) = (800.0, 600.0);
+const GLASS: DialogGlass = DialogGlass {
+    panel: [0.1, 0.1, 0.12, 1.0],
+    fill: [0.2, 0.2, 0.2, 0.62],
+    noise: false,
+};
+const DIALOG: Dialog<'static> = Dialog {
+    title: "Title",
+    message: "Message",
+    extra_h: 220.0,
+    confirm: "Yes",
+    cancel: Cancel::Default,
+};
+const PAGE: Rect = Rect::new(20.0, 20.0, 100.0, 30.0);
+/// A point on the scrim, off the card and off the page button.
+const ON_SCRIM: (f32, f32) = (40.0, 400.0);
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Child {
+    Dropdown,
+    Popover,
+    Menu,
+}
+
+const CHILDREN: [Child; 3] = [Child::Dropdown, Child::Popover, Child::Menu];
+
+/// A page button, a dialog, and in its body an anchor, a button under where the child opens, one
+/// off to the side, and the child with an item named "two".
+#[derive(Debug)]
+struct Bed {
+    kind: Child,
+    dialog: bool,
+    child: bool,
+    page_clicks: u32,
+    under_clicks: u32,
+    side_clicks: u32,
+    picked: u32,
+    cancelled: u32,
+    anchor: Option<WidgetId>,
+    side: Rect,
+    under: Rect,
+}
+
+impl Bed {
+    fn of(kind: Child) -> Self {
+        Self {
+            kind,
+            dialog: false,
+            child: false,
+            page_clicks: 0,
+            under_clicks: 0,
+            side_clicks: 0,
+            picked: 0,
+            cancelled: 0,
+            anchor: None,
+            side: Rect::default(),
+            under: Rect::default(),
+        }
+    }
+
+    fn body(&mut self, ui: &mut Ui<'_>, x: f32, y: f32) {
+        let open = ui.button(
+            "anchor",
+            Rect::new(x, y, 120.0, 24.0),
+            "open",
+            ButtonKind::Secondary,
+        );
+        self.child |= open.clicked;
+        self.anchor = Some(open.id);
+        self.under = Rect::new(x, y + 30.0, 300.0, 120.0);
+        self.side = Rect::new(x, y + 170.0, 80.0, 24.0);
+        let under = ui.button("under", self.under, "under", ButtonKind::Secondary);
+        self.under_clicks += u32::from(under.clicked);
+        let side = ui.button("side", self.side, "side", ButtonKind::Secondary);
+        self.side_clicks += u32::from(side.clicked);
+        if self.child {
+            self.draw_child(ui, &open, (x, y + 30.0));
+        }
+    }
+
+    fn draw_child(&mut self, ui: &mut Ui<'_>, anchor: &Response, at: (f32, f32)) {
+        let (picked, dismissed) = match self.kind {
+            Child::Dropdown => {
+                let rows = [("one", true), ("two", true)];
+                let r = ui.dropdown("child", anchor.rect, anchor.id, &rows, 0);
+                (r.picked == Some(1), r.dismissed)
+            }
+            Child::Popover => {
+                let options = PopoverOptions {
+                    anchor_id: Some(anchor.id),
+                    ..PopoverOptions::new(anchor.rect, (200.0, 90.0))
+                };
+                let (frame, _, two) = ui.popover("child", &options, |ui, rect| {
+                    let at = Rect::new(rect.x + 8.0, rect.y + 8.0, 100.0, 24.0);
+                    ui.button("two", at, "two", ButtonKind::Secondary)
+                });
+                (two.clicked, frame.dismissed.is_some())
+            }
+            Child::Menu => {
+                let item = |text| MenuRow::Item {
+                    glyph: None,
+                    text,
+                    shortcut: "",
+                };
+                let r = ui.menu("child", &[item("one"), item("two")], at);
+                (r.picked == Some(1), r.dismissed)
+            }
+        };
+        self.picked += u32::from(picked);
+        self.child &= !dismissed;
+    }
+}
+
+fn bed_frame(h: &mut UiHarness, b: &mut Bed) -> (Scene, FrameOutput) {
+    h.frame(|ui| {
+        ui.painter().on(LayerId::Page);
+        let page = ui.button("page", PAGE, "page", ButtonKind::Secondary);
+        b.page_clicks += u32::from(page.clicked);
+        if b.dialog {
+            let r = ui.dialog("dialog", &DIALOG, &GLASS, |ui, x, y, _| b.body(ui, x, y));
+            if r.cancelled {
+                b.cancelled += 1;
+                b.dialog = false;
+            }
+        }
+    })
+}
+
+/// A settled open dialog, focus on the page button when it opened.
+fn bed(kind: Child) -> (UiHarness, Bed) {
+    let mut h = UiHarness::new(WIN);
+    let mut b = Bed::of(kind);
+    h.at_ms(0);
+    bed_frame(&mut h, &mut b);
+    h.input.key_down(Key::Named(NamedKey::Tab), None);
+    let (_, out) = bed_frame(&mut h, &mut b);
+    assert_eq!(out.focused, Some(page_id()));
+    b.dialog = true;
+    bed_frame(&mut h, &mut b);
+    settle(&mut h, &mut b, 1_000);
+    (h, b)
+}
+
+fn page_id() -> WidgetId {
+    WidgetId::ROOT.with("page")
+}
+
+/// Two frames, the second at `ms`: everything moving at that time is done.
+fn settle(h: &mut UiHarness, b: &mut Bed, ms: u64) {
+    h.at_ms(ms);
+    bed_frame(h, b);
+    bed_frame(h, b);
+}
+
+/// The child open and settled, opened with a click on the anchor, as a user does.
+fn open_child(kind: Child) -> (UiHarness, Bed, FrameOutput) {
+    let (mut h, mut b) = bed(kind);
+    bed_frame(&mut h, &mut b);
+    let r = b.under;
+    h.input.pointer_to(r.x + 20.0, r.y - 20.0).click(P);
+    bed_frame(&mut h, &mut b);
+    assert!(b.child, "{kind:?}: the click on the anchor opens it");
+    h.input.pointer_to(ON_SCRIM.0, ON_SCRIM.1);
+    settle(&mut h, &mut b, 2_000);
+    let (_, out) = bed_frame(&mut h, &mut b);
+    (h, b, out)
+}
+
+fn has_content(scene: &Scene, layer: LayerId) -> bool {
+    let l = &scene.layers[layer as usize];
+    !(l.texts.is_empty() && l.geometry.under.is_empty() && l.geometry.acrylic.is_empty())
+}
+
+/// How much each kind of draw `layer` holds.
+fn counts(scene: &Scene, layer: LayerId) -> (usize, usize, usize, usize) {
+    let l = &scene.layers[layer as usize];
+    let g = &l.geometry;
+    (g.acrylic.len(), g.under.len(), g.over.len(), l.texts.len())
+}
+
+fn centre(out: &FrameOutput, name: &str) -> (f32, f32) {
+    let r = out
+        .tree
+        .nodes
+        .iter()
+        .find(|n| n.name == name)
+        .unwrap_or_else(|| panic!("a node named {name}"))
+        .bounds;
+    (r.x + r.w / 2.0, r.y + r.h / 2.0)
+}
+
+#[test]
+fn a_child_of_a_dialog_draws_on_raised_on_its_first_frames() {
+    for kind in CHILDREN {
+        let (mut h, mut b) = bed(kind);
+        let (rest, _) = bed_frame(&mut h, &mut b);
+        b.child = true;
+        for frame in 1..=2 {
+            let (scene, _) = bed_frame(&mut h, &mut b);
+            let at = format!("{kind:?}, frame {frame}");
+            assert!(has_content(&scene, LayerId::Raised), "{at}: on Raised");
+            assert!(!has_content(&scene, LayerId::Popup), "{at}: not on Popup");
+            assert_eq!(
+                counts(&scene, LayerId::Modal),
+                counts(&rest, LayerId::Modal),
+                "{at}: the dialog's layer holds the dialog alone"
+            );
+        }
+    }
+}
+
+#[test]
+fn a_tooltip_in_a_dialog_is_on_raised_from_its_first_frame() {
+    let (mut h, mut b) = bed(Child::Dropdown);
+    let tip = |h: &mut UiHarness, ms: u64| {
+        h.at_ms(ms);
+        h.frame(|ui| {
+            ui.dialog("dialog", &DIALOG, &GLASS, |ui, x, y, _| {
+                let at = Rect::new(x, y, 120.0, 24.0);
+                let r = ui.button("anchor", at, "open", ButtonKind::Secondary);
+                ui.tooltip(&r, "hint");
+            });
+        })
+        .0
+    };
+    let (scene, out) = bed_frame(&mut h, &mut b);
+    assert!(!has_content(&scene, LayerId::Raised));
+    let (x, y) = centre(&out, "open");
+    h.input.pointer_to(x, y);
+    tip(&mut h, 3_000);
+    tip(&mut h, 3_016);
+    let rest = counts(&tip(&mut h, 3_032), LayerId::Modal);
+    let first = tip(&mut h, 4_000);
+    let second = tip(&mut h, 4_016);
+    for (i, scene) in [first, second].iter().enumerate() {
+        assert!(has_content(scene, LayerId::Raised), "frame {}", i + 1);
+        assert!(!has_content(scene, LayerId::Popup), "frame {}", i + 1);
+        assert_eq!(counts(scene, LayerId::Modal), rest, "frame {}", i + 1);
+    }
+}
+
+#[test]
+fn a_press_inside_the_child_reaches_it_and_nothing_under_it() {
+    for kind in CHILDREN {
+        let (mut h, mut b, out) = open_child(kind);
+        let (x, y) = centre(&out, "two");
+        assert!(b.under.contains((x, y)), "{kind:?}: the button is under it");
+        h.input.pointer_to(x, y);
+        bed_frame(&mut h, &mut b);
+        h.input.click(P);
+        bed_frame(&mut h, &mut b);
+        assert_eq!(b.picked, 1, "{kind:?}");
+        assert_eq!(b.under_clicks + b.cancelled + b.page_clicks, 0, "{kind:?}");
+    }
+}
+
+#[test]
+fn a_press_on_the_card_outside_the_child_dismisses_it_only() {
+    for kind in CHILDREN {
+        let (mut h, mut b, _) = open_child(kind);
+        let r = b.side;
+        h.input.pointer_to(r.x + 10.0, r.y + 10.0);
+        bed_frame(&mut h, &mut b);
+        h.input.click(P);
+        bed_frame(&mut h, &mut b);
+        bed_frame(&mut h, &mut b);
+        assert!(!b.child, "{kind:?}: dismissed");
+        assert!(b.dialog, "{kind:?}: the dialog stays");
+        assert_eq!(b.side_clicks + b.picked + b.page_clicks, 0, "{kind:?}");
+    }
+}
+
+#[test]
+fn a_press_on_the_scrim_dismisses_the_child_only() {
+    for kind in CHILDREN {
+        let (mut h, mut b, _) = open_child(kind);
+        h.input.click(P);
+        bed_frame(&mut h, &mut b);
+        bed_frame(&mut h, &mut b);
+        assert!(!b.child, "{kind:?}: dismissed");
+        assert!(b.dialog && b.cancelled == 0, "{kind:?}: the dialog stays");
+    }
+}
+
+#[test]
+fn escape_closes_the_child_then_cancels_the_dialog_and_focus_walks_back() {
+    for kind in CHILDREN {
+        let (mut h, mut b, out) = open_child(kind);
+        let anchor = b.anchor.expect("drawn");
+        assert_ne!(out.focused, Some(anchor), "{kind:?}: the child has focus");
+
+        h.input.key_down(Key::Named(NamedKey::Escape), None);
+        bed_frame(&mut h, &mut b);
+        assert!(
+            !b.child && b.dialog,
+            "{kind:?}: the first Escape is the child's"
+        );
+        let (_, out) = bed_frame(&mut h, &mut b);
+        assert_eq!(out.focused, Some(anchor), "{kind:?}: back to the anchor");
+
+        h.input.key_down(Key::Named(NamedKey::Escape), None);
+        bed_frame(&mut h, &mut b);
+        assert_eq!(
+            b.cancelled, 1,
+            "{kind:?}: the second Escape is the dialog's"
+        );
+        let (_, out) = bed_frame(&mut h, &mut b);
+        assert_eq!(out.focused, Some(page_id()), "{kind:?}: back to the page");
+    }
+}
+
+#[test]
+fn tab_never_reaches_the_page_from_a_child_of_a_dialog() {
+    for kind in CHILDREN {
+        let (mut h, mut b, _) = open_child(kind);
+        for _ in 0..8 {
+            h.input.key_down(Key::Named(NamedKey::Tab), None);
+            let (_, out) = bed_frame(&mut h, &mut b);
+            assert!(out.focused.is_some(), "{kind:?}");
+            assert_ne!(out.focused, Some(page_id()), "{kind:?}");
+        }
+    }
+}
+
+/// An overlay under `key` with `opts`, whose content fills `MENU` and whose exit does too.
+fn marked(ui: &mut Ui<'_>, key: &str, opts: &OverlayOptions) -> Response {
+    ui.overlay(
+        key,
+        opts,
+        |p, _, _| p.fill(MENU, 0.0, [1, 2, 3, 255]),
+        |ui, _| {
+            ui.painter().fill(MENU, 0.0, [1, 2, 3, 255]);
+            let id = ui.id((key, "hit"));
+            ui.interact(id, MENU, Sense::CLICK_FOCUS)
+        },
+    )
+    .1
+}
+
+fn fills(scene: &Scene, layer: LayerId) -> usize {
+    scene.layers[layer as usize]
+        .geometry
+        .under
+        .iter()
+        .filter(|s| s.rect == MENU.phys(1.0))
+        .count()
+}
+
+#[test]
+fn an_overlay_opened_before_the_modal_stays_on_popup() {
+    let mut h = harness();
+    h.frame(|ui| {
+        marked(ui, "early", &popup());
+    });
+    for _ in 0..3 {
+        let (scene, _) = h.frame(|ui| {
+            marked(ui, "early", &popup());
+            dialog(ui, "dialog", &modal());
+        });
+        assert_eq!(fills(&scene, LayerId::Popup), 1);
+        assert_eq!(fills(&scene, LayerId::Raised), 0);
+    }
+}
+
+#[test]
+fn without_a_modal_every_overlay_is_on_the_layer_it_asks_for() {
+    let mut h = harness();
+    for layer in [LayerId::Popup, LayerId::Modal, LayerId::Toast] {
+        let opts = OverlayOptions { layer, ..popup() };
+        for _ in 0..2 {
+            let (scene, _) = h.frame(|ui| {
+                marked(ui, "overlay", &opts);
+            });
+            assert_eq!(fills(&scene, layer), 1, "{layer:?}");
+        }
+        h.at_ms(10_000 * (layer as u64 + 1));
+        h.frame(|_| {});
+        h.frame(|_| {});
+    }
+}
+
+#[test]
+fn a_toast_layer_overlay_above_a_modal_is_not_raised() {
+    let mut h = harness();
+    let opts = OverlayOptions {
+        layer: LayerId::Toast,
+        ..popup()
+    };
+    let (scene, _) = h.frame(|ui| {
+        dialog(ui, "dialog", &modal());
+        marked(ui, "toast", &opts);
+    });
+    assert_eq!(fills(&scene, LayerId::Toast), 1);
+}
+
+#[test]
+fn the_layer_holds_whatever_later_frames_ask_for() {
+    let mut h = harness();
+    h.frame(|ui| {
+        marked(ui, "overlay", &popup());
+    });
+    let opts = OverlayOptions {
+        layer: LayerId::Modal,
+        ..popup()
+    };
+    let (scene, _) = h.frame(|ui| {
+        marked(ui, "overlay", &opts);
+    });
+    assert_eq!(fills(&scene, LayerId::Popup), 1);
+    assert_eq!(fills(&scene, LayerId::Modal), 0);
+}
+
+#[derive(Debug, Default)]
+struct Nested {
+    lower_clicks: u32,
+    lower_ended: bool,
+    upper_confirmed: u32,
+    upper_cancelled: u32,
+    lower_body: Rect,
+}
+
+fn nested_frame(h: &mut UiHarness, n: &mut Nested) -> (Scene, FrameOutput) {
+    h.frame(|ui| {
+        let r = ui.dialog("lower", &DIALOG, &GLASS, |ui, x, y, _| {
+            n.lower_body = Rect::new(x, y, 300.0, 200.0);
+            let b = ui.button("b", n.lower_body, "b", ButtonKind::Secondary);
+            n.lower_clicks += u32::from(b.clicked);
+            let r = ui.dialog("upper", &DIALOG, &GLASS, |_, _, _, _| {});
+            n.upper_confirmed += u32::from(r.confirmed);
+            n.upper_cancelled += u32::from(r.cancelled);
+        });
+        n.lower_ended |= r.confirmed || r.cancelled;
+    })
+}
+
+#[test]
+fn a_dialog_over_a_dialog_is_raised_takes_input_and_the_first_gets_none() {
+    let mut h = UiHarness::new(WIN);
+    let mut n = Nested::default();
+    nested_frame(&mut h, &mut n);
+    h.at_ms(1_000);
+    nested_frame(&mut h, &mut n);
+    let (scene, out) = nested_frame(&mut h, &mut n);
+    assert!(has_content(&scene, LayerId::Raised));
+    let dialogs = out.tree.nodes.iter().filter(|d| d.role == Role::Dialog);
+    assert_eq!(dialogs.count(), 2);
+
+    // The upper confirm takes the press, though the lower card lies under it.
+    let yes = out
+        .tree
+        .nodes
+        .iter()
+        .rfind(|d| d.name == "Yes")
+        .expect("upper confirm")
+        .bounds;
+    h.input.pointer_to(yes.x + 4.0, yes.y + 4.0);
+    nested_frame(&mut h, &mut n);
+    h.input.click(P);
+    nested_frame(&mut h, &mut n);
+    assert_eq!((n.upper_confirmed, n.upper_cancelled), (1, 0));
+    assert!(!n.lower_ended);
+
+    // A press on the lower dialog's body lands on the upper card and goes no further.
+    let body = n.lower_body;
+    h.input.pointer_to(body.x + 150.0, body.y + 100.0);
+    nested_frame(&mut h, &mut n);
+    h.input.click(P);
+    nested_frame(&mut h, &mut n);
+    assert_eq!(n.lower_clicks, 0, "the first dialog gets no input");
+    h.input.key_down(Key::Named(NamedKey::Escape), None);
+    nested_frame(&mut h, &mut n);
+    assert_eq!(n.upper_cancelled, 1, "Escape is the upper dialog's");
+    assert!(!n.lower_ended);
+}
+
+#[test]
+fn a_parent_closing_first_leaves_the_child_raised_until_it_closes() {
+    let mut h = harness();
+    let (scene, _) = h.frame(|ui| {
+        dialog(ui, "dialog", &modal());
+        marked(ui, "child", &popup());
+    });
+    assert_eq!(fills(&scene, LayerId::Raised), 1);
+    for ms in [10, 1_000, 2_000] {
+        h.at_ms(ms);
+        let (scene, _) = h.frame(|ui| {
+            marked(ui, "child", &popup());
+        });
+        assert_eq!(fills(&scene, LayerId::Raised), 1, "held at {ms} ms");
+        assert_eq!(fills(&scene, LayerId::Popup), 0);
+    }
+    h.at_ms(2_010);
+    let (scene, _) = h.frame(|_| {});
+    assert_eq!(
+        fills(&scene, LayerId::Raised),
+        1,
+        "its exit is on Raised too"
+    );
+    assert_eq!(fills(&scene, LayerId::Popup), 0);
+}
+
+#[test]
+fn a_child_reopening_after_its_parent_closed_is_on_popup() {
+    let mut h = harness();
+    h.frame(|ui| {
+        dialog(ui, "dialog", &modal());
+        marked(ui, "child", &popup());
+    });
+    h.at_ms(1_000);
+    h.frame(|ui| {
+        dialog(ui, "dialog", &modal());
+        marked(ui, "child", &popup());
+    });
+    h.at_ms(1_010);
+    let (closing, _) = h.frame(|_| {});
+    assert_eq!(
+        fills(&closing, LayerId::Raised),
+        1,
+        "still closing, on Raised"
+    );
+    h.at_ms(1_020);
+    for _ in 0..2 {
+        let (scene, _) = h.frame(|ui| {
+            marked(ui, "child", &popup());
+        });
+        assert_eq!(fills(&scene, LayerId::Popup), 1);
+        assert_eq!(fills(&scene, LayerId::Raised), 0);
+    }
+}
+
+#[test]
+fn a_child_reopening_under_its_open_parent_stays_raised() {
+    let mut h = harness();
+    h.frame(|ui| {
+        dialog(ui, "dialog", &modal());
+        marked(ui, "child", &popup());
+    });
+    h.at_ms(1_000);
+    h.frame(|ui| {
+        dialog(ui, "dialog", &modal());
+    });
+    h.at_ms(1_010);
+    let (scene, _) = h.frame(|ui| {
+        dialog(ui, "dialog", &modal());
+        marked(ui, "child", &popup());
+    });
+    assert_eq!(fills(&scene, LayerId::Raised), 1);
+}
+
+#[test]
+fn a_toast_layer_hit_stays_eligible_above_raised() {
+    let mut h = harness();
+    let run = |h: &mut UiHarness| {
+        let mut out = None;
+        h.frame(|ui| {
+            dialog(ui, "lower", &modal());
+            dialog(ui, "upper", &modal());
+            ui.painter().on(LayerId::Toast);
+            let id = ui.id("toast");
+            out = Some(ui.interact(id, PAGE_BTN, Sense::CLICK));
+        });
+        out.expect("frame ran")
+    };
+    run(&mut h);
+    h.input.pointer_to(20.0, 20.0).click(P);
+    let t = run(&mut h);
+    assert!(t.hovered && t.clicked);
+}
+
+/// One frame of a dialog holding `child` when `open`, in a settled window, then the frame the
+/// dialog stops being called, at `ms`.
+fn closing_frame(kind: Child, open: bool, ms: u64) -> Scene {
+    let (mut h, mut b) = bed(kind);
+    b.child = open;
+    settle(&mut h, &mut b, 2_000);
+    b.dialog = false;
+    b.child = false;
+    h.at_ms(2_000 + ms);
+    bed_frame(&mut h, &mut b).0
+}
+
+#[test]
+fn a_closing_dialog_replays_none_of_its_child() {
+    for kind in CHILDREN {
+        let (ga, gu, go, gt) = counts(&closing_frame(kind, true, 30), LayerId::Modal);
+        let (wa, wu, wo, wt) = counts(&closing_frame(kind, false, 30), LayerId::Modal);
+        assert!(gu > 0, "{kind:?}: still closing");
+        // Without the child the dialog's button keeps focus, so its ring is the one shape more.
+        assert!(gu <= wu, "{kind:?}: no shape of the child");
+        assert_eq!((ga, go, gt), (wa, wo, wt), "{kind:?}: the dialog alone");
+    }
+}
+
+#[test]
+fn a_child_closing_with_its_dialog_leaves_on_its_own_layer() {
+    // The dropdown snaps by contract (it has no exit); the other two fade on Raised.
+    let snap = closing_frame(Child::Dropdown, true, 30);
+    assert!(!has_content(&snap, LayerId::Raised));
+    assert!(!has_content(&snap, LayerId::Popup));
+    for kind in [Child::Popover, Child::Menu] {
+        let scene = closing_frame(kind, true, 30);
+        assert!(has_content(&scene, LayerId::Raised), "{kind:?}");
+        assert!(!has_content(&scene, LayerId::Popup), "{kind:?}");
+    }
+    let glass = closing_frame(Child::Menu, true, 30);
+    let b = glass.backdrop.expect("the menu's own exit asks for it");
+    assert_eq!(b.layer, LayerId::Raised as usize);
+}
+
+#[test]
+fn a_tooltip_inside_a_popover_is_not_in_the_popover_exit() {
+    let mut h = UiHarness::new(WIN);
+    let anchor = Rect::new(100.0, 100.0, 50.0, 20.0);
+    let inner = Rect::new(108.0, 132.0, 100.0, 24.0);
+    let run = |h: &mut UiHarness, open: bool| {
+        h.frame(|ui| {
+            if open {
+                let options = PopoverOptions::new(anchor, (200.0, 90.0));
+                ui.popover("pop", &options, |ui, _| {
+                    let r = ui.button("in", inner, "in", ButtonKind::Secondary);
+                    ui.tooltip(&r, "hint");
+                });
+            }
+        })
+        .0
+    };
+    h.input.pointer_to(inner.x + 4.0, inner.y + 4.0);
+    run(&mut h, true);
+    h.at_ms(1_000);
+    run(&mut h, true);
+    h.at_ms(2_000);
+    run(&mut h, true);
+    h.at_ms(3_000);
+    let open = run(&mut h, true);
+    let drawn = open.layers[LayerId::Popup as usize].texts.len();
+    assert_eq!(drawn, 2, "the button's label and the tooltip's text");
+    h.at_ms(3_010);
+    let closing = run(&mut h, false);
+    assert_eq!(
+        closing.layers[LayerId::Popup as usize].texts.len(),
+        drawn,
+        "each exit draws its own, once"
+    );
 }

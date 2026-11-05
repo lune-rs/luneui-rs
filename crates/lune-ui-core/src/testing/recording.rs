@@ -1,8 +1,7 @@
 //! The display-list seam's fake: a renderer that records draw calls instead of drawing.
 
 use crate::scene::{
-    BackdropRequest, CustomItem, FrameParams, ImageItem, SCENE_LAYERS, Scene, Shape, StrokeVertex,
-    TextItem,
+    BackdropRequest, CustomItem, FrameParams, ImageItem, Scene, Shape, StrokeVertex, TextItem,
 };
 
 /// One draw call, in the order a renderer issues it. `layer` is the index into
@@ -35,7 +34,7 @@ pub enum DrawCall {
         layer: usize,
         vertices: Vec<StrokeVertex>,
     },
-    /// The blurred backdrop, drawn after the scene layers and before the rest.
+    /// The blurred backdrop, drawn after the layers below [`Scene::split`] and before the rest.
     Backdrop(BackdropRequest),
 }
 
@@ -81,7 +80,7 @@ impl RecordingRenderer {
     pub fn render(&mut self, scene: &Scene, params: &FrameParams) {
         let mut calls = Vec::new();
         for (i, layer) in scene.layers.iter().enumerate() {
-            if i == SCENE_LAYERS
+            if i == scene.split()
                 && let Some(b) = scene.backdrop
             {
                 calls.push(DrawCall::Backdrop(b));

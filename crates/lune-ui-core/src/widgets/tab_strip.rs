@@ -549,7 +549,7 @@ impl Ui<'_> {
             let pressed_here = st.pressed == Some(tab.key);
             // Both keys are consumed whether or not the strip is enabled, so a focused tab of a
             // disabled strip does not let Enter or Space fall through to whatever handles them
-            // next. This is the tabs only: the new-tab button gates first, as every button does.
+            // next.
             let enter = self.consume_key(item.id, NamedKey::Enter);
             let space = self.consume_key(item.id, NamedKey::Space);
             let activated = resp.enabled

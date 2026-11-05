@@ -1532,6 +1532,24 @@ fn a_disabled_strip_activates_nothing_from_enter_or_space_and_still_does_after_e
 }
 
 #[test]
+fn a_disabled_strip_keeps_the_arrows_home_and_end_from_the_shortcuts() {
+    use NamedKey::{ArrowLeft, ArrowRight, End, Home};
+    for k in [ArrowLeft, ArrowRight, Home, End] {
+        let (mut h, mut app) = disabled_after_focus();
+        h.shortcuts
+            .add(Binding::new(Scope::Global, Chord::key(Key::Named(k)), "go"));
+        key(&mut h, k);
+        let r = run(&mut h, &mut app);
+        assert!(r.events.is_empty(), "{k:?}: {:?}", r.events);
+        assert!(
+            r.out.fired.is_empty(),
+            "{k:?} fell through: {:?}",
+            r.out.fired
+        );
+    }
+}
+
+#[test]
 fn a_disabled_strip_nodes_are_disabled_and_offer_no_focus_or_action() {
     let mut app = App::of(3, Some(1));
     let mut h = bench(&mut app);

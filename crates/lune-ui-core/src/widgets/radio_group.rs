@@ -199,7 +199,9 @@ impl Ui<'_> {
             let kid = items[i].0;
             let r = self.with_enabled(o.enabled, |ui| {
                 let r = ui.interact(kid, rows[i], sense);
-                if r.enabled && (r.clicked || ui.consume_key(kid, NamedKey::Space)) {
+                if (r.clicked || ui.activation_keys(kid, r.enabled, &[NamedKey::Space]))
+                    && r.enabled
+                {
                     chosen = Some(i);
                 }
                 r
