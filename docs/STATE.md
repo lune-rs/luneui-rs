@@ -12,7 +12,9 @@ one way no longer swallows the other, and the M8 sideways-swipe limit is gone). 
 `Style.italic` (the GPU test shows the skew), six theme tokens, `icon::REMOVE`, the strings, `widgets::text_lines` (spans,
 `line_spec`, `range_boxes` across runs), rich selectable text by position (D187), the list frame's x axis, `fill`, `identity`
 and `link` with the scroll link, stub modules for the four widgets and four empty gallery pages (70 pages, 332 scenes still).
-Steps 3 to 9 follow the plan.
+Step 6 (track B, part branch m9b) is in: `Ui::diff_view` unified and split on the list frame, `pair_rows`, `widest_chars`, hunk actions,
+marks, `Ui::diff_selected_text`, 14 scenes; a linked pane adds its own queued shift before it takes the group's value
+(`scroll_pending_shift`). Steps 3 to 5 and 7 to 9 follow the plan.
 
 M8 (data views: table, bar chart, pie chart, kanban board, lane graph) is merged to main at 2474248 (7 steps, DECISIONS
 D160 to D176) and closed: the cross-widget suite, the disabled-keys rows, the catalogue audit, the architecture notes and the

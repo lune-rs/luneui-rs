@@ -153,9 +153,19 @@ Hunk and line action labels (Lunegit: "Stage hunk", "Unstage hunk", "Stage line"
 
 ## Open questions
 
-- The intra-line marks: no Lunegit source; Wane's before and after diff may need word-level marks. The mark tint is a theme value M9 chooses.
-- Whether the unified and split forms share one row model in the toolkit (Lunegit has two views over two models, [L src/Lunegit.Desktop/Views/SplitDiffView.axaml.cs:257-267]); M9 decides.
-- Caps on very large diffs: none found in the files read.
+Answered in M9 (D15, D16):
+
+- The intra-line marks: `DiffMark { start, end }` in chars of the line, clamped like a highlight span; the tint is the theme's `diff_added_mark` / `diff_removed_mark` (the fill's hue at alpha 0x40, a look deviation, D14). Word-level computation stays the app's.
+- One row model for both forms: yes. `DiffLine` is the one model; split takes `&[SplitRow]` (index pairs into the lines) from the pure `pair_rows`, which the app calls when its lines change.
+- Caps on very large diffs: none; 100,000 rows build only the window, `pair_rows` and `widest_chars` are O(lines) and the app calls them on change.
+
+Built as the entry's contract, with these notes:
+
+- The hunk text is the `link` colour (the states table); Lunegit's template draws it `fg_quaternary` in the pill (Anatomy), so the director may flip it.
+- A hunk row keeps the 20 px row; the 18 px buttons sit 1 px from its edges (Lunegit grows the row to 22).
+- The hunk action is an `icon_button` host: the ghost press scale 0.98 applies to it.
+- Number and prefix columns stay put while the text scrolls sideways (Lunegit's list moves them).
+- A split pane's table node carries the same label; the diff's `context` is the pane's line index, `None` over an empty half. `Ui::diff_selected_text` gives the text Command+C writes, for the app's "Copy selected lines" row.
 
 ## Notes for the planner
 

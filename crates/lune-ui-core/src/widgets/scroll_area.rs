@@ -432,6 +432,15 @@ impl Ui<'_> {
         self.transient::<Requests>(id).shift_y += by;
     }
 
+    /// The vertical shift [`Self::scroll_shift`] has queued for the area under `key` and the area
+    /// has not taken yet. A pane of a scroll link adds it to the offset it drew, since the area
+    /// moves by it first: asked of the group's value without it, a pane that measured the same
+    /// rows as the pane that published would move twice (D8).
+    pub(crate) fn scroll_pending_shift(&mut self, key: impl Hash) -> f64 {
+        let id = self.id(key);
+        self.transient::<Requests>(id).shift_y
+    }
+
     /// [`Self::scroll_shift`] on the horizontal axis: an edit moves its caret into view at once,
     /// since typing and caret motion never animate.
     pub(crate) fn scroll_shift_x(&mut self, key: impl Hash, by: f64) {
