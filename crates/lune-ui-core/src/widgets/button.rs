@@ -383,7 +383,8 @@ impl Ui<'_> {
 
     /// Consumes the activation `keys` of `id` and says whether one activates it. Enabled, the
     /// first key found is taken and the rest stay for later handlers. Disabled, every one is taken
-    /// and nothing activates, so a key the widget would handle reaches no shortcut.
+    /// and nothing activates, so a key the widget would handle reaches no shortcut. A Control, Alt
+    /// or Command chord on one of them is not the widget's: it stays a shortcut.
     pub(crate) fn activation_keys(
         &mut self,
         id: WidgetId,
@@ -391,10 +392,10 @@ impl Ui<'_> {
         keys: &[NamedKey],
     ) -> bool {
         if enabled {
-            return keys.iter().any(|k| self.consume_key(id, *k));
+            return keys.iter().any(|k| self.consume_plain_key(id, *k));
         }
         for k in keys {
-            while self.consume_key(id, *k) {}
+            while self.consume_plain_key(id, *k) {}
         }
         false
     }
@@ -454,7 +455,9 @@ impl Ui<'_> {
 
         let mut node = Node::new(id, Role::Button, name, rect);
         if r.enabled {
-            node.states.insert(State::Focusable);
+            if sense.focusable {
+                node.states.insert(State::Focusable);
+            }
             node.actions.insert(Action::Default);
         } else {
             node.states.insert(State::Disabled);

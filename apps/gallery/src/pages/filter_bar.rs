@@ -44,6 +44,7 @@ const fn row(i: usize) -> Rect {
 const OPTS: FilterOptions<'static> = FilterOptions {
     placeholder: "Filter files",
     label: None,
+    clear_unfocusable: false,
 };
 
 struct Live {

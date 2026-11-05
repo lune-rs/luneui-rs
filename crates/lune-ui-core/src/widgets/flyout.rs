@@ -42,7 +42,7 @@ const STATE_DOT_GAP: f32 = 6.0;
 /// The stats strip's outline radius, and its width (the cells sit this far inside it).
 const STRIP_RADIUS: f32 = 8.0;
 const STRIP_RING: f32 = 1.0;
-/// The routes' key size is `font_s`, as Wane's `.c-flyout__routes .c-kv dt`.
+/// The routes' key size is `font_s`, as in the consuming app's design.
 /// The routes' horizontal inset.
 const ROUTES_INSET: f32 = 8.0;
 /// A separator row's height.
@@ -220,7 +220,7 @@ pub(crate) fn flyout_body(ui: &mut Ui<'_>, rect: Rect, f: &Flyout<'_>) -> Option
             at.h - 2.0 * STRIP_RING,
         );
         ui.node_container(group, |ui| ui.stat_strip("stats", inner, &cells));
-        // The outline of Wane's `c-panel--strip`, after the cells.
+        // The outline of the strip panel, after the cells.
         ui.painter()
             .ring(at, STRIP_RADIUS, STRIP_RING, t.border_subtle, false);
         y += stats_h;

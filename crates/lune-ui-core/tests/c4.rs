@@ -976,6 +976,7 @@ mod m6 {
                 &FilterOptions {
                     placeholder: "Filter",
                     label: None,
+                    clear_unfocusable: false,
                 },
             );
             ui.search_picker(

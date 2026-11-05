@@ -308,7 +308,11 @@ impl<'a> Ui<'a> {
                         store
                             .pointer
                             .button(*pos, *button, true, *modifiers, &cx, &mut pointer);
-                        if let Some(h) = target.filter(|h| h.enabled && h.sense.focusable) {
+                        // A toast is outside the focus model (D146): a press on one leaves focus
+                        // where it was, or a toast that goes would take the focus with it.
+                        if let Some(h) = target.filter(|h| {
+                            h.enabled && h.sense.focusable && h.layer != LayerId::Toast as usize
+                        }) {
                             store.focus.focused = Some(h.id);
                         }
                     }
@@ -452,7 +456,13 @@ impl<'a> Ui<'a> {
                             continue;
                         }
                         acted = true;
-                        let top_escape = top_escape.map(|t| (t.id, t.opts.dismiss_on_escape));
+                        // A toast is no overlay (D146): what targets one acts on it alone, so it
+                        // dismisses no overlay and takes no focus out of a modal.
+                        let on_toast =
+                            meta.is_some_and(|(layer, _)| layer == LayerId::Toast as usize);
+                        let top_escape = top_escape
+                            .filter(|_| !on_toast)
+                            .map(|t| (t.id, t.opts.dismiss_on_escape));
                         let focus_to = access::route(
                             a,
                             node,
@@ -461,7 +471,7 @@ impl<'a> Ui<'a> {
                             &mut routed,
                             &mut dismissed,
                         );
-                        if let Some(id) = focus_to {
+                        if let Some(id) = focus_to.filter(|_| !on_toast || modal.is_none()) {
                             store.focus.focused = Some(id);
                             store.focus.visible = false;
                             focus_loss(&active, &hits, Some(id), &mut dismissed);

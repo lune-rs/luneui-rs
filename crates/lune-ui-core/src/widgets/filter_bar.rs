@@ -37,6 +37,9 @@ pub struct FilterOptions<'a> {
     pub placeholder: &'a str,
     /// The accessible name.
     pub label: Option<&'a str>,
+    /// The clear button takes no focus and is no tab stop, so focus stays in the field: for a
+    /// composite whose keys go through the field. The pointer and accessibility still reach it.
+    pub clear_unfocusable: bool,
 }
 
 /// The clear button of the bar `id`.
@@ -95,7 +98,14 @@ impl Ui<'_> {
                 radius: RADIUS,
                 name: self.tr("luneui.text-field.clear"),
             };
-            let c = self.scope(&key, |ui| ui.icon_button("clear", clear, &button));
+            let sense = if opts.clear_unfocusable {
+                Sense::CLICK
+            } else {
+                Sense::CLICK_FOCUS
+            };
+            let c = self.scope(&key, |ui| {
+                ui.icon_button_sensed("clear", clear, &button, sense)
+            });
             // While composing the engine refuses a clear, as it does any press.
             if c.clicked && !self.composing() {
                 text.clear();

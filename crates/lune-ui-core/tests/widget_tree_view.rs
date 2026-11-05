@@ -700,6 +700,25 @@ fn modified_arrows_are_left_for_shortcuts() {
     assert_eq!(f.out.fired.len(), 1);
 }
 
+#[test]
+fn modified_enter_and_space_are_left_for_shortcuts() {
+    for k in [NamedKey::Enter, NamedKey::Space] {
+        let mut h = focused(&[]);
+        h.shortcuts.add(Binding::new(
+            Scope::Global,
+            Chord::key(Key::Named(k)).ctrl(),
+            "chord",
+        ));
+        h.input.set_modifiers(lune_ui_core::input::Modifiers {
+            control: true,
+            ..Default::default()
+        });
+        let f = key(&mut h, &ROWS, 100, k);
+        assert_eq!(f.r.activated, None, "{k:?}");
+        assert_eq!(f.out.fired.len(), 1, "{k:?}");
+    }
+}
+
 // The class: every way the cursor could point at a row that is not shown.
 
 #[test]

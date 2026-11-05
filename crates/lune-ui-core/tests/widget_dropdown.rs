@@ -4,7 +4,7 @@
 
 use lune_ui_core::access::{Action, Role, State};
 use lune_ui_core::color::premul;
-use lune_ui_core::input::{FrameOutput, Key, NamedKey, PointerButton};
+use lune_ui_core::input::{FrameOutput, Key, Modifiers, NamedKey, PointerButton};
 use lune_ui_core::paint::{LayerId, Painter, Rect};
 use lune_ui_core::scene::Scene;
 use lune_ui_core::shortcuts::{Binding, Chord, Scope};
@@ -436,6 +436,32 @@ fn the_wheel_scrolls_and_a_click_picks_the_row_under_the_pointer() {
     h.input.pointer_to(above.x + 10.0, above.y + 10.0).click(P);
     let (_, resp, _) = with_options(&mut h, 1030, &many(), 0, &SCROLLING);
     assert_eq!(resp.picked, None);
+}
+
+#[test]
+fn a_chord_on_the_lists_keys_stays_a_shortcut() {
+    for k in [NamedKey::Enter, NamedKey::ArrowDown, NamedKey::ArrowUp] {
+        let opts = DropdownOptions::default();
+        let mut h = UiHarness::new(WIN);
+        h.shortcuts.add(Binding::new(
+            Scope::Global,
+            Chord::key(Key::Named(k)).ctrl(),
+            "chord",
+        ));
+        with_options(&mut h, 0, &many(), 0, &opts);
+        with_options(&mut h, 10, &many(), 0, &opts);
+        h.input.set_modifiers(Modifiers {
+            control: true,
+            ..Modifiers::default()
+        });
+        h.input.key_down(Key::Named(k), None);
+        let mut resp = DropdownResponse::default();
+        let (_, out) = h.at_ms(20).frame(|ui| {
+            resp = ui.dropdown_with("dd", ANCHOR, anchor_id(), &many(), 0, &opts);
+        });
+        assert_eq!(out.fired.len(), 1, "{k:?}");
+        assert_eq!(resp.picked, None, "{k:?}");
+    }
 }
 
 #[test]

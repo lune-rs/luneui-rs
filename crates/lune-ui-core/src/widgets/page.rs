@@ -88,8 +88,8 @@ pub struct PageOptions<'a> {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PageSlot {
     /// The header's actions: the right-aligned box, as wide as `actions_w` and as tall as the
-    /// heading. Called only when `actions_w` is above 0. Wane's header aligns its actions to the
-    /// top (`align-items: flex-start`), so the app puts them at the slot's top, not its middle.
+    /// heading. Called only when `actions_w` is above 0. The header aligns its actions to the top,
+    /// so the app puts them at the slot's top, not its middle.
     Actions(Rect),
     /// The body: the scroll view and the padded box content is drawn in (0 16 16, so the box is
     /// the viewport less 16 each side and 16 below). The closure returns the content's height.

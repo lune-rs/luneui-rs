@@ -17,6 +17,7 @@ use lune_ui_core::theme::DARK;
 use lune_ui_core::ui::{Ui, WidgetId};
 use lune_ui_core::widgets::button::ButtonKind;
 use lune_ui_core::widgets::dialog::{Cancel, Dialog, DialogGlass};
+use lune_ui_core::widgets::field::FieldOptions;
 use lune_ui_core::widgets::popover::PopoverOptions;
 use lune_ui_core::widgets::toast::{
     APPEAR, EXPAND, GAP, HISTORY_CAP, LEAVE, MAX_VISIBLE, SHIFT, ToastAction, ToastId, ToastKind,
@@ -574,6 +575,32 @@ fn no_toast_jumps_while_others_arrive_and_leave() {
     assert!(worst <= 0.35 * 54.0, "a step of {worst}");
 }
 
+#[test]
+fn a_second_arrival_during_a_shift_retargets_the_toast_from_where_it_is() {
+    let mut h = UiHarness::new(WIN);
+    let mut toasts = Toasts::default();
+    let first = toasts.push(spec(ToastKind::Error, "first"), ms(0));
+    settle(&mut h, &mut toasts, 0);
+    let mut last: Option<f32> = None;
+    let mut worst = 0.0f32;
+    for k in 0..40u64 {
+        let t = 1000 + k * 1000 / 60;
+        // The second arrival lands a few frames into the shift the first one started.
+        if k == 2 || k == 6 {
+            toasts.push(spec(ToastKind::Error, &format!("t{k}")), ms(t));
+        }
+        let (_, out, _) = frame(&mut h, &mut toasts, t);
+        let y = out.tree.get(node_of(first)).expect("first").bounds.y;
+        if let Some(a) = last {
+            worst = worst.max((a - y).abs());
+        }
+        last = Some(y);
+    }
+    assert!(worst > 0.5, "the test moved nothing: {worst}");
+    // A place is 54: a shift dropped mid-flight would step by what it had left.
+    assert!(worst <= 0.35 * 54.0, "a step of {worst}");
+}
+
 // -- nodes and input ----------------------------------------------------------------------------
 
 #[test]
@@ -785,15 +812,18 @@ fn a_toast_takes_no_focus_on_appear_and_draws_outside_a_record() {
     toasts.push(prompt("Update?"), ms(0));
     let (_, out, _) = frame(&mut h, &mut toasts, 0);
     assert_eq!(out.focused, None);
-    // Inside a `record`, the toasts are not part of the recording.
+    // Inside a `record`, the toasts are not part of the recording, and the recording goes on
+    // around them.
     let mut ops_len = usize::MAX;
     h.at_ms(100).frame(|ui| {
         let (_, ops) = ui.record(|ui| {
+            ui.painter().fill(PAGE, 0.0, [1, 2, 3, 255]);
             ui.toasts("t", &mut toasts);
+            ui.painter().fill(PAGE, 0.0, [4, 5, 6, 255]);
         });
         ops_len = ops.len();
     });
-    assert_eq!(ops_len, 0);
+    assert_eq!(ops_len, 2, "the two fills, and nothing of the toast");
 }
 
 #[test]
@@ -889,6 +919,7 @@ struct Bed {
     dialog: bool,
     popover: bool,
     cancelled: u32,
+    confirmed: u32,
 }
 
 fn bed(
@@ -930,6 +961,10 @@ fn bed(
             });
             if r.cancelled {
                 b.cancelled += 1;
+                b.dialog = false;
+            }
+            if r.confirmed {
+                b.confirmed += 1;
                 b.dialog = false;
             }
         }
@@ -995,6 +1030,164 @@ fn a_body_press_over_a_dialog_toggles_the_toast_and_not_the_dialog() {
     bed(&mut h, &mut b, &mut toasts, 2020);
     assert!(toasts.expanded(id));
     assert!(b.dialog && b.cancelled == 0);
+}
+
+#[test]
+fn an_accessibility_dismiss_on_a_toast_dismisses_the_toast_and_no_overlay() {
+    for with_popover in [false, true] {
+        let (mut h, mut b, mut toasts) = open_bed(with_popover);
+        let id = ToastId(1);
+        h.input.access(AccessAction {
+            target: node_of(id),
+            action: Action::Dismiss,
+            value: None,
+        });
+        bed(&mut h, &mut b, &mut toasts, 2000);
+        for t in [2100, 2400, 2800] {
+            bed(&mut h, &mut b, &mut toasts, t);
+        }
+        assert_eq!(toasts.history().count(), 1, "popover {with_popover}");
+        assert!(b.dialog && b.cancelled == 0, "popover {with_popover}");
+        assert_eq!(b.popover, with_popover, "the popover stays as it was");
+    }
+}
+
+#[test]
+fn a_dismiss_on_any_node_of_the_dialog_still_cancels_it_with_a_toast_up() {
+    let (mut h, mut b, mut toasts) = open_bed(false);
+    let (out, _) = bed(&mut h, &mut b, &mut toasts, 2000);
+    let card = out
+        .tree
+        .nodes
+        .iter()
+        .find(|n| n.role == Role::Dialog)
+        .expect("dialog")
+        .id;
+    h.input.access(AccessAction {
+        target: card,
+        action: Action::Dismiss,
+        value: None,
+    });
+    bed(&mut h, &mut b, &mut toasts, 2010);
+    assert_eq!(b.cancelled, 1);
+}
+
+#[test]
+fn a_press_on_a_toast_button_leaves_the_dialogs_focus_and_enter_still_confirms() {
+    let (mut h, mut b, mut toasts) = open_bed(false);
+    let (out, _) = bed(&mut h, &mut b, &mut toasts, 2000);
+    let held = out.focused;
+    assert!(held.is_some(), "the dialog took focus");
+    let c = centre(button_named(&out, "Open"));
+    h.input.pointer_to(c.0, c.1);
+    bed(&mut h, &mut b, &mut toasts, 2010);
+    h.input.click(P);
+    let (out, resp) = bed(&mut h, &mut b, &mut toasts, 2020);
+    assert!(matches!(resp.action, Some((_, 2))), "{resp:?}");
+    assert_eq!(out.focused, held);
+    // The toast has gone; the dialog still has the keys.
+    for t in [2300, 2600, 2900] {
+        let (out, _) = bed(&mut h, &mut b, &mut toasts, t);
+        assert_eq!(out.focused, held, "at {t}");
+    }
+    h.input.key_down(Key::Named(NamedKey::Enter), None);
+    bed(&mut h, &mut b, &mut toasts, 3000);
+    assert_eq!(b.confirmed, 1);
+}
+
+#[test]
+fn an_accessibility_focus_on_a_toast_button_stays_out_of_a_dialog() {
+    let (mut h, mut b, mut toasts) = open_bed(false);
+    let (out, _) = bed(&mut h, &mut b, &mut toasts, 2000);
+    let held = out.focused;
+    let button = out
+        .tree
+        .nodes
+        .iter()
+        .find(|n| n.role == Role::Button && n.name == "Open")
+        .expect("Open")
+        .id;
+    h.input.access(AccessAction {
+        target: button,
+        action: Action::Focus,
+        value: None,
+    });
+    let (out, _) = bed(&mut h, &mut b, &mut toasts, 2010);
+    assert_eq!(out.focused, held);
+
+    // With no modal a toast button can hold focus, as Tab can put it there.
+    let mut h = UiHarness::new(WIN);
+    let mut toasts = Toasts::default();
+    toasts.push(prompt("Update?"), ms(0));
+    settle(&mut h, &mut toasts, 0);
+    h.input.access(AccessAction {
+        target: button,
+        action: Action::Focus,
+        value: None,
+    });
+    let (_, out, _) = frame(&mut h, &mut toasts, 500);
+    assert_eq!(out.focused, Some(button));
+}
+
+#[test]
+fn a_press_on_a_toast_leaves_a_text_field_its_focus() {
+    let mut h = UiHarness::new(WIN);
+    let mut toasts = Toasts::default();
+    let mut text = String::new();
+    let field = Rect::new(20.0, 20.0, 200.0, 28.0);
+    toasts.push(prompt("Update?"), ms(0));
+    let run = |h: &mut UiHarness, toasts: &mut Toasts, text: &mut String, at: u64| {
+        h.at_ms(at)
+            .frame(|ui| {
+                ui.text_field_with("field", field, text, &FieldOptions::default());
+                ui.toasts("t", toasts);
+            })
+            .1
+    };
+    for t in [0, 300, 600] {
+        run(&mut h, &mut toasts, &mut text, t);
+    }
+    h.input.pointer_to(30.0, 30.0);
+    run(&mut h, &mut toasts, &mut text, 700);
+    h.input.click(P);
+    let out = run(&mut h, &mut toasts, &mut text, 710);
+    let held = out.focused;
+    assert!(held.is_some(), "the field took focus");
+    let c = centre(button_named(&out, "Later"));
+    h.input.pointer_to(c.0, c.1);
+    run(&mut h, &mut toasts, &mut text, 720);
+    h.input.click(P);
+    run(&mut h, &mut toasts, &mut text, 730);
+    for t in [1000, 1300] {
+        assert_eq!(run(&mut h, &mut toasts, &mut text, t).focused, held);
+    }
+    h.input.key_down(Key::Character("a".to_owned()), Some("a"));
+    run(&mut h, &mut toasts, &mut text, 1400);
+    assert_eq!(text, "a", "typing goes on");
+}
+
+#[test]
+fn a_chord_on_a_focused_toast_button_stays_a_shortcut() {
+    let mut h = UiHarness::new(WIN);
+    let mut toasts = Toasts::default();
+    h.shortcuts.add(Binding::new(
+        Scope::Global,
+        Chord::key(Key::Named(NamedKey::Enter)).ctrl(),
+        "go",
+    ));
+    toasts.push(prompt("Update?"), ms(0));
+    settle(&mut h, &mut toasts, 0);
+    h.input.key_down(Key::Named(NamedKey::Tab), None);
+    let (_, out, _) = frame(&mut h, &mut toasts, 500);
+    assert!(out.focused.is_some());
+    h.input.set_modifiers(Modifiers {
+        control: true,
+        ..Modifiers::default()
+    });
+    h.input.key_down(Key::Named(NamedKey::Enter), None);
+    let (_, out, r) = frame(&mut h, &mut toasts, 510);
+    assert_eq!(r, ToastResponse::default());
+    assert_eq!(out.fired.len(), 1);
 }
 
 /// The focused node names after `tabs` presses of Tab.

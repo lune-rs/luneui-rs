@@ -17,9 +17,10 @@
 //! Keys, on the strip as the one tab stop: the arrows along the axis move the strip 16 px (Left and
 //! Right for [`Axis::Horizontal`], Up and Down for [`Axis::Vertical`]); Home and End set the sized
 //! pane to its smallest and largest size; Escape during a drag restores the size at the press and
-//! is consumed. For [`Axis::Horizontal`], Up and Down grow and shrink the sized pane by 16, which
-//! is what an accessibility increment and decrement arrive as; for [`Axis::Vertical`] those two
-//! actions move the strip up and down.
+//! is consumed. For [`Axis::Horizontal`], Up and Down grow and shrink the sized pane by 16. A
+//! Control, Alt or Command chord on any of these stays a shortcut. An accessibility increment and
+//! decrement raise and lower the value, the sized pane, by 16 on both axes and both sides,
+//! whichever way that moves the strip.
 
 use std::hash::Hash;
 
@@ -329,17 +330,26 @@ impl Ui<'_> {
         };
         for (index, event) in self.focus_events(id) {
             let FocusEvent::Key {
-                key: Key::Named(k), ..
+                key: Key::Named(k),
+                modifiers,
+                ..
             } = event
             else {
                 continue;
             };
+            if modifiers.control || modifiers.alt || modifiers.logo {
+                continue;
+            }
+            // An accessibility increment or decrement arrives as Up or Down.
+            let action = self.focus_event_is_synthetic(index);
             // The strip's move along the axis, or the sized pane's direct change.
             let by = |strip: f32| match opts.sized {
                 SplitSide::First => strip,
                 SplitSide::Second => -strip,
             };
             let to = match k {
+                NamedKey::ArrowUp if action => next + KEY_STEP,
+                NamedKey::ArrowDown if action => next - KEY_STEP,
                 k if k == toward_start => next - by(KEY_STEP),
                 k if k == toward_end => next + by(KEY_STEP),
                 NamedKey::ArrowUp if opts.axis == Axis::Horizontal => next + KEY_STEP,

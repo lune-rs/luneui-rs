@@ -1,7 +1,7 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-05 (M7 done on `orch/toolkit-v1`, all 15 steps; a pause point, M8 waits for the user)
+Last updated: 2026-11-05 (M7 done on `orch/toolkit-v1`, all 15 steps, review round 1 fixed; a pause point, M8 waits for the user)
 
 ## Now
 
@@ -29,7 +29,12 @@ What M7 added (DECISIONS D137 to D156; `docs/architecture.md` has the module map
 - The catalogue audit holds: all 79 scene names of the 14 M7 entries are in `gallery --list`, every Open question is
   answered or marked, every Build line and Depends id holds. The 14 entries stay `in-progress` (as M6's did).
 
-Counts at the tip: gallery 61 pages, 305 scene names in `--list`; `cargo test --workspace` 1,720 passed, 0 failed.
+Review round 1 fixed F1 to F8 and F10 (D157): an accessibility action on a toast acts on the toast alone and a press on
+one moves no focus; accessibility Increment raises the splitter's value on all four configurations; a popup reopened under
+a newer modal is a true open on `Raised`; Tab stays in the palette's box (`FilterOptions::clear_unfocusable`); toasts
+clone no spec per frame; `wane` is in boundary rule 3; chords stay shortcuts on the splitter and `activation_keys`.
+
+Counts at the tip: gallery 61 pages, 305 scene names in `--list`; `cargo test --workspace` 1,740 passed, 0 failed.
 
 Pixel gate (`scripts/pixel-gate.sh --base a75a708`, expected: 231 identical, 74 new, nothing allowed): the orchestrator's
 final gate fills this in. Each step passed it at zero delta against its own base.
@@ -46,10 +51,13 @@ no dependency). The gallery has a page registry (two legacy pages, 59 Ui pages),
 ## Carried limits
 
 - Overlays above a modal go one level deep: those stacked further share `Raised`, so a third level that overlaps its
-  parent interleaves (fills under text). Three edges of that rule (step 1): a popup that closes when a modal opens and
-  is reopened during its close keeps its lower layer and gets no input; a child held on `Raised` after its parent closed
-  sits above, and is eligible over, a dialog opened in that window; on `Raised` a child opened in a nested dialog's body
-  registers before that dialog's footer buttons, so where they overlap the buttons win the hit.
+  parent interleaves (fills under text). Two edges of that rule (step 1): a child held on `Raised` after its parent
+  closed sits above, and is eligible over, a dialog opened in that window; on `Raised` a child opened in a nested dialog's
+  body registers before that dialog's footer buttons, so where they overlap the buttons win the hit.
+- Disabled keys (M7 review F9): the stepper, slider, virtual list, combo, search picker and scroll area still gate key handling on
+  `enabled` before they take the key, so one focused when its scope turns disabled passes its keys to the shortcuts
+  (`Ui::setting_row` hosts steppers). D140's consume-then-gate holds for the button, toolbar, checkbox, toggle, radio
+  group, tab strip and the M7 widgets, not for these six (the last three from reading the code, not run).
 - One blur per frame: a glass menu over a dialog with a blurred scrim has none of its own.
 - Text cannot be cut by a rounded clip (it gets the clip's bounding rect). The toolkit keeps text out of the corners: the
   page and panel inset every text and padded body by the radius (8); a flush panel body is rounded-clipped for fills and
@@ -66,9 +74,7 @@ no dependency). The gallery has a page registry (two legacy pages, 59 Ui pages),
   side panel's show moves only the content and fires on a swap, not on the column.
 - Tree view: `cells` is not called on rows of a moving block; rows have no ShowMenu action; there is no folder glyph;
   `CHEVRON_GAP` and `GLYPH_GAP` have no source (the director accepted them). Split panes: the panes draw with the size the
-  frame began with, so a size a frame's input changed shows in the panes on the catch-up frame; on a row split an
-  accessibility Increment or Decrement arrives as an arrow key and moves the strip up or down (the direction depends on
-  `sized`).
+  frame began with, so a size a frame's input changed shows in the panes on the catch-up frame.
 - `role-gap: tab to panel association` of the tab strip stays open (D122). The real pointer feel of the tab drag, the
   slider, the splitter and the tree in window mode is not testable with scripted input.
 - Review nits left open (M6 `review.md`): `toolbar_label` repeats `button_inner_colored` (F2); colour helpers exist twice

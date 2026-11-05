@@ -6,7 +6,9 @@
 
 use lune_ui_core::access::{AccessAction, AccessValue, Action, Role, State, Value};
 use lune_ui_core::color::premul;
-use lune_ui_core::input::{CursorIcon, FrameOutput, Key, NamedKey, PointerButton, Repaint};
+use lune_ui_core::input::{
+    CursorIcon, FrameOutput, Key, Modifiers, NamedKey, PointerButton, Repaint,
+};
 use lune_ui_core::layout::Axis;
 use lune_ui_core::motion::{MotionTier, conformance};
 use lune_ui_core::paint::{LayerId, Rect, Xform};
@@ -770,14 +772,128 @@ fn keys_while_the_pointer_holds_the_strip_are_dropped() {
     clock.focus(&mut h, &c);
     let from = strip_at(&c, 200.0);
     clock.drag(&mut h, &c, from, moved(&c, from, 20.0));
+    // Checked on the frame the key lands: the next frame's pointer would hide a move.
     h.input.key_down(Key::Named(NamedKey::End), None);
-    let out = clock.two(&mut h, &c);
+    let out = clock.frame(&mut h, &c);
     near(out.size(), 220.0);
+    assert_eq!(out.stored, Some(Some(220.0)));
+    assert!(!out.split.as_ref().expect("drawn").changed);
+    h.input.access(AccessAction {
+        target: split_id(),
+        action: Action::Increment,
+        value: None,
+    });
+    near(clock.frame(&mut h, &c).size(), 220.0);
     let out = clock.release(&mut h, &c);
     near(out.size(), 220.0);
 }
 
+#[test]
+fn a_chord_on_the_strips_keys_is_left_for_the_shortcuts() {
+    let held = |control, alt, logo| Modifiers {
+        control,
+        alt,
+        logo,
+        ..Modifiers::default()
+    };
+    let chords = [
+        (held(true, false, false), Chord::ctrl as fn(Chord) -> Chord),
+        (held(false, true, false), Chord::alt),
+        (held(false, false, true), Chord::logo),
+    ];
+    let keys = [
+        NamedKey::ArrowLeft,
+        NamedKey::ArrowRight,
+        NamedKey::ArrowUp,
+        NamedKey::ArrowDown,
+        NamedKey::Home,
+        NamedKey::End,
+    ];
+    for (m, chord) in chords {
+        for k in keys {
+            let (mut h, mut clock) = start();
+            let c = cfg();
+            h.shortcuts.add(Binding::new(
+                Scope::Global,
+                chord(Chord::key(Key::Named(k))),
+                "chord",
+            ));
+            clock.focus(&mut h, &c);
+            h.input.set_modifiers(m);
+            h.input.key_down(Key::Named(k), None);
+            let out = clock.frame(&mut h, &c);
+            near(out.size(), 200.0);
+            assert_eq!(out.out.fired.len(), 1, "{m:?} {k:?}");
+        }
+    }
+}
+
+#[test]
+fn the_arrows_on_a_row_split_with_the_first_pane_sized_follow_the_strip() {
+    let (mut h, mut clock) = start();
+    let c = Cfg {
+        sized: SplitSide::First,
+        ..rows()
+    };
+    clock.focus(&mut h, &c);
+    near(clock.key(&mut h, &c, NamedKey::ArrowDown).size(), 116.0);
+    near(clock.key(&mut h, &c, NamedKey::ArrowUp).size(), 100.0);
+    near(clock.key(&mut h, &c, NamedKey::ArrowUp).size(), 84.0);
+}
+
+// ---- the panes catch up ----
+
+#[test]
+fn a_move_below_the_drag_threshold_asks_for_the_frame_that_shows_it_in_the_panes() {
+    let (mut h, mut clock) = start();
+    let c = cfg();
+    clock.settle(&mut h, &c);
+    let from = strip_at(&c, 200.0);
+    clock.pointer(&mut h, &c, from);
+    h.input.press(P);
+    clock.settle(&mut h, &c);
+    h.input.pointer_to(from.0 + 1.0, from.1);
+    let moved = clock.frame(&mut h, &c);
+    near(moved.size(), 201.0);
+    near(moved.pane(Pane::First).w, 200.0);
+    assert_eq!(moved.out.repaint, Repaint::Now);
+    let next = clock.frame(&mut h, &c);
+    near(next.pane(Pane::First).w, 201.0);
+}
+
 // ---- accessibility ----
+
+#[test]
+fn increment_raises_and_decrement_lowers_the_value_on_all_four_configurations() {
+    for axis in [Axis::Horizontal, Axis::Vertical] {
+        for sized in [SplitSide::First, SplitSide::Second] {
+            let (mut h, mut clock) = start();
+            let c = Cfg {
+                rect: Rect::new(20.0, 30.0, 500.0, 340.0),
+                axis,
+                sized,
+                max: 250.0,
+                ..cfg()
+            };
+            clock.settle(&mut h, &c);
+            let up = clock.access(&mut h, &c, Action::Increment, None);
+            near(up.size(), 216.0);
+            let node = up.out.tree.get(split_id()).expect("strip");
+            assert!(
+                matches!(node.value, Some(Value::Number { value, .. }) if value == 216.0),
+                "{axis:?} {sized:?}"
+            );
+            near(
+                clock.access(&mut h, &c, Action::Decrement, None).size(),
+                200.0,
+            );
+            near(
+                clock.access(&mut h, &c, Action::Decrement, None).size(),
+                184.0,
+            );
+        }
+    }
+}
 
 #[test]
 fn increment_decrement_and_set_value_move_the_size_and_a_nan_or_infinity_changes_nothing() {

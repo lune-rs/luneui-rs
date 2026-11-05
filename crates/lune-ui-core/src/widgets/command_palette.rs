@@ -436,6 +436,7 @@ impl<'p, 'q> Body<'p, 'q> {
             &FilterOptions {
                 placeholder: palette.placeholder,
                 label: None,
+                clear_unfocusable: true,
             },
         );
         out.changed = field.response.changed;

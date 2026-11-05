@@ -632,10 +632,8 @@ impl<'a> Ui<'a> {
                 dy: shift + rise,
                 alpha,
             });
-            let spec = toasts.entries[i].spec.clone();
-            let outcome = self.scope(id.0, |ui| {
-                ui.paint_toast(&spec, expanded, m, card, !leaving)
-            });
+            let spec = &toasts.entries[i].spec;
+            let outcome = self.scope(id.0, |ui| ui.paint_toast(spec, expanded, m, card, !leaving));
             self.painter().pop_xform();
             outcomes.push((id, outcome));
         }
@@ -1028,7 +1026,7 @@ impl<'a> Ui<'a> {
 
         let mut list = Node::new(id, Role::List, header, area);
         list.description = None;
-        let history: Vec<ToastSpec> = toasts.history.iter().cloned().collect();
+        let history = &toasts.history;
         self.node_container(list, |ui| {
             ui.scope(&key, |ui| {
                 ui.scroll_area("list", area, &ScrollOptions::default(), |ui, view| {

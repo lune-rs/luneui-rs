@@ -48,6 +48,12 @@ impl KeyPress {
             _ => None,
         }
     }
+
+    /// A Control, Alt or Command chord, which stays a shortcut.
+    fn chord(&self) -> bool {
+        matches!(&self.event, FocusEvent::Key { modifiers: m, .. }
+            if m.control || m.alt || m.logo)
+    }
 }
 
 impl Ui<'_> {
@@ -55,10 +61,20 @@ impl Ui<'_> {
     /// focused widget of the active scope (or the target of a synthetic key). A consumed real key
     /// turns the focus ring on.
     pub fn consume_key(&mut self, id: WidgetId, key: NamedKey) -> bool {
+        self.take_key(id, key, true)
+    }
+
+    /// [`Self::consume_key`] that leaves a Control, Alt or Command chord for the shortcuts.
+    pub(crate) fn consume_plain_key(&mut self, id: WidgetId, key: NamedKey) -> bool {
+        self.take_key(id, key, false)
+    }
+
+    fn take_key(&mut self, id: WidgetId, key: NamedKey, chords: bool) -> bool {
         let focus = self.key_focus;
         let Some(k) = self.keys.iter_mut().find(|k| {
             !k.consumed
                 && k.named() == Some(key)
+                && (chords || !k.chord())
                 && match k.target {
                     Some(t) => t == id,
                     None => focus == Some(id),
@@ -110,6 +126,12 @@ impl Ui<'_> {
             })
             .map(|(i, k)| (i, k.event.clone()))
             .collect()
+    }
+
+    /// Whether the event at `index` of [`Self::focus_events`] stands for an accessibility action
+    /// rather than a key the user pressed.
+    pub(crate) fn focus_event_is_synthetic(&self, index: usize) -> bool {
+        self.keys.get(index).is_some_and(|k| k.target.is_some())
     }
 
     /// Takes the event at `index` of [`Self::focus_events`]; the frame then asks for a catch-up

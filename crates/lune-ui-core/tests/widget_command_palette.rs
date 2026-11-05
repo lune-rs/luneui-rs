@@ -6,7 +6,9 @@
 
 use lune_ui_core::access::{Action, Live, Node, Role, State, Value};
 use lune_ui_core::color::premul;
-use lune_ui_core::input::{FrameOutput, Key, Keymap, Modifiers, NamedKey, PointerButton, Repaint};
+use lune_ui_core::input::{
+    FrameOutput, ImeEvent, Key, Keymap, Modifiers, NamedKey, PointerButton, Repaint,
+};
 use lune_ui_core::motion::{MotionTier, Time};
 use lune_ui_core::paint::{LayerId, Painter, Rect};
 use lune_ui_core::scene::Scene;
@@ -776,17 +778,67 @@ fn tab_stays_in_the_card_and_never_lands_on_a_row() {
         );
     }
     q.push_str("ma");
-    let mut seen = Vec::new();
+    h.at_ms(1290);
+    frame(&mut h, &mut q, &secs);
     for i in 0..4 {
         let (_, out, _) = press(&mut h, &mut q, &secs, 1300 + i * 20, NamedKey::Tab);
-        let f = out.focused.expect("focus stays in the card");
-        assert!(
-            [search_id(), search_id().with("clear")].contains(&f),
-            "{f:?}"
-        );
-        seen.push(f);
+        assert_eq!(out.focused, Some(search_id()), "one stop with a query too");
     }
-    assert_ne!(seen[0], seen[1], "the clear button is the only other stop");
+}
+
+#[test]
+fn the_keys_still_work_after_a_tab_with_text_in_the_box() {
+    let secs = sections();
+    let (mut h, mut q) = opened(&secs);
+    q.push_str("ma");
+    h.at_ms(1090);
+    frame(&mut h, &mut q, &secs);
+    press(&mut h, &mut q, &secs, 1100, NamedKey::Tab);
+    press(&mut h, &mut q, &secs, 1120, NamedKey::ArrowDown);
+    let (_, _, r) = press(&mut h, &mut q, &secs, 1140, NamedKey::Enter);
+    assert_eq!(r.activated, Some(2));
+    assert_eq!(q, "ma", "Enter does not clear the query");
+}
+
+#[test]
+fn a_click_on_the_clear_button_clears_and_leaves_focus_in_the_box() {
+    let secs = sections();
+    let (mut h, mut q) = opened(&secs);
+    q.push_str("ma");
+    h.at_ms(1090);
+    let (_, out, _) = frame(&mut h, &mut q, &secs);
+    let clear = node(&out, search_id().with("clear"));
+    assert!(!clear.states.contains(State::Focusable));
+    assert!(clear.actions.contains(Action::Default));
+    let at = clear.bounds;
+    h.input.pointer_to(at.x + at.w / 2.0, at.y + at.h / 2.0);
+    h.at_ms(1100);
+    frame(&mut h, &mut q, &secs);
+    h.input.press(P);
+    h.at_ms(1110);
+    let (_, out, _) = frame(&mut h, &mut q, &secs);
+    assert_eq!(out.focused, Some(search_id()), "the press took no focus");
+    h.input.release(P);
+    h.at_ms(1120);
+    let (_, out, r) = frame(&mut h, &mut q, &secs);
+    assert!(q.is_empty() && r.changed);
+    assert_eq!(out.focused, Some(search_id()));
+}
+
+#[test]
+fn enter_committing_a_composition_activates_nothing() {
+    let secs = sections();
+    let (mut h, mut q) = opened(&secs);
+    h.input.ime(ImeEvent::Preedit {
+        text: "か".to_owned(),
+        cursor: Some((0, 3)),
+    });
+    h.at_ms(1100);
+    frame(&mut h, &mut q, &secs);
+    let (_, _, r) = press(&mut h, &mut q, &secs, 1120, NamedKey::Enter);
+    assert_eq!(r.activated, None);
+    let (_, _, r) = press(&mut h, &mut q, &secs, 1140, NamedKey::ArrowDown);
+    assert_eq!(r.activated, None);
 }
 
 #[test]

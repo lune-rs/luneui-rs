@@ -56,7 +56,7 @@ pub struct DialogHits<H> {
 const CARD_W: f32 = 448.0;
 /// The form dialog's card width.
 const FORM_W: f32 = 600.0;
-/// The scrim blur's Gaussian sigma and saturation (the window content behind a Wane dialog).
+/// The scrim blur's Gaussian sigma and saturation (the window content behind the dialog).
 const SCRIM_SIGMA: f32 = 8.0;
 const SCRIM_SATURATION: f32 = 1.0;
 /// The card's scale at the start of the open and the end of the close.

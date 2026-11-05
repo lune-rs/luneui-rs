@@ -104,11 +104,13 @@ tree, focused widget and the shortcut commands that fired. `FrameConfig` also ca
   draws and takes input on top; no widget asks for it. The rule is one level deep: overlays stacked further share
   `Raised`, and a layer draws by kind, so a third level that overlaps its parent interleaves with it (fills under
   text). A toast is not an overlay record: `Ui::toasts` draws on `Toast` directly and a press on a `Toast` hit is
-  never an outside press (D146). `Ui::overlay` also pauses any enclosing `record`, so a dialog's exit replay does not
+  never an outside press, moves no focus, and an accessibility action on one dismisses no overlay and takes no focus
+  out of a modal (D146). `Ui::overlay` also pauses any enclosing `record`, so a dialog's exit replay does not
   draw the overlays opened in its body (D139).
 - Disabled scope (D140): `Ui::node` inside a disabled scope (`with_enabled(false, ..)`) sets `State::Disabled` and
   clears `Focusable` and the actions, so a group node cannot be forgotten; a widget consumes its keys first and gates
-  after (`Ui::activation_keys`), so a disabled widget keeps its keys from the shortcuts.
+  after (`Ui::activation_keys`), so a disabled widget keeps its keys from the shortcuts. The stepper, slider, virtual
+  list, combo, search picker and scroll area do not yet (STATE's carried limits).
   `testing::disabled_violations(tree, root)` walks a subtree for a node that broke the rule.
 - Focus: scopes with a tab trap, initial focus, and restore on close (D72); keys are consumed by id
   (`consume_key`); a focused widget that is not registered for a frame loses focus unless a live
@@ -396,6 +398,7 @@ Since M7 (D137 to D154):
   `toast_warning`, `toast_error`, `toast_log_bg`, `toast_log_fg`, `dirty_indicator`, `count_badge` and `status_error`;
   `strings` gains `luneui.menu.name`, the `luneui.toast-notifications.*`, `luneui.command-palette.*` and
   `luneui.settings-page.*` keys; `icon` gains `CHEVRON_RIGHT`, `WARNING`, `ERROR`, `CLEAR_ALL` and `CIRCLE_SLASH`;
+- `FilterOptions` gains `clear_unfocusable`; `Ui::activation_keys` leaves chords to the shortcuts (D157);
 - no scene that existed before M7 changed: each step passed the pixel gate at zero delta against its base, and the
   new scenes are the only ones the visual batches (steps 13 and 14) moved.
 

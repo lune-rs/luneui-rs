@@ -265,7 +265,7 @@ fn the_footer_is_an_ok_dot_and_text_or_an_err_dot_and_a_stopped_line() {
 
 #[test]
 fn a_long_footer_is_elided_to_the_room_beside_the_dot() {
-    let long = "Proxy listening on 127.0.0.1:4646 and a long path ~/.wane/state/somewhere";
+    let long = "Proxy listening on 127.0.0.1:4646 and a long path ~/.demo/state/somewhere";
     let mut h = UiHarness::new(WIN);
     let mut c = Case {
         footer: Some(SidebarFooter {

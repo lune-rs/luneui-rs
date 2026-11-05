@@ -4,7 +4,7 @@
 use lune_ui_core::access::{Action, Role, State};
 use lune_ui_core::color::premul;
 use lune_ui_core::icon;
-use lune_ui_core::input::{Key, NamedKey, PointerButton, Repaint};
+use lune_ui_core::input::{Key, Modifiers, NamedKey, PointerButton, Repaint};
 use lune_ui_core::motion::{MotionTier, conformance};
 use lune_ui_core::paint::{Painter, Rect};
 use lune_ui_core::scene::Scene;
@@ -582,6 +582,35 @@ fn a_radio_group(ui: &mut Ui<'_>) {
         &mut 0,
         "Label",
     );
+}
+
+#[test]
+fn a_chord_on_enter_or_space_is_a_shortcut_and_clicks_nothing() {
+    for k in [NamedKey::Enter, NamedKey::Space] {
+        let mut h = UiHarness::new(WIN);
+        h.shortcuts.add(Binding::new(
+            Scope::Global,
+            Chord::key(Key::Named(k)).ctrl(),
+            "chord",
+        ));
+        let at = Rect::new(10.0, 10.0, 100.0, 30.0);
+        let mut clicked = false;
+        let mut run = |h: &mut UiHarness| {
+            h.frame(|ui| clicked = ui.button("b", at, "B", ButtonKind::Secondary).clicked)
+                .1
+        };
+        run(&mut h);
+        h.input.key_down(Key::Named(NamedKey::Tab), None);
+        assert!(run(&mut h).focused.is_some());
+        h.input.set_modifiers(Modifiers {
+            control: true,
+            ..Modifiers::default()
+        });
+        h.input.key_down(Key::Named(k), None);
+        let out = run(&mut h);
+        assert!(!clicked, "{k:?}");
+        assert_eq!(out.fired.len(), 1, "{k:?}");
+    }
 }
 
 /// Focuses the widget, disables it, presses `keys` in one frame and returns what fired.

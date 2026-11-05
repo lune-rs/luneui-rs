@@ -6,7 +6,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
-use lune_ui_core::access::Role;
+use lune_ui_core::access::{Node, Role};
 use lune_ui_core::input::{FrameOutput, Key, NamedKey, PointerButton, Repaint};
 use lune_ui_core::motion::{Easing, Kind, Motion, MotionTier, Reduce, Token};
 use lune_ui_core::paint::{LayerId, Rect};
@@ -1037,6 +1037,127 @@ fn a_child_reopening_after_its_parent_closed_is_on_popup() {
         assert_eq!(fills(&scene, LayerId::Popup), 1);
         assert_eq!(fills(&scene, LayerId::Raised), 0);
     }
+}
+
+/// What one frame of the reopen tests' overlays reports.
+#[derive(Default)]
+struct Reopen {
+    scene: Option<Scene>,
+    focused: Option<WidgetId>,
+    enter: bool,
+    clicked: bool,
+    confirm_enter: bool,
+    dismissed: Option<Dismissal>,
+}
+
+/// A dialog when asked for, and after it the popup `child` when asked for. Both read Enter.
+fn reopen_frame(h: &mut UiHarness, at: u64, with_dialog: bool, with_popup: bool) -> Reopen {
+    let mut r = Reopen::default();
+    let (scene, out) = h.at_ms(at).frame(|ui| {
+        if with_dialog {
+            ui.overlay(
+                "dialog",
+                &modal(),
+                |_, _, _| {},
+                |ui, _| {
+                    let ok = ui.id("ok");
+                    let at = Rect::new(160.0, 180.0, 60.0, 24.0);
+                    ui.interact(ok, at, Sense::CLICK_FOCUS);
+                    ui.node(Node::new(ok, Role::Button, "ok", at));
+                    r.confirm_enter = ui.consume_key(ok, NamedKey::Enter);
+                },
+            );
+        }
+        if with_popup {
+            let (f, b) = ui.overlay(
+                "child",
+                &popup(),
+                |p, _, _| p.fill(MENU, 0.0, [1, 2, 3, 255]),
+                |ui, _| {
+                    ui.painter().fill(MENU, 0.0, [1, 2, 3, 255]);
+                    let id = ui.id("row");
+                    let b = ui.interact(id, MENU, Sense::CLICK_FOCUS);
+                    ui.node(Node::new(id, Role::Button, "row", MENU));
+                    r.enter = ui.consume_key(id, NamedKey::Enter);
+                    b
+                },
+            );
+            r.clicked = b.clicked;
+            r.dismissed = f.dismissed;
+        }
+    });
+    r.scene = Some(scene);
+    r.focused = out.focused;
+    r
+}
+
+/// A popup open and settled, closing from 1,000 ms, a dialog opened at 1,010 ms with its button
+/// focused, and the popup called again at 1,020 ms, inside its close.
+fn reopened_under_a_modal() -> (UiHarness, Reopen) {
+    let mut h = harness();
+    reopen_frame(&mut h, 0, false, true);
+    reopen_frame(&mut h, 500, false, true);
+    reopen_frame(&mut h, 1_000, false, false);
+    reopen_frame(&mut h, 1_010, true, false);
+    let held = reopen_frame(&mut h, 1_015, true, false);
+    assert!(held.focused.is_some(), "the dialog took focus");
+    assert!(
+        fills(held.scene.as_ref().expect("scene"), LayerId::Popup) >= 1,
+        "the popup is still closing"
+    );
+    let r = reopen_frame(&mut h, 1_020, true, true);
+    (h, r)
+}
+
+#[test]
+fn a_popup_reopened_during_its_close_under_a_newer_modal_is_raised_on_every_frame() {
+    let (mut h, r) = reopened_under_a_modal();
+    let scene = r.scene.expect("scene");
+    assert_eq!(fills(&scene, LayerId::Raised), 1, "on the reopen's frame");
+    assert_eq!(fills(&scene, LayerId::Popup), 0);
+    for t in [1_030, 1_300, 1_600] {
+        let r = reopen_frame(&mut h, t, true, true);
+        let scene = r.scene.expect("scene");
+        assert_eq!(fills(&scene, LayerId::Raised), 1, "at {t}");
+        assert_eq!(fills(&scene, LayerId::Popup), 0, "at {t}");
+    }
+}
+
+#[test]
+fn a_popup_reopened_under_a_newer_modal_takes_input_and_gives_focus_back() {
+    let (mut h, r) = reopened_under_a_modal();
+    let row = WidgetId::ROOT.with("row");
+    let ok = WidgetId::ROOT.with("ok");
+    assert_eq!(r.focused, Some(row), "a true open takes focus");
+    for t in [1_300, 1_600] {
+        reopen_frame(&mut h, t, true, true);
+    }
+    h.input.key_down(Key::Named(NamedKey::Enter), None);
+    let r = reopen_frame(&mut h, 1_610, true, true);
+    assert!(r.enter && !r.confirm_enter, "its keys are live");
+    h.input.pointer_to(MENU.x + 5.0, MENU.y + 5.0);
+    reopen_frame(&mut h, 1_620, true, true);
+    h.input.click(P);
+    assert!(reopen_frame(&mut h, 1_630, true, true).clicked);
+    // Escape closes it alone, focus goes back to the dialog, and the dialog has the keys.
+    h.input.key_down(Key::Named(NamedKey::Escape), None);
+    let r = reopen_frame(&mut h, 1_640, true, true);
+    assert_eq!(r.dismissed, Some(Dismissal::Escape));
+    let r = reopen_frame(&mut h, 1_650, true, false);
+    assert_eq!(r.focused, Some(ok));
+    h.input.key_down(Key::Named(NamedKey::Enter), None);
+    assert!(reopen_frame(&mut h, 1_660, true, false).confirm_enter);
+}
+
+#[test]
+fn a_popup_reopened_with_no_new_modal_keeps_its_place() {
+    let mut h = harness();
+    reopen_frame(&mut h, 0, false, true);
+    reopen_frame(&mut h, 500, false, true);
+    reopen_frame(&mut h, 1_000, false, false);
+    let r = reopen_frame(&mut h, 1_020, false, true);
+    assert_eq!(fills(&r.scene.expect("scene"), LayerId::Popup), 1);
+    assert_eq!(r.focused, Some(WidgetId::ROOT.with("row")));
 }
 
 #[test]

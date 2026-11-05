@@ -104,6 +104,20 @@ fn open_layer(overlays: &[OverlayRec], requested: LayerId, tag: u32) -> LayerId 
     }
 }
 
+/// Whether an active modal opened after the overlay with `tag`.
+fn modal_above(overlays: &[OverlayRec], tag: u32) -> bool {
+    overlays
+        .iter()
+        .any(|o| o.tag > tag && o.active() && o.opts.modal)
+}
+
+/// The next overlay's tag. Base content is tag 0; overlays count up from 1 in open order.
+fn next_tag(store: &mut super::UiStore) -> u32 {
+    let tag = store.next_tag.saturating_add(1).min(SUPPRESSED - 1);
+    store.next_tag = tag;
+    tag
+}
+
 /// `r` unless the motion is absent or takes no time.
 fn usable(r: Option<Resolved>) -> Option<Resolved> {
     r.filter(|r| !r.duration.is_zero())
@@ -227,7 +241,8 @@ impl<'a> Ui<'a> {
     ///
     /// A `Popup` or `Modal` overlay opened above an active modal draws on [`LayerId::Raised`]
     /// instead. That is settled at open or reopen and holds until it closes, whatever later frames
-    /// pass as `layer`, so the overlay draws, hits and exits on one layer. What `content` draws is
+    /// pass as `layer`, so the overlay draws, hits and exits on one layer. A reopen under a modal
+    /// that opened during the close is an open above that modal. What `content` draws is
     /// the overlay's alone: a surrounding [`Self::record`] does not get it.
     pub fn overlay<R>(
         &mut self,
@@ -240,12 +255,10 @@ impl<'a> Ui<'a> {
         let now = self.time();
         let (tokens, tier) = (self.config.theme.motion, self.config.tier);
         let focused = self.store.focus.focused;
-        let index = match self.store.overlays.iter().position(|o| o.id == id) {
+        let mut index = match self.store.overlays.iter().position(|o| o.id == id) {
             Some(i) => i,
             None => {
-                // Base content is tag 0; overlays count up from 1 in open order.
-                let tag = self.store.next_tag.saturating_add(1).min(SUPPRESSED - 1);
-                self.store.next_tag = tag;
+                let tag = next_tag(self.store);
                 let layer = open_layer(&self.store.overlays, options.layer, tag);
                 self.store.overlays.push(OverlayRec {
                     id,
@@ -264,6 +277,14 @@ impl<'a> Ui<'a> {
             }
         };
         let reopened = !self.store.overlays[index].active();
+        // A modal that opened during the close is under a reopen as it is under any open: the
+        // overlay goes last in the stack with a new tag, so it is above the modal and not below it.
+        if reopened && modal_above(&self.store.overlays, self.store.overlays[index].tag) {
+            let mut rec = self.store.overlays.remove(index);
+            rec.tag = next_tag(self.store);
+            self.store.overlays.push(rec);
+            index = self.store.overlays.len() - 1;
+        }
         let layer = if reopened {
             let tag = self.store.overlays[index].tag;
             open_layer(&self.store.overlays, options.layer, tag)

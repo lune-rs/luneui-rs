@@ -70,7 +70,7 @@ Opening and closing are the dialog's (`pop`, base, quad-out; dismiss, fast; Redu
 
 - Pointer: a click on a row activates it and selects it; a click on the scrim reports `dismissed`; a click on the card does nothing.
 - Keyboard (focus stays in the search box): Up and Down move the selection, wrapping, over rows and "show more" rows in order; Enter activates the selected row (or reports `show_more`); Escape reports `dismissed`. Up, Down and Enter are taken before the box draws, so they never reach it, and they are taken, but do nothing, in a disabled scope or with no rows. Control, Alt and Command chords stay shortcuts (an `Overlay` binding fires inside the palette; a `Global` one does not while it is open). While an input method composes, the keys are its own.
-- Tab stop: the search box only; rows have none. With text in the box the clear button is the second stop, as the filter bar's; Tab never leaves the card.
+- Tab stop: the search box only; rows have none, and the clear button is none (`FilterOptions::clear_unfocusable`: the pointer and accessibility reach it, and a click leaves focus in the box), so Tab never leaves the box [D147].
 - Layer: Modal (an overlay above it, a tooltip or a dialog the app opens, goes to `Raised`) [D137].
 - Focus scope: the modal host's: opens focused in the search box; Escape and scrim click act on the top overlay only.
 - Pointer capture while pressed: a row's, as any click region.

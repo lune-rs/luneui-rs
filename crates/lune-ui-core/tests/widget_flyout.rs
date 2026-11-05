@@ -585,7 +585,7 @@ fn a_disabled_flyout_closes_on_escape_picks_nothing_and_marks_every_node() {
     assert!(frame(&mut h, 410).1.dismissed, "Escape still closes it");
 }
 
-/// The routes' keys are set at `font_s` (Wane's `.c-kv dt`), and the stats strip has its outline:
+/// The routes' keys are set at `font_s` (the app design's key column), and the stats strip has its outline:
 /// a 1 px ring at radius 8 on the strip's 50 px rect, with the cells 1 px inside it.
 #[test]
 fn the_routes_keys_are_small_and_the_strip_has_its_outline() {
