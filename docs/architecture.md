@@ -226,7 +226,10 @@ nothing acted. Each gates on `enabled` or a focus that is false in a disabled sc
 Not a leak: Escape in a pointer drag (`consume_key_while_pressed`: the splitter, `drag_gesture`) fired nothing enabled
 and fired its binding once the scope turned disabled mid-drag (probe, splitter and tab strip). From reading: `Ui::interact`
 reports no press in a disabled scope, so the drag has ended and Escape has nothing to cancel, which `drag.rs` leaves to
-the shortcuts by design.
+the shortcuts by design. A drag inside an overlay (a dialog body) is a different case, fixed in M8 (D175): `Ui::begin` used to turn
+Escape into the overlay's dismissal and never queue it, so the drag could not take it. The three readers of
+`consume_key_while_pressed` (`drag_gesture`, `free_drag_gesture`, the splitter) now call `Ui::note_live_gesture` while they drag,
+and the next frame's Escape is queued for them; once the drag ends the next Escape dismisses the overlay.
 
 One item disabled in a live group holds too, by probe: a nav row, a rail button, a menu row, a `toolbar_action`, the
 dialog's disabled confirm. A disabled radio option takes its keys, and the arrows move on to a live sibling.
@@ -478,6 +481,9 @@ Since M8 (D160 to D174; nothing public was removed or changed in signature):
   serves a focused child in a disabled scope; `virtual_list` and the combo consume then gate (D160);
 - `icon` gains `ARROW_UP`, `ARROW_DOWN`, `ACCOUNT` and `NOTE`; `strings` gains `luneui.bar-chart.name`,
   `luneui.pie-chart.name` and four `luneui.kanban-board.*` keys; no `Theme` token was added;
+- Escape cancels a live pointer drag before the overlay around it dismisses (D175): `UiStore.gesture_live`, set through the
+  crate-private `Ui::note_live_gesture` by `drag_gesture`, `free_drag_gesture` and the splitter while they drag, read and
+  cleared at each `begin`; the board's column list registers no scroll sense when its cards fit, so the wheel reaches the board;
 - no scene that existed before M8 changed: the pixel gate against the M7 tip reads 305 identical and 27 new.
 
 Since M7 (D137 to D154):
