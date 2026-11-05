@@ -63,6 +63,8 @@ struct Setup {
     sortable: bool,
     /// Row `i` is key `count - 1 - i`: the app sorted descending.
     reverse: bool,
+    /// The app clears the sort before the table is drawn.
+    clear_sort: bool,
 }
 
 fn setup(count: usize) -> Setup {
@@ -72,6 +74,7 @@ fn setup(count: usize) -> Setup {
         enabled: true,
         sortable: true,
         reverse: false,
+        clear_sort: false,
     }
 }
 
@@ -120,6 +123,9 @@ fn frame_with(
     let mut sel = ListState::default();
     let mut state = TableState::default();
     let (scene, out) = h.frame(|ui| {
+        if s.clear_sort {
+            ui.table_state("t").sort = None;
+        }
         ui.with_enabled(s.enabled, |ui| {
             r = Some(ui.table("t", TABLE, &opts, row_key, |ui, c| {
                 cells.push(*c);
@@ -937,6 +943,16 @@ fn without_the_wrap_option_a_wrap_cell_stays_one_elided_line() {
             .filter(|n| n.role == Role::Row && n.id != head_id())
             .all(|n| n.bounds.h == ROW)
     );
+    // The text itself is one elided line: neither the whole text nor a wrapped layout of it is drawn
+    // (the Note column's text is 86 px wide).
+    let style = body_style(DARK.fg_primary);
+    let long = "x".repeat(40);
+    let whole = Spec::plain(long.clone(), style);
+    assert!(find(&r.scene, &whole, 1.0).is_none(), "elided");
+    assert!(
+        find(&r.scene, &whole.clone().wrapped(86.0), 1.0).is_none(),
+        "not wrapped, though the cell asks: the table does not"
+    );
 }
 
 // The look at scale 2.
@@ -1208,6 +1224,54 @@ fn the_header_fades_over_fast_and_the_reduced_and_off_tiers_agree_at_rest() {
     assert!(find(&r.scene, &secondary, 1.0).is_some());
     let up = icon::glyph(icon::ARROW_UP, ARROW, DARK.fg_secondary);
     assert!(find(&r.scene, &up, 1.0).is_some());
+}
+
+/// The brightness of the sort arrow `glyph` in `scene`, if it is drawn: its colour is `fg_secondary`
+/// at the fade's alpha, found by the text key.
+fn arrow_alpha(scene: &Scene, glyph: &str) -> Option<u8> {
+    (1..=255u8).find(|&a| {
+        let mut c = DARK.fg_secondary;
+        c[3] = a;
+        find(scene, &icon::glyph(glyph, ARROW, c), 1.0).is_some()
+    })
+}
+
+/// A sorted header that the app unsorts fades its arrow out the way it came in: the same
+/// direction, still drawn half way, gone at the end.
+#[test]
+fn an_unsorted_header_fades_its_arrow_out_in_the_direction_it_showed() {
+    let s = setup(10);
+    let mut h = harness();
+    run(&mut h, &s);
+    click(&mut h, over_header(0));
+    run(&mut h, &s);
+    click(&mut h, over_header(0));
+    run(&mut h, &s);
+    let mut ms = 0;
+    let r = settle(&mut h, &s, &mut ms);
+    assert_eq!(r.state.sort.map(|k| k.descending), Some(true));
+    let full = arrow_alpha(&r.scene, icon::ARROW_DOWN).expect("the descending arrow");
+    assert_eq!(full, DARK.fg_secondary[3]);
+
+    let clear = Setup {
+        clear_sort: true,
+        ..s
+    };
+    ms += 1000;
+    h.at_ms(ms);
+    run(&mut h, &clear);
+    h.at_ms(ms + 60);
+    let mid = run(&mut h, &clear);
+    assert_eq!(mid.out.repaint, Repaint::Now, "in flight");
+    let a = arrow_alpha(&mid.scene, icon::ARROW_DOWN).expect("still drawn half way, pointing down");
+    assert!(a > 0 && a < full, "partly faded: {a}");
+    assert!(
+        arrow_alpha(&mid.scene, icon::ARROW_UP).is_none(),
+        "not flipped by the fade"
+    );
+    let end = settle(&mut h, &clear, &mut ms);
+    assert!(arrow_alpha(&end.scene, icon::ARROW_DOWN).is_none());
+    assert!(arrow_alpha(&end.scene, icon::ARROW_UP).is_none());
 }
 
 #[test]

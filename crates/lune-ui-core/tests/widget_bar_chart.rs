@@ -218,16 +218,193 @@ fn x_labels_are_centred_in_their_slot_below_the_plot() {
 
 #[test]
 fn an_x_label_is_elided_to_the_distance_to_the_next_label() {
+    // Twelve chars of 5.5 px are 66: more than the 50 px slot, less than the plot's 100.
+    let long = "000000000000";
     let o = BarChartOptions {
-        x_labels: &[(0, "00000000000000000000"), (1, "03")],
+        x_labels: &[(0, long), (1, "03")],
         ..base()
     };
     let d = draw(&o);
-    let long = label_spec("00000000000000000000", 1.0);
     assert!(
-        texts(&d.scene).iter().all(|t| t.key.0 != long),
-        "twenty chars do not fit one 50 px slot"
+        texts(&d.scene)
+            .iter()
+            .all(|t| t.key.0 != label_spec(long, 1.0)),
+        "it does not fit the one slot to the next label"
     );
+    // The last label has the rest of the plot.
+    let o = BarChartOptions {
+        x_labels: &[(0, long)],
+        ..base()
+    };
+    let d = draw(&o);
+    assert!(
+        texts(&d.scene)
+            .iter()
+            .any(|t| t.key.0 == label_spec(long, 1.0)),
+        "with no label after it, it has the plot to the end"
+    );
+}
+
+// Six columns of 16.67 px: a twelve-char label (66 px) needs four slots.
+const SIX: [BarColumn<'static>; 6] = [
+    BarColumn {
+        values: &[10.0, 10.0],
+        tip: "",
+    },
+    BarColumn {
+        values: &[10.0, 10.0],
+        tip: "",
+    },
+    BarColumn {
+        values: &[10.0, 10.0],
+        tip: "",
+    },
+    BarColumn {
+        values: &[10.0, 10.0],
+        tip: "",
+    },
+    BarColumn {
+        values: &[10.0, 10.0],
+        tip: "",
+    },
+    BarColumn {
+        values: &[10.0, 10.0],
+        tip: "",
+    },
+];
+
+#[test]
+fn x_labels_are_ordered_by_column_whatever_the_order_they_are_given_in() {
+    let long = "000000000000";
+    // Given last-first: column 0's label still has only the three slots to the label at 3.
+    let o = BarChartOptions {
+        columns: &SIX,
+        x_labels: &[(3, "03"), (0, long)],
+        ..base()
+    };
+    let d = draw(&o);
+    assert!(
+        texts(&d.scene)
+            .iter()
+            .all(|t| t.key.0 != label_spec(long, 1.0)),
+        "elided to the distance to the next label by column"
+    );
+    // Given in order: the same.
+    let o = BarChartOptions {
+        columns: &SIX,
+        x_labels: &[(0, long), (3, "03")],
+        ..base()
+    };
+    let d = draw(&o);
+    assert!(
+        texts(&d.scene)
+            .iter()
+            .all(|t| t.key.0 != label_spec(long, 1.0))
+    );
+    // And the label at 3 has the rest of the plot, in either order: eight chars (44 px) fit
+    // its three slots (50 px).
+    let eight = "00000000";
+    for labels in [[(3, eight), (0, "03")], [(0, "03"), (3, eight)]] {
+        let o = BarChartOptions {
+            columns: &SIX,
+            x_labels: &labels,
+            ..base()
+        };
+        let d = draw(&o);
+        assert!(
+            texts(&d.scene)
+                .iter()
+                .any(|t| t.key.0 == label_spec(eight, 1.0)),
+            "{labels:?}"
+        );
+    }
+}
+
+#[test]
+fn a_label_for_a_column_that_is_not_there_is_not_drawn() {
+    let o = BarChartOptions {
+        x_labels: &[(0, "00"), (2, "zz"), (9, "yy")],
+        ..base()
+    };
+    let d = draw(&o);
+    for gone in ["zz", "yy"] {
+        assert!(
+            texts(&d.scene)
+                .iter()
+                .all(|t| t.key.0 != label_spec(gone, 1.0)),
+            "{gone}: two columns only"
+        );
+    }
+    assert!(
+        texts(&d.scene)
+            .iter()
+            .any(|t| t.key.0 == label_spec("00", 1.0))
+    );
+}
+
+#[test]
+fn values_past_the_series_count_do_not_make_an_empty_chart_a_chart() {
+    // Two series, three values: the third is nobody's.
+    static COLUMNS: [BarColumn<'static>; 2] = [
+        BarColumn {
+            values: &[0.0, 0.0, 50.0],
+            tip: "",
+        },
+        BarColumn {
+            values: &[0.0, 0.0, 70.0],
+            tip: "",
+        },
+    ];
+    let o = BarChartOptions {
+        columns: &COLUMNS,
+        ..base()
+    };
+    let d = draw(&o);
+    assert!(
+        of_color(&d.scene, LOW).iter().all(|s| s.rect[2] == 8.0),
+        "no bar of series 0"
+    );
+    assert!(
+        texts(&d.scene)
+            .iter()
+            .all(|t| t.key.0 != label_spec("1.4M", 1.0)),
+        "still empty: no y labels"
+    );
+    assert!(
+        texts(&d.scene)
+            .iter()
+            .any(|t| t.key.0 == label_spec("00", 1.0)),
+        "x labels stay"
+    );
+}
+
+#[test]
+fn a_segment_under_a_pixel_takes_a_smaller_gap_than_a_pixel() {
+    // 0.5 px of series 0 (value 0.3125 of 100 over 160 px), then series 1.
+    static COLUMNS: [BarColumn<'static>; 1] = [BarColumn {
+        values: &[0.3125, 40.0],
+        tip: "",
+    }];
+    let o = BarChartOptions {
+        columns: &COLUMNS,
+        ..base()
+    };
+    let mut h = UiHarness::new(WIN);
+    draw_in(&mut h, &o);
+    h.at_ms(5000);
+    let d = draw_in(&mut h, &o);
+    let bottom = RECT.y + 160.0;
+    let low = of_color(&d.scene, LOW)
+        .into_iter()
+        .find(|s| s.rect[2] == 12.0)
+        .expect("series 0");
+    assert_eq!(low.rect[3], 0.5);
+    let high = of_color(&d.scene, HIGH)
+        .into_iter()
+        .find(|s| s.rect[2] == 12.0)
+        .expect("series 1");
+    // The gap is the segment's own half pixel, not a whole one: 0.5 + 0.5.
+    assert_eq!(high.rect[1] + high.rect[3], bottom - 1.0);
 }
 
 #[test]
