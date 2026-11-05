@@ -134,7 +134,7 @@ pub enum ToastKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ToastAction {
     pub label: String,
-    /// Drawn last, at the far right.
+    /// The look: the filled `surface_input` button; the others are ghosts. Position is the app's order.
     pub primary: bool,
     pub id: u64,
 }
@@ -377,13 +377,9 @@ struct Parts {
     total: f32,
 }
 
-fn bar_height(kind: ToastKind) -> f32 {
-    match kind {
-        ToastKind::Loading {
-            progress: Some(_), ..
-        } => progress::HEIGHT,
-        _ => progress::HEIGHT_INDETERMINATE,
-    }
+/// The bar is 3 px high in both states (`MainWindow.axaml:369`, `Height="3"`).
+fn bar_height(_kind: ToastKind) -> f32 {
+    progress::HEIGHT_INDETERMINATE
 }
 
 fn message_style(t: &Theme) -> Style {
@@ -838,7 +834,7 @@ impl<'a> Ui<'a> {
             y += SECTION_TOP;
             let track = Rect::new(x0, y, w, 0.0);
             if live {
-                self.progress(
+                self.progress_sized(
                     "progress",
                     track,
                     &ProgressOptions {
@@ -847,6 +843,7 @@ impl<'a> Ui<'a> {
                         head: None,
                         name: spec.message.as_str(),
                     },
+                    bar_height(spec.kind),
                 );
             } else {
                 let bar = Rect::new(x0, y, w, bar_height(spec.kind));
@@ -873,12 +870,11 @@ impl<'a> Ui<'a> {
             y += LOG_HEIGHT;
         }
 
-        // The actions, secondary first and the primary last, right-aligned.
+        // The actions in the app's order (`MainWindow.axaml:373-392` sorts nothing), right-aligned.
         if !spec.actions.is_empty() {
             y += SECTION_TOP;
             let height = action_height(&t);
-            let mut order: Vec<usize> = (0..spec.actions.len()).collect();
-            order.sort_by_key(|&i| spec.actions[i].primary);
+            let order: Vec<usize> = (0..spec.actions.len()).collect();
             let total: f32 = order.iter().map(|&i| m.action_widths[i]).sum::<f32>()
                 + ACTION_GAP * (order.len() - 1) as f32;
             let mut x = x0 + w - total;
@@ -996,7 +992,7 @@ impl<'a> Ui<'a> {
         let clear = self.tr("luneui.toast-notifications.clear-all");
         let id = self.id(&key);
         let top = rect.y + HISTORY_HEADER_TOP;
-        let title = Spec::plain(header, Style::ui(t.font_m, t.fg_bright).bold());
+        let title = Spec::plain(header, Style::ui(t.font_m, t.on_accent).bold());
         let th = self.painter().measure(&title).1;
         self.painter()
             .text(&title, rect.x, top + (HISTORY_HEADER - th) / 2.0);

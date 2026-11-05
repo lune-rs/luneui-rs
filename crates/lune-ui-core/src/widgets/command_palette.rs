@@ -33,12 +33,21 @@ pub const CARD_W: f32 = 640.0;
 pub const MAX_H: f32 = 720.0;
 /// The results area's greatest height.
 pub const RESULTS_MAX_H: f32 = 560.0;
-/// The search row: padding left, top, right and bottom, and the bar's height.
+/// The search row: padding left, top, right and bottom, and the bar's height (a 28 px dock with
+/// the filter bar's 8 by 6 padding around it: `GlobalSearchDialogView.axaml:17-18`,
+/// `App.axaml:302-306`).
 pub const SEARCH_PAD: [f32; 4] = [18.0, 18.0, 18.0, 10.0];
-pub const SEARCH_H: f32 = 28.0;
-/// The results area's horizontal margin and the gap under it; its content is inset by `LIST_PAD`.
-pub const RESULTS_MARGIN: (f32, f32) = (18.0, 10.0);
+pub const SEARCH_H: f32 = 40.0;
+/// The results area spans the card, with no margin and no gap under it (`GlobalSearchDialogView.axaml:
+/// 59-67`: the `ScrollViewer` has `Padding="10,0,10,0"`; the `18,0,18,10` margin at `:60` is the
+/// indexing banner's). Its content is inset by `LIST_PAD`, so rows sit 10 in and their text 18.
 pub const LIST_PAD: f32 = 10.0;
+/// The gap under the error line in the footer (the stack's spacing, `axaml:523`).
+const ERROR_GAP: f32 = 6.0;
+/// The destructive mark: a dot of this diameter at the row's right edge, 8 from what is left of
+/// it (`axaml:489-496`).
+const DOT: f32 = 6.0;
+const DOT_GAP: f32 = 8.0;
 /// A row's padding (horizontal, vertical), corner radius, and the space between its icon and text.
 pub const ROW_PAD: (f32, f32) = (8.0, 6.0);
 pub const ROW_RADIUS: f32 = 6.0;
@@ -89,7 +98,7 @@ pub struct Palette<'a> {
     pub placeholder: &'a str,
     /// Left of the footer; the right is the string table's `luneui.command-palette.footer-right`.
     pub footer_left: &'a str,
-    /// One line above the results, in the error tone, announced politely.
+    /// One line in the footer above its text, in `status_error`, announced politely.
     pub error: Option<&'a str>,
     pub name: &'a str,
 }
@@ -139,8 +148,15 @@ impl Lines {
         2.0 * ROW_PAD.1 + self.small
     }
 
-    fn footer(self) -> f32 {
-        FOOTER_PAD[1] + self.small + FOOTER_PAD[3]
+    /// The footer's height: its padding around the key line, and the error line with its gap
+    /// above them when there is one.
+    fn footer(self, has_error: bool) -> f32 {
+        let error = if has_error {
+            self.small + ERROR_GAP
+        } else {
+            0.0
+        };
+        FOOTER_PAD[1] + error + self.small + FOOTER_PAD[3]
     }
 }
 
@@ -261,25 +277,15 @@ struct Geometry {
 impl Geometry {
     fn of(win: Rect, list: &List, has_error: bool, lines: Lines) -> Self {
         let search_block = SEARCH_PAD[1] + SEARCH_H + SEARCH_PAD[3];
-        let error_block = if has_error {
-            lines.small + RESULTS_MARGIN.1
-        } else {
-            0.0
-        };
-        let footer_h = lines.footer();
+        let footer_h = lines.footer(has_error);
         let max_h = MAX_H.min((win.h - 2.0 * WINDOW_MARGIN).max(0.0));
-        let room = (max_h - search_block - error_block - RESULTS_MARGIN.1 - footer_h).max(0.0);
+        let room = (max_h - search_block - footer_h).max(0.0);
         let results_h = if list.entries.is_empty() {
             0.0
         } else {
             list.height.min(RESULTS_MAX_H).min(room)
         };
-        let results_block = if results_h > 0.0 {
-            results_h + RESULTS_MARGIN.1
-        } else {
-            0.0
-        };
-        let h = search_block + error_block + results_block + footer_h;
+        let h = search_block + results_h + footer_h;
         let card = Rect::new(
             (win.w - CARD_W) / 2.0,
             ((win.h - h) / 2.0).max(20.0),
@@ -292,22 +298,15 @@ impl Geometry {
             CARD_W - SEARCH_PAD[0] - SEARCH_PAD[2],
             SEARCH_H,
         );
-        let mut y = card.y + search_block;
+        let results =
+            (results_h > 0.0).then(|| Rect::new(card.x, card.y + search_block, CARD_W, results_h));
+        let footer = Rect::new(card.x, card.bottom() - footer_h, CARD_W, footer_h);
         let error = has_error.then(|| {
             Rect::new(
-                card.x + SEARCH_PAD[0],
-                y,
-                CARD_W - SEARCH_PAD[0] - SEARCH_PAD[2],
+                footer.x + FOOTER_PAD[0],
+                footer.y + FOOTER_PAD[1],
+                CARD_W - FOOTER_PAD[0] - FOOTER_PAD[2],
                 lines.small,
-            )
-        });
-        y += error_block;
-        let results = (results_h > 0.0).then(|| {
-            Rect::new(
-                card.x + RESULTS_MARGIN.0,
-                y,
-                CARD_W - 2.0 * RESULTS_MARGIN.0,
-                results_h,
             )
         });
         Geometry {
@@ -315,7 +314,7 @@ impl Geometry {
             search,
             error,
             results,
-            footer: Rect::new(card.x, card.bottom() - footer_h, CARD_W, footer_h),
+            footer,
         }
     }
 }
@@ -443,7 +442,7 @@ impl<'p, 'q> Body<'p, 'q> {
 
         if let (Some(text), Some(r)) = (palette.error, geo.error) {
             let eid = self.id.with("error");
-            let spec = Spec::plain(text, Style::ui(t.font_s, t.status_error_light));
+            let spec = Spec::plain(text, Style::ui(t.font_s, t.status_error));
             let spec = ui.painter().elide(&spec, r.w);
             ui.painter().text(&spec, r.x, r.y);
             let mut node = Node::new(eid, Role::Status, text, r);
@@ -560,10 +559,10 @@ impl<'p, 'q> Body<'p, 'q> {
             left += ICON + ICON_GAP;
         }
         if row.destructive {
-            let spec = icon::glyph(icon::WARNING, ICON, t.warn);
-            ui.painter()
-                .text_centered(&spec, Rect::new(right - ICON, rect.y, ICON, rect.h));
-            right -= ICON + ICON_GAP;
+            // A 6 px dot in `status_error`, 8 from the text (`axaml:489-496`).
+            let dot = Rect::new(right - DOT, rect.y + (rect.h - DOT) / 2.0, DOT, DOT);
+            ui.painter().fill(dot, DOT / 2.0, t.status_error);
+            right -= DOT + DOT_GAP;
         }
         let top = rect.y + ROW_PAD.1;
         if let Some(hint) = row.hint {
@@ -638,7 +637,8 @@ impl<'p, 'q> Body<'p, 'q> {
     fn footer(&self, ui: &mut Ui<'_>, t: &Theme) {
         let f = self.geo.footer;
         let style = Style::ui(t.font_s, t.fg_secondary);
-        let y = f.y + FOOTER_PAD[1];
+        // The error line, when there is one, comes first, so the key line sits under it.
+        let y = f.y + FOOTER_PAD[1] + self.geo.error.map_or(0.0, |_| self.lines.small + ERROR_GAP);
         let right = Spec::plain(ui.tr("luneui.command-palette.footer-right"), style);
         let (rw, _) = ui.painter().measure(&right);
         let right_x = f.right() - FOOTER_PAD[2] - rw;

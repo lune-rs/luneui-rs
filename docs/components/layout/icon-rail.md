@@ -38,7 +38,7 @@ Conflicts: none. Wane and this repo have no icon rail.
 - Button: 40 × 40, transparent background, class `toolbar-action` [L src/Lunegit.Desktop/Views/IconRailView.axaml:24,31,85].
 - Icon: 20 × 20, `ForegroundMuted` [L src/Lunegit.Desktop/Views/IconRailView.axaml:28,35,90].
 - Top stack: spacing 4, five buttons in order: repository, branches, commit, files, scratchpad [L src/Lunegit.Desktop/Views/IconRailView.axaml:83-134].
-- Bottom dock: settings, help, notifications, terminal, AI projects, docked bottom [L src/Lunegit.Desktop/Views/IconRailView.axaml:24-80].
+- Bottom dock: settings, help, notifications, terminal, AI projects, docked bottom [L src/Lunegit.Desktop/Views/IconRailView.axaml:24-80]; no spacing, so its buttons touch at a pitch of 40 (the `DockPanel` has none: `:22-24,83`), and the toolkit follows it (C19).
 - Commit dot: a `Border` shown when there are uncommitted changes [L src/Lunegit.Desktop/Views/IconRailView.axaml:109]; its size is not read (Open questions).
 - Notification badge: a `Border` 16 high, min width 16, padding 2 0, margin 0 0 −4 −4 [L src/Lunegit.Desktop/Views/IconRailView.axaml:46-53]; hidden by default (`IsVisible="False"`), shown when there are unread items (binding in code-behind, not read).
 

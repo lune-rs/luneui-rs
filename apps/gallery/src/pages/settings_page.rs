@@ -6,7 +6,7 @@
 
 use std::time::Duration;
 
-use lune_ui::lunegit_dark::{CARD, WINDOW};
+use lune_ui::lunegit_dark::{CARD, PANEL};
 use lune_ui::motion::MotionTier;
 use lune_ui::paint::Rect;
 use lune_ui::ui::Ui;
@@ -30,8 +30,11 @@ pub(crate) static PAGE: Page = Page {
 
 /// The page's rect inside the card (the card is at (10, 34), the heading 24 px in).
 const PAGE_RECT: Rect = Rect::new(34.0, 82.0, 972.0, 544.0);
-/// The rows' width, and their controls' widths.
-const ROW_W: f32 = 640.0;
+/// The content host's inset, and the rows' margin inside it (`GeneralSettingsView.axaml:148`,
+/// `Margin="12,0"`: the rows stretch).
+const HOST_INSET: f32 = 20.0;
+const ROW_MARGIN: f32 = 12.0;
+/// The controls' widths.
 const TOGGLE_W: f32 = 40.0;
 const COMBO_W: f32 = 210.0;
 const STEPPER_W: f32 = 140.0;
@@ -92,7 +95,7 @@ impl PageState for Live {
         }
         let page = SettingsPage {
             active: self.active,
-            glass: WINDOW,
+            glass: PANEL,
             under: CARD.premultiplied(),
             restart: self.restart,
             name: "General",
@@ -116,7 +119,7 @@ impl PageState for Live {
             y += 2.0
                 + ui.setting_row(
                     "updates",
-                    Rect::new(vp.x, y, ROW_W, 0.0),
+                    Rect::new(vp.x + ROW_MARGIN, y, vp.w - 2.0 * ROW_MARGIN, 0.0),
                     &row,
                     |ui, slot| {
                         ui.toggle("switch", slot, updates, "Check for updates");
@@ -131,22 +134,28 @@ impl PageState for Live {
                 control_w: COMBO_W,
             };
             y += 2.0
-                + ui.setting_row("font", Rect::new(vp.x, y, ROW_W, 0.0), &row, |ui, slot| {
-                    let at = Rect::new(slot.x, slot.y + (slot.h - 32.0) / 2.0, COMBO_W, 32.0);
-                    let r = ui.combo("combo", at, OPTIONS[*font].0, combo_open, "Interface font");
-                    if r.clicked && !r.changed {
-                        *combo_open = false;
-                    }
-                    if *combo_open {
-                        let d = ui.dropdown("list", r.rect, r.id, &OPTIONS, *font);
-                        if let Some(i) = d.picked {
-                            *font = i;
-                        }
-                        if d.picked.is_some() || d.dismissed {
+                + ui.setting_row(
+                    "font",
+                    Rect::new(vp.x + ROW_MARGIN, y, vp.w - 2.0 * ROW_MARGIN, 0.0),
+                    &row,
+                    |ui, slot| {
+                        let at = Rect::new(slot.x, slot.y + (slot.h - 32.0) / 2.0, COMBO_W, 32.0);
+                        let r =
+                            ui.combo("combo", at, OPTIONS[*font].0, combo_open, "Interface font");
+                        if r.clicked && !r.changed {
                             *combo_open = false;
                         }
-                    }
-                });
+                        if *combo_open {
+                            let d = ui.dropdown("list", r.rect, r.id, &OPTIONS, *font);
+                            if let Some(i) = d.picked {
+                                *font = i;
+                            }
+                            if d.picked.is_some() || d.dismissed {
+                                *combo_open = false;
+                            }
+                        }
+                    },
+                );
 
             let row = SettingRow {
                 title: "Recent items",
@@ -156,7 +165,7 @@ impl PageState for Live {
             };
             y += ui.setting_row(
                 "recent",
-                Rect::new(vp.x, y, ROW_W, 0.0),
+                Rect::new(vp.x + ROW_MARGIN, y, vp.w - 2.0 * ROW_MARGIN, 0.0),
                 &row,
                 |ui, slot| {
                     let at = Rect::new(slot.x, slot.y + (slot.h - 32.0) / 2.0, STEPPER_W, 32.0);
@@ -179,8 +188,12 @@ impl PageState for Live {
     }
 }
 
-/// The toggle of the first row: the row is 62 high and 640 wide from the host's top left.
-const TOGGLE: (f32, f32) = (54.0 + ROW_W - 12.0 - TOGGLE_W / 2.0, 102.0 + 31.0);
+/// The toggle of the first row: the row is 62 high and spans the host less its margins; the
+/// toggle sits 12 in from the row's right edge.
+const TOGGLE: (f32, f32) = (
+    PAGE_RECT.x + PAGE_RECT.w - HOST_INSET - ROW_MARGIN - 12.0 - TOGGLE_W / 2.0,
+    PAGE_RECT.y + HOST_INSET + 31.0,
+);
 /// The banner's action, near the page's bottom right.
 const ACTION: (f32, f32) = (
     PAGE_RECT.x + PAGE_RECT.w - 20.0 - 56.0,

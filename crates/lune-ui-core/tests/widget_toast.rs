@@ -12,6 +12,7 @@ use lune_ui_core::paint::{LayerId, Painter, Rect};
 use lune_ui_core::scene::Scene;
 use lune_ui_core::shortcuts::{Binding, Chord, Scope};
 use lune_ui_core::testing::{FakeText, UiHarness, disabled_violations};
+use lune_ui_core::text::{Spec, Style, TextKey};
 use lune_ui_core::theme::DARK;
 use lune_ui_core::ui::{Ui, WidgetId};
 use lune_ui_core::widgets::button::ButtonKind;
@@ -367,7 +368,8 @@ fn width_is_320_collapsed_and_720_expanded_and_the_height_follows_the_text() {
     let (_, hl) = toast_size(&mut p, &loading(None, false), false);
     assert_eq!(hl, 26.0 + 20.0 + 8.0 + 3.0);
     let (_, hd) = toast_size(&mut p, &loading(Some(0.4), false), false);
-    assert_eq!(hd, 26.0 + 20.0 + 8.0 + 4.0);
+    // 3 px in both states (`MainWindow.axaml:369`).
+    assert_eq!(hd, 26.0 + 20.0 + 8.0 + 3.0);
 }
 
 // -- motion -------------------------------------------------------------------------------------
@@ -646,6 +648,10 @@ fn a_determinate_bar_has_a_value() {
         Some(Value::Number { value, .. }) => assert!((value - 40.0).abs() < 0.01),
         ref v => panic!("{v:?}"),
     }
+    assert_eq!(
+        bar.bounds.h, 3.0,
+        "3 px high while determinate, as the shipped bar"
+    );
 }
 
 #[test]
@@ -730,11 +736,11 @@ fn an_action_button_reports_once_and_the_toast_leaves() {
     let mut toasts = Toasts::default();
     let id = toasts.push(prompt("Update?"), ms(0));
     let (_, out) = settle(&mut h, &mut toasts, 0);
-    // Secondary first, the primary at the far right.
+    // The app's order, no sort: `prompt` lists Open (primary) then Later, so Later is rightmost.
     let (later, open) = (button_named(&out, "Later"), button_named(&out, "Open"));
-    assert!(later.x < open.x);
+    assert!(open.x < later.x);
     let card = out.tree.get(node_of(id)).expect("node").bounds;
-    assert!(open.right() <= card.right() - 13.0 + 0.01);
+    assert!(later.right() <= card.right() - 13.0 + 0.01);
     let resp = click(&mut h, &mut toasts, centre(open), 600);
     assert_eq!(resp.action, Some((id, 2)));
     assert_eq!(toasts.history().count(), 1);
@@ -762,8 +768,8 @@ fn enter_and_space_press_a_focused_action_once() {
             .map(|n| n.name.clone());
         assert_eq!(
             at.as_deref(),
-            Some("Open"),
-            "Shift+Tab reaches the last button"
+            Some("Later"),
+            "Shift+Tab reaches the last button, drawn in the app's order"
         );
         h.input.key_down(Key::Named(k), None);
         let r = frame(&mut h, &mut toasts, 610).2;
@@ -1118,6 +1124,25 @@ fn the_history_lists_newest_first_and_clear_all_empties_it() {
     assert_eq!((toasts.history().count(), toasts.unread()), (0, 0));
     let (_, out) = history_frame(&mut h, &mut toasts, 130);
     assert!(out.tree.nodes.iter().all(|n| n.role != Role::ListItem));
+}
+
+#[test]
+fn the_history_title_is_white() {
+    // `NotificationHistoryPanelView.axaml:22`: `Foreground="White"`, not `fg_bright`.
+    let mut toasts = history_toasts();
+    let mut h = UiHarness::new((320.0, 400.0));
+    let (scene, _) = history_frame(&mut h, &mut toasts, 0);
+    let title = Spec::plain(
+        "NOTIFICATIONS",
+        Style::ui(DARK.font_m, DARK.on_accent).bold(),
+    );
+    let key = TextKey(title.cache_key(1.0));
+    assert!(
+        scene
+            .layers
+            .iter()
+            .any(|l| l.texts.iter().any(|t| t.key == key))
+    );
 }
 
 #[test]

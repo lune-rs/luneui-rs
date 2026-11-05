@@ -33,17 +33,17 @@ Moved code: none.
 Pinned: Lunegit 33a1dd41, this repo fa2958b. Read: `src/Lunegit.Desktop/Views/Dialogs/GlobalSearchDialogView.axaml:1-547`
 (sizes, sections, styles; `grep` for Transition, Animation and KeyDown: none); `src/Lunegit.Infrastructure/Localization/en.json:281-294`;
 `src/Lunegit.Desktop/Themes/Animations.axaml` (no selector for the view's classes; `row-button` only at :172).
-Conflicts: none between sources (Wane has no command palette entry; the Wane `overlay.dialog` is the host). One inside this entry, resolved by the contract: the earlier text gave the results area a margin of 18 0 18 10 and a padding of 10 0 10 0, but the axaml puts that margin on the indexing banner (`:60-62`) and only the padding and the 560 max height on the results `ScrollViewer` (`:63-67`); the build keeps the entry's reading (viewport inset 18, rows inset a further 10), and the visual batch decides whether the rows go to 10. The error line sits in the axaml's footer block above the key text (`:526-533`); the build draws it above the results, as the contract says. Hosting:
+Conflicts: none between sources (Wane has no command palette entry; the Wane `overlay.dialog` is the host). One inside this entry, resolved by the contract: the earlier text gave the results area a margin of 18 0 18 10 and a padding of 10 0 10 0, but the axaml puts that margin on the indexing banner (`:60-62`) and only the padding and the 560 max height on the results `ScrollViewer` (`:63-67`); the visual batch ruled for the axaml (P1): the results area spans the card, rows sit 10 in (width 620) and their text 18 in, with no gap under the results. The error line sits in the axaml's footer block above the key text (`:523-532`); the visual batch ruled for the axaml (C18), so the build draws it there. Hosting:
 the view is in `Views/Dialogs/`, which the dialog overlay hosts [L src/Lunegit.Desktop/MainWindow.axaml:232]; the host call was not read (Open question).
 
 ### Anatomy
 
 - Dialog: width 640, max height 720 (and never taller than the window less 40 px) [L src/Lunegit.Desktop/Views/Dialogs/GlobalSearchDialogView.axaml:10-12]; centred as the dialog is, its height follows the rows up to the maximum and snaps (never animated) [R crates/lune-ui-core/src/widgets/command_palette.rs `Geometry::of`].
-- Search row: padding 18 18 18 10, a 28 px `Ui::filter_bar` (its 14 px search glyph and clear button; the axaml's glyph is 16) [L src/Lunegit.Desktop/Views/Dialogs/GlobalSearchDialogView.axaml:14-25]; placeholder is the app's `Palette.placeholder`.
-- Error line (optional): one line of `font_s` in `status_error_light`, under the search row, then a 10 px gap [L src/Lunegit.Desktop/Views/Dialogs/GlobalSearchDialogView.axaml:526-533].
-- Results: a scroll area inset 18 each side, at most 560 high, 10 px gap under it; the content is inset a further 10; sections 10 apart [L src/Lunegit.Desktop/Views/Dialogs/GlobalSearchDialogView.axaml:60-71]. With no rows there is no results area and no gap.
+- Search row: padding 18 18 18 10, a 40 px `Ui::filter_bar` (a 28 px dock in the filter bar's 8 by 6 padding: `:17-18`, `App.axaml:302-306`; its 14 px search glyph and clear button; the axaml's glyph is 16) [L src/Lunegit.Desktop/Views/Dialogs/GlobalSearchDialogView.axaml:14-25]; placeholder is the app's `Palette.placeholder`.
+- Error line (optional): the first line of the footer, one line of `font_s` in `status_error` #F44336 (`DarkTheme.axaml:63`), 6 px above the key line, inside the footer's padding (the footer grows by the line and the 6) [L src/Lunegit.Desktop/Views/Dialogs/GlobalSearchDialogView.axaml:523-532].
+- Results: a scroll area spanning the card (the `18 0 18 10` margin at `:60` is the indexing banner's, which the toolkit does not have), at most 560 high, no gap under it; the content is inset 10 (`LIST_PAD`), so rows are 620 wide at card x + 10 and header and row text start at x + 18; sections 10 apart [L src/Lunegit.Desktop/Views/Dialogs/GlobalSearchDialogView.axaml:60-71]. With no rows there is no results area and no gap.
 - Section header: `font_s` weight 600 `fg_tertiary`, inset 8, 4 px above its rows (the axaml's letter spacing 1 is not drawn: the painter has none) [L src/Lunegit.Desktop/Views/Dialogs/GlobalSearchDialogView.axaml:72-76]. The title is the app's text (caps included).
-- Row: radius 6, padding 8 6, a line of `font_base` `fg_primary` and, with `detail`, a `font_s` `fg_secondary` line under it; an icon of 14 with 8 to its right in `fg_dim`; `hint` right-aligned in `font_s` `fg_dim` (a `Chord::hint`), and for a destructive row the `icon::WARNING` glyph (`warn`) at the right edge [L src/Lunegit.Desktop/Views/Dialogs/GlobalSearchDialogView.axaml:80-98,136-140; src/Lunegit.Desktop/App.axaml:400-428].
+- Row: radius 6, padding 8 6, a line of `font_base` `fg_primary` and, with `detail`, a `font_s` `fg_secondary` line under it; an icon of 14 with 8 to its right in `fg_dim`; `hint` right-aligned in `font_s` `fg_dim` (a `Chord::hint`), and for a destructive row a 6 px dot in `status_error` at the right edge, 8 from what is left of it [L src/Lunegit.Desktop/Views/Dialogs/GlobalSearchDialogView.axaml:80-98,136-140; src/Lunegit.Desktop/App.axaml:400-428].
 - "Show more": a row of the same padding after its section's rows, 4 px apart, `font_s` `fg_secondary` [L src/Lunegit.Desktop/Views/Dialogs/GlobalSearchDialogView.axaml:117-128].
 - Footer: padding 18 10 18 12 on `dialog_footer` (bottom corners 8); `font_s` `fg_secondary`; the app's `footer_left` at the left (cut to fit), the string table's `luneui.command-palette.footer-right` at the right [L src/Lunegit.Desktop/Views/Dialogs/GlobalSearchDialogView.axaml:535-542].
 
@@ -56,7 +56,7 @@ the view is in `Views/Dialogs/`, which the dialog overlay hosts [L src/Lunegit.D
 | row hover | `surface_hover` #FFFFFF10; hover fills without moving the selection | [L src/Lunegit.Desktop/App.axaml:413-416] |
 | row pressed | `surface_active` #FFFFFF20 | [L src/Lunegit.Desktop/App.axaml:417-420] |
 | row selected | `surface_selected` #FFFFFF18; selected and hovered `surface_active` | [L src/Lunegit.Desktop/App.axaml:421-428] |
-| destructive row | the warning glyph; hover shows the tooltip "Destructive action \u{2014} requires confirmation" (above the card: `Raised`); activation is reported as any row's | [L src/Lunegit.Infrastructure/Localization/en.json:291], [D147] |
+| destructive row | a 6 px `status_error` dot [L src/Lunegit.Desktop/Views/Dialogs/GlobalSearchDialogView.axaml:489-496]; hover shows the tooltip "Destructive action \u{2014} requires confirmation" (above the card: `Raised`); activation is reported as any row's | [L src/Lunegit.Infrastructure/Localization/en.json:291], [D147] |
 | section with more results | a "Show more results" row after its rows, in the selection order | [L src/Lunegit.Infrastructure/Localization/en.json:290] |
 | error | the error line | [L src/Lunegit.Infrastructure/Localization/en.json:292] |
 | focus-visible on a row | none: rows take no focus; the selected row is the cue | [D147] |
@@ -117,7 +117,7 @@ The gallery's data is neutral (files and commands), not git words.
 ### Acceptance
 
 - Behaviour (scripted input, injected time; `crates/lune-ui-core/tests/widget_command_palette.rs`): Up and Down walk the sections and the "show more" rows and wrap; Enter activates the selected row once, a click activates and selects, hover moves nothing; the first row is selected at open and when the rows change, a selected key still present stays; Enter, Up and Down with no rows do nothing and reach no binding; typing edits the query while Up, Down and Enter leave the caret; "show more" by Enter and by click; a selection out of view is revealed; Escape and a scrim click dismiss once, a card click does nothing; Tab never lands on a row; a destructive row shows its tooltip on `Raised` and still reports; the page under it stays inert.
-- Pixel probes at scale 2: card 1280 px wide, at most 1440 high, results at most 1120 high, the footer block's bottom corners 16, search bar 28 px (56 in the probe's logical px), scrim #00000080.
+- Pixel probes at scale 2: card 1280 px wide, at most 1440 high, results at most 1120 high, the footer block's bottom corners 16, search bar 40 px (80 in the probe's logical px), scrim #00000080.
 - Conformance: opening and closing sampled at 60 Hz under every tier equal the dialog's.
 - Semantic node: `dialog` modal; `text-input` with the placeholder name; sections as groups; `list-item` rows with `selected`; the disabled walk.
 
@@ -137,4 +137,4 @@ All five are closed (D147):
 
 ## Notes for the planner
 
-Renamed by `git mv` from `lunegit.global-search-dialog` (D10 mapping, D42). The axaml's letter spacing on the section headers is not drawn (no painter support), and the results margin and the error line's place are the two readings recorded under Conflicts.
+Renamed by `git mv` from `lunegit.global-search-dialog` (D10 mapping, D42). The axaml's letter spacing on the section headers is not drawn (no painter support), and the error line sits in the footer (C18).

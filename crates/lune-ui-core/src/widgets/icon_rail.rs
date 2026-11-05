@@ -30,11 +30,15 @@ use crate::ui::{RoveAxis, Sense, Ui, WidgetId};
 /// The rail's padding: left and right, above the top group and below the bottom one.
 pub const PAD_X: f32 = 4.0;
 pub const PAD_Y: f32 = 10.0;
-/// The gap between two buttons of a group.
+/// The gap between two buttons of the top group (the `StackPanel`'s spacing). The bottom group
+/// has none: its buttons are docked children of a `DockPanel` with no spacing
+/// (`IconRailView.axaml:22-24,83`).
 pub const GAP: f32 = 4.0;
-/// A button's side (`toolbar::ACTION_SIZE`) and the distance between two tops.
+/// A button's side (`toolbar::ACTION_SIZE`) and the distance between two tops of the top group
+/// and of the bottom group.
 pub const SIZE: f32 = ACTION_SIZE;
 pub const PITCH: f32 = ACTION_SIZE + GAP;
+pub const BOTTOM_PITCH: f32 = ACTION_SIZE;
 /// The dot: 8 by 8, its top left from the button's.
 pub const DOT: f32 = 8.0;
 pub const DOT_X: f32 = 27.0;
@@ -71,12 +75,17 @@ pub struct RailItem<'a> {
     pub note: Option<&'a str>,
 }
 
-/// The height of a group of `n` buttons.
+/// The height of the top group of `n` buttons, `GAP` apart.
 pub fn group_height(n: usize) -> f32 {
     match n {
         0 => 0.0,
         n => n as f32 * SIZE + (n - 1) as f32 * GAP,
     }
+}
+
+/// The height of the bottom group of `n` buttons, touching.
+pub fn bottom_height(n: usize) -> f32 {
+    n as f32 * BOTTOM_PITCH
 }
 
 /// The text a badge of `count` reads.
@@ -110,7 +119,7 @@ impl Ui<'_> {
         let stop = self.rove_stop(&items, all.iter().position(|i| i.active));
         let x = rect.x + PAD_X;
         let top_y = rect.y + PAD_Y;
-        let bottom_y = rect.bottom() - PAD_Y - group_height(bottom.len());
+        let bottom_y = rect.bottom() - PAD_Y - bottom_height(bottom.len());
 
         let mut activated = None;
         let node = Node::new(id, Role::Toolbar, name, rect);
@@ -120,7 +129,7 @@ impl Ui<'_> {
                     let y = if i < top.len() {
                         top_y + i as f32 * PITCH
                     } else {
-                        bottom_y + (i - top.len()) as f32 * PITCH
+                        bottom_y + (i - top.len()) as f32 * BOTTOM_PITCH
                     };
                     let sense = if stop == Some(i) {
                         Sense::CLICK_FOCUS

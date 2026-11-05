@@ -116,15 +116,17 @@ fn faded(c: Rgba, opacity: f32) -> Rgba {
 }
 
 /// Draws a determinate bar in `track` at `fraction` (clamped): the track, then the fill from the
-/// left, whose width is the fraction of the track's. No fill op at 0. Public for the stat meter.
+/// left, whose width is the fraction of the track's. No fill op at 0. The ends are semicircles of
+/// the track's own height (4 px gives `RADIUS`). Public for the stat meter.
 pub fn paint<H: Copy + PartialEq>(p: &mut Painter<'_, H>, track: Rect, fraction: f32, tone: Tone) {
     let theme = p.theme;
-    p.fill(track, RADIUS, theme.surface_overlay);
+    let radius = track.h / 2.0;
+    p.fill(track, radius, theme.surface_overlay);
     let f = clamp(fraction);
     if f > 0.0 {
         // Square leading edge, clipped by the rounded track (a full bar keeps the track's ends).
         let fill = Rect::new(track.x, track.y, track.w * f, track.h);
-        p.push_clip_rounded(track, RADIUS);
+        p.push_clip_rounded(track, radius);
         p.fill(fill, 0.0, fill_color(&theme, tone));
         p.pop_clip();
     }
@@ -168,6 +170,18 @@ impl Ui<'_> {
     /// head, when set, takes its line first. Returns the height drawn. The node is `Progress`
     /// valued 0 to 100 (none when indeterminate), named by `opts.name` or the head's name.
     pub fn progress(&mut self, key: impl Hash, rect: Rect, opts: &ProgressOptions<'_>) -> f32 {
+        self.progress_sized(key, rect, opts, HEIGHT)
+    }
+
+    /// `progress` with the determinate track `determinate_h` high (the toast's bar is 3 px in
+    /// both states).
+    pub(super) fn progress_sized(
+        &mut self,
+        key: impl Hash,
+        rect: Rect,
+        opts: &ProgressOptions<'_>,
+        determinate_h: f32,
+    ) -> f32 {
         let id = self.id(key);
         let theme = *self.theme();
         let mut y = rect.y;
@@ -188,7 +202,7 @@ impl Ui<'_> {
             y += HEAD_LINE + HEAD_GAP;
         }
         let track_h = if opts.value.is_some() {
-            HEIGHT
+            determinate_h
         } else {
             HEIGHT_INDETERMINATE
         };

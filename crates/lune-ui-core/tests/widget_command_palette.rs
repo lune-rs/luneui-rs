@@ -12,6 +12,7 @@ use lune_ui_core::paint::{LayerId, Painter, Rect};
 use lune_ui_core::scene::Scene;
 use lune_ui_core::shortcuts::{Binding, Chord, Scope};
 use lune_ui_core::testing::{UiHarness, disabled_violations};
+use lune_ui_core::text::{Spec, Style, TextKey};
 use lune_ui_core::theme::DARK;
 use lune_ui_core::ui::{Ui, WidgetId};
 use lune_ui_core::widgets::button::ButtonKind;
@@ -272,8 +273,9 @@ fn a_section_with_no_rows_is_not_drawn_and_no_rows_means_a_short_card() {
     h.at_ms(1100);
     let (_, out, _) = frame(&mut h, &mut q, &secs);
     assert!(card(&out).h > short + 100.0, "the card follows the rows");
-    // 18 + 28 + 10 for the search row, the footer's 10 + 14 + 12.
-    assert_eq!(short, 56.0 + 36.0);
+    // 18 + 40 + 10 for the search row (a 28 px dock in the filter bar's 6 px padding), the
+    // footer's 10 + 14 + 12.
+    assert_eq!(short, 68.0 + 36.0);
 }
 
 #[test]
@@ -804,7 +806,7 @@ fn the_page_under_the_palette_stays_inert() {
 }
 
 #[test]
-fn the_error_line_is_a_polite_status_above_the_results() {
+fn the_error_line_is_a_polite_status_in_the_footer_above_its_text() {
     let secs = sections();
     let mut h = UiHarness::new(WIN);
     let mut q = String::new();
@@ -815,13 +817,25 @@ fn the_error_line_is_a_polite_status_above_the_results() {
         Some("Could not parse the filter"),
     );
     h.at_ms(500);
-    let (_, out2, _) = frame_with(
+    let (scene2, out2, _) = frame_with(
         &mut h,
         Some(&mut q),
         &secs,
         Some("Could not parse the filter"),
     );
     let _ = out;
+    // `status_error` #F44336 (`DarkTheme.axaml:63`), not the light tint.
+    let line = Spec::plain(
+        "Could not parse the filter",
+        Style::ui(DARK.font_s, DARK.status_error),
+    );
+    let key = TextKey(line.cache_key(1.0));
+    assert!(
+        scene2
+            .layers
+            .iter()
+            .any(|l| l.texts.iter().any(|t| t.key == key))
+    );
     let status = out2
         .tree
         .nodes
@@ -836,9 +850,23 @@ fn the_error_line_is_a_polite_status_above_the_results() {
         .iter()
         .find(|n| n.role == Role::ScrollArea)
         .expect("results");
-    assert!(status.bounds.bottom() <= area.bounds.y, "above the results");
-    let search = node(&out2, search_id()).bounds;
-    assert!(status.bounds.y >= search.bottom(), "under the search box");
+    // `GlobalSearchDialogView.axaml:523-532`: the first line of the footer's stack, 10 under its
+    // top, 6 above the key line.
+    let card = card(&out2);
+    let line = status.bounds.h;
+    let footer_top = card.bottom() - (10.0 + line + 6.0 + line + 12.0);
+    assert_eq!(
+        status.bounds.y,
+        footer_top + 10.0,
+        "10 under the footer's top"
+    );
+    assert_eq!(
+        area.bounds.bottom(),
+        footer_top,
+        "the rows run to the footer"
+    );
+    assert!(status.bounds.bottom() <= card.bottom());
+    assert_eq!(status.bounds.x, card.x + 18.0);
     // Without an error there is no status node.
     h.at_ms(600);
     let (_, out3, _) = frame(&mut h, &mut q, &secs);
@@ -850,8 +878,20 @@ fn the_destructive_row_describes_itself_shows_a_tooltip_above_the_card_and_still
     let secs = sections();
     let (mut h, mut q) = opened(&secs);
     h.at_ms(1100);
-    let (_, out, _) = frame(&mut h, &mut q, &secs);
+    let (scene, out, _) = frame(&mut h, &mut q, &secs);
     let n = node(&out, row_id(11));
+    // The mark is a 6 px dot in `status_error` at the row's right edge, centred in the row
+    // (`GlobalSearchDialogView.axaml:489-496`).
+    let dot = scene.layers[LayerId::Modal as usize]
+        .geometry
+        .under
+        .iter()
+        .find(|s| s.rect[2] == 6.0 && s.rect[3] == 6.0)
+        .expect("the destructive dot");
+    assert_eq!(dot.color, premul(DARK.status_error));
+    assert_eq!(dot.radii, [3.0; 4]);
+    assert_eq!(dot.rect[0] + 6.0, n.bounds.right() - 8.0);
+    assert_eq!(dot.rect[1] + 3.0, n.bounds.y + n.bounds.h / 2.0);
     assert_eq!(
         n.description.as_deref(),
         Some("Destructive action \u{2014} requires confirmation")
@@ -888,6 +928,32 @@ fn the_destructive_row_describes_itself_shows_a_tooltip_above_the_card_and_still
 // Probes.
 
 #[test]
+fn the_results_span_the_card_with_rows_ten_in_and_no_gap_under() {
+    // `GlobalSearchDialogView.axaml:59-67`: padding 10 0 10 0, no margin.
+    let secs = sections();
+    let (mut h, mut q) = opened(&secs);
+    h.at_ms(1100);
+    let (_, out, _) = frame(&mut h, &mut q, &secs);
+    let card = card(&out);
+    let area = out
+        .tree
+        .nodes
+        .iter()
+        .find(|n| n.role == Role::ScrollArea)
+        .expect("results")
+        .bounds;
+    assert_eq!((area.x, area.w), (card.x, CARD_W));
+    assert_eq!(
+        area.bottom() + 36.0,
+        card.bottom(),
+        "rows run to the footer"
+    );
+    let first = node(&out, row_id(1)).bounds;
+    assert_eq!(first.x, card.x + 10.0, "rows sit 10 in");
+    assert_eq!(first.w, CARD_W - 20.0);
+}
+
+#[test]
 fn the_card_is_640_wide_and_the_results_stop_at_560_at_scale_two() {
     let rows = many();
     let secs = [PaletteSection {
@@ -915,14 +981,14 @@ fn the_card_is_640_wide_and_the_results_stop_at_560_at_scale_two() {
         .expect("results")
         .bounds;
     assert_eq!(area.h * 2.0, 1120.0, "the results stop at 560 px");
-    assert_eq!(area.w, 604.0, "inside the 18 px margins");
+    assert_eq!(area.w, 640.0, "the results span the card");
     // The scrim is the dialog's.
     let scrim = modal.geometry.under[0];
     assert_eq!(scrim.rect, [0.0, 0.0, WIN.0 * 2.0, WIN.1 * 2.0]);
     assert_eq!(scrim.color, premul(DARK.dialog_backdrop));
-    // The search bar is 28 px high, the footer block draws its fill at the bottom.
+    // The search bar is 40 px high, the footer block draws its fill at the bottom.
     let search = node(&out, search_id()).bounds;
-    assert_eq!(search.h, 28.0);
+    assert_eq!(search.h, 40.0);
     assert_eq!(
         node(&out, pid()).bounds.x,
         (WIN.0 - CARD_W) / 2.0,

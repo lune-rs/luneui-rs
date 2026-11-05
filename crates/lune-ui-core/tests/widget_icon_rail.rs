@@ -19,7 +19,8 @@ use lune_ui_core::ui::WidgetId;
 use lune_ui_core::widgets::button::{ButtonKind, ButtonOptions};
 use lune_ui_core::widgets::button::{FOCUS, HOVER, PRESS};
 use lune_ui_core::widgets::icon_rail::{
-    BADGE_H, BADGE_MIN_W, DOT, PITCH, RailItem, badge_text, group_height,
+    BADGE_H, BADGE_MIN_W, BOTTOM_PITCH, DOT, PITCH, RailItem, badge_text, bottom_height,
+    group_height,
 };
 use lune_ui_core::widgets::toolbar::{ACTION_GLYPH, ACTION_SIZE};
 
@@ -74,7 +75,7 @@ fn button_rect(key: u64) -> Rect {
     let y = if i < 5 {
         RAIL.y + 10.0 + PITCH * i as f32
     } else {
-        RAIL.bottom() - 10.0 - group_height(5) + PITCH * (i - 5) as f32
+        RAIL.bottom() - 10.0 - bottom_height(5) + BOTTOM_PITCH * (i - 5) as f32
     };
     Rect::new(RAIL.x + 4.0, y, ACTION_SIZE, ACTION_SIZE)
 }
@@ -209,9 +210,11 @@ fn the_buttons_are_40_with_gap_4_from_the_padding_and_the_bottom_group_is_docked
     assert_eq!(RAIL.right() - button_rect(1).right(), 4.0);
     assert_eq!(button_rect(1).y - RAIL.y, 10.0);
     assert_eq!(RAIL.bottom() - button_rect(10).bottom(), 10.0);
-    // The groups are 4 apart inside.
+    // The top group is 4 apart inside.
     assert_eq!(button_rect(2).y - button_rect(1).bottom(), 4.0);
-    assert_eq!(button_rect(7).y - button_rect(6).bottom(), 4.0);
+    // The bottom group has no spacing (`IconRailView.axaml:22-24`): its buttons touch.
+    assert_eq!(button_rect(7).y - button_rect(6).bottom(), 0.0);
+    assert_eq!(bottom_height(5), 5.0 * 40.0);
     // The rail itself fills nothing at rest.
     assert!(fills(&out.scene).is_empty());
     assert_eq!(out.out.repaint, Repaint::Idle);

@@ -3,7 +3,7 @@
 //!
 //! [`Ui::side_panel`] draws the card (the layer while the window is active, the theme's
 //! `window_fallback` fill when it is not, D128: the widget names no preset), then runs `content`
-//! once, for the shown panel, in the rect inside the [`PAD`] of 10. The shown panel runs under
+//! once, for the shown panel, in the rect inside the 1 px [`RING`] and the [`PAD`] of 10. The shown panel runs under
 //! [`Ui::keep_alive`]; every other key of [`SidePanelOptions::keys`] is only marked alive, so a
 //! hidden panel's scroll offset, text edits and other retained state survive however many frames
 //! it is not drawn. Hidden panels draw nothing and emit no node. A panel stays alive once it has
@@ -16,7 +16,7 @@
 //! gone on the frame of the change. A show moves no focus (the app knows the first control).
 //!
 //! The card's text limit (D12): a text cannot be cut by a rounded clip, so the host keeps the
-//! content [`PAD`] (10) from the edge, more than the radius of 8.
+//! content [`RING`] + [`PAD`] (11) from the edge, more than the radius of 8.
 
 use std::hash::Hash;
 
@@ -28,8 +28,11 @@ use crate::ui::{Ui, WidgetId};
 
 /// The card's corner radius.
 pub const RADIUS: f32 = 8.0;
-/// The padding between the card and the content.
+/// The padding between the card's ring and the content.
 pub const PAD: f32 = 10.0;
+/// The ring: 1 px in `border`, inside the rect (the inner `glass-panel` border,
+/// `SidePanelView.axaml:20`, `App.axaml:294-298`), so the content starts `RING + PAD` in.
+pub const RING: f32 = 1.0;
 /// Where a panel's slide starts (x offset, px); it ends at 0.
 pub const SHOW_SLIDE_FROM: f32 = -6.0;
 
@@ -66,10 +69,10 @@ pub struct SidePanelOptions<'a> {
 /// The rect `content` is given in a host at `rect`.
 pub fn content_rect(rect: Rect) -> Rect {
     Rect::new(
-        rect.x + PAD,
-        rect.y + PAD,
-        (rect.w - 2.0 * PAD).max(0.0),
-        (rect.h - 2.0 * PAD).max(0.0),
+        rect.x + RING + PAD,
+        rect.y + RING + PAD,
+        (rect.w - 2.0 * (RING + PAD)).max(0.0),
+        (rect.h - 2.0 * (RING + PAD)).max(0.0),
     )
 }
 
@@ -88,13 +91,14 @@ impl Ui<'_> {
         content: impl FnOnce(&mut Ui<'_>, Rect),
     ) {
         let id = self.id(&key);
-        let fallback = self.theme().window_fallback;
+        let (fallback, border) = (self.theme().window_fallback, self.theme().border);
         let p = self.painter();
         if opts.active {
             p.acrylic(rect, RADIUS, opts.glass.premultiplied(), opts.under, true);
         } else {
             p.fill(rect, RADIUS, fallback);
         }
+        p.ring(rect, RADIUS, RING, border, false);
         for k in opts.keys.iter().filter(|k| **k != opts.panel) {
             self.mark_alive((&key, *k));
         }

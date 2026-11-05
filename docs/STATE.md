@@ -1,7 +1,7 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-05 (M7 in progress: steps 1 and 2 done)
+Last updated: 2026-11-05 (M7 in progress: steps 1 to 14 done; step 15, the close, is next)
 
 ## Now
 
@@ -19,6 +19,16 @@ widget modules, 11 page stubs (`flyout`, `toast-notifications`, `command-palette
 231 names until the scenes land), 12 `Theme` tokens (`menu_item_pressed`, `menu_text_disabled`, `toast_*`,
 `dirty_indicator`, `count_badge`), 5 glyphs, 9 string defaults, the M7 motion rows, DECISIONS D137 to D153 and the 14
 entries `in-progress`. Next: the tracks (steps 3 to 12), then visual batches 13 and 14 and the close.
+
+M7 steps 3 to 12 (the three tracks) and the visual batches 13 and 14 are done. Batch 2 (D154, the orchestrator's ruling
+C17 to C22) moved the Lunegit composites to the axaml: the palette's search bar is 40 high, its results span the card
+with rows 10 in, its error line is the footer's first line in the new `Theme.status_error`, a destructive row shows a
+6 px dot; the toast bar is 3 px in both states, the toast actions keep the app's order, the history title is white; the
+rail's bottom group has pitch 40; the side panel draws a 1 px `border` ring (content 11 in); the side panel and settings
+page use `PANEL` glass. API gaps for later: history rows have no hover or expand; `Ui::filter_bar` has no option for the
+palette's 16 px glyph, 14 px text or radius 6; `PaletteRow` has no icon tone; the side panel's show moves only the
+content and fires on a swap, not on the column; `SidebarFooter` is one line in one family. Next: step 15 (cross-widget
+contract, catalogue audit, architecture, bench, STATE).
 
 M6 (widgets) is merged to main at a75a708 (14 steps, review passed in 3 rounds): roving focus (`Sense.skip_tab`,
 `Sense::CLICK_ROVE`, `RoveAxis`, `Ui::rove_stop`, `rove_keys`, `rove_focus`), `text::elide` and `Painter::elide`,

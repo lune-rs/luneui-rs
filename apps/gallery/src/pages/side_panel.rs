@@ -1,4 +1,4 @@
-//! The `side-panel` page: the host on the window glass showing one of three panels (a row list
+//! The `side-panel` page: the host on the panel glass showing one of three panels (a row list
 //! each), with a row of buttons that switch the shown panel and a switch for the window's active
 //! state. The glass layer is the page's choice (the widget names no preset); inactive, the host
 //! draws the fallback fill. A switch shows the new panel with the drawer motion.
@@ -6,7 +6,7 @@
 use std::time::Duration;
 
 use lune_ui::input::NamedKey;
-use lune_ui::lunegit_dark::{CARD, THEME, WINDOW};
+use lune_ui::lunegit_dark::{CARD, PANEL, THEME};
 use lune_ui::motion::MotionTier;
 use lune_ui::paint::Rect;
 use lune_ui::text::{Spec, Style};
@@ -89,7 +89,7 @@ impl PageState for Live {
             panel: self.panel,
             keys: &KEYS,
             active: self.active,
-            glass: WINDOW,
+            glass: PANEL,
             under: CARD.premultiplied(),
             name: TITLES[(self.panel - 1) as usize],
         };

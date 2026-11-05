@@ -320,8 +320,9 @@ const fn settled(id: &'static str, state: fn() -> Box<dyn PageState>) -> UiScene
 }
 
 /// The only result is the destructive command: with the card centred in the 1040 x 660 window,
-/// its row is 29 px high, 18 px under the results' top (a header and its gap).
-const DESTRUCTIVE_AT: (f32, f32) = (520.0, 344.0);
+/// its row is 29 px high, 18 px under the results' top (a header and its gap), and the results
+/// start 68 px under the card's top (the 40 px bar in its padding).
+const DESTRUCTIVE_AT: (f32, f32) = (520.0, 355.0);
 
 const SCENES: &[UiScene] = &[
     settled("command-palette-empty", empty),

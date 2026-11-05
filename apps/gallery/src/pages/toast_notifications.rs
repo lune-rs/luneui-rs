@@ -334,9 +334,17 @@ impl State {
     }
 }
 
+/// A frame at 600 ms, where `State::act` runs: the capture frame then falls part way into the
+/// motion it starts, instead of drawing the act at progress 0.
+const ACT: &[Step] = &[Step {
+    at_ms: 600,
+    events: &[],
+}];
+
 const fn scene(
     id: &'static str,
     state: fn() -> Box<dyn PageState>,
+    script: &'static [Step],
     capture_ms: u32,
     expect: Expect,
 ) -> UiScene {
@@ -345,7 +353,7 @@ const fn scene(
         scale: 2,
         tier: MotionTier::Full,
         state,
-        script: &[],
+        script,
         capture_ms,
         expect,
     }
@@ -353,26 +361,59 @@ const fn scene(
 
 const SCENES: &[UiScene] = &[
     // Timed toasts wait on their deadline: a frame is due, nothing moves.
-    scene("toast-notifications-stack", stack, 800, Expect::Waiting),
-    // The turning glyph and the bar run.
-    scene("toast-notifications-loading", loading, 800, Expect::Moving),
-    scene("toast-notifications-prompt", prompt, 800, Expect::Settled),
     scene(
-        "toast-notifications-expanded",
-        expanded,
+        "toast-notifications-stack",
+        stack,
+        &[],
+        800,
+        Expect::Waiting,
+    ),
+    // The turning glyph and the bar run.
+    scene(
+        "toast-notifications-loading",
+        loading,
+        &[],
+        800,
+        Expect::Moving,
+    ),
+    scene(
+        "toast-notifications-prompt",
+        prompt,
+        &[],
         800,
         Expect::Settled,
     ),
-    scene("toast-notifications-history", history, 400, Expect::Settled),
-    // The arrival is `base` (250 ms): half way at 725 ms, with the toast below it moving up.
+    scene(
+        "toast-notifications-expanded",
+        expanded,
+        &[],
+        800,
+        Expect::Settled,
+    ),
+    scene(
+        "toast-notifications-history",
+        history,
+        &[],
+        400,
+        Expect::Settled,
+    ),
+    // The arrival is `base` (250 ms) from the act at 600 ms: half way at 725 ms, with the toast
+    // below it moving up.
     scene(
         "toast-notifications-appearing",
         appearing,
+        ACT,
         725,
         Expect::Moving,
     ),
-    // The fade is `fast` (180 ms): half way at 690 ms.
-    scene("toast-notifications-leaving", leaving, 690, Expect::Moving),
+    // The fade is `fast` (180 ms) from the act at 600 ms: half way at 690 ms.
+    scene(
+        "toast-notifications-leaving",
+        leaving,
+        ACT,
+        690,
+        Expect::Moving,
+    ),
 ];
 
 const INFO: &[&str] = &["push-info"];

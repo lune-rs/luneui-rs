@@ -20,7 +20,7 @@ use lune_ui_core::widgets::button::ButtonKind;
 use lune_ui_core::widgets::field::FieldOptions;
 use lune_ui_core::widgets::scroll_area::{Extent, ScrollOptions};
 use lune_ui_core::widgets::side_panel::{
-    PAD, RADIUS, SHOW_OPACITY, SHOW_SLIDE, SHOW_SLIDE_FROM, SidePanelOptions, content_rect,
+    PAD, RADIUS, RING, SHOW_OPACITY, SHOW_SLIDE, SHOW_SLIDE_FROM, SidePanelOptions, content_rect,
 };
 
 const WIN: (f32, f32) = (600.0, 500.0);
@@ -175,7 +175,7 @@ fn x_of(scene: &Scene, panel: u64) -> f32 {
 }
 
 #[test]
-fn the_card_is_the_acrylic_at_radius_8_with_the_given_under_and_content_inside_10() {
+fn the_card_is_the_acrylic_at_radius_8_with_the_given_under_and_content_inside_ring_and_10() {
     let mut h = UiHarness::new(WIN);
     let out = settled(&mut h, &Cfg::new(1));
     let g = &out.scene.layers[0].geometry;
@@ -186,10 +186,10 @@ fn the_card_is_the_acrylic_at_radius_8_with_the_given_under_and_content_inside_1
     assert_eq!(a.color, GLASS.premultiplied());
     assert_eq!(a.under, UNDER);
     assert_eq!(RADIUS, 8.0);
-    assert_eq!(PAD, 10.0);
-    assert_eq!(out.inner, Some(Rect::new(30.0, 30.0, 280.0, 380.0)));
-    assert_eq!(content_rect(HOST), Rect::new(30.0, 30.0, 280.0, 380.0));
-    assert_eq!(x_of(&out.scene, 1), 30.0);
+    assert_eq!((PAD, RING), (10.0, 1.0));
+    assert_eq!(out.inner, Some(Rect::new(31.0, 31.0, 278.0, 378.0)));
+    assert_eq!(content_rect(HOST), Rect::new(31.0, 31.0, 278.0, 378.0));
+    assert_eq!(x_of(&out.scene, 1), 31.0);
     assert_eq!(out.out.repaint, Repaint::Idle);
 }
 
@@ -199,7 +199,8 @@ fn pixel_probes_at_scale_two() {
     h.input.set_scale(2.0);
     let out = settled(&mut h, &Cfg::new(1));
     let a = out.scene.layers[0].geometry.acrylic[0].shape;
-    // Radius 16 px; the content starts 20 px in.
+    // Radius 16 px; the content starts 22 px in (the 1 px ring and the padding of 10, doubled),
+    // and the ring is `border`, 2 px.
     assert_eq!(a.radii, [16.0; 4]);
     let t = texts(&out.scene)
         .into_iter()
@@ -207,9 +208,18 @@ fn pixel_probes_at_scale_two() {
         .expect("line");
     assert_eq!(
         (t.x - 20.0, t.y - 20.0),
-        (10.0, 10.0),
-        "logical 10 px inside"
+        (11.0, 11.0),
+        "logical 11 px inside"
     );
+    let ring = out.scene.layers[0]
+        .geometry
+        .under
+        .iter()
+        .find(|s| s.params[0] == 1.0)
+        .expect("the ring");
+    assert_eq!(ring.params[1], 2.0, "1 logical px is 2 physical");
+    assert_eq!(ring.rect, a.rect);
+    assert_eq!(ring.color, premul(DARK.border));
 }
 
 #[test]
@@ -357,7 +367,7 @@ fn the_first_frame_of_a_host_does_not_animate() {
     let mut h = UiHarness::new(WIN);
     let out = frame(&mut h, &Cfg::new(2));
     assert_eq!(alpha_of(&out.scene, 2), Some(255));
-    assert_eq!(x_of(&out.scene, 2), 30.0);
+    assert_eq!(x_of(&out.scene, 2), 31.0);
     assert_eq!(out.out.repaint, Repaint::Idle);
     // And a host that starts on another panel animates nothing either.
     let mut h = UiHarness::new(WIN);
@@ -373,7 +383,7 @@ fn a_show_fades_the_panel_in_and_slides_it_from_the_left_and_leaves_the_card() {
     let first = frame(&mut h, &Cfg::new(2));
     assert_eq!(first.out.repaint, Repaint::Now);
     assert_eq!(alpha_of(&first.scene, 2), Some(0));
-    assert_eq!(x_of(&first.scene, 2), 30.0 + SHOW_SLIDE_FROM);
+    assert_eq!(x_of(&first.scene, 2), 31.0 + SHOW_SLIDE_FROM);
     // The card does not move.
     let card = |o: &Out| o.scene.layers[0].geometry.acrylic[0].shape.rect;
     assert_eq!(card(&first), card(&rest));
@@ -384,14 +394,14 @@ fn a_show_fades_the_panel_in_and_slides_it_from_the_left_and_leaves_the_card() {
     let want_a = (Easing::QuadOut.eval(p) * 255.0).round();
     let got_a = f32::from(alpha_of(&mid.scene, 2).expect("faded"));
     assert!((got_a - want_a).abs() <= 1.0, "{got_a} vs {want_a}");
-    let want_x = 30.0 + SHOW_SLIDE_FROM * (1.0 - Easing::SineInOut.eval(p));
+    let want_x = 31.0 + SHOW_SLIDE_FROM * (1.0 - Easing::SineInOut.eval(p));
     assert!((x_of(&mid.scene, 2) - want_x).abs() < 0.01);
     assert_eq!(mid.out.repaint, Repaint::Now);
     // Settled by 350 ms.
     h.at_ms(6000 + MODERATE);
     let done = frame(&mut h, &Cfg::new(2));
     assert_eq!(alpha_of(&done.scene, 2), Some(255));
-    assert_eq!(x_of(&done.scene, 2), 30.0);
+    assert_eq!(x_of(&done.scene, 2), 31.0);
     assert_eq!(done.out.repaint, Repaint::Idle);
 }
 
@@ -450,19 +460,19 @@ fn show_conforms_in_three_tiers() {
 #[test]
 fn reduced_fades_the_opacity_only_and_off_snaps() {
     let r = shown(MotionTier::Reduced, 0);
-    assert_eq!(x_of(&r.scene, 2), 30.0, "no slide");
+    assert_eq!(x_of(&r.scene, 2), 31.0, "no slide");
     assert_eq!(alpha_of(&r.scene, 2), Some(0));
     assert_eq!(r.out.repaint, Repaint::Now);
     let r = shown(MotionTier::Reduced, 60);
     let a = alpha_of(&r.scene, 2).expect("faded");
     assert!(a > 0 && a < 255, "{a}");
-    assert_eq!(x_of(&r.scene, 2), 30.0);
+    assert_eq!(x_of(&r.scene, 2), 31.0);
     let r = shown(MotionTier::Reduced, 400);
     assert_eq!(alpha_of(&r.scene, 2), Some(255));
     assert_eq!(r.out.repaint, Repaint::Idle);
     let o = shown(MotionTier::Off, 0);
     assert_eq!(alpha_of(&o.scene, 2), Some(255));
-    assert_eq!(x_of(&o.scene, 2), 30.0);
+    assert_eq!(x_of(&o.scene, 2), 31.0);
     assert_eq!(o.out.repaint, Repaint::Idle);
 }
 

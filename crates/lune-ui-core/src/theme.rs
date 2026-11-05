@@ -82,6 +82,9 @@ pub struct Theme {
     /// The error counterpart of `status_warning_light` (Lunegit `StatusErrorLight`): the error
     /// tint of a busy cue and a tab's progress spinner.
     pub status_error_light: Rgba,
+    /// The error status colour itself (Lunegit `StatusError`): the command palette's error line
+    /// and its destructive mark.
+    pub status_error: Rgba,
     pub status_warning_dark: Rgba,
     /// Data tone (chart series) and the text drawn on a data fill.
     pub data: Rgba,
@@ -174,6 +177,7 @@ pub mod lunegit_dark {
         status_warning: [0xFF, 0xC1, 0x07, 0xFF],
         status_warning_light: [0xFF, 0xD6, 0x66, 0xFF],
         status_error_light: [0xEF, 0x9A, 0x9A, 0xFF],
+        status_error: [0xF4, 0x43, 0x36, 0xFF],
         status_warning_dark: [0x5D, 0x43, 0x00, 0xFF],
         data: [0x5C, 0x8F, 0xE6, 0xFF],
         data_hi: [0x8F, 0xBB, 0xFF, 0xFF],
@@ -245,6 +249,7 @@ mod tests {
             (THEME.status_warning, [0xFF, 0xC1, 0x07, 0xFF]),
             (THEME.status_warning_light, [0xFF, 0xD6, 0x66, 0xFF]),
             (THEME.status_error_light, [0xEF, 0x9A, 0x9A, 0xFF]),
+            (THEME.status_error, [0xF4, 0x43, 0x36, 0xFF]),
             (THEME.status_warning_dark, [0x5D, 0x43, 0x00, 0xFF]),
             (THEME.data, [0x5C, 0x8F, 0xE6, 0xFF]),
             (THEME.data_hi, [0x8F, 0xBB, 0xFF, 0xFF]),
@@ -264,7 +269,7 @@ mod tests {
             (THEME.dirty_indicator, [0xD9, 0x8A, 0x3D, 0xFF]),
             (THEME.count_badge, [0xE7, 0x48, 0x56, 0xFF]),
         ];
-        assert_eq!(expected.len(), 34);
+        assert_eq!(expected.len(), 35);
         for (got, want) in expected {
             assert_eq!(got, want);
         }
