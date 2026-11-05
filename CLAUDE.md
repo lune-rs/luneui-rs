@@ -56,9 +56,9 @@ Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, r
 - Extend, don't patch: new OS glass = a `material` submodule of `lune-ui-platform`; new overlay or widget = a new module plus
   a catalogue file; new look = a `Theme` value. App-specific drawing goes through the `CustomDraw`
   hook, not into the toolkit (D8).
-- A composite with one tab stop (radio group, star rating, nav list, tab strip) uses roving focus: `Sense.skip_tab`,
+- A composite with one tab stop (radio group, star rating, nav list, tab strip, table header, board cards) uses roving focus: `Sense.skip_tab`,
   `Ui::rove_stop`, `rove_keys`, `rove_focus` (D113); text that must fit a width goes through `text::elide` / `Painter::elide`
-  (D114).
+  (D114). A drag ghost draws one layer group above its source, out of any `record` (`Ui::drag_ghost`, D168).
 - An overlay that opens above an active modal is put on `LayerId::Raised` by `Ui::overlay`, once at open (D137): a widget
   never names the layer. A widget in a `with_enabled(false, ..)` scope needs no rule of its own for its nodes (`Ui::node`
   marks them, D140), but it consumes its keys before it gates on `enabled` (not every reader does yet: `docs/architecture.md`, "Disabled keys", is the one list, D159); `testing::disabled_violations` checks a subtree.

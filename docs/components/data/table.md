@@ -127,3 +127,5 @@ All at scale 2 on the `table` page (100,000 rows live; six rows or fewer in the 
 ## Notes for the planner
 
 Wane priority P0 (P0 = needed by Overview, Requests or Settings). Full spec: Wane `docs/ui/components.md`, section `data.table`; mock: Wane `docs/ui/mocks/components.html`. Screens using it: components, first-run, local-models, overview, pricing, requests, routes, sessions, upstreams.
+
+Built in M8 (D161 to D163, D174). Deviations and limits: a wrapping cell ignores `num` and is left-aligned; the header's focus ring snaps (`HEADER_FADE` fades the text colour and the arrow); there is no horizontal scroll (`Fill` columns shrink, then the last columns clip); a `Measured` height after a sort takes effect on the next frame; rows out of view are not built, so a control in one cannot keep the focus; no column resize or reorder (D163). The table stays `in-progress` for M11's done standard.

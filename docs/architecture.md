@@ -1,6 +1,6 @@
 # Architecture
 
-State after M7 (overlays and containers): the toolkit is five crates. A pure core (`lune-ui-core`, no
+State after M8 (data views): the toolkit is five crates. A pure core (`lune-ui-core`, no
 dependencies) holds the painter, the display list, the per-window `Ui` frame, the motion system,
 the string table, the semantic tree, widgets, the theme and the four seam types; three adapter
 crates implement the seams on wgpu/glyphon, winit and the OS glass; the facade `lune-ui` re-exports
@@ -11,7 +11,8 @@ reuses: layout helpers, the scroll area and virtualized list, popover and toolti
 in-window drag and drop, the shortcut registry, seven painter primitives and the `ImageStore` seam (D91 to D109). M6 added the
 controls and chrome (D113 to D136); M7 the overlays and containers: a sixth layer for an overlay above a dialog, the
 flyout, toasts, the command palette, the page, panel, sidebar, side panel, icon rail, split panes, tree view and settings
-page (D137 to D154).
+page (D137 to D154). M8 added the data views: the table on the list frame, the bar and pie charts with value
+transitions, the lane graph row and the kanban board with its drag across columns (D160 to D174).
 
 ## Workspace layout
 
@@ -52,7 +53,7 @@ app passes time, sizes, fonts, theme, scale and hit values in), so frames are de
 | `layout` (`layout.rs`) | Pure stack, row, column and grid helpers: rects out, nothing drawn or stored (D108) | `stack`, `row`, `column`, `grid`, `Size`, `Align`, `Insets`, `Track` |
 | `shortcuts` (`shortcuts.rs`) | The scoped chord registry, resolved by the frame (D93) | `Shortcuts`, `Binding`, `Chord`, `Scope`, `CommandId`, `Chord::hint` |
 | `text_edit` (`text_edit.rs`) | The pure text editing engine: caret, selection, undo, clipboard commands, preedit; offsets in chars (D95) | `TextEdit`, `EditCommand`, `EditOutcome`, `EditFlags`, `EditLayout`, `SpecLayout` |
-| `drag` (`drag.rs`) | The in-window drag machines and their `Ui` glue (D89, D104) | `ReorderDrag`, `FreeDrag`, `Metrics`, `Strip`, `Column`, `DropResult`, `FreeResult`, `paint_drop_line` |
+| `drag` (`drag.rs`) | The in-window drag machines and their `Ui` glue (D89, D104) | `ReorderDrag`, `FreeDrag` (with `pressed`), `Metrics`, `Strip`, `Column`, `DropResult`, `FreeResult`, `paint_drop_line`, `edge_step` (the auto-scroll zone math, shared by the strip and the board; D168) |
 | `backdrop` (`backdrop.rs`) | The material seam | `Backdrop`, `Material`, `BackdropKind`, `GlassLayer` |
 | `window` (`window.rs`) | Edge resize, double click, caption buttons (no windowing type) | `ResizeEdge`, `edge_at`, `DoubleClick`, `caption_buttons` |
 | `icon` (`icon.rs`) | Codicon codepoints as Nerd Font glyphs; no font file bundled | `glyph`, `ADD`, `GEAR`, `CHECK`, ... |
@@ -60,14 +61,14 @@ app passes time, sizes, fonts, theme, scale and hit values in), so frames are de
 | `access` (`access.rs`) | The semantic tree and the actions that come back; plain data the `Ui` fills and routes | `Node`, `SemanticTree`, `Role` (36), `State` (15), `Action` (10), `Value`, `AccessAction`; `Node.level` (a tree row's depth + 1) |
 | `motion` (`motion.rs`, `motion/{easing,tween,transition,tokens,conformance}.rs`) | Closed-form motion: every value is a function of the app's `Time` and stored parameters; the 60 Hz conformance harness | `Time`, `Easing`, `Tween`, `Spring`, `Keyframes`, `Transition`, `Token`, `Kind`, `Motion`, `MotionTier`, `MOTION`, `conformance` |
 | `strings` (`strings.rs`) | The string table: keys, `{n}` and `{n:spec}` placeholders, the toolkit's defaults | `StringTable`, `DEFAULTS`, `ArgFormat`, `DisplayFormat`, `format_template` |
-| `widgets` (`widgets/<name>.rs`, `widgets/mod.rs`) | One file per control, generic over `H` for the Painter API; each has a `Look`, a `paint` function, the old function as a wrapper and a `Ui` method (D60) | `button`, `toggle`, `checkbox`, `label`, `combo`, `stepper`, `field` (text field with its variants), `text_area`, `input_box` (shared look), `focus_ring`, `popup_panel`, `scroll_area`, `scrollbar`, `virtual_list`, `popover`, `tooltip`; M6 added `badge`, `status_dot`, `verdict_row`, `progress`, `spinner`, `callout`, `stat`, `kv_list` (with `selectable`, the read-only selectable text of D125), `row`, `list_row`, `form_field`, `steps`, `nav_item` (`Ui::nav_list`), `radio_group`, `star_rating`, `slider`, `filter_bar`, `search_picker`, `tab_strip`, `toolbar`, `banner` (with the empty state) and `tone` (the one tone recipe, D129); `button` gained `Ghost`, `ButtonOptions` (`Ui::button_with`) and `IconButton` (`Ui::icon_button`, D116); M7 added `flyout` (`Ui::flyout`), `toast` (the `Toasts` model, `Ui::toasts`, `Ui::toast_history`), `command_palette` (`Ui::command_palette`), `page` and `panel` (`Ui::page`, `Ui::panel`: one closure called per slot), `sidebar`, `side_panel` and `icon_rail` (`Ui::sidebar`, `Ui::side_panel`, `Ui::icon_rail`), `split_panes` (`Ui::split_panes`, `Ui::split_state`), `tree_view` (`Ui::tree_view`, `Ui::tree_state`) and `settings_page` (`Ui::settings_page`) |
+| `widgets` (`widgets/<name>.rs`, `widgets/mod.rs`) | One file per control, generic over `H` for the Painter API; each has a `Look`, a `paint` function, the old function as a wrapper and a `Ui` method (D60) | `button`, `toggle`, `checkbox`, `label`, `combo`, `stepper`, `field` (text field with its variants), `text_area`, `input_box` (shared look), `focus_ring`, `popup_panel`, `scroll_area`, `scrollbar`, `virtual_list`, `popover`, `tooltip`; M6 added `badge`, `status_dot`, `verdict_row`, `progress`, `spinner`, `callout`, `stat`, `kv_list` (with `selectable`, the read-only selectable text of D125), `row`, `list_row`, `form_field`, `steps`, `nav_item` (`Ui::nav_list`), `radio_group`, `star_rating`, `slider`, `filter_bar`, `search_picker`, `tab_strip`, `toolbar`, `banner` (with the empty state) and `tone` (the one tone recipe, D129); `button` gained `Ghost`, `ButtonOptions` (`Ui::button_with`) and `IconButton` (`Ui::icon_button`, D116); M7 added `flyout` (`Ui::flyout`), `toast` (the `Toasts` model, `Ui::toasts`, `Ui::toast_history`), `command_palette` (`Ui::command_palette`), `page` and `panel` (`Ui::page`, `Ui::panel`: one closure called per slot), `sidebar`, `side_panel` and `icon_rail` (`Ui::sidebar`, `Ui::side_panel`, `Ui::icon_rail`), `split_panes` (`Ui::split_panes`, `Ui::split_state`), `tree_view` (`Ui::tree_view`, `Ui::tree_state`) and `settings_page` (`Ui::settings_page`); M8 added `table` (`Ui::table`, `Ui::table_state`, `Ui::table_selection`: the list frame with a header, sort requests and tones; `virtual_list` gained a crate-private `ListStyle`, D161), `bar_chart` (`Ui::bar_chart`), `pie_chart` (`Ui::pie_chart`), `lane_graph` (`Ui::lane_graph_row`, a stateless `paint`) and `kanban_board` (`Ui::kanban_board`, `landed_index`) |
 | `widgets::menu`, `dropdown`, `dialog` | The overlays: the old Painter functions and `Ui::menu`, `Ui::dropdown`, `Ui::dialog` on the overlay stack; M7 added `menu_with` (`MenuOptions`, `MenuPlace`: anchored menus and the node name; rows `MenuRow::Entry` and `Header`; one highlight), `dropdown_with` (`DropdownOptions`: glass, `max_rows`), `dialog_with` (`DialogOptions`: `DialogWidth::{Confirm, Form}`, scrim blur, disabled confirm) and `dialog::modal_host`, which the palette shares | `menu`, `MenuRow`, `MenuItem`, `menu_open_anim`; `dropdown`; `dialog`, `Dialog`, `DialogGlass`, `Cancel` |
 | `chrome` (`chrome.rs`) | Tab chrome outline geometry | `outline`, `TabSpan` |
 | `testing` (`testing/`) | Fakes and contract suites of the seams, public so apps can use them | `RecordingRenderer`, `FakeText`, `text_system_contract`, `FakeImages`, `image_store_contract`, `ScriptedInput`, `NullMaterial`, `backdrop_contract`, `UiHarness` |
 
 `lib.rs` re-exports `Backdrop`, `BackdropKind`, `GlassLayer` and `theme::lunegit_dark`. Tests: unit
 tests in the modules and the files under `tests/` (`window`, `painter`, `motion`, `strings`, `ui_*`,
-one `widget_*` file per control, and `c4`, the cross-widget contract suite, with a section for the M6 set and one for the M7 set: roles, names and states of every interactive widget in one frame, accessibility actions, one tab stop per composite, the disabled walk, idle at rest, and the overlays over a dialog); none needs a
+one `widget_*` file per control, and `c4`, the cross-widget contract suite, with a section for the M6 set, one for the M7 set and one for the M8 set (the table, both charts, a lane graph row and the board in one frame): roles, names and states of every interactive widget in one frame, accessibility actions, one tab stop per composite, the disabled walk, idle at rest, and the overlays over a dialog); none needs a
 GPU or a window.
 
 ### The `Ui` frame
@@ -171,6 +172,11 @@ Command with A, C, V, X, Z), against the same run enabled. A key that fires noth
 a Shift form counts as its key below. Each run needs F5, which nothing takes, to fire: a `Global` binding is never
 offered under a modal, so it cannot fail there, and the dialog and the palette run on `Scope::Overlay`.
 
+Re-run for M8 (the same call patterns plus `consume_synthetic_key` and `consume_focus_event`, over `crates/lune-ui-core/src`
+at the M8 tip, the search first run on a known-absent name to see it report nothing): against the M7 tip, `table.rs` (two
+calls) and `kanban_board.rs` (four) are new, and `combo.rs` went from three calls to one (D160). `bar_chart.rs`, `pie_chart.rs`
+and `lane_graph.rs` have none. The new rows below come from those calls, each with a test and a mutant, not from reading.
+
 A new reader, or a change to one, gets its row here. **Test** means a named test fails when that reader is made to leak
 (a mutant of it, run at 406f780). **Probe** means only the scratch probe showed it: nothing in the repo holds it.
 
@@ -198,6 +204,11 @@ Holds, for the keys listed:
 | `combo` | Enter, Space, Down | Test (D160): `widget_combo::a_combo_focused_then_disabled_keeps_its_keys_from_the_shortcuts`; a chord on them stays a shortcut, enabled and disabled: `a_chord_on_the_combos_keys_is_a_shortcut_and_opens_nothing` |
 | `virtual_list`, so the list frame the table runs on | Up, Down, Home, End, PageUp, PageDown; Command+C with a selection | Test (D160): `widget_virtual_list::a_list_focused_then_disabled_takes_its_keys_and_changes_nothing`, `command_c_on_a_list_focused_then_disabled_copies_nothing_and_fires_no_binding`; chords: `a_chord_on_the_lists_keys_stays_a_shortcut` |
 | `scroll_area`, a focused child the keys passed (including one in a disabled scope) | PageUp, PageDown, Home, End, in an area that overflows. Hosts: the page body and the settings content | Test (D160): `widget_scroll_area::a_focused_child_that_is_disabled_keeps_the_page_keys_from_the_shortcuts_and_scrolls_nothing`, `a_disabled_focused_child_leaves_f5_and_the_page_key_chords_to_the_shortcuts`, `nested_areas_take_a_page_key_of_a_disabled_child_once` |
+| `table`, the header (`activation_keys` and `rove_keys`) | Left, Right, Home, End, Enter, Space | Test (M8): `widget_table::a_header_focused_then_disabled_takes_its_keys_and_changes_nothing`, `c4::m8::a_disabled_page_takes_every_key_a_focused_composite_takes_and_fires_no_global_binding` (header stop); mutants: the Enter and Space reader gated before it consumes and `rove_keys` skipped when disabled (both fail the widget test), the readers made `consume_key` (fails the chord test), `activation_keys` leaving a disabled key (fails the c4 test). Chords: `a_chord_on_the_tables_keys_stays_a_shortcut` |
+| `table`, the body, through `virtual_list` (the row above) | Up, Down, Home, End, PageUp, PageDown | Test (M8): `widget_table::a_body_focused_then_disabled_takes_its_keys_and_changes_nothing`, the same c4 test (body stop); mutant: `virtual_list` consuming only when enabled fails the c4 test (`table body: ArrowUp reached ...`) |
+| `kanban_board`, the cards (one roving stop) | Up, Down, Left, Right, Home, End, each also with Shift, Enter, Space | Test (M8): `widget_kanban_board::a_focused_card_turned_disabled_keeps_its_keys_and_acts_on_none`, the same c4 test (card stop). The arrow loop's own gate is masked by the `rove_keys` that follows it, which takes the same keys, so the mutant gates both: it fails both tests. Chords: `a_chord_on_a_card_stays_a_shortcut_enabled_and_disabled` |
+| `kanban_board`, the column area, PageUp and PageDown (`scroll_area`) | PageUp, PageDown | Test (M8): `widget_kanban_board::page_keys_scroll_a_column_and_die_disabled` |
+| Hosts of `Ui::icon_button`: the board's add column, add card and column actions | Enter, Space | Test (M8): `c4::m8::the_boards_buttons_focused_then_disabled_keep_enter_and_space_from_the_shortcuts`; mutant: `activation_keys` leaving a disabled key fails it |
 
 Does not hold: each key listed fired nothing enabled and fired its binding disabled, with focus kept. All by probe;
 nothing acted. Each gates on `enabled` or a focus that is false in a disabled scope before it takes the key.
@@ -226,8 +237,8 @@ Not checked, from reading only:
 - The tab strip's menu (`menu`), not run.
 - `free_drag_gesture`: no library caller, not run.
 - Keys outside the 27, such as Alt word moves in a text field and Control chords. D157 leaves chords to the shortcuts where it applies.
-- A closure host (`dialog` body, `popover`, `panel`, `page`, `side_panel`, `form_field`, `setting_row`) reads no key: what it
-  hosts has the row of that widget.
+- A closure host (`dialog` body, `popover`, `panel`, `page`, `side_panel`, `form_field`, `setting_row`, and a table's cell closure) reads no key: what it
+  hosts has the row of that widget. The bar chart, pie chart and lane graph row read no key at all.
 
 ### Draw order
 
@@ -379,15 +390,15 @@ functions; mid-transition and interaction scenes are live scripted `Ui` frames. 
 `verdict_row`, `progress`, `spinner`, `callout`, `stat`, `kv_list`, `row`, `list_row`, `form_field`, `steps`,
 `nav_item`, `radio_group`, `star_rating`, `slider`, `filter_bar`, `search_picker`, `tab_strip`, `toolbar` and `banner`, and from M7
 `flyout`, `toast-notifications`, `command-palette`, `page`, `panel`, `sidebar`, `side-panel`, `icon-rail`, `split-panes`,
-`tree-view` and `settings-page`
-(61 pages in all, 305 scene names; every page of the same pattern: a live state, scripted scenes, a bench timeline); `apps/gallery/src/pages/controls_ui.rs` is the shared composition of every M4 widget that the
+`tree-view` and `settings-page`, and from M8 `table`, `bar-chart`, `pie-chart`, `kanban-board` and `lane-graph`
+(66 pages in all, 332 scene names; every page of the same pattern: a live state, scripted scenes, a bench timeline); `apps/gallery/src/pages/controls_ui.rs` is the shared composition of every M4 widget that the
 core pages draw. Window mode builds a `Ui` per frame over the page's live state; dump and bench
 drive the same state through a `Player` (a scripted input, the retained store and the page state). A scene's `Expect` is `Settled` (`Idle`),
 `Moving` (`Now`) or, for a pending tooltip, `Waiting` (`At`). `Ev` scripts pointer, scroll, typed text, keys
 with modifiers, IME preedit and commit, and the clipboard's answer; the window answers a clipboard
 request from an in-process string until M10 (D107). The bundled fonts have no CJK glyph, so the IME scenes'
 "かな" draws as boxes (D90). A shown overlay fades from the first frame that draws it, so a scene that wants
-it visible needs a frame at the due time. Window mode and the bench draw the list page with 1,000,000 rows.
+it visible needs a frame at the due time. Window mode and the bench draw the list page with 1,000,000 rows, and the table and lane graph pages with 100,000.
 
 `gallery --bench [--runs N] [--frames N] [--size WxH]` times offscreen frames: a timeline per page,
 cost probes (text fades, a scaling and fading dialog over a blurred stripe page) and a 4 ms-sleep
@@ -453,6 +464,21 @@ facade keeps those paths):
 - `theme::DARK`, a neutral alias of `lunegit_dark::THEME`;
 - new: `RawInput`, `FrameOutput`, `Translator`, `OutputState`, `Backdrop::apply`, `WindowBackdrop`,
   the `testing` module.
+
+Since M8 (D160 to D174; nothing public was removed or changed in signature):
+
+- new widgets with a `Ui` method each: `table` (`Ui::table`, `table_state`, `table_selection`; `columns`, `Cell`,
+  `CellTone`, `TableColumn`, `ColumnWidth`, `SortKey`), `bar_chart` (`Ui::bar_chart`, `bar_chart::height`),
+  `pie_chart` (`Ui::pie_chart`, `pie_chart::sweeps`), `lane_graph` (`Ui::lane_graph_row`, `lane_graph::paint`, `width`,
+  `edge_points`) and `kanban_board` (`Ui::kanban_board`, `kanban_board::landed_index`);
+- `drag` gains `edge_step` (the strip's zone math moved out, `ReorderDrag` calls it) and `FreeDrag::pressed`;
+  `free_drag_gesture` reports a press and its release in one frame as a click; `Ui::drag_ghost` and `ListStyle` are
+  crate-private;
+- `scroll_area` reads only synthetic keys in its line loop (a real arrow on a focused area no longer scrolls, F18) and
+  serves a focused child in a disabled scope; `virtual_list` and the combo consume then gate (D160);
+- `icon` gains `ARROW_UP`, `ARROW_DOWN`, `ACCOUNT` and `NOTE`; `strings` gains `luneui.bar-chart.name`,
+  `luneui.pie-chart.name` and four `luneui.kanban-board.*` keys; no `Theme` token was added;
+- no scene that existed before M8 changed: the pixel gate against the M7 tip reads 305 identical and 27 new.
 
 Since M7 (D137 to D154):
 
@@ -566,7 +592,7 @@ only under `target/`, except that `scripts/pixel-gate.sh` extracts its base sour
 | `scripts/check-targets.sh [--skip-linux]` | The workspace lints and builds beyond the host: Windows `clippy` (needs the `x86_64-pc-windows-msvc` target) and Linux fmt, clippy and tests in a `rust:1.92` container. Not a pixel gate; it covers the code the host `cfg` hides | `windows: passed`, `linux: passed` or `skipped (<reason>)` | 0 every half that ran passed; 1 a check failed; 2 usage |
 
 Dump file names: the gallery writes `<id>@<scale>x.png` (logical 1040x660; `gallery --list` prints
-the 15 legacy names first, then the Ui pages' scenes: 62 names after M4, 152 after M5, 231 after M6); Luneterm's spike writes `NN-<name>@<scale>x.png` (18 scenes). `tools/dump-compare`
+the 15 legacy names first, then the Ui pages' scenes: 62 names after M4, 152 after M5, 231 after M6, 305 after M7, 332 after M8); Luneterm's spike writes `NN-<name>@<scale>x.png` (18 scenes). `tools/dump-compare`
 (`cargo run -p dump-compare -- <baseline> <candidate> [--max-delta N] [--allow-new]`) compares per
 pixel, max channel delta including alpha; a file missing from the candidate, a file only in the
 candidate (unless `--allow-new`), a size or colour-type mismatch or a delta above `N` (default 0)

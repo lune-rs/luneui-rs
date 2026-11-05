@@ -124,7 +124,7 @@ the plot, a slice's share of the turn), so a scale change animates with no speci
 | table row hover and selection | hover, selection | the row fill, while the rows are still; rows never animate on a sort or a scroll | instant, fast | linear | keep | [D40], [D161] |
 | board card dim | selection | the dragged card's source at `DIM_ALPHA` | fast | linear | fade | [D40], [D168] |
 | board drop line | move | the line's y inside one column; across columns it snaps | fast | sine-in-out | snap | [D40], [D168] |
-| board neighbours | settle | the cards that make room or close a gap, one slot | fast | sine-in-out | snap | [D40], [D168] |
+| board neighbours | move | the cards that make room or close a gap, one slot (`SLIDE`: the same token and easing as `settle`) | fast | sine-in-out | snap | [D40], [D168] |
 | board landing | settle | the ghost into the card's slot after a release, wherever the model now puts it (accepted, refused, cancelled and keyboard moves are one path) | fast | sine-in-out | snap | [D40], [D168] |
 
 The board's ghost tracks the pointer 1:1 and never transitions (`settle`). Off snaps every row above. The lane graph
