@@ -2,10 +2,10 @@
 id: data.stat
 title: Stat cell
 area: data
-status: in-progress
+status: done
 consumers: wane
-source: —
-owner: toolkit-v1 M6
+source: crates/lune-ui-core/src/widgets/stat.rs
+owner: —
 summary: A labelled figure in a strip: label, mono value, sub-line, optional meter
 ---
 
@@ -108,11 +108,13 @@ The label, value and sub-line are app text. The placeholder value "—" is a lit
 - Pixel probes at scale 2: cell padding 24 px top and bottom, 32 px sides; hairline 2 px.
 - Conformance: value change reaches the new value in 180 ms (fast) under Full, snaps under Off.
 - Semantic node: `group` per cell; label, value and sub-line as `static-text`.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_stat.rs`: behaviour `a_change_of_number_animates_once_from_the_old_to_the_new`, `a_live_or_text_only_value_never_puts_the_frame_in_flight`, `a_new_number_mid_flight_retargets_from_where_it_is`, `at_rest_the_drawn_text_is_the_value_exactly_not_the_formatted_number`; pixel probes `at_scale_2_the_padding_is_24_px_by_32_px`, `a_strip_shares_the_width_with_1_px_hairlines_between_cells`, `the_cell_is_padding_12_16_label_value_and_sub_line`; conformance `the_value_row_conforms_under_every_tier`, `off_snaps_and_reduced_keeps_a_short_tween`; node `the_node_is_a_group_named_by_the_label_over_the_value_and_the_sub_line`, `a_stat_is_static_and_takes_no_input`.
 
 ### Build
 
 - Milestone: M6.
 - Depends on: core.painter, core.theme, data.progress (meter), motion.transitions.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_stat.rs::a_change_of_number_animates_once_from_the_old_to_the_new, crates/lune-ui-core/tests/widget_stat.rs::a_live_or_text_only_value_never_puts_the_frame_in_flight, crates/lune-ui-core/tests/widget_stat.rs::at_scale_2_the_padding_is_24_px_by_32_px, crates/lune-ui-core/tests/widget_stat.rs::a_strip_shares_the_width_with_1_px_hairlines_between_cells, crates/lune-ui-core/tests/widget_stat.rs::the_value_row_conforms_under_every_tier, crates/lune-ui-core/tests/widget_stat.rs::the_node_is_a_group_named_by_the_label_over_the_value_and_the_sub_line`; page `stat`; unverified here: none.
 
 ## Open questions
 

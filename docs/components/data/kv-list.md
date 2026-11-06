@@ -2,10 +2,10 @@
 id: data.kv-list
 title: Key-value list
 area: data
-status: in-progress
+status: done
 consumers: wane
-source: —
-owner: toolkit-v1 M6
+source: crates/lune-ui-core/src/widgets/kv_list.rs
+owner: —
 summary: Aligned key and value pairs: facts, paths, ids, figures
 ---
 
@@ -94,11 +94,13 @@ None: keys and values are app text.
 - Pixel probes at scale 2: row 48 px; key-value gap 32 px; key text at 26 px font size; the key column equals the longest key's measured width.
 - Conformance: none (no motion).
 - Semantic node: `group` per pair; key and value `static-text`.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_kv_list.rs`: behaviour `a_drag_across_a_value_then_copy_writes_the_substring`, `a_press_on_an_elided_value_selects_it_whole_and_copy_writes_all_of_it`, `a_value_is_not_a_tab_stop`, `a_press_outside_a_value_does_nothing`, `the_selection_draws_while_focused_and_a_focus_loss_clears_it`; pixel probes `at_scale_2_the_row_is_48_px_and_the_gap_32_px`, `the_key_column_is_the_longest_keys_measured_width_and_the_gap_is_16`, `rows_are_24_high_with_the_text_on_a_20_px_line_2_px_down`, `key_and_value_colours_and_the_mono_option`; `a_long_value_is_elided_to_the_value_column_and_a_key_never_is`; node `each_pair_is_a_group_over_a_key_and_a_selectable_value`; no motion `the_list_is_static_and_settles`; disabled `a_value_focused_then_disabled_takes_its_keys_and_changes_nothing`.
 
 ### Build
 
 - Milestone: M6.
 - Depends on: core.painter, core.theme, infra.accessibility.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_kv_list.rs::a_drag_across_a_value_then_copy_writes_the_substring, crates/lune-ui-core/tests/widget_kv_list.rs::a_press_on_an_elided_value_selects_it_whole_and_copy_writes_all_of_it, crates/lune-ui-core/tests/widget_kv_list.rs::a_value_is_not_a_tab_stop, crates/lune-ui-core/tests/widget_kv_list.rs::at_scale_2_the_row_is_48_px_and_the_gap_32_px, crates/lune-ui-core/tests/widget_kv_list.rs::each_pair_is_a_group_over_a_key_and_a_selectable_value, crates/lune-ui-core/tests/widget_kv_list.rs::the_list_is_static_and_settles`; page `kv-list`; unverified here: the OS clipboard the copy reaches (`platform.clipboard`).
 
 ## Open questions
 

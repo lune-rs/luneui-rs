@@ -12,8 +12,8 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | in-luneterm | 0 |
 | planned | 0 |
 | stub | 0 |
-| in-progress | 19 |
-| done | 74 |
+| in-progress | 2 |
+| done | 91 |
 | external | 4 |
 | **total** | **97** |
 
@@ -104,30 +104,30 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
-| [layout.icon-rail](layout/icon-rail.md) | Icon rail | in-progress | lunegit | Narrow icon column of 40 px toolbar buttons that switch the side panels and toggle the terminal, with a notification badge |
-| [layout.page](layout/page.md) | Page card (header, scroll body, footer) | in-progress | wane | The card that holds a screen: header with title and actions, scrolling body, optional pinned footer |
-| [layout.panel](layout/panel.md) | Panel (group box) | in-progress | wane | Outline-only group box with title, meta, body and action footer |
-| [layout.scroll-area](layout/scroll-area.md) | Scroll area | in-progress | any | Scrolling region: per-id offset, wheel and trackpad scrolling, scroll-into-view, follow-tail, offset kept across content replacement |
-| [layout.settings-page](layout/settings-page.md) | Settings page layout | in-progress | luneterm | Settings page shell: a 20 px content host for the current section, a restart banner that reveals on demand, and the rows and sections built from toolkit widgets |
-| [layout.side-panel](layout/side-panel.md) | Side panel host and panels | in-progress | lunegit | Side panel host that shows one of nine panels by key, with a fade and 6 px slide on show |
-| [layout.sidebar](layout/sidebar.md) | Sidebar | in-progress | wane | 208 px column on the window glass: nav list (or wizard steps) and a status footer |
-| [layout.split-panes](layout/split-panes.md) | Resizable split panes | in-progress | lunegit | Resizable columns and rows between panels and content, with a 4 px splitter that snaps columns shown or hidden |
+| [layout.icon-rail](layout/icon-rail.md) | Icon rail | done | lunegit | Narrow icon column of 40 px toolbar buttons that switch the side panels and toggle the terminal, with a notification badge |
+| [layout.page](layout/page.md) | Page card (header, scroll body, footer) | done | wane | The card that holds a screen: header with title and actions, scrolling body, optional pinned footer |
+| [layout.panel](layout/panel.md) | Panel (group box) | done | wane | Outline-only group box with title, meta, body and action footer |
+| [layout.scroll-area](layout/scroll-area.md) | Scroll area | done | any | Scrolling region: per-id offset, wheel and trackpad scrolling, scroll-into-view, follow-tail, offset kept across content replacement |
+| [layout.settings-page](layout/settings-page.md) | Settings page layout | done | luneterm | Settings page shell: a 20 px content host for the current section, a restart banner that reveals on demand, and the rows and sections built from toolkit widgets |
+| [layout.side-panel](layout/side-panel.md) | Side panel host and panels | done | lunegit | Side panel host that shows one of nine panels by key, with a fade and 6 px slide on show |
+| [layout.sidebar](layout/sidebar.md) | Sidebar | done | wane | 208 px column on the window glass: nav list (or wizard steps) and a status footer |
+| [layout.split-panes](layout/split-panes.md) | Resizable split panes | done | lunegit | Resizable columns and rows between panels and content, with a 4 px splitter that snaps columns shown or hidden |
 | [layout.stack](layout/stack.md) | Stack, row, column and grid layout | done | any | Pure layout helpers: stack, row, column and grid with gaps, alignment, insets and fixed, fill and hug sizing |
-| [layout.tree-view](layout/tree-view.md) | Tree view and tree guides | in-progress | lunegit, wane | Tree rows with guide lines (trunk and rounded elbow) per depth; expansion is a set of node keys, animated on the container |
+| [layout.tree-view](layout/tree-view.md) | Tree view and tree guides | done | lunegit, wane | Tree rows with guide lines (trunk and rounded elbow) per depth; expansion is a set of node keys, animated on the container |
 | [layout.virtualized-list](layout/virtualized-list.md) | Virtualized list | done | lunegit, wane | Builds only the visible rows; selection as a set of row keys (single, multi, range); keyboard navigation; no row animation while scrolling |
 
 ## data
 
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
-| [data.bar-chart](data/bar-chart.md) | Stacked bar chart | in-progress | wane | Hourly stacked columns, two series, three grid lines |
-| [data.kanban-board](data/kanban-board.md) | Kanban board | in-progress | lunegit | Horizontal board of columns with card lists, card drag between columns by manual pointer capture, and an error state for a corrupt board |
-| [data.kv-list](data/kv-list.md) | Key-value list | in-progress | wane | Aligned key and value pairs: facts, paths, ids, figures |
-| [data.lane-graph](data/lane-graph.md) | Lane graph (row) | in-progress | lunegit | One row of a lane graph: connection curves between lanes, vertical lane lines, and a node dot in its lane; generalised from commits to app data |
-| [data.pie-chart](data/pie-chart.md) | Pie chart | in-progress | lunegit | 160 px pie of slices sized by value, drawn from the top clockwise, with a glass highlight over the top half |
-| [data.progress](data/progress.md) | Progress bar | in-progress | wane | 4 px track with an accent fill; warn and err only for meaning |
-| [data.stat](data/stat.md) | Stat cell | in-progress | wane | A labelled figure in a strip: label, mono value, sub-line, optional meter |
-| [data.table](data/table.md) | Data table | in-progress | wane | 28 px rows with hairlines, numeric columns in mono, sortable header look, selectable rows |
+| [data.bar-chart](data/bar-chart.md) | Stacked bar chart | done | wane | Hourly stacked columns, two series, three grid lines |
+| [data.kanban-board](data/kanban-board.md) | Kanban board | done | lunegit | Horizontal board of columns with card lists, card drag between columns by manual pointer capture, and an error state for a corrupt board |
+| [data.kv-list](data/kv-list.md) | Key-value list | done | wane | Aligned key and value pairs: facts, paths, ids, figures |
+| [data.lane-graph](data/lane-graph.md) | Lane graph (row) | done | lunegit | One row of a lane graph: connection curves between lanes, vertical lane lines, and a node dot in its lane; generalised from commits to app data |
+| [data.pie-chart](data/pie-chart.md) | Pie chart | done | lunegit | 160 px pie of slices sized by value, drawn from the top clockwise, with a glass highlight over the top half |
+| [data.progress](data/progress.md) | Progress bar | done | wane | 4 px track with an accent fill; warn and err only for meaning |
+| [data.stat](data/stat.md) | Stat cell | done | wane | A labelled figure in a strip: label, mono value, sub-line, optional meter |
+| [data.table](data/table.md) | Data table | done | wane | 28 px rows with hairlines, numeric columns in mono, sortable header look, selectable rows |
 
 ## text
 

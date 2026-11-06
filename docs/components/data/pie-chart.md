@@ -2,10 +2,10 @@
 id: data.pie-chart
 title: Pie chart
 area: data
-status: in-progress
+status: done
 consumers: lunegit
 source: crates/lune-ui-core/src/widgets/pie_chart.rs
-owner: toolkit-v1 M8
+owner: —
 summary: 160 px pie of slices sized by value, drawn from the top clockwise, with a glass highlight over the top half
 ---
 
@@ -92,15 +92,17 @@ One toolkit key, `luneui.pie-chart.name` ("Pie chart"), the fallback name. The c
 
 ### Acceptance
 
-- Behaviour (scripted input, injected time): slice sweeps sum to 2π for any positive total; an empty input draws nothing; a zero slice is skipped. None exists.
+- Behaviour (scripted input, injected time): slice sweeps sum to 2π for any positive total; an empty input draws nothing; a zero slice is skipped.
 - Pixel probes at scale 2: diameter 320 px; the first slice starts at the top centre; highlight alpha 38 over the top half.
 - Conformance: the `Kind::Value` row on Full, Reduced and Off, and the sweeps totalling 2π in every frame (`widget_pie_chart.rs`).
 - Semantic node: `image` with a name; no per-slice nodes in the control.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_pie_chart.rs`: behaviour `sweeps_sum_to_a_turn_for_any_positive_total`, `empty_draws_nothing_the_highlight_included`, `a_zero_slice_is_skipped`, `a_value_that_is_not_positive_or_not_finite_sweeps_nothing`, `one_slice_of_the_whole_is_a_full_disc_probed_at_the_four_quarter_points`; pixel probes `the_first_slice_starts_at_the_top_centre_and_turns_clockwise`, `the_highlight_is_one_white_sector_over_the_top_half_after_the_slices`, `a_slice_above_half_fills_past_the_bottom`; conformance `the_value_row_conforms_under_every_tier`, `the_sweeps_total_a_turn_in_every_frame_of_a_change_and_of_a_retarget`, `a_change_animates_once_and_ends_exactly_at_each_share`, `off_and_reduced_snap`, `idle_at_rest`; node `the_chart_is_an_image_named_by_the_app_with_no_children`, `a_disabled_scope_marks_the_node`.
 
 ### Build
 
 - Milestone: M8.
 - Depends on: core.painter, core.theme, infra.accessibility.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_pie_chart.rs::sweeps_sum_to_a_turn_for_any_positive_total, crates/lune-ui-core/tests/widget_pie_chart.rs::one_slice_of_the_whole_is_a_full_disc_probed_at_the_four_quarter_points, crates/lune-ui-core/tests/widget_pie_chart.rs::the_first_slice_starts_at_the_top_centre_and_turns_clockwise, crates/lune-ui-core/tests/widget_pie_chart.rs::the_highlight_is_one_white_sector_over_the_top_half_after_the_slices, crates/lune-ui-core/tests/widget_pie_chart.rs::the_value_row_conforms_under_every_tier, crates/lune-ui-core/tests/widget_pie_chart.rs::the_chart_is_an_image_named_by_the_app_with_no_children`; page `pie-chart`; unverified here: none.
 
 ## Open questions
 

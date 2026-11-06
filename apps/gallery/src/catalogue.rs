@@ -9,6 +9,7 @@
 //! - every hyphenated backticked id under an entry's `### Gallery scenes`, and the first id of
 //!   each bullet, is a scene or a page of the gallery; every scene and page is claimed;
 //! - a non-external entry names a scene or says `n/a —`;
+//! - the `in-progress` entries are exactly the two Class B ones (D1), each quoting its line;
 //! - a `done` entry has no owner, a `source:` that exists, no open "still needs", and a
 //!   `- Done (D47, M11):` line in `### Build` whose cited tests exist, unless it says
 //!   `tests: n/a — <reason>`;
@@ -316,6 +317,51 @@ pub(crate) fn done_complaints(e: &Entry, root: &Path) -> Vec<String> {
     out
 }
 
+/// The entries that stay `in-progress` by their own text (Class B, D1): path suffix, who runs
+/// what the entry names, and the line of the entry that ties its done standard to that run. An
+/// audit may add one only by quoting such a line; it may not remove one by rewording it.
+pub(crate) const CLASS_B: [(&str, &str, &str); 2] = [
+    (
+        "platform/material.md",
+        "Luneterm M9 to M11 runs",
+        "The done standard (D18) for this entry needs those runs",
+    ),
+    (
+        "render/surface.md",
+        "consumer's window run",
+        "the pixel gate on a presented frame (open: the platform run is not in this milestone)",
+    ),
+];
+
+/// The `in-progress` entries that are not Class B, and a Class B entry that is not `in-progress`,
+/// has another owner, or no longer quotes its line.
+pub(crate) fn class_b_complaints(entries: &[Entry]) -> Vec<String> {
+    let mut out = Vec::new();
+    for e in entries.iter().filter(|e| e.status == "in-progress") {
+        let p = &e.path;
+        let Some((_, owner, quote)) = CLASS_B.iter().find(|(suffix, _, _)| p.ends_with(suffix))
+        else {
+            out.push(format!("{p}: in-progress, but it is not a Class B entry"));
+            continue;
+        };
+        if e.owner != *owner {
+            out.push(format!("{p}: owner is `{}`, not `{owner}`", e.owner));
+        }
+        if !e.body.contains(quote) {
+            out.push(format!("{p}: no longer quotes \"{quote}\""));
+        }
+    }
+    for (suffix, _, _) in CLASS_B {
+        if !entries
+            .iter()
+            .any(|e| e.path.ends_with(suffix) && e.status == "in-progress")
+        {
+            out.push(format!("{suffix}: Class B, but not an in-progress entry"));
+        }
+    }
+    out
+}
+
 /// `R-<area>-<n>` ids in `text`.
 pub(crate) fn requirement_ids(text: &str) -> BTreeSet<String> {
     let bytes = text.as_bytes();
@@ -522,6 +568,48 @@ mod tests {
     }
 
     #[test]
+    fn an_in_progress_entry_outside_class_b_is_reported() {
+        let e = entry("in-progress", "o", "—", "");
+        let bad = class_b_complaints(&[e]);
+        assert!(
+            bad.iter().any(|b| b.contains("not a Class B entry")),
+            "{bad:?}"
+        );
+    }
+
+    #[test]
+    fn a_class_b_entry_that_lost_its_quote_its_owner_or_its_status_is_reported() {
+        let make = |status: &str, owner: &str, body: &str| {
+            let text = format!(
+                "---\nid: platform.material\nstatus: {status}\nowner: {owner}\nsource: —\n---\n{body}"
+            );
+            Entry::parse("docs/components/platform/material.md", &text).expect("parses")
+        };
+        let surface = |status: &str| {
+            let text = format!(
+                "---\nid: render.surface\nstatus: {status}\nowner: consumer's window run\nsource: —\n---\n{}",
+                CLASS_B[1].2
+            );
+            Entry::parse("docs/components/render/surface.md", &text).expect("parses")
+        };
+        let ok = make("in-progress", CLASS_B[0].1, CLASS_B[0].2);
+        assert_eq!(
+            class_b_complaints(&[ok, surface("in-progress")]),
+            Vec::<String>::new()
+        );
+        let no_quote = make("in-progress", CLASS_B[0].1, "reworded");
+        assert!(class_b_complaints(&[no_quote, surface("in-progress")])[0].contains("quotes"));
+        let other_owner = make("in-progress", "someone", CLASS_B[0].2);
+        assert!(class_b_complaints(&[other_owner, surface("in-progress")])[0].contains("owner"));
+        let flipped = make("done", "—", CLASS_B[0].2);
+        let bad = class_b_complaints(&[flipped, surface("in-progress")]);
+        assert!(
+            bad.iter().any(|b| b.contains("Class B, but not")),
+            "{bad:?}"
+        );
+    }
+
+    #[test]
     fn requirement_ids_are_read_and_an_uncited_one_is_reported() {
         let ids = requirement_ids("see R-core-4, (R-nfr-6) and R-<area>-<n>, not XR-core-9");
         assert_eq!(ids.into_iter().collect::<Vec<_>>(), ["R-core-4", "R-nfr-6"]);
@@ -607,6 +695,18 @@ mod tests {
                 .flat_map(|e| done_complaints(e, &root))
                 .collect(),
         );
+    }
+
+    #[test]
+    fn the_in_progress_entries_are_exactly_the_two_class_b_ones() {
+        let (entries, _) = all();
+        none(class_b_complaints(&entries));
+        let open: Vec<&str> = entries
+            .iter()
+            .filter(|e| e.status == "in-progress")
+            .map(|e| e.path.as_str())
+            .collect();
+        assert_eq!(open.len(), 2, "{open:?}");
     }
 
     #[test]
