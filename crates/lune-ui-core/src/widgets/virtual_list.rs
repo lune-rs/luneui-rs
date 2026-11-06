@@ -658,7 +658,7 @@ impl Ui<'_> {
                 self.scroll_link_open(group);
                 0.0
             }
-            Some(group) => self.scroll_link_pull(group, mem.ended + pending),
+            Some(group) => self.scroll_link_pull(group, mem.ended + pending, mem.rect.is_none()),
             None => 0.0,
         };
         if pulled != 0.0 {
@@ -1498,6 +1498,32 @@ mod tests {
         assert_eq!((a, b), (120.0, 120.0), "in its first frame");
         let (a, b, _) = offsets(&mut h, (document(1), document(1)));
         assert_eq!((a, b), (120.0, 120.0), "and the first pane stays");
+    }
+
+    #[test]
+    fn a_pane_hidden_while_its_group_stands_still_comes_back_with_the_group() {
+        // `taken` lives under the group and outlasts the pane's own state: a first draw joins
+        // where the group stands, whether it moved meanwhile or not.
+        let styles = (document(1), document(1));
+        let mut h = UiHarness::new(WIN);
+        offsets(&mut h, styles);
+        h.input.pointer_to(100.0, 60.0);
+        offsets(&mut h, styles);
+        h.input.scroll_pixels(0.0, -120.0);
+        assert_eq!(offsets(&mut h, styles).0, 120.0);
+        for _ in 0..3 {
+            let mut seen = None;
+            h.frame(|ui| seen = Some(pane(ui, RECT, COUNT, document(1))));
+            assert_eq!(seen.expect("drew").resp.offset, 120.0);
+        }
+        let (a, b, _) = offsets(&mut h, styles);
+        assert_eq!((a, b), (120.0, 120.0), "in the frame it returns");
+        h.at_ms(5_000);
+        assert_eq!(
+            offsets(&mut h, styles).2,
+            Repaint::Idle,
+            "and the page rests"
+        );
     }
 
     #[test]

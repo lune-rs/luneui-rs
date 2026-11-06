@@ -919,7 +919,7 @@ impl Ui<'_> {
                 self.scroll_link_open(g);
                 0.0
             }
-            Some(g) => self.scroll_link_pull(g, drawn.1 + pending),
+            Some(g) => self.scroll_link_pull(g, drawn.1 + pending, !mem.drew),
             None => 0.0,
         };
         if pulled != 0.0 {

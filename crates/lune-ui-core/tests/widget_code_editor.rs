@@ -1901,6 +1901,43 @@ fn a_pane_alone_on_a_new_identity_takes_its_group_to_the_top() {
 }
 
 #[test]
+fn a_pane_hidden_while_its_group_stands_still_comes_back_with_the_group() {
+    // The group's record of what the pane took outlasts the pane's own state: a first draw joins
+    // where the group stands, whether the group moved meanwhile or not.
+    let (mut a, mut b) = (numbered(100), numbered(100));
+    let synced = CodeOptions {
+        scroll_group: Some("g"),
+        identity: Some(1),
+        ..read_only()
+    };
+    let mut h = UiHarness::new(WIN);
+    let mut draw = |h: &mut UiHarness, show_b: bool| {
+        let mut out = (0.0, -1.0);
+        let (_, frame) = h.frame(|ui| {
+            out.0 = ui.code_editor("a", A, &mut a, &synced).offset.1;
+            if show_b {
+                out.1 = ui.code_editor("b", B, &mut b, &synced).offset.1;
+            }
+        });
+        (out, frame.repaint)
+    };
+    draw(&mut h, true);
+    h.input.pointer_to(50.0, 50.0).scroll_pixels(0.0, -120.0);
+    assert_eq!(draw(&mut h, true).0, (120.0, 120.0));
+    h.input.pointer_leave();
+    for _ in 0..3 {
+        assert_eq!(draw(&mut h, false).0, (120.0, -1.0));
+    }
+    assert_eq!(
+        draw(&mut h, true).0,
+        (120.0, 120.0),
+        "in the frame it returns"
+    );
+    h.at_ms(5_000);
+    assert_eq!(draw(&mut h, true).1, Repaint::Idle, "and the page rests");
+}
+
+#[test]
 fn a_line_wheel_on_the_second_pane_rests_with_both_panes_equal() {
     let (mut a, mut b) = (numbered(100), numbered(100));
     let synced = CodeOptions {

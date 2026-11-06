@@ -496,14 +496,22 @@ impl Ui<'_> {
     /// A pane of a scroll link (D8) asks what to apply before its area runs: the shift that takes
     /// `own_offset`, where the last frame left it, to the group's value. Zero when the group has
     /// no value yet, when the pane already took that value (a pane that clamps does not ask every
-    /// frame), or when they are equal. The pane is the current scope.
-    pub(crate) fn scroll_link_pull(&mut self, group: WidgetId, own_offset: f64) -> f64 {
+    /// frame), or when they are equal. A `first` draw (the pane's state is new: its first frame, or
+    /// the first after it was not drawn and its state swept) ignores what it took before, since
+    /// `taken` lives under the group and outlasts the pane: it joins where the group stands. The
+    /// pane is the current scope.
+    pub(crate) fn scroll_link_pull(
+        &mut self,
+        group: WidgetId,
+        own_offset: f64,
+        first: bool,
+    ) -> f64 {
         let pane = self.scope_id();
         let link = self.link_drawn(group);
         let Some(value) = link.value else {
             return 0.0;
         };
-        if link.taken.get(&pane) == Some(&value) {
+        if !first && link.taken.get(&pane) == Some(&value) {
             return 0.0;
         }
         link.taken.insert(pane, value);
