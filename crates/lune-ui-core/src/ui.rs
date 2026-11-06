@@ -582,6 +582,7 @@ impl<'a> Ui<'a> {
             pointer,
             input_acted,
             focus_at_begin,
+            theme_cut,
             ..
         } = self;
         let now = input.time;
@@ -597,6 +598,7 @@ impl<'a> Ui<'a> {
             now,
             &config.theme.motion,
             config.tier,
+            theme_cut,
         );
         // A composition ends with its widget's last drawn frame. Nothing else clears it under a live
         // keep-alive scope, where D15 keeps the focus and the widget's own `end_edit` does not run.

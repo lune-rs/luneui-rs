@@ -594,3 +594,117 @@ fn the_first_frame_needs_no_snap() {
     });
     assert_eq!(out.repaint, Repaint::Idle);
 }
+
+// A theme swap and a closing overlay. The exit of an overlay replays what its content recorded,
+// colours already resolved, so a swap must not let one fade out in the old theme (D209).
+
+mod closing {
+    use super::*;
+    use lune_ui_core::paint::LayerId;
+    use lune_ui_core::scene::Scene;
+    use lune_ui_core::ui::Ui;
+    use lune_ui_core::widgets::dialog::{Cancel, Dialog, DialogGlass};
+    use lune_ui_core::widgets::label::LabelRole;
+    use lune_ui_core::widgets::popover::PopoverOptions;
+
+    #[derive(Clone, Copy, Debug)]
+    enum Kind {
+        Popover,
+        Dialog,
+    }
+
+    const TOGGLE: Rect = Rect::new(20.0, 20.0, 40.0, 24.0);
+
+    /// A page (a toggle) and, while `open`, the overlay.
+    fn frame(h: &mut UiHarness, ms: u64, kind: Kind, open: bool) -> (Scene, Repaint) {
+        let mut on = true;
+        h.at_ms(ms);
+        let (scene, out) = h.frame(|ui: &mut Ui<'_>| {
+            ui.painter().on(LayerId::Page);
+            ui.toggle("t", TOGGLE, &mut on, "Notifications");
+            if !open {
+                return;
+            }
+            match kind {
+                Kind::Popover => {
+                    let o = PopoverOptions::new(Rect::new(20.0, 60.0, 80.0, 24.0), (140.0, 80.0));
+                    ui.popover("pop", &o, |ui, rect| {
+                        ui.label("l", (rect.x + 8.0, rect.y + 8.0), "Hello", LabelRole::Base);
+                    });
+                }
+                Kind::Dialog => {
+                    let d = Dialog {
+                        title: "Discard",
+                        message: "Unsaved changes.",
+                        extra_h: 0.0,
+                        confirm: "Discard",
+                        cancel: Cancel::Default,
+                    };
+                    let glass = DialogGlass {
+                        panel: [0.1, 0.1, 0.12, 1.0],
+                        fill: [0.2, 0.2, 0.2, 0.62],
+                        noise: true,
+                    };
+                    ui.dialog("dialog", &d, &glass, |_, _, _, _| {});
+                }
+            }
+        });
+        (scene, out.repaint)
+    }
+
+    /// The overlay opens under theme `a` and settles, stops being called at 1100 ms, and the theme
+    /// becomes `b` at `swap_ms` (1100: the frame the overlay starts to close; 1116: the next one).
+    /// Returns the frame at `swap_ms` and what a frame a second later reports.
+    fn run(kind: Kind, a: Theme, b: Theme, swap_ms: u64) -> (Scene, Repaint, Repaint) {
+        let mut h = UiHarness::new((300.0, 200.0));
+        h.theme = a;
+        frame(&mut h, 0, kind, true);
+        frame(&mut h, 600, kind, true);
+        frame(&mut h, 1000, kind, true);
+        if swap_ms > 1100 {
+            frame(&mut h, 1100, kind, false);
+        }
+        h.theme = b;
+        let (scene, repaint) = frame(&mut h, swap_ms, kind, false);
+        let (_, later) = frame(&mut h, swap_ms + 1000, kind, false);
+        (scene, repaint, later)
+    }
+
+    /// The page alone under `b` at `ms`, a fresh window.
+    fn solo(kind: Kind, b: Theme, ms: u64) -> Scene {
+        let mut h = UiHarness::new((300.0, 200.0));
+        h.theme = b;
+        frame(&mut h, ms, kind, false).0
+    }
+
+    #[test]
+    fn a_closing_overlay_is_gone_in_the_frame_of_a_swap() {
+        // Mutant: drop the `theme_cut` retain in `settle_overlays` and the exit replays in the old
+        // theme's colours, so the scene differs from the page alone and this fails.
+        for kind in [Kind::Popover, Kind::Dialog] {
+            for swap_ms in [1100, 1116] {
+                let b = other_theme();
+                let (scene, _, later) = run(kind, DARK, b, swap_ms);
+                assert_eq!(
+                    scene,
+                    solo(kind, b, swap_ms),
+                    "{kind:?} swapped at {swap_ms}"
+                );
+                // Nothing of the overlay is left to move: the page goes idle.
+                assert_eq!(later, Repaint::Idle, "{kind:?} at {swap_ms}");
+            }
+        }
+    }
+
+    #[test]
+    fn the_same_frame_without_a_swap_still_shows_the_exit() {
+        // The control: with no swap the overlay is still fading out at those times, so the scene
+        // is not the page alone and the frame asks for another.
+        for kind in [Kind::Popover, Kind::Dialog] {
+            let (scene, repaint, later) = run(kind, DARK, DARK, 1116);
+            assert_ne!(scene, solo(kind, DARK, 1116), "{kind:?}");
+            assert_eq!(repaint, Repaint::Now, "{kind:?}");
+            assert_eq!(later, Repaint::Idle, "{kind:?}");
+        }
+    }
+}
