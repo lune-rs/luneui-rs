@@ -30,6 +30,14 @@ use crate::text::{CaretPos, LineSpan, Spec, TextSystem, Unit, clamp_to_boundary,
 /// How many undo steps a [`TextEdit`] keeps.
 pub const UNDO_DEPTH: usize = 200;
 
+/// The most bytes a one-line editor takes in one insert (a paste, an assistive `SetValue`, an input
+/// method's commit); a longer one is refused whole, never cut. A one-line field shapes its whole
+/// text as one buffer, so what it takes costs in proportion: about 25 ms a frame and 290 MB at 1
+/// MiB, 10 s and 9.6 GB at the clipboard adapter's 32 MiB cap (measured and extrapolated in
+/// D232), and that cap is sized for the code view, which draws only the lines in view. A
+/// multi-line editor is not bound here; an app's own `max_chars` still applies.
+pub const MAX_ONE_LINE_INSERT: usize = 1_048_576;
+
 /// The pause that ends a run of typed characters as one undo step.
 pub const COALESCE_PAUSE: Duration = Duration::from_millis(500);
 
@@ -1033,7 +1041,8 @@ impl TextEdit {
     }
 
     /// Replaces the selection with `insert`, cleaned and cut to fit; `typing` lets it join the
-    /// typed run before it. Empty text after cleaning changes nothing, selection included.
+    /// typed run before it. Empty text after cleaning changes nothing, selection included. A
+    /// one-line editor refuses an insert over [`MAX_ONE_LINE_INSERT`] bytes whole.
     fn insert<T: EditBuffer + ?Sized>(
         &mut self,
         insert: &str,
@@ -1042,6 +1051,9 @@ impl TextEdit {
         typing: bool,
         now: Time,
     ) -> bool {
+        if !self.flags.multiline && insert.len() > MAX_ONE_LINE_INSERT {
+            return false;
+        }
         let sel = self.selection();
         let mut insert = clean(insert, self.flags.multiline);
         if let Some(max) = self.flags.max_chars {

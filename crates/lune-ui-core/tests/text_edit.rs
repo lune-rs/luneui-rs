@@ -8,8 +8,8 @@ use lune_ui_core::input::{FocusEvent, ImeEvent, Key, Keymap, Modifiers, NamedKey
 use lune_ui_core::testing::FakeText;
 use lune_ui_core::text::{CaretPos, LineSpan, Spec, Style, TextSystem, Unit};
 use lune_ui_core::text_edit::{
-    COALESCE_PAUSE, EditCommand, EditFlags, EditLayout, EditOutcome, Motion, SpecLayout, TextEdit,
-    UNDO_DEPTH,
+    COALESCE_PAUSE, EditCommand, EditFlags, EditLayout, EditOutcome, MAX_ONE_LINE_INSERT, Motion,
+    SpecLayout, TextEdit, UNDO_DEPTH,
 };
 
 const WORLD: &str = "héllo wörld";
@@ -794,6 +794,81 @@ fn text_that_cleans_to_nothing_keeps_the_selection() {
     assert!(!out.changed && out.consumed);
     assert_eq!(ed.text, "abc");
     assert_eq!(ed.sel(), (0, 3));
+}
+
+#[test]
+fn a_one_line_editor_refuses_an_insert_over_the_cap_whole() {
+    // A paste and an assistive set-value both come in as `PasteText`; typing and an input method's
+    // commit as `Insert`. Past 1 MiB a one-line field would shape the lot every frame.
+    let at_cap = "a".repeat(MAX_ONE_LINE_INSERT);
+    let over = "a".repeat(MAX_ONE_LINE_INSERT + 1);
+    for make in [EditCommand::PasteText, EditCommand::Insert] {
+        let mut ed = Ed::new("ab");
+        ed.edit.set_selection(1, 1);
+        ed.sync();
+        let out = ed.cmd(make(over.clone()));
+        assert!(!out.changed, "refused");
+        assert_eq!(
+            (ed.text.as_str(), ed.sel()),
+            ("ab", (1, 1)),
+            "nothing cut, nothing moved"
+        );
+
+        // The same on a selection: it is not replaced.
+        ed.edit.set_selection(0, 2);
+        ed.sync();
+        assert!(!ed.cmd(make(over.clone())).changed);
+        assert_eq!((ed.text.as_str(), ed.sel()), ("ab", (0, 2)));
+
+        // One byte less is a normal insert.
+        let mut ed = Ed::new("");
+        assert!(ed.cmd(make(at_cap.clone())).changed);
+        assert_eq!(ed.text.len(), MAX_ONE_LINE_INSERT);
+    }
+    // Bytes, not chars: a 3-byte char 349,526 times is over the cap in bytes.
+    let wide = "\u{20AC}".repeat(MAX_ONE_LINE_INSERT / 3 + 1);
+    assert!(wide.len() > MAX_ONE_LINE_INSERT);
+    let mut ed = Ed::new("");
+    assert!(!ed.cmd(EditCommand::PasteText(wide)).changed);
+    assert_eq!(ed.text, "");
+    // A password field is one line too.
+    let mut ed = Ed::with_flags(
+        "",
+        EditFlags {
+            password: true,
+            ..EditFlags::default()
+        },
+    );
+    assert!(!ed.cmd(EditCommand::PasteText(over.clone())).changed);
+    assert_eq!(ed.text, "");
+}
+
+#[test]
+fn a_multi_line_editor_is_not_bound_by_the_one_line_cap() {
+    let big = "line\n".repeat(MAX_ONE_LINE_INSERT / 5 * 2);
+    assert!(big.len() > MAX_ONE_LINE_INSERT);
+    let mut ed = Ed::with_flags(
+        "",
+        EditFlags {
+            multiline: true,
+            ..EditFlags::default()
+        },
+    );
+    assert!(ed.cmd(EditCommand::PasteText(big.clone())).changed);
+    assert_eq!(ed.text.len(), big.len());
+}
+
+#[test]
+fn max_chars_still_applies_to_a_one_line_insert_under_the_cap() {
+    let mut ed = Ed::with_flags(
+        "",
+        EditFlags {
+            max_chars: Some(5),
+            ..EditFlags::default()
+        },
+    );
+    ed.cmd(EditCommand::PasteText("abcdefgh".to_owned()));
+    assert_eq!(ed.text, "abcde");
 }
 
 #[test]
