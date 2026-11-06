@@ -4,7 +4,7 @@
 //! - `lune-ui-core`: the painter, display list, widgets, theme and seam types (no GPU or window);
 //! - `lune-ui-wgpu`: the shared GPU, frame renderers, window surfaces, dumps and glyphon text;
 //! - `lune-ui-winit`: window attributes, input translation and output;
-//! - `lune-ui-platform`: the OS glass material.
+//! - `lune-ui-platform`: the OS glass material, the tray item and the popover window.
 //!
 //! The app owns the winit event loop; the toolkit never starts one and never reads the clock or
 //! the environment, so frames are deterministic.
@@ -14,13 +14,20 @@
 pub use lune_ui_core::{Backdrop, BackdropKind, GlassLayer};
 pub use lune_ui_core::{
     acrylic, backdrop, chrome, code_doc, color, drag, icon, image, json, layout, motion, paint,
-    scene, shortcuts, strings, testing, text_edit, theme, tray, ui, widgets,
+    scene, shortcuts, strings, testing, text_edit, theme, ui, widgets,
 };
 pub use theme::lunegit_dark;
 
 pub use lune_ui_wgpu::{blur, custom, dump, frame, gpu, surface};
 
-pub use lune_ui_platform::material;
+pub use lune_ui_platform::{material, popover};
+
+/// The tray: the core's icon raster, placement and click rules, and the OS item
+/// (`lune-ui-platform`).
+pub mod tray {
+    pub use lune_ui_core::tray::*;
+    pub use lune_ui_platform::tray::*;
+}
 
 /// Accessibility: the core's semantic tree and actions and, with the `accesskit` feature, the
 /// bridge to the OS accessibility API (`lune-ui-winit`).

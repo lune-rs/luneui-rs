@@ -19,9 +19,25 @@ use super::Material;
 pub(super) const BEST_SUPPORTED: crate::backdrop::BackdropKind =
     crate::backdrop::BackdropKind::Blur;
 
+pub(super) fn apply(window: &winit::window::Window, material: Material) -> Result<(), String> {
+    apply_with_radius(window, material, None)
+}
+
+pub(super) fn apply_rounded(
+    window: &winit::window::Window,
+    material: Material,
+    radius: f64,
+) -> Result<(), String> {
+    apply_with_radius(window, material, Some(radius))
+}
+
 // `Light` is deprecated by Apple but is exactly what Avalonia uses.
 #[allow(deprecated)]
-pub(super) fn apply(window: &winit::window::Window, material: Material) -> Result<(), String> {
+fn apply_with_radius(
+    window: &winit::window::Window,
+    material: Material,
+    radius: Option<f64>,
+) -> Result<(), String> {
     let frame = FrameView::of(window).ok_or("no NSWindow frame view")?;
     // Clearing an effect that was never applied is a no-op (`Ok(false)`).
     clear_vibrancy(&frame).map_err(|e| e.to_string())?;
@@ -32,25 +48,31 @@ pub(super) fn apply(window: &winit::window::Window, material: Material) -> Resul
             &frame,
             NSVisualEffectMaterial::Light,
             Some(NSVisualEffectState::Active),
-            None,
+            radius,
         ),
         Material::VibrancyFollowsWindow => apply_vibrancy(
             &frame,
             NSVisualEffectMaterial::Light,
             Some(NSVisualEffectState::FollowsWindowActiveState),
-            None,
+            radius,
         ),
-        Material::LiquidClear => apply_liquid_glass(
-            &frame,
-            LiquidGlassOptions::new(NSGlassEffectViewStyle::Clear),
-        ),
-        Material::LiquidRegular => apply_liquid_glass(
-            &frame,
-            LiquidGlassOptions::new(NSGlassEffectViewStyle::Regular),
-        ),
+        Material::LiquidClear => {
+            apply_liquid_glass(&frame, liquid(NSGlassEffectViewStyle::Clear, radius))
+        }
+        Material::LiquidRegular => {
+            apply_liquid_glass(&frame, liquid(NSGlassEffectViewStyle::Regular, radius))
+        }
         Material::Opaque => Ok(()),
     };
     result.map_err(|e| e.to_string())
+}
+
+fn liquid(style: NSGlassEffectViewStyle, radius: Option<f64>) -> LiquidGlassOptions<'static> {
+    let options = LiquidGlassOptions::new(style);
+    match radius {
+        Some(radius) => options.radius(radius),
+        None => options,
+    }
 }
 
 /// The NSWindow's frame view (superview of winit's content view), exposed as a window handle

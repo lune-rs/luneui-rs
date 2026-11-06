@@ -12,3 +12,5 @@ pub mod clipboard;
 pub mod input;
 mod platform;
 pub mod window;
+
+pub use window::popover_attributes;

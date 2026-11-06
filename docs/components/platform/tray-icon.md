@@ -30,7 +30,7 @@ OS notifications are app-side (D43).
 
 ## Existing code
 
-M10 step 7 built the pure half in `crates/lune-ui-core/src/tray.rs` [D218 to D221]: `icon_bitmap` (the CPU raster, `TrayBitmap`, `TrayState`, `GlyphTone`), `bar_from_tray` and `place_surface` (`TraySurface`), `TrayToggle` and `TrayAction`, `tray_surface` (`TrayPlatform`); the surfaces in their own window are `Ui::flyout_window` and `Ui::menu_window` (`overlay.flyout`, `overlay.menu`). Tests: `crates/lune-ui-core/tests/tray.rs`, `tests/widget_flyout.rs`. The OS tray item and the popover window (step 8) and the gallery pages (step 9) are not built yet. Design sources (not code to move): Wane `docs/ui/mocks/css/components.css:691-701` (the icon), `docs/ui/mocks/css/tokens.css:12,49,52,62,97` (colours), `docs/ui/mocks/tray.html?surface=icon-states` (the states, scene `tray-icon-states`, `docs/ui/mocks/scenes.txt:33`),
+M10 step 7 built the pure half in `crates/lune-ui-core/src/tray.rs` [D218 to D221]: `icon_bitmap` (the CPU raster, `TrayBitmap`, `TrayState`, `GlyphTone`), `bar_from_tray` and `place_surface` (`TraySurface`), `TrayToggle` and `TrayAction`, `tray_surface` (`TrayPlatform`); the surfaces in their own window are `Ui::flyout_window` and `Ui::menu_window` (`overlay.flyout`, `overlay.menu`). Tests: `crates/lune-ui-core/tests/tray.rs`, `tests/widget_flyout.rs`. The OS half is `crates/lune-ui-platform/src/tray.rs`, `popover.rs` and `platform/` (step 8), with `lune_ui_winit::popover_attributes` and `material::apply_rounded`; `lune_ui::tray` holds both halves. The gallery pages (step 9) are not built yet. Design sources (not code to move): Wane `docs/ui/mocks/css/components.css:691-701` (the icon), `docs/ui/mocks/css/tokens.css:12,49,52,62,97` (colours), `docs/ui/mocks/tray.html?surface=icon-states` (the states, scene `tray-icon-states`, `docs/ui/mocks/scenes.txt:33`),
 `docs/mockups/Tray.dc.html:44` (the provisional crescent).
 
 ## Spec
@@ -105,13 +105,25 @@ None: the tooltip texts are app strings [W docs/ui/components.md:758].
 - Pixel probes (offscreen, scale 1 and 2): at 1x the dot's inner circle is 6 px across and filled `#73C991`, `#E2B93D` or `#8a9099` for the three states, the ring is 1.5 px in the ring colour, the glyph box is 16 px; at 2x 12 px, 3 px and 32 px [W docs/ui/mocks/css/components.css:694-701], [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:115-116], [W docs/ui/mocks/css/tokens.css:62], [D58]. The three icons differ only in the dot pixels.
 - Placement (pure function, known answers): menu bar bottom at y 24 (an example height), the macOS menu's top is 28 and its right edge is the screen's right edge; taskbar top at y 1040 on a 1080 screen, the flyout's bottom is 1028 and its right edge 12 px inside the screen's right edge, the menu's bottom is 1032 [W docs/ui/components.md:707,757].
 - Behaviour (fake tray, scripted clicks): a left click opens the flyout and a second closes it; an outside click and focus loss close it; a right click on Windows opens the menu [W docs/ui/components.md:577].
-- Real tray behaviour on macOS and Windows (icon in the OS slot, template images, non-activating windows) is unverified here: no GUI run, no VM (D15); Wane's hands-on run covers it later.
+- Real tray behaviour on macOS and Windows is unverified beyond what "Unverified" below lists: no VM (D15); Wane's hands-on run covers it later.
 - Conformance: n/a, no transitions. Semantic node: n/a, the OS owns the item.
 
 ### Build
 
 - Milestone: M10
 - Depends on: core.painter, render.frame, overlay.flyout, overlay.menu, overlay.popover, platform.material, platform.window
+
+### API
+
+- `tray::set_event_handler(f)`: first, before `Tray::new`, once; `f` should only pass the event to the event loop. `TrayEvent::Click { button, rect }` comes once per release; a press sends nothing.
+- `Tray::new(TrayImage { width, height, rgba }, tooltip)`, main thread only; a size mismatch is `TrayError::BadImage`, Linux is `Unsupported`. `set_image`, `set_tooltip` (Windows cuts a long one: its field holds 128 UTF-16 units).
+- `Tray::rect()`: physical px, top-left origin; `None` until the OS has placed the item, which on macOS is after the event loop has run. `Tray::bar_is_dark()`: macOS only and `None` until then too; set the first image with a guessed tone and redo it once this answers (D222).
+- `popover_attributes(size)`, then `PopoverWindow::wrap(Arc<Window>)` on the hidden window, then `apply_rounded(window, material, radius)`; `show`, `hide`. Keep the guard for as long as the window is in use. Build the event loop with `with_activate_ignoring_other_apps(false)` on macOS, or the first show takes the front (D223). `Focused(false)` arrives once at creation: listen for focus loss only while a surface is open.
+- Image form (D218): non-template with a white or black glyph, picked from `bar_is_dark`; the ring is alpha 0, so it needs no colour of its own on a light or a dark bar. Bitmaps are 18 and 36 px: macOS draws either at 18 pt.
+
+### Unverified
+
+Measured on this Mac only, by a scratch harness over the real crates (D223): the panel, each teardown path, the frontmost app, the status item's rect and appearance. Not run anywhere: a real click on the item, real hover and keys in the panel, the surface's OS shadow and corners, a menu bar on a second display, the appearance while the item is highlighted; and everything on Windows (it compiles and passes clippy; nothing has run). The panel rests on AppKit behaviour Apple does not document and is proved only on this macOS version.
 
 ## Open questions
 

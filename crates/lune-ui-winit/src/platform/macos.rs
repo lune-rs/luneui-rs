@@ -9,6 +9,10 @@ pub(crate) fn glass(attrs: WindowAttributes) -> WindowAttributes {
         .with_title_hidden(true)
 }
 
+pub(crate) fn popover(attrs: WindowAttributes) -> WindowAttributes {
+    attrs.with_has_shadow(true).with_accepts_first_mouse(true)
+}
+
 /// The keyboard conventions of this platform.
 pub(crate) fn keymap() -> Keymap {
     Keymap::MAC

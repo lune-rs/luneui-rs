@@ -23,7 +23,7 @@ preview on virtual blocks and the diff view, unified and split on the list frame
 | `crates/lune-ui-core` | Pure core: painter, `Scene`, `Ui` frame, motion, strings, semantic tree, widgets, theme, `TextSystem`, `RawInput`/`FrameOutput`, `Backdrop`, fakes. No dependencies |
 | `crates/lune-ui-wgpu` | wgpu renderer and glyphon text: one shared `Gpu` (which is also the `ImageStore`), per-target `FrameRenderer`, `WindowSurface`, dumps, `TextCache` |
 | `crates/lune-ui-winit` | winit adapter: input translation, output application, glass window attributes |
-| `crates/lune-ui-platform` | OS glass (`Material`) per platform; the only crate with `unsafe` |
+| `crates/lune-ui-platform` | OS glass (`Material`) per platform, the tray item, the popover window; the only crate with `unsafe` |
 | `crates/lune-ui` | Facade: `lib.rs` only, re-exports the four crates at the old paths |
 | `apps/gallery` | A page registry (legacy Painter-API pages and `Ui` pages), a glass window, `--dump <dir>` (offscreen PNG frames on a headless device, no window), `--list`, `--bench` (frame-time probes). App code, outside `crates/` (D12): it bundles fonts |
 | `tools/dump-compare` | Compares two dirs of PNG frame dumps pixel by pixel (the pixel gate's compare tool) |
@@ -308,9 +308,9 @@ Asset: `assets/acrylic-noise.png` (Avalonia's texture). Tests: `tests/text.rs` (
 | Module (file) | Purpose | Key items |
 |---|---|---|
 | `input` (`input.rs`) | winit events to `RawInput`; `FrameOutput` onto a window | `Translator`, `OutputState`, `cursor_icon` |
-| `window` (`window.rs`) | Glass window attributes, `ResizeEdge` to winit's direction | `glass_attributes`, `resize_direction` |
+| `window` (`window.rs`) | Glass and popover window attributes, `ResizeEdge` to winit's direction | `glass_attributes`, `popover_attributes`, `resize_direction` |
 | `access` (`access.rs`; feature `accesskit`) | The semantic tree out to AccessKit and its actions back. AccessKit calls the handlers on its own thread: they touch only `Shared` (a flag, a queue capped at 256, the app's `wake`), and the frame reads it on the app's thread. No lock is held across `wake`. | `AccessBridge`, `tree_update`, `action_from`, `NodeCache`, `RootInfo`, `BridgeError` |
-| `platform` (private; `platform/{macos,windows,other}.rs`) | Per-platform window attributes | `glass` |
+| `platform` (private; `platform/{macos,windows,other}.rs`) | Per-platform window attributes | `glass`, `popover` |
 
 Tests: `tests/input.rs` (translator against `ScriptedInput`, key, button, cursor and edge mappings);
 `tests/access.rs` (the bridge with no window, each update replayed into `accesskit_consumer`, run
@@ -320,14 +320,19 @@ only with the feature; the gate runs the crate both ways).
 
 | Module (file) | Purpose | Key items |
 |---|---|---|
-| `material` (`material.rs`, `material/{macos,windows,other}.rs`) | OS backdrop per platform; the only `unsafe` is `material/macos.rs` | `apply`, `WindowBackdrop`, `Material` (re-export) |
+| `material` (`material.rs`, `material/{macos,windows,other}.rs`) | OS backdrop per platform | `apply`, `apply_rounded`, `WindowBackdrop`, `Material` (re-export) |
+| `tray` (`tray.rs`) | The tray item: image, tooltip, rect, clicks; `Unsupported` where there is no tray (D222) | `Tray`, `TrayImage`, `TrayRect`, `TrayButton`, `TrayEvent`, `TrayError`, `set_event_handler` |
+| `popover` (`popover.rs`) | The guard of a tray surface's window (D223, D224) | `PopoverWindow`, `frontmost_app` |
+| `platform` (private; `platform.rs`, `platform/{item,macos,windows,other}.rs`) | The OS half of both: `item.rs` is the `tray-icon` wrapper macOS and Windows share, `macos.rs` the panel class swap. With `material/macos.rs`, the only `unsafe` | `Panel`, `TrayItem` |
+
+Tests: unit tests in `tray.rs` (the click rule, image sizes, an unplaced rect) and `platform/other.rs` (`Unsupported`, so they run in the Linux half of `scripts/check-targets.sh`). Nothing in the gate opens a window or a status item.
 
 ### `lune-ui` (facade, `crates/lune-ui/src/lib.rs`)
 
-One `pub use` per module keeps every `lune_ui::<module>` path. Four modules merge a core and an
+One `pub use` per module keeps every `lune_ui::<module>` path. Five modules merge a core and an
 adapter part: `text` (core text plus `TextCache`), `window` (core window helpers plus the winit
 attributes), `input` (core model plus the winit translation), `access` (core model plus, with the
-facade's `accesskit` feature, the bridge). The facade also re-exports `testing`.
+facade's `accesskit` feature, the bridge), `tray` (core raster, placement and click rules plus the OS item). The facade also re-exports `testing`.
 Boundary rule 11 keeps it free of items.
 
 ## Seams
@@ -348,7 +353,7 @@ and a contract test the real adapter passes too (R-nfr-8).
 
 Locked versions (`Cargo.lock`; the M1 set was identical to Luneterm 296cfdc's, and M10 adds to it,
 so the lock parity check of `scripts/pixel-gate-luneterm.sh --parity-only` fails by design from M10 on;
-DECISIONS D15 to D23, D38, D213 and D216 record each). Each crate's allowed set is enforced by boundary rule 9.
+DECISIONS D15 to D23, D38, D213, D216 and D222 record each). Each crate's allowed set is enforced by boundary rule 9.
 
 | Crate | Version | Used by | For |
 |---|---|---|---|
@@ -359,8 +364,9 @@ DECISIONS D15 to D23, D38, D213 and D216 record each). Each crate's allowed set 
 | `bytemuck` | 1.25.2 | lune-ui-wgpu | casting vertex data |
 | `png` | 0.18.1 | lune-ui-wgpu, dump-compare | frame dumps, compare |
 | `window-vibrancy` | 0.8.1 (macOS, Windows) | lune-ui-platform | OS glass |
-| `objc2-app-kit` | 0.3.2 (macOS) | lune-ui-platform | NSView access for glass |
+| `objc2`, `objc2-app-kit` | 0.6.5, 0.3.2 (macOS) | lune-ui-platform | NSView access for glass, the panel class, the status item's appearance (D222, D223) |
 | `raw-window-handle` | 0.6.2 (macOS) | lune-ui-platform | native window handle |
+| `tray-icon` | 0.24.2 (`default-features = false`, macOS and Windows; pulls `muda` 0.19.3, unused) | lune-ui-platform | the OS tray item (D222) |
 | `pollster` | 0.4.0 | gallery; lune-ui-wgpu (dev) | block on async `Gpu::new` |
 | `arboard` | 3.7.0 (`default-features = false`; pulls `clipboard-win` 5.4.3 and `error-code` 3.4.0 on Windows) | lune-ui-winit | the OS text clipboard (D213) |
 | `accesskit`, `accesskit_winit` | 0.25.0, 0.34.0 (optional, feature `accesskit`; `accesskit_unix` brings `zbus` and an async stack on Linux) | lune-ui-winit | the OS accessibility API (D216) |

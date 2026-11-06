@@ -13,3 +13,11 @@ pub(super) fn apply(_window: &winit::window::Window, material: Material) -> Resu
         Ok(())
     }
 }
+
+pub(super) fn apply_rounded(
+    window: &winit::window::Window,
+    material: Material,
+    _radius: f64,
+) -> Result<(), String> {
+    apply(window, material)
+}

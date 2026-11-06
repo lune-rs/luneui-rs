@@ -25,3 +25,12 @@ pub(super) fn apply(window: &winit::window::Window, material: Material) -> Resul
     };
     result.map_err(|e| e.to_string())
 }
+
+/// Windows rounds the window itself (`CornerPreference`), so the radius has nothing to do.
+pub(super) fn apply_rounded(
+    window: &winit::window::Window,
+    material: Material,
+    _radius: f64,
+) -> Result<(), String> {
+    apply(window, material)
+}
