@@ -1,4 +1,4 @@
-//! The window's caption buttons through the `Ui` (`platform.window`, D7): minimize, maximize or
+//! The window's caption buttons through the `Ui` (`platform.window`, D240): minimize, maximize or
 //! restore, close, right-aligned along the top of a borderless window.
 //!
 //! The look is the Painter form's, [`window::caption_buttons`](crate::window::caption_buttons):

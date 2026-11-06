@@ -1,4 +1,4 @@
-//! The caption buttons through the `Ui` (`platform.window`, D7): the Painter form's look at rest,
+//! The caption buttons through the `Ui` (`platform.window`, D240): the Painter form's look at rest,
 //! hover and the close fill, the click, the restore glyph, the 92 device px at scale 2, the hover
 //! motion under every tier, the three nodes with their names, the default action, and that they
 //! are no tab stops.

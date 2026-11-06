@@ -38,7 +38,7 @@ Conflicts: none.
 
 ### States
 
-n/a — a device has no UI states; a lost device is reported by `Gpu::is_lost` (D8), which is not a UI state.
+n/a — a device has no UI states; a lost device is reported by `Gpu::is_lost` (D241), which is not a UI state.
 
 ### Transitions
 
@@ -73,7 +73,7 @@ n/a — the GPU draws the primitives the scene records.
 
 - The records the shaders read: `crates/lune-ui-wgpu/src/gpu.rs::gpu_records_are_bit_exact`.
 - Many targets on one device: `crates/lune-ui-wgpu/tests/targets.rs` (`two_targets_on_one_gpu_match_each_alone`, `second_format_on_one_gpu_matches_a_fresh_gpu`).
-- Device loss (D8: report, do not recover): `crates/lune-ui-wgpu/tests/device_lost.rs::a_new_device_is_not_lost` and `a_destroyed_device_is_lost_a_draw_on_it_never_succeeds_and_a_rebuild_draws` (a destroyed device reports lost after a poll and stays lost; a draw on it never reports success; a new `Gpu` and renderers draw). The doc on `Gpu::is_lost` lists what the app rebuilds: `Gpu`, text, renderers, surfaces, images.
+- Device loss (D241: report, do not recover): `crates/lune-ui-wgpu/tests/device_lost.rs::a_new_device_is_not_lost` and `a_destroyed_device_is_lost_a_draw_on_it_never_succeeds_and_a_rebuild_draws` (a destroyed device reports lost after a poll and stays lost; a draw on it never reports success; a new `Gpu` and renderers draw). The doc on `Gpu::is_lost` lists what the app rebuilds: `Gpu`, text, renderers, surfaces, images.
 - The pixel gate at zero delta: the orchestrator's gate (M11's pre-audit run held 413 of 413).
 
 ### Build

@@ -44,7 +44,7 @@ Depend on the facade `lune-ui`: it re-exports the four adapters under the paths 
 `popover`, `material`, `testing`, `lunegit_dark`, ...). The snapshot builds as a path dependency with
 `cargo check --offline` from a scratch consumer, and `cargo metadata --offline` passes inside it.
 
-**The version is 0.2.0 (D5).** Luneterm's own in-tree `crates/lune-ui` is 0.1.0; two packages named
+**The version is 0.2.0 (D238).** Luneterm's own in-tree `crates/lune-ui` is 0.1.0; two packages named
 `lune-ui` at one version cannot stand in one lock. At 0.2.0 they can, so a port goes crate by crate
 instead of in one commit. Keep the in-tree crate until the last importer has moved, then delete it.
 
@@ -64,7 +64,7 @@ environment. The app:
   request, accessibility tree); the toolkit calls none of them;
 - keeps `Gpu::end_frame(&mut text)` once per frame after every target drew;
 - rebuilds `Gpu`, `TextCache`, every `FrameRenderer`, every `WindowSurface` and every registered image
-  when `Gpu::is_lost()` says the device is gone (it reports, it does not recover; D8);
+  when `Gpu::is_lost()` says the device is gone (it reports, it does not recover; D241);
 - enables the facade's `accesskit` feature to bridge accessibility;
 - for a tray item: calls `tray::set_event_handler` first and once, creates the `Tray` on the main
   thread after the event loop has started, and on macOS builds the event loop with

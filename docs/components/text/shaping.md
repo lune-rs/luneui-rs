@@ -88,7 +88,7 @@ n/a — the strings belong to the caller's `Spec`.
 
 ## Open questions
 
-- Still open, a limit: no bold face is bundled, so bold shows as medium (D4: the bundled-font limit stays; a consumer that wants bold bundles the face and passes it to `TextCache::new`). A shaping feature such as `tnum` is not covered either, and no consumer has asked for it.
+- Still open, a limit: no bold face is bundled, so bold shows as medium (D237: the bundled-font limit stays; a consumer that wants bold bundles the face and passes it to `TextCache::new`). A shaping feature such as `tnum` is not covered either, and no consumer has asked for it.
 - None on the seam (M2 step 5): the trait has no glyphon type in its signature. `R-text-5` (selection, caret) is covered since M5 by the caret, hit, lines and segments queries (D86, D94); a shaping feature such as `tnum` is not covered yet.
 
 ## Notes for the planner

@@ -73,7 +73,7 @@ Between two `---` lines, one `key: value` per line, no nesting, every key presen
   and is never ticked.
 - `external`: needed by a consumer but stays in the consumer's repo
 
-Class A and B (D1). Class A: every D47 item of the entry holds by something that runs here, so it goes
+Class A and B (D234). Class A: every D47 item of the entry holds by something that runs here, so it goes
 `done`. Class B: the entry's own text ties its done standard to a run that cannot happen here (an OS
 material on real machines, a pixel gate on a presented frame); it stays `in-progress`, `owner:` names who
 runs it, and the reason is under `## Open questions`. An audit may add a Class B entry only by quoting that

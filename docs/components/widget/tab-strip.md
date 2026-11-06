@@ -172,7 +172,7 @@ The confirm and rename dialog texts, "Duplicate Tab" and "Copy Working Directory
 
 ## Open questions
 
-- Still open, a `role-gap` limit (D122; D4): `role-gap: tab to panel association` (see Accessibility).
+- Still open, a `role-gap` limit (D122; D237): `role-gap: tab to panel association` (see Accessibility).
 - Limit (Q23): a disabled strip closes its open menu (`disabling_the_strip_closes_an_open_menu`), so no widget holds focus that frame and the menu's keys reach a `Global` binding. Kept as the recorded behaviour.
 - Header tint: `Theme` has no token for the header's layer, so `TabStripOptions.header_tint` takes the colour from the app and `None` draws no tint; the gallery uses #00000024 ([D131]). It is a plain fill, drawn after the under shapes, so a hover fill sits under it, where Lunegit's sits over it.
 

@@ -118,8 +118,8 @@ None: no user-visible text.
 
 ## Open questions
 
-- Still open, a limit: `Spring` stiffness and default `w`: no catalogue entry needs a spring today (every kind uses a tween token), and neither Lunegit nor Wane has one. M4 built the type per the animation model and picks no default rate until a component needs one (D4: no consumer has asked).
-- Still open, a limit: `ui.animate_*` return types beyond `f32` and colour (points, rects): added per component as its entry needs them; none is required by an entry yet (D4).
+- Still open, a limit: `Spring` stiffness and default `w`: no catalogue entry needs a spring today (every kind uses a tween token), and neither Lunegit nor Wane has one. M4 built the type per the animation model and picks no default rate until a component needs one (D237: no consumer has asked).
+- Still open, a limit: `ui.animate_*` return types beyond `f32` and colour (points, rects): added per component as its entry needs them; none is required by an entry yet (D237).
 
 ## Notes for the planner
 

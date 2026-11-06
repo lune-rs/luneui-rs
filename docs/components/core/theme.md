@@ -92,7 +92,7 @@ n/a — no text.
 
 ## Open questions
 
-- Still open, a placement question: `TAB_HEADER_HEIGHT` and `BODY_PADDING` read as terminal-app values. Checked at M11: nothing in this repo reads either, so they affect no widget. They stay as the preset's constants; moving or dropping them is a public-API change no consumer has asked for (D4).
+- Still open, a placement question: `TAB_HEADER_HEIGHT` and `BODY_PADDING` read as terminal-app values. Checked at M11: nothing in this repo reads either, so they affect no widget. They stay as the preset's constants; moving or dropping them is a public-API change no consumer has asked for (D237).
 
 ## Notes for the planner
 

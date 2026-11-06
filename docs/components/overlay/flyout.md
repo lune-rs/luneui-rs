@@ -125,7 +125,7 @@ None of its own: the header, stats, route and action labels are app text (Wane m
 
 ## Open questions
 
-- Still open, an API gap (D4): a route's state note ("loaded", Wane's `.c-flyout__note`, sans 11 tertiary after the id) has no place in `routes: &[(&str, &str)]`.
+- Still open, an API gap (D237): a route's state note ("loaded", Wane's `.c-flyout__note`, sans 11 tertiary after the id) has no place in `routes: &[(&str, &str)]`.
 - Resolved [D145]: a toolkit component, so every consumer gets the surface and the keys.
 - Answered (M10): native rendering is `Ui::flyout_window` in its own borderless window placed from the tray icon's rect (`platform.tray-icon`, `place_surface`); the in-app blur over the real desktop is the OS material (`platform.material`), which is not run here.
 - Resolved [D145]: the menu's keys carry over, and focus-visible is the highlight.

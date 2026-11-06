@@ -1,4 +1,4 @@
-//! The catalogue check (M11, D3): the gallery and `docs/components` agree, and a `done` entry
+//! The catalogue check (M11, D236): the gallery and `docs/components` agree, and a `done` entry
 //! carries the evidence its status claims. It reads the entries from `docs/components` under the
 //! workspace root and the scenes from `PAGES`; nothing here draws.
 //!
@@ -9,7 +9,7 @@
 //! - every hyphenated backticked id under an entry's `### Gallery scenes`, and the first id of
 //!   each bullet, is a scene or a page of the gallery; every scene and page is claimed;
 //! - a non-external entry names a scene or says `n/a —`;
-//! - the `in-progress` entries are exactly the two Class B ones (D1), each quoting its line;
+//! - the `in-progress` entries are exactly the two Class B ones (D234), each quoting its line;
 //! - a `done` entry has no owner, a `source:` that exists, no open "still needs", and a
 //!   `- Done (D47, M11):` line in `### Build` whose cited tests exist, unless it says
 //!   `tests: n/a — <reason>`;
@@ -317,7 +317,7 @@ pub(crate) fn done_complaints(e: &Entry, root: &Path) -> Vec<String> {
     out
 }
 
-/// The entries that stay `in-progress` by their own text (Class B, D1): path suffix, who runs
+/// The entries that stay `in-progress` by their own text (Class B, D234): path suffix, who runs
 /// what the entry names, and the line of the entry that ties its done standard to that run. An
 /// audit may add one only by quoting such a line; it may not remove one by rewording it.
 pub(crate) const CLASS_B: [(&str, &str, &str); 2] = [

@@ -23,7 +23,7 @@ Core (`lune-ui-core`): `EDGE_BORDER`, `ResizeEdge`, `edge_at`, `DoubleClick` and
 
 ## Existing code
 
-`crates/lune-ui-core/src/window.rs` (`edge_at`, `DoubleClick`, the Painter-form `caption_buttons` and the shared `CAPTION_BUTTON_WIDTH`, `CAPTION_GLYPH_SIZE`, `caption_rect`); since M11 `Ui::caption_buttons` over `CaptionButton` and `CaptionOptions` in `crates/lune-ui-core/src/widgets/caption.rs` (D7: the Painter form stays, `unfocused` and `chrome` draw through it at zero delta); `crates/lune-ui-winit/src/window.rs:12` (`glass_attributes`), `:28` (`resize_direction`). Integration test `crates/lune-ui-core/tests/window.rs` (edges, 6 px border, double-click gap under 400 ms); `crates/lune-ui-winit/tests/input.rs` covers the direction mapping.
+`crates/lune-ui-core/src/window.rs` (`edge_at`, `DoubleClick`, the Painter-form `caption_buttons` and the shared `CAPTION_BUTTON_WIDTH`, `CAPTION_GLYPH_SIZE`, `caption_rect`); since M11 `Ui::caption_buttons` over `CaptionButton` and `CaptionOptions` in `crates/lune-ui-core/src/widgets/caption.rs` (D240: the Painter form stays, `unfocused` and `chrome` draw through it at zero delta); `crates/lune-ui-winit/src/window.rs:12` (`glass_attributes`), `:28` (`resize_direction`). Integration test `crates/lune-ui-core/tests/window.rs` (edges, 6 px border, double-click gap under 400 ms); `crates/lune-ui-winit/tests/input.rs` covers the direction mapping.
 
 ## Spec
 
@@ -128,7 +128,7 @@ The Wane mock eases with `--ease-out`; the animation rules give Linear for hover
 
 - None on the seam: the core half has no winit type; the winit mapping is in `lune-ui-winit` (M2 step 8). `edge_at` returns `ResizeEdge` (was winit's `ResizeDirection`).
 - Answered (M4, `core.ui`): the `Ui` detects double clicks from the frame's own time (`Response::double_clicked`, `ui_core.rs::double_click_is_strictly_under_400_ms`), so scripted tests need no real clock. `DoubleClick` with an `Instant` stays for an app that has no `Ui`.
-- Still open, a limit: Windows 11 snap layouts on the maximize button need non-client hit-testing from the OS window procedure [W docs/ui/components.md:714]; no helper exists; unverified here (an OS window-procedure hook, an API no consumer has asked for, D4).
+- Still open, a limit: Windows 11 snap layouts on the maximize button need non-client hit-testing from the OS window procedure [W docs/ui/components.md:714]; no helper exists; unverified here (an OS window-procedure hook, an API no consumer has asked for, D237).
 - Still open: space for the macOS traffic lights in the app's title strip: no source gives the inset, and the toolkit draws none.
 - A loaded theme's `WindowFallbackBackground` sets only `Theme::window_fallback` (M10, D207); Lunegit recomputes the inactive window's fill from the glass tint, and that recomputation is the app's, since the toolkit has no inactive-window policy of its own.
 

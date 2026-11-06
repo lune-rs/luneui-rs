@@ -85,7 +85,7 @@ n/a — no drawing.
 ## Open questions
 
 - Window-mode presentation is not exercised by an automated test (no visible windows in the gates).
-- Class B (D1): this entry's own Acceptance says "the pixel gate on a presented frame (open: the platform run is not in this milestone)". A presented frame is what the OS composites to the screen; nothing here can read it back (reading it would need a `COPY_SRC` surface configuration for every app, D1). So the entry stays `in-progress` and `owner:` names the run that closes it: a consumer's window run that presents a frame and compares it.
+- Class B (D234): this entry's own Acceptance says "the pixel gate on a presented frame (open: the platform run is not in this milestone)". A presented frame is what the OS composites to the screen; nothing here can read it back (reading it would need a `COPY_SRC` surface configuration for every app, D234). So the entry stays `in-progress` and `owner:` names the run that closes it: a consumer's window run that presents a frame and compares it.
 
 ## Notes for the planner
 

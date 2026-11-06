@@ -143,7 +143,7 @@ None: rows carry app text.
 ## Open questions
 
 - Answered (D97, D100): measured (variable) row heights: no Lunegit list read needs them (the commit list is a fixed 45 px); the strategy (a height cache with an estimated height) is for M5.
-- Still open, a `role-gap` limit (D100: no new state; D4): `role-gap: multi-selectable` (see Accessibility).
+- Still open, a `role-gap` limit (D100: no new state; D237): `role-gap: multi-selectable` (see Accessibility).
 - Answered (D100, the app): whether the commit list pages data in the toolkit or in the app: Lunegit pages in app code on scroll [L src/Lunegit.Desktop/Views/RepositoryContentView.axaml.cs:74-75]; this entry assumes the app.
 
 ## Notes for the planner

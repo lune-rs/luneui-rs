@@ -119,7 +119,7 @@ None: no text of its own.
 - Answered (D106): sampling filter: Lunegit leaves Avalonia's default; the toolkit picks bilinear for scaled draws and nearest for integer ratios, or states one filter; M5 decides and records the pixel probe.
 - Answered (D106, straight alpha in, premultiplied on upload): whether alpha-premultiplied input is accepted: the app passes straight-alpha RGBA; the painter's colours are straight alpha with premultiply helpers (R-core-3).
 - Answered (D105, `clip-rounded` applies to images): a rounded clip for avatars or thumbnails: none in Lunegit's uses; out of this entry until a consumer names it.
-- Still open (D106): texture memory budget and eviction: the app releases explicitly; a cache with a cap is not specified (D41 sets no memory target in v1). It stays open because no consumer has asked for a cap (D4).
+- Still open (D106): texture memory budget and eviction: the app releases explicitly; a cache with a cap is not specified (D41 sets no memory target in v1). It stays open because no consumer has asked for a cap (D237).
 
 ## Notes for the planner
 

@@ -116,7 +116,7 @@ None: the value and option text are app data.
 
 ## Open questions
 
-- Still open, an API gap (D4): `Ui::combo` calls `Ui::dropdown`, so a combo has no path to the glass list of `DropdownOptions::glass` [D143]; Wane's combos draw a glass list. No consumer has asked for the option.
+- Still open, an API gap (D237): `Ui::combo` calls `Ui::dropdown`, so a combo has no path to the glass list of `DropdownOptions::glass` [D143]; Wane's combos draw a glass list. No consumer has asked for the option.
 
 ## Notes for the planner
 

@@ -96,7 +96,7 @@ n/a — no text.
 
 ## Open questions
 
-- Still open, a naming question: the name `chrome` and its tab-bar assumption read as app-shaped; whether it is generic is for the planner. It changes no behaviour, and no consumer has asked for a rename (D4).
+- Still open, a naming question: the name `chrome` and its tab-bar assumption read as app-shaped; whether it is generic is for the planner. It changes no behaviour, and no consumer has asked for a rename (D237).
 
 ## Notes for the planner
 

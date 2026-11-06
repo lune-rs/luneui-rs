@@ -124,7 +124,7 @@ All at scale 2 on the `table` page (100,000 rows live; six rows or fewer in the 
 ## Open questions
 
 - Answered (D162): tone colours: Wane's, muted `fg_secondary`, warn, err, dim `fg_tertiary`, strong `fg_bright`; keyboard row navigation: the list frame's keys, with the header as a second roving stop; toolkit or app: a toolkit component, the app passing columns and a cell closure.
-- Still open, a limit (Q15, D163: deferred, reversible; D4): column resize and reorder. Wane calls them requirements, not mocked, and no screen shows them; `TableColumn.width` and the column order are the app's arguments, so both gestures are additive later with no API break.
+- Still open, a limit (Q15, D163: deferred, reversible; D237): column resize and reorder. Wane calls them requirements, not mocked, and no screen shows them; `TableColumn.width` and the column order are the app's arguments, so both gestures are additive later with no API break.
 - Native rendering: plain drawing; the page's bench runs scroll, select and sort over 100,000 rows.
 
 ## Notes for the planner

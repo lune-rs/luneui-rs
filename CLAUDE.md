@@ -38,7 +38,7 @@ for the extraction; Luneterm's `docs/architecture.md` sections "lune-ui modules"
   version Luneterm's lock lacks, and fails by design from M10 on: `arboard` and its tree are new, D213)
 - Cross-target (Windows clippy, Linux in Docker; skips Linux when Docker is not running): `scripts/check-targets.sh`
 - Snapshot export for an app that vendors the toolkit (D239; exit 0 done, 1 a check failed, 2 usage or setup; reads `git archive <rev>`, never the working tree; `docs/consuming.md` says how it is used): `scripts/export-snapshot.sh <dest> [--rev <rev>]`
-- Docs (every public function, method, type, trait and module has a doc comment, D9; must build clean): `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --exclude gallery --exclude dump-compare`
+- Docs (every public function, method, type, trait and module has a doc comment, D242; must build clean): `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --exclude gallery --exclude dump-compare`
 
 Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, resolver 3: in
 `rust-toolchain.toml` and the root manifest.

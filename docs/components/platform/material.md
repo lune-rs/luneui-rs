@@ -103,7 +103,7 @@ None: no text.
 
 ### Build
 
-- Milestone: M11 (done standard; code exists). Class B (D1): stays `in-progress` after the M11 audit; see Open questions.
+- Milestone: M11 (done standard; code exists). Class B (D234): stays `in-progress` after the M11 audit; see Open questions.
 - Depends on: core.theme, platform.window, render.blur
 
 ## Open questions
@@ -111,7 +111,7 @@ None: no text.
 - Windows glass is unverified on hardware by this inventory; Luneterm's go/no-go gate covers it (Luneterm decision 3).
 - `apply` takes a winit `Window` (D31); a `HasWindowHandle` form needs a new SAFETY argument and a main-thread marker, which nothing before M11 needs.
 - Blur radius and the noise texture match Avalonia's acrylic defaults only by Luneterm's open item [LT docs/glass-styling.md:51-52]. Not run here: the comparison needs side-by-side shots of the OS material and Lunegit on real machines; Luneterm's M9 to M11 runs make it.
-- Class B (D1): this entry's own Acceptance says "The done standard (D18) for this entry needs those runs" (what the OS composites for each material, Windows acrylic and Mica on hardware, liquid glass on macOS versions without it). None can happen in this environment, so the entry stays `in-progress` with `owner:` naming who runs them. Everything in the entry that runs here is listed under Acceptance, "Tests that run here".
+- Class B (D234): this entry's own Acceptance says "The done standard (D18) for this entry needs those runs" (what the OS composites for each material, Windows acrylic and Mica on hardware, liquid glass on macOS versions without it). None can happen in this environment, so the entry stays `in-progress` with `owner:` naming who runs them. Everything in the entry that runs here is listed under Acceptance, "Tests that run here".
 
 ## Notes for the planner
 

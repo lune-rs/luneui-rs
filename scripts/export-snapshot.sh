@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Writes a consumer's snapshot of the toolkit (D6, D16) from a git revision.
+# Writes a consumer's snapshot of the toolkit (D239, roadmap D16) from a git revision.
 #   scripts/export-snapshot.sh <dest> [--rev <rev>]
 # <rev> defaults to HEAD. The snapshot is `git archive` of an allow list, never the working tree,
 # so a dirty tree changes nothing and SNAPSHOT's sha is true:
