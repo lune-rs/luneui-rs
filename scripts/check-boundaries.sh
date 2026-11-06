@@ -25,7 +25,8 @@
 #      `extern crate`
 #   9  every crate dir under crates/ is registered below with its allowed dependency names and is a
 #      workspace member whose package name is its dir name; each dependency cargo reports for it
-#      (normal, build, dev, any target) is within its lists; a path dependency points at
+#      (normal, build, dev, any target) is within its lists; a name on a crate's optional list is
+#      allowed only as a normal, optional dependency; a path dependency points at
 #      crates/<its name>; a rename (`package =`) is an offender; the root Cargo.toml has no
 #      `package =` key, [patch] or [replace] table, multi-line string or backslash escape
 #   10 no OS predicate (target_os, target_family, target_vendor, windows, unix) inside cfg(, cfg!(
@@ -296,7 +297,8 @@ END {
       g = ((p, j, "target") in dp) ? dp[p, j, "target"] : "-"
       pa = ((p, j, "path") in dp) ? dp[p, j, "path"] : "-"
       if (pa != "-") pa = rel(pa)
-      print "dep\t" m "\t" k "\t" dp[p, j, "name"] "\t" r "\t" g "\t" pa
+      if (dp[p, j, "optional"] != "true" && dp[p, j, "optional"] != "false") die("dependency " j " of " m " has no optional flag")
+      print "dep\t" m "\t" k "\t" dp[p, j, "name"] "\t" r "\t" g "\t" pa "\t" dp[p, j, "optional"]
     }
     for (j = 0; j < nt[p]; j++) {
       if (tk[p, j] == "" || tp[p, j] == "") die("target " j " of " m " has no kind or src_path")
@@ -345,7 +347,8 @@ check 8 no -rn -E \
   -e "(^|[^[:alnum:]_])use[[:space:]]+($THIRD)([^[:alnum:]_]|$)" \
   crates/lune-ui-core
 
-# Rule 9: registered crates and their allowed dependency names (normal, then dev-only extras).
+# Rule 9: registered crates and their allowed dependency names (normal, then dev-only extras, then
+# the ones allowed only behind a feature).
 # Adapters name no lune-ui-* crate but lune-ui-core; only the facade names the adapters.
 crate_deps() {
   case "$1" in
@@ -360,6 +363,13 @@ crate_deps() {
 crate_dev_deps() {
   case "$1" in
     lune-ui-wgpu) echo "pollster" ;;
+    lune-ui-winit) echo "accesskit_consumer" ;;
+    *) echo "" ;;
+  esac
+}
+crate_optional_deps() {
+  case "$1" in
+    lune-ui-winit) echo "accesskit accesskit_winit" ;;
     *) echo "" ;;
   esac
 }
@@ -389,15 +399,16 @@ for dir in crates/*/; do
       ;;
   esac
 done
-while IFS="$TAB" read -r typ man f1 f2 f3 f4 f5; do
+while IFS="$TAB" read -r typ man f1 f2 f3 f4 f5 f6; do
   case "$man" in crates/*/Cargo.toml) ;; *) continue ;; esac
   name="${man#crates/}"
   name="${name%/Cargo.toml}"
   allowed="$(crate_deps "$name")" || continue # unregistered: reported above
   dev_allowed="$(crate_dev_deps "$name")"
+  optional_allowed="$(crate_optional_deps "$name")"
   case "$typ" in
     dep)
-      kind="$f1" dep="$f2" ren="$f3" tgt="$f4" dpath="$f5"
+      kind="$f1" dep="$f2" ren="$f3" tgt="$f4" dpath="$f5" opt="$f6"
       where=""
       [ "$tgt" != - ] && where=" (target $tgt)"
       if [ "$name" = lune-ui-core ]; then
@@ -412,6 +423,15 @@ while IFS="$TAB" read -r typ man f1 f2 f3 f4 f5; do
         echo "rule 9: $man: path dependency '$dep' points at $dpath, not crates/$dep"
         fail=1
       fi
+      case " $optional_allowed " in
+        *" $dep "*)
+          if [ "$kind" != normal ] || [ "$opt" != true ]; then
+            echo "rule 9: $man: '$dep' must be a normal, optional dependency, not $kind with optional=$opt"
+            fail=1
+          fi
+          continue
+          ;;
+      esac
       case "$kind" in
         normal | build) list=" $allowed " ;;
         dev) list=" $allowed $dev_allowed " ;;

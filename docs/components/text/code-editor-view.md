@@ -99,6 +99,7 @@ n/a — typing, caret movement, selection, scrolling and line bands are high-fre
 
 - Role `multiline-text`; read-only state in the viewer; name = the label the app passes (the file name); value = the text and the selection as char offsets [infra.accessibility].
 - A document of up to 10,000,000 bytes cannot be re-exposed every frame: the node's `value` and `text` carry the lines in view joined by `\n`, and the selection clipped to them, in chars of that text; a set-value replaces the document under a paste's rules when editable (D185).
+- Through the AccessKit bridge (M10) a client sees the lines in view as one `TextRun` each, so it cannot read or move outside them: the selection it reads is the clipped one, and a selection wholly outside the view reads as the view's edge. Scrolling is the keyboard's (D217).
 
 ### Strings
 
@@ -150,7 +151,7 @@ n/a — typing, caret movement, selection, scrolling and line bands are high-fre
 
 Answered in M9 (D179 to D185, D194):
 
-- Ranged text value: the node carries the lines in view (D185). The full-text query stays open for M10's bridge.
+- Ranged text value: the node carries the lines in view (D185). The full-text query stays open after M10's bridge: AccessKit asks for the runs up front and has no query for text it was not sent, so the editor exposes the lines in view (D217).
 - Document representation: `CodeDoc`, one `String` and a line index (D179); at 11 MB and 1,000,000 lines an edit measures 0.9 ms.
 - Folding and in-editor search: out of v1, as Lunegit has neither (D181).
 - Gutter width and the selection fill: the numbers take `GUTTER_PAD` 4 and `GUTTER_GAP` 8 around the widest number, the text 2 from the column's edge; the selection is `text_selection`, with a 4 px sliver past a selected line's end (D195).

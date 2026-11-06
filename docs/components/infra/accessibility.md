@@ -89,7 +89,20 @@ n/a — the tree is rebuilt every frame; nothing animates. A widget's node repor
 
 - This entry defines the contract; a component's own `### Accessibility` subsection picks a role from the 36 values, a name source, and its states and actions.
 - Resolved by [D55]: `navigation` (Wane's steps list is a navigation landmark with a label [W docs/ui/mocks/js/shell.js:117]), `note` (Wane's callouts are `role="note"` [W docs/ui/mocks/overview.html:28]; a warning callout that must be announced still uses `alert`), `separator` (a splitter or divider; a resizable one carries a value), the `current` state and the `dragging` state, and the `sort` field. The mapping to the nearest older role is no longer needed.
-- Still open, listed in Open questions: heading level, multi-select lists, tab-to-panel association, composition range, ranged text, a keyboard move action.
+- Still open, listed in Open questions: multi-select lists, tab-to-panel association, composition range, ranged text, a keyboard move action.
+- The bridge (M10, `lune-ui-winit`'s `access` module, feature `accesskit`, re-exported through `lune_ui::access`) [D216], [D217]:
+  - All 36 roles map one to one; a `static-text` with `level` set is AccessKit's `Heading`, which answers the heading-level gap at the bridge, and `separator` is `Splitter` (AccessKit has no separator role).
+  - States: `focused` is the update's `focus`, `focusable` the focus action, `checked` and `pressed` `Toggled::True`, and a `checkbox`, `switch` or `radio` without either says `Toggled::False`. A node offering expand or collapse without `expanded` says collapsed.
+  - The update carries the changed nodes only, so a live region that changes every frame is one node per frame; the bridge does not debounce.
+  - A text node gets one `TextRun` child per `\n`-separated line, its value holding its line break; all of a node's runs have the node's bounds.
+  - An odd tree still goes out whole: a repeated id is its first node, a dangling child is dropped, a node left out by a cycle or by its parent's `children` goes under that parent if reached, else under the window.
+- Limits of the bridge:
+  - `dismiss` has an AccessKit counterpart only on a `tooltip` (`HideTooltip`), so no other node offers it; Escape still works through the keyboard.
+  - `dragging` has no AccessKit property and is not sent.
+  - `Toggled::Mixed` is never sent: `checked` is one bit and no widget sets mixed (`widget.checkbox`). Sending it needs a new core state.
+  - Runs have no per-char geometry (`character_positions`), so a client gets no caret or range rectangles.
+  - `set-value` text is refused over `MAX_PASTE_BYTES`, as a paste is. `Blur`, the scroll-by-unit actions, `ScrollToPoint`, `SetScrollOffset`, `SetTextSelection`, `ReplaceSelectedText`, `ShowTooltip` and custom actions have no core action and are ignored.
+  - Run on no real client in any gate: VoiceOver, Narrator and Orca are unverified; the tests replay every update into `accesskit_consumer`.
 
 ### Strings
 
@@ -114,7 +127,7 @@ None: node names come from each widget's visible text or from keys in that widge
 - A modal overlay's node is `modal`; nodes under it are not reachable by `AccessAction` while it is open [core.ui].
 - A toast node has live politeness `polite` and an error toast `assertive` [derived: C4 live regions].
 - `set-value` on a slider clamps to `min` and `max` and snaps to `step`; an out-of-range value never panics.
-- M10: the bridge feature builds with and without the AccessKit dependency; its size change is in the commit message (hard rule 5).
+- M10: the bridge feature builds with and without the AccessKit dependency; its size change is in the commit message (hard rule 5). Done in M10 step 6: `crates/lune-ui-winit/tests/access.rs` and the handler tests in `src/access.rs`; the gate runs `lune-ui-winit` both ways.
 
 ### Build
 
@@ -123,9 +136,8 @@ None: node names come from each widget's visible text or from keys in that widge
 
 ## Open questions
 
-- `role-gap` items other than the ones [D55] resolved stay open in their own entries: heading level (`text.markdown-preview`), multi-select reporting (`layout.virtualized-list`), tab-to-panel association (`widget.tab-strip`), composition range (`text.ime`), ranged text for large documents (`text.code-editor-view`) and a keyboard move or reorder action (`infra.drag-and-drop`). M4 settles them or keeps the nearest-role mapping.
-- The mapping from this enum to AccessKit's roles and actions: no source in this repo; M10 reads AccessKit when it builds the bridge.
-- A live-region node that updates every frame (a progress label): C4 gives politeness but no rate limit; M4 decides whether the bridge debounces.
+- `role-gap` items other than the ones [D55] resolved stay open in their own entries: multi-select reporting (`layout.virtualized-list`), tab-to-panel association (`widget.tab-strip`), composition range (`text.ime`), ranged text for large documents (`text.code-editor-view`) and a keyboard move or reorder action (`infra.drag-and-drop`). The bridge met them and sends what the tree holds: none has a field in the node to map. Heading level is answered at the bridge (see Accessibility).
+- Answered in M10 ([D216], [D217]): the mapping to AccessKit's roles and actions is under Accessibility. A live-region node that updates every frame is not debounced: only changed nodes go out.
 
 ## Notes for the planner
 

@@ -13,14 +13,22 @@
 
 pub use lune_ui_core::{Backdrop, BackdropKind, GlassLayer};
 pub use lune_ui_core::{
-    access, acrylic, backdrop, chrome, code_doc, color, drag, icon, image, json, layout, motion,
-    paint, scene, shortcuts, strings, testing, text_edit, theme, ui, widgets,
+    acrylic, backdrop, chrome, code_doc, color, drag, icon, image, json, layout, motion, paint,
+    scene, shortcuts, strings, testing, text_edit, theme, ui, widgets,
 };
 pub use theme::lunegit_dark;
 
 pub use lune_ui_wgpu::{blur, custom, dump, frame, gpu, surface};
 
 pub use lune_ui_platform::material;
+
+/// Accessibility: the core's semantic tree and actions and, with the `accesskit` feature, the
+/// bridge to the OS accessibility API (`lune-ui-winit`).
+pub mod access {
+    pub use lune_ui_core::access::*;
+    #[cfg(feature = "accesskit")]
+    pub use lune_ui_winit::access::*;
+}
 
 /// Text: the core's specs and `TextSystem` seam, and the glyphon `TextCache` that implements it.
 pub mod text {

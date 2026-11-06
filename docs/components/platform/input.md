@@ -49,7 +49,7 @@ Moved, today (`crates/lune-ui-winit/src/input.rs`):
 Additions:
 - M10, platform keymap: `lune_ui_winit::input::keymap()` (re-exported as `lune_ui::input::keymap`) answers `Keymap::MAC` on macOS and `Keymap::PC` elsewhere, through `platform/{macos,windows,other}.rs`; the gallery no longer branches on the OS (D212).
 - M10, file drop: `WindowEvent::HoveredFile`, `HoveredFileCancelled` and `DroppedFile` become the core file-drop events, stamped with the translator's last pointer position (winit gives none) [D43], [derived: winit 0.30.13 `src/event.rs:180-192`], [core.input].
-- M10, accessibility bridge: a `lune-ui-winit` module behind a cargo feature takes the `FrameOutput` tree and focused id and feeds an AccessKit adapter, and turns AccessKit action requests into `Translator`-queued `Event::Access`; the dependency needs its own DECISIONS row as a platform layer and its release-size change in the commit message (hard rule 5) [D46], [D2], [infra.accessibility].
+- M10, accessibility bridge: `lune_ui_winit::access`, behind the feature `accesskit` (`lune_ui::access` through the facade's feature of that name), takes the `FrameOutput` tree and focused id and feeds an AccessKit adapter, and turns AccessKit action requests into `Translator`-queued `Event::Access` [D46], [D2], [D216], [infra.accessibility].
 - M10, clipboard: `OutputState::apply` executes the frame's clipboard requests through the clipboard entry; paste text re-enters as an event [platform.clipboard].
 - M4, the new `FrameOutput` fields (`repaint`, `tree`, `focused`) are ignored by `apply` except `repaint`, which the app's event loop reads to schedule the next frame; the adapter never starts a loop [R crates/lune-ui-winit/src/input.rs:289-293], [D3], [core.ui].
 
@@ -76,7 +76,7 @@ n/a — no animation.
 
 ### Accessibility
 
-The AccessKit bridge lives here from M10 (feature-gated); the node model and enums are `infra.accessibility`. Until then the adapter exposes nothing to assistive technology [D46].
+The AccessKit bridge lives here from M10 (feature-gated); the node model, the enums and the bridge's limits are `infra.accessibility`. Without the feature the adapter exposes nothing to assistive technology [D46], [D216].
 
 ### Strings
 
@@ -94,7 +94,7 @@ n/a — no drawing.
 
 - Existing tests (`crates/lune-ui-winit/tests/input.rs`): `translator_and_scripted_input_agree`, `state_persists_and_events_drain`, `unmapped_keys_are_unidentified`, `other_mouse_button_keeps_its_number`, `resize_edges_map_to_the_same_named_direction`, `every_cursor_icon_maps_to_the_same_named_winit_icon`.
 - Done in M10 step 4 (`crates/lune-ui-winit/tests/input.rs`, module `files`): file-drop translation (`hover_cancel_and_drop_give_the_three_events_at_the_last_pointer_position`, scale 2; `before_any_pointer_move_the_position_is_the_origin`; `two_files_give_two_events_in_order`; `the_translator_and_the_script_agree_on_file_events`); `Translator::access` queues an `Access` event that appears in the next `take` (`an_access_action_queued_on_the_translator_appears_in_the_next_take`; the AccessKit bridge itself is step 6); the change detection of `OutputState::apply` factored into the pure `OutputState::plan_output` (`plan_output_is_public_pure_and_starts_from_nothing_set`, and the sequences in the unit tests of `src/input.rs`); `keymap()` is `Keymap::MAC` on macOS and `Keymap::PC` elsewhere (`platform/{macos,windows,other}.rs` own tests, D212); a non-UTF-8 path passes through unchanged (`platform/macos.rs` test). Still needed: the AccessKit bridge's tests and the feature matrix (step 6). Originally: file-drop translation tests (a hover, a cancel and a drop give the three core events at the last pointer position) in M10; an `Access` event queued by the bridge appears in the next `take`; the change-detection of `OutputState::apply` (cursor and IME area set only when changed) factored into a pure function so a test runs without a live window [derived: `apply` against a live window is not run by the gates].
-- A feature matrix: the crate builds and its tests pass with and without the accessibility feature (M10).
+- A feature matrix: the crate builds and its tests pass with and without the accessibility feature (M10). Done in M10 step 6: the gate's `-p lune-ui-winit` line runs it without, `--workspace` with (the gallery turns it on).
 - No clock read in the adapter: the app passes `time` to `take` [R crates/lune-ui-winit/src/input.rs:171].
 
 ### Build
@@ -106,7 +106,7 @@ n/a — no drawing.
 
 - Unmapped named keys become `Unidentified`. None of the catalogue specs written so far needs another named key; `text.text-edit` (M5) is the one that could, and it extends `NamedKey` and `map_key` together if it does.
 - `OutputState::apply` against a live window is not run by the gates (a window cannot be built headless); the pure change-detection split above is the proposed way to test it.
-- How AccessKit's adapter gets winit events alongside `Translator` (both want `WindowEvent`s): no source here; M10's probe decides.
+- Answered in M10 ([D216]): AccessKit's adapter and `Translator` both get every `WindowEvent`; the app calls `AccessBridge::window_event` first.
 
 ## Notes for the planner
 

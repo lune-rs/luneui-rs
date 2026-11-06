@@ -11,13 +11,16 @@ use std::time::Instant;
 
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, StartCause, WindowEvent};
-use winit::event_loop::{ActiveEventLoop, EventLoop};
+use winit::event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy};
 use winit::keyboard::{Key, ModifiersState, NamedKey};
 use winit::window::{Window, WindowId};
 
+use lune_ui::access::{AccessBridge, RootInfo};
 use lune_ui::clipboard::Clipboard;
 use lune_ui::gpu::{self, Gpu};
-use lune_ui::input::{ClipboardRequest, OutputState, Repaint, Translator, control_flow, keymap};
+use lune_ui::input::{
+    ClipboardRequest, FrameOutput, OutputState, Repaint, Translator, control_flow, keymap,
+};
 use lune_ui::lunegit_dark::THEME;
 use lune_ui::material::{self, Material};
 use lune_ui::motion::MotionTier;
@@ -35,6 +38,8 @@ use lune_ui::image::ImageId;
 
 /// Window mode: the window, its surface and the renderer drawing into it.
 struct Shown {
+    /// First, so it drops before the window it serves.
+    bridge: AccessBridge,
     window: Arc<Window>,
     surface: WindowSurface,
     r: Renderer,
@@ -68,6 +73,8 @@ fn shortcut(key: &Key, mods: ModifiersState, legacy: bool) -> Option<Shortcut> {
 
 struct App {
     shown: Option<Shown>,
+    /// Lets the accessibility handlers, on their own thread, reach the event loop.
+    proxy: EventLoopProxy<()>,
     /// Index of the page on screen.
     page: usize,
     /// The legacy scene on screen.
@@ -100,6 +107,7 @@ pub(crate) fn run() -> ExitCode {
     };
     let mut app = App {
         shown: None,
+        proxy: event_loop.create_proxy(),
         page: 0,
         scene: 0,
         store: UiStore::default(),
@@ -119,18 +127,24 @@ pub(crate) fn run() -> ExitCode {
     ExitCode::from(app.exit_code)
 }
 
-fn setup(event_loop: &ActiveEventLoop) -> Result<Shown, String> {
+fn setup(event_loop: &ActiveEventLoop, proxy: EventLoopProxy<()>) -> Result<Shown, String> {
     let attrs = glass_attributes(
         "luneui gallery",
         (f64::from(W), f64::from(H)),
         (560.0, 360.0),
         true,
-    );
+    )
+    .with_visible(false);
     let window = Arc::new(
         event_loop
             .create_window(attrs)
             .map_err(|e| format!("window: {e}"))?,
     );
+    // The bridge wants a window never shown yet. A wake only posts: the event loop redraws.
+    let bridge = AccessBridge::new(event_loop, &window, move || {
+        let _ = proxy.send_event(());
+    })
+    .map_err(|e| format!("accessibility: {e}"))?;
     if let Err(e) = material::apply(&window, Material::Vibrancy) {
         eprintln!("glass: {e}");
     }
@@ -145,7 +159,9 @@ fn setup(event_loop: &ActiveEventLoop) -> Result<Shown, String> {
     let frame = lune_ui::frame::FrameRenderer::new(&mut gpu, surface.format());
     let fill = custom::Fill::new(&gpu.device, surface.format());
     let translator = Translator::new(size, window.scale_factor());
+    window.set_visible(true);
     Ok(Shown {
+        bridge,
         window,
         surface,
         r: Renderer {
@@ -157,6 +173,11 @@ fn setup(event_loop: &ActiveEventLoop) -> Result<Shown, String> {
         translator,
         output: OutputState::new(),
     })
+}
+
+/// The window's title on `page`.
+fn window_title(page: &Page) -> String {
+    format!("luneui gallery - {}", page.title)
 }
 
 impl App {
@@ -182,9 +203,7 @@ impl App {
             self.images.clear();
         }
         if let Some(shown) = &self.shown {
-            shown
-                .window
-                .set_title(&format!("luneui gallery - {}", PAGES[index].title));
+            shown.window.set_title(&window_title(PAGES[index]));
         }
     }
 
@@ -196,6 +215,7 @@ impl App {
             return Ok(());
         };
         let Shown {
+            bridge,
             window,
             surface,
             r,
@@ -213,10 +233,17 @@ impl App {
         let view = frame.texture.create_view(&Default::default());
         let size = surface.size();
         let s = window.scale_factor() as f32;
+        bridge.drain(translator);
         let input = translator.take(self.start.elapsed());
         let mut repaint = Repaint::Idle;
+        let root = RootInfo {
+            title: window_title(page),
+            scale: window.scale_factor(),
+        };
         let display = match page.kind {
             PageKind::Legacy(scenes) => {
+                // A legacy page has no tree, but an activation still needs its update.
+                bridge.update(&FrameOutput::default(), &root);
                 scenes[self.scene % scenes.len()].paint(&mut r.text, s, size)
             }
             PageKind::Ui(ui_page) => {
@@ -255,6 +282,7 @@ impl App {
                 {
                     window.request_redraw();
                 }
+                bridge.update(&out, &root);
                 repaint = out.repaint;
                 display
             }
@@ -277,7 +305,7 @@ impl ApplicationHandler for App {
         if self.shown.is_some() {
             return;
         }
-        let shown = match setup(event_loop) {
+        let shown = match setup(event_loop, self.proxy.clone()) {
             Ok(v) => v,
             Err(e) => {
                 eprintln!("{e}");
@@ -288,6 +316,13 @@ impl ApplicationHandler for App {
         };
         shown.window.request_redraw();
         self.shown = Some(shown);
+    }
+
+    /// A wake from the accessibility handlers: an action or a tree request waits for a frame.
+    fn user_event(&mut self, _event_loop: &ActiveEventLoop, _event: ()) {
+        if let Some(shown) = &self.shown {
+            shown.window.request_redraw();
+        }
     }
 
     fn new_events(&mut self, _event_loop: &ActiveEventLoop, cause: StartCause) {
@@ -304,9 +339,8 @@ impl ApplicationHandler for App {
         if event_loop.exiting() {
             return;
         }
-        if self.shown.is_none() {
-            return;
-        }
+        let Some(shown) = &mut self.shown else { return };
+        shown.bridge.window_event(&shown.window, &event);
         let action = match &event {
             WindowEvent::KeyboardInput { event: key, .. } if key.state == ElementState::Pressed => {
                 shortcut(&key.logical_key, self.mods, self.legacy_len().is_some())

@@ -309,9 +309,12 @@ Asset: `assets/acrylic-noise.png` (Avalonia's texture). Tests: `tests/text.rs` (
 |---|---|---|
 | `input` (`input.rs`) | winit events to `RawInput`; `FrameOutput` onto a window | `Translator`, `OutputState`, `cursor_icon` |
 | `window` (`window.rs`) | Glass window attributes, `ResizeEdge` to winit's direction | `glass_attributes`, `resize_direction` |
+| `access` (`access.rs`; feature `accesskit`) | The semantic tree out to AccessKit and its actions back. AccessKit calls the handlers on its own thread: they touch only `Shared` (a flag, a queue capped at 256, the app's `wake`), and the frame reads it on the app's thread. No lock is held across `wake`. | `AccessBridge`, `tree_update`, `action_from`, `NodeCache`, `RootInfo`, `BridgeError` |
 | `platform` (private; `platform/{macos,windows,other}.rs`) | Per-platform window attributes | `glass` |
 
-Tests: `tests/input.rs` (translator against `ScriptedInput`, key, button, cursor and edge mappings).
+Tests: `tests/input.rs` (translator against `ScriptedInput`, key, button, cursor and edge mappings);
+`tests/access.rs` (the bridge with no window, each update replayed into `accesskit_consumer`, run
+only with the feature; the gate runs the crate both ways).
 
 ### `lune-ui-platform` (`crates/lune-ui-platform/src/`)
 
@@ -321,9 +324,10 @@ Tests: `tests/input.rs` (translator against `ScriptedInput`, key, button, cursor
 
 ### `lune-ui` (facade, `crates/lune-ui/src/lib.rs`)
 
-One `pub use` per module keeps every `lune_ui::<module>` path. Three modules merge a core and an
+One `pub use` per module keeps every `lune_ui::<module>` path. Four modules merge a core and an
 adapter part: `text` (core text plus `TextCache`), `window` (core window helpers plus the winit
-attributes), `input` (core model plus the winit translation). The facade also re-exports `testing`.
+attributes), `input` (core model plus the winit translation), `access` (core model plus, with the
+facade's `accesskit` feature, the bridge). The facade also re-exports `testing`.
 Boundary rule 11 keeps it free of items.
 
 ## Seams
@@ -344,7 +348,7 @@ and a contract test the real adapter passes too (R-nfr-8).
 
 Locked versions (`Cargo.lock`; the M1 set was identical to Luneterm 296cfdc's, and M10 adds to it,
 so the lock parity check of `scripts/pixel-gate-luneterm.sh --parity-only` fails by design from M10 on;
-DECISIONS D15 to D23, D38 and D213 record each). Each crate's allowed set is enforced by boundary rule 9.
+DECISIONS D15 to D23, D38, D213 and D216 record each). Each crate's allowed set is enforced by boundary rule 9.
 
 | Crate | Version | Used by | For |
 |---|---|---|---|
@@ -359,6 +363,8 @@ DECISIONS D15 to D23, D38 and D213 record each). Each crate's allowed set is enf
 | `raw-window-handle` | 0.6.2 (macOS) | lune-ui-platform | native window handle |
 | `pollster` | 0.4.0 | gallery; lune-ui-wgpu (dev) | block on async `Gpu::new` |
 | `arboard` | 3.7.0 (`default-features = false`; pulls `clipboard-win` 5.4.3 and `error-code` 3.4.0 on Windows) | lune-ui-winit | the OS text clipboard (D213) |
+| `accesskit`, `accesskit_winit` | 0.25.0, 0.34.0 (optional, feature `accesskit`; `accesskit_unix` brings `zbus` and an async stack on Linux) | lune-ui-winit | the OS accessibility API (D216) |
+| `accesskit_consumer` | 0.39.0 | lune-ui-winit (dev) | the tests' check that AccessKit accepts each update (D216) |
 
 `window-vibrancy` also pulls `objc2` 0.5.3 and `objc2-app-kit` 0.2.2 beside `objc2` 0.6.5 and
 `objc2-app-kit` 0.3.2. The facade `lune-ui` depends on the four crates only. Bundled assets and their
@@ -448,7 +454,7 @@ offender, 2 when a scanned path or a tool is missing):
 | 6 | `unsafe` only under `lune-ui-platform/src/platform/` or `src/material/`; every other crate's `lib.rs` has `#![forbid(unsafe_code)]` | hard rule 3 |
 | 7 | `lune-ui-core` declares no dependency of any kind (as `cargo metadata --no-deps` reports them) | crate rule |
 | 8 | No third-party crate path or `extern crate` in a file under `lune-ui-core` | crate rule |
-| 9 | Every crate dir is registered with its allowed dependency names and is the workspace member of that name; every dependency cargo reports is within its lists; an unregistered dir, a rename, a path dependency outside `crates/<name>`, or a root `package =`, `[patch]` or `[replace]` fails; adapters name no `lune-ui-*` crate but the core | crate rule (adapters depend on the core only) |
+| 9 | Every crate dir is registered with its allowed dependency names and is the workspace member of that name; every dependency cargo reports is within its lists; a name on a crate's optional list (`accesskit`, `accesskit_winit`) only as a normal, optional dependency; an unregistered dir, a rename, a path dependency outside `crates/<name>`, or a root `package =`, `[patch]` or `[replace]` fails; adapters name no `lune-ui-*` crate but the core | crate rule (adapters depend on the core only) |
 | 10 | No OS predicate in `cfg` outside `platform/` or `material/` dirs, except `#[cfg]` on `mod x;` or `use`; a wrapped statement is joined (strings and comments skipped), one open after 40 lines fails | hard rule 3 |
 | 11 | `crates/lune-ui/src` holds only `lib.rs`, with no item definitions | crate rule (facade only) |
 | 12 | Compiled code comes only from the scanned files: build targets are `src/lib.rs` and its modules (`tests/` files are not library code and are not scanned); no `path = "..."` attribute or `include!` in `crates/*/src` (comment lines and `let path =` bindings are not attributes) | rules 6, 10, 11 (what they scan is what is built) |
@@ -613,7 +619,9 @@ Since M4:
   also has a `Look`, `paint` and a `Ui` method (D60);
 - new modules `ui`, `access`, `motion`, `strings` (see above), re-exported by the facade;
 - `Token::Zero` (outside `Token::ALL`) is a zero-duration row; the dropdown's snap
-  open and close use it so an overlay with no motion reports `Idle` at once (D80).
+  open and close use it so an overlay with no motion reports `Idle` at once (D80);
+- M10: `WidgetId::from_value` is the inverse of `value`, for an adapter mapping an id back from an
+  outside system; `lune_ui::access` is a module of its own, so the feature can add the bridge (D216).
 
 ## Provenance of reworded comments
 

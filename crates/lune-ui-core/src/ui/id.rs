@@ -22,6 +22,13 @@ impl WidgetId {
     pub fn value(self) -> u64 {
         self.0
     }
+
+    /// The id whose [`value`](WidgetId::value) is `raw`, for an adapter mapping an id back from an
+    /// outside system. Nothing checks that a widget has it: a target the frame cannot find is
+    /// ignored.
+    pub fn from_value(raw: u64) -> WidgetId {
+        WidgetId(raw)
+    }
 }
 
 #[cfg(test)]
@@ -42,6 +49,14 @@ mod tests {
             WidgetId::ROOT.with("a").with("b"),
             WidgetId::ROOT.with("b").with("a")
         );
+    }
+
+    #[test]
+    fn from_value_is_the_inverse_of_value() {
+        let id = WidgetId::ROOT.with("panel").with(3_u32);
+        assert_eq!(WidgetId::from_value(id.value()), id);
+        assert_eq!(WidgetId::from_value(0), WidgetId::ROOT);
+        assert_eq!(WidgetId::from_value(u64::MAX).value(), u64::MAX);
     }
 
     #[test]
