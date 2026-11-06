@@ -9,6 +9,7 @@ use lune_ui::icon;
 use lune_ui::input::NamedKey;
 use lune_ui::motion::MotionTier;
 use lune_ui::paint::Rect;
+use lune_ui::tray::TrayState as Tray;
 use lune_ui::ui::Ui;
 use lune_ui::widgets::button::ButtonKind;
 use lune_ui::widgets::flyout::Flyout;
@@ -30,39 +31,31 @@ pub(crate) static PAGE: Page = Page {
     }),
 };
 
-/// What the tray reports; the flyout's header follows it.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Tray {
-    Serving,
-    Degraded,
-    Paused,
-}
-
-impl Tray {
-    fn text(self) -> &'static str {
-        match self {
-            Tray::Serving => "Serving",
-            Tray::Degraded => "degraded",
-            Tray::Paused => "paused",
-        }
-    }
-
-    fn tone(self) -> Tone {
-        match self {
-            Tray::Serving => Tone::Ok,
-            Tray::Degraded => Tone::Warn,
-            Tray::Paused => Tone::Paused,
-        }
+/// The state's text in the flyout's header.
+pub(super) fn state_text(tray: Tray) -> &'static str {
+    match tray {
+        Tray::Serving => "Serving",
+        Tray::Degraded => "degraded",
+        Tray::Paused => "paused",
     }
 }
 
-const ROUTES: [(&str, &str); 3] = [
+/// The tone of the dot beside the state's text.
+pub(super) fn state_tone(tray: Tray) -> Tone {
+    match tray {
+        Tray::Serving => Tone::Ok,
+        Tray::Degraded => Tone::Warn,
+        Tray::Paused => Tone::Paused,
+    }
+}
+
+pub(super) const ROUTES: [(&str, &str); 3] = [
     ("Opus", "corp-claude-opus"),
     ("Sonnet", "corp-gpt-5"),
     ("Haiku", "qwen3-coder-30b-a3b"),
 ];
 
-fn stats() -> [StatOptions<'static>; 3] {
+pub(super) fn stats() -> [StatOptions<'static>; 3] {
     let cell = |label, value, gold| StatOptions {
         label,
         value,
@@ -77,7 +70,7 @@ fn stats() -> [StatOptions<'static>; 3] {
 }
 
 /// The action rows; the second follows the state.
-fn rows(tray: Tray) -> [MenuRow<'static>; 5] {
+pub(super) fn rows(tray: Tray) -> [MenuRow<'static>; 5] {
     let row = |text, shortcut, chevron, danger| {
         MenuRow::Entry(MenuItem {
             glyph: None,
@@ -191,8 +184,8 @@ impl PageState for Live {
             align: PlaceAlign::End,
             mark: Some(icon::INFO),
             wordmark: "Wane",
-            state: self.tray.text(),
-            tone: self.tray.tone(),
+            state: state_text(self.tray),
+            tone: state_tone(self.tray),
             stats: &stats,
             routes: &ROUTES,
             rows: &rows,

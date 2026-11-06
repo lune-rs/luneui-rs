@@ -30,6 +30,7 @@ for the extraction; Luneterm's `docs/architecture.md` sections "lune-ui modules"
   and give the reason in a DECISIONS.md row in the same commit. Exit 0 pass, 1 delta, 2 setup error.
   The working tree dumps headless (no window); a base from before M2 step 4 (`52b11d6` and older)
   opens a hidden window, so such a gate needs a logged-in macOS GUI session.
+- Platform smoke (needs a logged-in macOS or Windows GUI session; puts a tray item up for about 2 s; not in the gate; exit 0 held, 1 failed, 2 no session): `cargo run -p gallery -- --smoke-platform`
 - Dump the scenes by hand: `cargo run -p gallery -- --dump <dir>` (`-- --list` prints the scene names)
 - M1-only proof against Luneterm's 18-scene spike gate: `scripts/pixel-gate-luneterm.sh` (its full run
   cannot build against the M2 API and exits 2; `--parity-only` checked that `Cargo.lock` holds no

@@ -84,7 +84,7 @@ None: no user-visible text.
 
 ### Gallery scenes
 
-No scene exercises the adapter: a scene's hover is a field of the scene, not translated input [R apps/gallery/src/main.rs:260], [R apps/gallery/src/scenes.rs:90-94]. In window mode the gallery's own event loop is the first consumer once it moves to `Translator` and `OutputState` (M4 pages); nothing new to draw.
+No scene exercises the adapter: a scene's hover is a field of the scene, not translated input [R apps/gallery/src/main.rs:260], [R apps/gallery/src/scenes.rs:90-94]. In window mode the gallery's own event loop is the consumer (`Translator` and `OutputState`, for the main window and the tray's surface window); the `file-drop` page (M10) shows a file dragged from the OS in the window, and its two scenes (`core.input` lists them) send the same events through the script.
 
 ### Painter primitives
 

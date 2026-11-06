@@ -30,7 +30,7 @@ OS notifications are app-side (D43).
 
 ## Existing code
 
-M10 step 7 built the pure half in `crates/lune-ui-core/src/tray.rs` [D218 to D221]: `icon_bitmap` (the CPU raster, `TrayBitmap`, `TrayState`, `GlyphTone`), `bar_from_tray` and `place_surface` (`TraySurface`), `TrayToggle` and `TrayAction`, `tray_surface` (`TrayPlatform`); the surfaces in their own window are `Ui::flyout_window` and `Ui::menu_window` (`overlay.flyout`, `overlay.menu`). Tests: `crates/lune-ui-core/tests/tray.rs`, `tests/widget_flyout.rs`. The OS half is `crates/lune-ui-platform/src/tray.rs`, `popover.rs` and `platform/` (step 8), with `lune_ui_winit::popover_attributes` and `material::apply_rounded`; `lune_ui::tray` holds both halves. The gallery pages (step 9) are not built yet. Design sources (not code to move): Wane `docs/ui/mocks/css/components.css:691-701` (the icon), `docs/ui/mocks/css/tokens.css:12,49,52,62,97` (colours), `docs/ui/mocks/tray.html?surface=icon-states` (the states, scene `tray-icon-states`, `docs/ui/mocks/scenes.txt:33`),
+M10 step 7 built the pure half in `crates/lune-ui-core/src/tray.rs` [D218 to D221]: `icon_bitmap` (the CPU raster, `TrayBitmap`, `TrayState`, `GlyphTone`), `bar_from_tray` and `place_surface` (`TraySurface`), `TrayToggle` and `TrayAction`, `tray_surface` (`TrayPlatform`); the surfaces in their own window are `Ui::flyout_window` and `Ui::menu_window` (`overlay.flyout`, `overlay.menu`). Tests: `crates/lune-ui-core/tests/tray.rs`, `tests/widget_flyout.rs`. The OS half is `crates/lune-ui-platform/src/tray.rs`, `popover.rs` and `platform/` (step 8), with `lune_ui_winit::popover_attributes` and `material::apply_rounded`; `lune_ui::tray` holds both halves. The gallery side (step 9): `apps/gallery/src/pages/tray.rs` (the scenes and the shared surface drawing), `popover.rs` (`TrayHost`: the item, `TrayToggle` and the placed surface window `PopoverHost`, a second window on the app's one `Gpu` and `TextCache`), `window.rs` (the `tray` page puts a real item in the tray) and `smoke.rs` (`gallery --smoke-platform`). Design sources (not code to move): Wane `docs/ui/mocks/css/components.css:691-701` (the icon), `docs/ui/mocks/css/tokens.css:12,49,52,62,97` (colours), `docs/ui/mocks/tray.html?surface=icon-states` (the states, scene `tray-icon-states`, `docs/ui/mocks/scenes.txt:33`),
 `docs/mockups/Tray.dc.html:44` (the provisional crescent).
 
 ## Spec
@@ -91,9 +91,10 @@ None: the tooltip texts are app strings [W docs/ui/components.md:758].
 
 ### Gallery scenes
 
-- `tray-icon-serving`, `tray-icon-degraded`, `tray-icon-paused`: the icon at scale 1 and 2 on the surface colour, settled (the dump writes `<id>@1x.png` and `<id>@2x.png`).
-- `tray-icon-light-tray`: the paused icon on a light surface, to check the ring (Open questions), settled.
-- `tray-icon-placement`: a screen rectangle with the menu bar, the macOS menu 4 px under it flush right and a status item near the right edge, settled; and `tray-icon-placement-windows`: the taskbar with the flyout 12 px above it and the menu 8 px above, settled.
+- `tray-icon-serving`, `tray-icon-degraded`, `tray-icon-paused`: the `icon_bitmap` of the scale through `images()`, drawn 1:1 on a dark bar, and a nearest-neighbour copy 144 px across beside it so the pixels can be judged, settled (the dump writes `<id>@1x.png` and `<id>@2x.png`).
+- `tray-icon-light-tray`: the paused icon with the dark glyph on a light bar, to check the ring (Open questions), settled.
+- `tray-icon-placement`: a screen rectangle with the menu bar, the macOS menu 4 px under it flush right and a status item near the right edge, settled; and `tray-icon-placement-windows`: the taskbar with the flyout 12 px above it and the menu 8 px above, settled. Both place with `bar_from_tray` and `place_surface` and print the rects.
+- `tray-flyout-window`, `tray-menu-window`: `Ui::flyout_window` and `Ui::menu_window` filling the window from its corner, over a flat stand-in for the desktop (a dump has no OS material), settled.
 
 ### Painter primitives
 
@@ -120,6 +121,8 @@ None: the tooltip texts are app strings [W docs/ui/components.md:758].
 - `Tray::rect()`: physical px, top-left origin; `None` until the OS has placed the item, which on macOS is after the event loop has run. `Tray::bar_is_dark()`: macOS only and `None` until then too; set the first image with a guessed tone and redo it once this answers (D222).
 - `popover_attributes(size)`, then `PopoverWindow::wrap(Arc<Window>)` on the hidden window, then `apply_rounded(window, material, radius)`; `show`, `hide`. Keep the guard for as long as the window is in use. Build the event loop with `with_activate_ignoring_other_apps(false)` on macOS, or the first show takes the front (D223). `Focused(false)` arrives once at creation: listen for focus loss only while a surface is open.
 - Image form (D218): non-template with a white or black glyph, picked from `bar_is_dark`; the ring is alpha 0, so it needs no colour of its own on a light or a dark bar. Bitmaps are 18 and 36 px: macOS draws either at 18 pt.
+
+- Gallery host findings (step 9, measured on this Mac by `--smoke-platform`): right after `Tray::new` macOS can report a rect with an area that lies off every screen (x 0, y at the screen's height), and for a few tens of milliseconds more it slides; the host takes the rect once it holds still on a monitor for 300 ms (`TrayHost::settled_rect`) and reads `bar_is_dark` only then. A resize on macOS keeps the window's bottom edge, so the host sizes the surface window first and moves it after. A smoke run must build its event loop with `with_activate_ignoring_other_apps(false)` (`popover::event_loop(true)`); the window mode keeps the default so the gallery's first window comes to the front.
 
 ### Unverified
 

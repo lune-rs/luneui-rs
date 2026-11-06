@@ -84,7 +84,12 @@ None: no user-visible text.
 
 ### Gallery scenes
 
-The 15 legacy scenes stay on the Painter API and pass hover directly to each scene [R apps/gallery/src/scenes.rs:90-94] [D59]. The Ui pages (`button`, `dialog`, `menu`, `ui`, `focus` and the rest) are driven by a scripted `RawInput` through `ScriptedInput`, so they exercise it; no new scene id is needed.
+The 15 legacy scenes stay on the Painter API and pass hover directly to each scene [R apps/gallery/src/scenes.rs:90-94] [D59]. The Ui pages (`button`, `dialog`, `menu`, `ui`, `focus` and the rest) are driven by a scripted `RawInput` through `ScriptedInput`, so they exercise it. The file events (M10) have the `file-drop` page, whose scenes send them through the script's `Ev::FileHover`, `Ev::FileHoverCancelled` and `Ev::FileDrop`:
+
+- `file-drop-hover`: a file is over the window with the pointer at (300, 200); the page lights its zone and shows the path it read from `ui.input()`, settled.
+- `file-drop-dropped`: the same hover, then the drop; the path is listed, settled.
+
+In the window the events are the OS's: drag a file over it.
 
 ### Painter primitives
 

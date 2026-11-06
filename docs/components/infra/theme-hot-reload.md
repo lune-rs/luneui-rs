@@ -90,9 +90,10 @@ None: theme names and warnings are the app's text.
 - `theme-green`: the `controls` scene under `green.json` (Lunegit's bundled theme), settled, after M10.
 - `theme-orange`: the `controls` scene under `orange.json` (Lunegit's bundled theme), settled, after M10.
 - `theme-purple`: the `controls` scene under `purple.json` (Lunegit's bundled theme), settled, after M10.
-- `theme-partial`: a file that overrides only `AccentPrimaryColor`, settled.
-- `theme-acrylic-less`, `theme-acrylic-more`, `theme-acrylic-opaque`: the `menu` scene's glass under each level, settled.
-- `theme-swap`: the same frame drawn with theme A then theme B in consecutive frames (two dumps), settled.
+- `theme-partial`: an inline file that overrides only `AccentPrimaryColor`, settled.
+- `theme-acrylic-less`, `theme-acrylic-more`, `theme-acrylic-opaque`: the preset under each level: a panel taken from `theme.glass.panel` over bright stripes and a glass menu over the panel, settled.
+- `theme-swap`: dark modern, a toggle clicked at 40 ms, a cue at 60 ms that swaps to blue, captured at 80 ms: every colour is already blue (a hard cut) and only the toggle's thumb, which no theme drives, is still moving.
+- `theme-swap-b`: the same script captured at 600 ms, settled; a gallery test (`pages::theme::tests`) proves it equals the blue theme's frame after the same click.
 
 ### Painter primitives
 
@@ -122,7 +123,7 @@ None open. Answered in M10 step 2 (D207 to D209):
 - A theme change does not crossfade: it is a hard cut (D209).
 - The `Theme` fields with no Lunegit key derive from the mapped ones (D208); no toolkit keys.
 - Contrast and legibility checks on loaded colours: none (Lunegit has none).
-- The sample themes' colours differ from the dark preset by design; their dumps are new baselines (step 9's `theme-*` scenes).
+- The sample themes' colours differ from the dark preset by design; their dumps are new baselines (step 9's `theme-*` scenes, on the gallery's `theme` page, which also lets the window pick a file and an acrylic level).
 
 ## Notes for the planner
 
