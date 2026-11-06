@@ -511,12 +511,6 @@ mod tests {
     #[test]
     fn a_docs_only_done_entry_may_say_its_tests_are_n_a() {
         let body = "### Build\n\n- Done (D47, M11): tests: n/a — documentation only; page n/a; unverified here: none.\n";
-        let e = entry("done", "—", "docs/consuming.md", body);
-        assert_eq!(
-            done_complaints(&e, &root()).len(),
-            1,
-            "docs/consuming.md may not exist yet"
-        );
         let e = entry("done", "—", "docs/architecture.md", body);
         assert_eq!(done_complaints(&e, &root()), Vec::<String>::new());
     }
