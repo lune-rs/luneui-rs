@@ -2,10 +2,10 @@
 id: core.scene
 title: Display list
 area: core
-status: in-progress
+status: done
 consumers: any
 source: crates/lune-ui-core/src/scene.rs
-owner: orch/toolkit-v1
+owner: —
 summary: Plain-data Scene the painter builds and a renderer consumes; the draw-order contract
 ---
 
@@ -20,7 +20,7 @@ summary: Plain-data Scene the painter builds and a renderer consumes; the draw-o
 
 ## Existing code
 
-`crates/lune-ui-core/src/scene.rs:99` (`Scene`), `:31` (`Shape`), `:55` (`LayerGeometry`), `:74` (`CustomItem`), `:91` (`BackdropRequest`), `:107` (`FrameParams`); 116 lines. Consumers: `crates/lune-ui-wgpu/src/gpu.rs:340` (`upload`), `crates/lune-ui-core/src/testing/recording.rs:57` (the fake).
+`crates/lune-ui-core/src/scene.rs:179` (`Scene`), `:44` (`Shape`), `:86` (`LayerGeometry`), `:109` (`CustomItem`), `:136` (`ImageItem`), `:165` (`BackdropRequest`), `:197` (`FrameParams`); 206 lines, the draw-order contract in its header. Consumers: `crates/lune-ui-wgpu/src/gpu.rs:554` (`upload`), `crates/lune-ui-core/src/testing/recording.rs` (the fake).
 
 ## Spec
 
@@ -78,13 +78,15 @@ n/a — text items carry strings from the caller.
 
 ### Acceptance
 
-- Existing test: `records_the_documented_draw_order` (`crates/lune-ui-core/src/testing/recording.rs`).
-- Done standard still needs: a test that items land on the layer set by `Painter::on` (the paint.rs test `custom_lands_on_the_current_layer`, `crates/lune-ui-core/src/paint.rs`, covers custom items only).
+- The draw order: `crates/lune-ui-core/src/testing/recording.rs::records_the_documented_draw_order` (acrylic, under, path fills, customs, images, text, over, strokes inside a layer; the backdrop at the split).
+- Items land on the layer set by `Painter::on`, for every kind, under the clip and `Xform`: `crates/lune-ui-core/tests/painter.rs::fills_rings_and_backdrops_take_the_layer_clip_scale_and_alpha_of_the_xform`, `strokes_fans_and_polygons_take_the_layer_clip_scale_and_alpha_of_the_xform`, `text_takes_the_layer_clip_scale_and_alpha_of_the_xform`, `image_lands_on_the_current_layer_under_the_clip_and_xform`, `text_rotated_lands_on_the_current_layer_under_the_clip_and_xform` (each asserts the other layers stay empty), and the paint.rs unit test `custom_lands_on_the_current_layer` for customs.
+- The split: `painter.rs::the_recording_renderer_puts_the_backdrop_at_the_split`, `of_two_backdrops_the_lower_layer_keeps_it_in_either_draw_order`.
 
 ### Build
 
 - Milestone: M11 (done standard; code exists).
 - Depends on: core.painter, render.frame.
+- Done (D47, M11): tests `crates/lune-ui-core/src/testing/recording.rs::records_the_documented_draw_order, crates/lune-ui-core/tests/painter.rs::fills_rings_and_backdrops_take_the_layer_clip_scale_and_alpha_of_the_xform, crates/lune-ui-core/tests/painter.rs::image_lands_on_the_current_layer_under_the_clip_and_xform, crates/lune-ui-core/tests/painter.rs::the_recording_renderer_puts_the_backdrop_at_the_split`; page n/a (plain data; drawn by the legacy scenes `menu`, `dialog-confirm`, `custom-draw`); unverified here: none.
 
 ## Open questions
 

@@ -12,8 +12,8 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | in-luneterm | 0 |
 | planned | 0 |
 | stub | 0 |
-| in-progress | 89 |
-| done | 4 |
+| in-progress | 79 |
+| done | 14 |
 | external | 4 |
 | **total** | **97** |
 
@@ -21,17 +21,17 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
-| [core.acrylic](core/acrylic.md) | Acrylic colour math and noise opacity | in-progress | luneterm | Avalonia acrylic colour math with tests, and the noise opacity |
-| [core.color](core/color.md) | Colour helpers | in-progress | luneterm | Straight-alpha RGBA values with premultiply, blend-over and alpha helpers |
-| [core.focus](core/focus.md) | Keyboard focus | in-progress | any | Tab order by call order within focus scopes, focus-visible, scope push, trap and restore, roving focus in composites |
-| [core.icon](core/icon.md) | Codicon glyph constants | in-progress | luneterm, wane | Codicon glyph constants and a glyph helper; the app supplies the icon font |
-| [core.image](core/image.md) | Image drawing | in-progress | lunegit, wane | Image primitive: app-decoded RGBA drawn into a rect with a fit mode, alpha and optional corner radius; explicit resource lifetime |
-| [core.input](core/input.md) | Input model | in-progress | any | Plain-data RawInput in, FrameOutput out; the windowing adapter translates both |
+| [core.acrylic](core/acrylic.md) | Acrylic colour math and noise opacity | done | luneterm | Avalonia acrylic colour math with tests, and the noise opacity |
+| [core.color](core/color.md) | Colour helpers | done | luneterm | Straight-alpha RGBA values with premultiply, blend-over and alpha helpers |
+| [core.focus](core/focus.md) | Keyboard focus | done | any | Tab order by call order within focus scopes, focus-visible, scope push, trap and restore, roving focus in composites |
+| [core.icon](core/icon.md) | Codicon glyph constants | done | luneterm, wane | Codicon glyph constants and a glyph helper; the app supplies the icon font |
+| [core.image](core/image.md) | Image drawing | done | lunegit, wane | Image primitive: app-decoded RGBA drawn into a rect with a fit mode, alpha and optional corner radius; explicit resource lifetime |
+| [core.input](core/input.md) | Input model | done | any | Plain-data RawInput in, FrameOutput out; the windowing adapter translates both |
 | [core.painter](core/painter.md) | Immediate-mode painter | done | luneterm | Painter: ordered layers, fills, rings, strokes, acrylic, text, clip, transform and hit regions, building a plain-data Scene; holds the aggregate table of new primitives |
-| [core.scene](core/scene.md) | Display list | in-progress | any | Plain-data Scene the painter builds and a renderer consumes; the draw-order contract |
-| [core.tab-outline](core/tab-outline.md) | Tab outline geometry | in-progress | luneterm | Tab-chrome outline loop geometry |
-| [core.testing](core/testing.md) | Seam fakes and contract suites | in-progress | any | Public testing module: RecordingRenderer, FakeText, ScriptedInput, NullMaterial and the contract suites |
-| [core.theme](core/theme.md) | Theme tokens and Lunegit dark preset | in-progress | luneterm | Theme token struct and the lunegit_dark preset with the WINDOW, PANEL and CARD glass layers |
+| [core.scene](core/scene.md) | Display list | done | any | Plain-data Scene the painter builds and a renderer consumes; the draw-order contract |
+| [core.tab-outline](core/tab-outline.md) | Tab outline geometry | done | luneterm | Tab-chrome outline loop geometry |
+| [core.testing](core/testing.md) | Seam fakes and contract suites | done | any | Public testing module: RecordingRenderer, FakeText, ScriptedInput, NullMaterial and the contract suites |
+| [core.theme](core/theme.md) | Theme tokens and Lunegit dark preset | done | luneterm | Theme token struct and the lunegit_dark preset with the WINDOW, PANEL and CARD glass layers |
 | [core.ui](core/ui.md) | Ui frame context | done | any | Immediate-mode Ui frame: ids, transient and persistent retained state, Response, layers and modality, Repaint |
 
 ## render

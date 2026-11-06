@@ -2,10 +2,10 @@
 id: core.theme
 title: Theme tokens and Lunegit dark preset
 area: core
-status: in-progress
+status: done
 consumers: luneterm
-source: crates/lune-ui-core/src/theme.rs
-owner: orch/toolkit-v1
+source: crates/lune-ui-core/src/theme.rs, crates/lune-ui-core/src/theme/file.rs
+owner: —
 summary: Theme token struct and the lunegit_dark preset with the WINDOW, PANEL and CARD glass layers
 ---
 
@@ -21,7 +21,7 @@ Since M10 the three glass layers also travel inside the theme: `Theme.glass: The
 
 ## Existing code
 
-`crates/lune-ui-core/src/theme.rs:11` (`Theme`), `:47` (`DARK`, the neutral alias), `:50` (`lunegit_dark`), `:55` (`THEME`), `:88` (`TINT`), `:91`/`:98`/`:105` (layers); 118 lines. No tests.
+`crates/lune-ui-core/src/theme.rs:21` (`Theme`), `:135` (`ThemeGlass`), `:290` (`DARK`, the neutral alias), `:293` (`lunegit_dark`), `:298` (`THEME`); 802 lines, unit tests from `:421`; the JSON loader in `crates/lune-ui-core/src/theme/file.rs`.
 
 ## Spec
 
@@ -79,17 +79,20 @@ n/a — no text.
 
 ### Acceptance
 
-- Existing tests: none in `crates/lune-ui-core/src/theme.rs`.
-- Done standard still needs: a test that `THEME` equals the Lunegit values (`DarkTheme.axaml:200-233`) for every token the pixel gate uses; the M4 motion tokens with a test per token; the M10 JSON loader with a bounded reader (R-infra-6): done, `tests/theme_file.rs` (`Theme::glass` equals the three consts: `theme::tests`).
+- The preset against Lunegit's `DarkTheme.axaml` (`crates/lune-ui-core/src/theme.rs`, module `tests`): `every_color_key_holds_the_dark_theme_axaml_value` (all 50 keys, a line cite each; the file's brushes sit at `:7-159` and `:298-341`, the glass at `:226-235`), `the_glass_layers_hold_the_dark_theme_axaml_opacities`, `the_tokens_without_an_axaml_key_follow_their_decision_rows` (each field with no key of its own cites the row that sets it: D51, D14, D58, D207, D208), `the_status_and_surface_tokens_hold_their_values`, `the_font_sizes_hold_the_app_axaml_typography_scale` (`App.axaml:159-162`), `the_preset_glass_is_the_old_constants`.
+- The motion tokens with a test per token: `anim_duration_instant_is_120_ms`, `fast` 180, `base` 250, `moderate` 350, `slow` 500 (`App.axaml:151-155`); the easings are `motion.curves`.
+- The M10 JSON loader with a bounded reader (R-infra-6): `crates/lune-ui-core/tests/theme_file.rs` (`the_key_table_has_50_distinct_keys_each_of_which_resolves`, `the_preset_written_through_the_table_loads_back_equal`, `bad_colours_are_skipped_by_key_and_change_nothing`, `the_envelope_is_checked`, `nothing_panics_on_a_damaged_file`); a swap between two themes is a hard cut for colours (`a_swap_snaps_a_colour_that_is_mid_transition_and_one_whose_target_did_not_move`).
+- Every widget takes its colours from the theme: `crates/lune-ui-core/tests/c4.rs` module `m10` (the frame under a theme of distinct colours; `UNREACHED` is empty).
 
 ### Build
 
 - Milestone: M4 (motion tokens), M10 (JSON).
 - Depends on: core.color, core.painter, motion.transitions.
+- Done (D47, M11): tests `crates/lune-ui-core/src/theme.rs::every_color_key_holds_the_dark_theme_axaml_value, crates/lune-ui-core/src/theme.rs::the_glass_layers_hold_the_dark_theme_axaml_opacities, crates/lune-ui-core/src/theme.rs::the_tokens_without_an_axaml_key_follow_their_decision_rows, crates/lune-ui-core/src/theme.rs::anim_duration_fast_is_180_ms, crates/lune-ui-core/tests/theme_file.rs::the_preset_written_through_the_table_loads_back_equal, crates/lune-ui-core/tests/theme_file.rs::nothing_panics_on_a_damaged_file, crates/lune-ui-core/tests/theme_file.rs::a_swap_snaps_a_colour_that_is_mid_transition_and_one_whose_target_did_not_move`; page n/a (data; every scene reads it, `controls` among them); unverified here: none.
 
 ## Open questions
 
-- `TAB_HEADER_HEIGHT` and `BODY_PADDING` read as terminal-app values; whether they belong in the toolkit theme is unchecked.
+- Still open, a placement question: `TAB_HEADER_HEIGHT` and `BODY_PADDING` read as terminal-app values. Checked at M11: nothing in this repo reads either, so they affect no widget. They stay as the preset's constants; moving or dropping them is a public-API change no consumer has asked for (D4).
 
 ## Notes for the planner
 

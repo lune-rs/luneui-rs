@@ -2,10 +2,10 @@
 id: core.input
 title: Input model
 area: core
-status: in-progress
+status: done
 consumers: any
 source: crates/lune-ui-core/src/input.rs
-owner: orch/toolkit-v1
+owner: —
 summary: Plain-data RawInput in, FrameOutput out; the windowing adapter translates both
 ---
 
@@ -22,7 +22,7 @@ summary: Plain-data RawInput in, FrameOutput out; the windowing adapter translat
 
 ## Existing code
 
-`crates/lune-ui-core/src/input.rs:16` (`RawInput`), `:32` (`Event`), `:156` (`FrameOutput`), `:169` (`WindowCommand`), `:185` (`CursorIcon`), `:227` (`printable`); 230 lines. The winit side is `platform.input`; the fake is `testing::ScriptedInput` (`core.testing`).
+`crates/lune-ui-core/src/input.rs:21` (`RawInput`), `:37` (`Event`), `:119` (`NamedKey`), `:282` (`FrameOutput`), `:305` (`WindowCommand`), `:321` (`CursorIcon`), `:405` (`printable`); 472 lines. The winit side is `platform.input`; the fake is `testing::ScriptedInput` (`core.testing`).
 
 ## Spec
 
@@ -97,8 +97,7 @@ n/a — no drawing.
 
 ### Acceptance
 
-- Existing tests: `crates/lune-ui-winit/tests/input.rs` (`translator_and_scripted_input_agree`, `state_persists_and_events_drain`, `unmapped_keys_are_unidentified`, `other_mouse_button_keeps_its_number`, `every_cursor_icon_maps_to_the_same_named_winit_icon`); core has no inline test for `input.rs` and `printable` is covered through them.
-- The done standard still needs: a unit test of `printable` (control characters dropped, empty gives `None`); an `Access` event round trip through `ScriptedInput`; file-drop events through `ScriptedInput` and the translator (M10, done: `crates/lune-ui-winit/tests/input.rs` `files::the_translator_and_the_script_agree_on_file_events`, `files::hover_cancel_and_drop_give_the_three_events_at_the_last_pointer_position`; the core side, `crates/lune-ui-core/tests/input.rs` `file_events_reach_the_app_and_change_no_widget_state` and `a_file_event_alone_asks_for_no_repaint`: the events reach `ui.input().events` and change no widget state and ask for no frame); a match over each `#[non_exhaustive]` enum in a downstream test compiles with a wildcard arm.
+- Tests: `crates/lune-ui-winit/tests/input.rs` (`translator_and_scripted_input_agree`, `state_persists_and_events_drain`, `unmapped_keys_are_unidentified`, `other_mouse_button_keeps_its_number`, `every_cursor_icon_maps_to_the_same_named_winit_icon`); `printable` has a unit test in the file (`crates/lune-ui-core/src/input.rs::printable_drops_control_characters`: a bell drops to `None`, a tab is dropped inside text, empty is `None`, `é` stays); an `Access` event round trip through `ScriptedInput::access` is `crates/lune-ui-core/tests/ui_access.rs::default_clicks_a_checkbox_and_sets_changed` (the action reaches the widget and sets `changed`); file-drop events through `ScriptedInput` and the translator (M10: `crates/lune-ui-winit/tests/input.rs` `files::the_translator_and_the_script_agree_on_file_events`, `files::hover_cancel_and_drop_give_the_three_events_at_the_last_pointer_position`; the core side, `crates/lune-ui-core/tests/input.rs` `file_events_reach_the_app_and_change_no_widget_state` and `a_file_event_alone_asks_for_no_repaint`: the events reach `ui.input().events` and change no widget state and ask for no frame); a match over each `#[non_exhaustive]` enum in a downstream test compiles with a wildcard arm (`crates/lune-ui-core/tests/input.rs::non_exhaustive_seam_enums_match_with_a_wildcard_downstream`: `Event`, `NamedKey`, `WindowCommand`, `CursorIcon`).
 - `ScriptedInput` gains `access(...)` and `file_hover(...)`, `file_hover_cancelled()`, `file_drop(...)` builders (M4, M10, D211); `Translator` and `ScriptedInput` agree on the new events in the same test style [R crates/lune-ui-core/src/testing/input.rs:16-30,161].
 - No clock read: the boundary script stays green; `RawInput.time` is the only time [R crates/lune-ui-core/src/input.rs:5-6].
 
@@ -106,13 +105,14 @@ n/a — no drawing.
 
 - Milestone: M4 (`Access`, the `FrameOutput` additions) and M10 (file-drop events).
 - Depends on: core.ui, infra.accessibility, platform.clipboard.
+- Done (D47, M11): tests `crates/lune-ui-core/src/input.rs::printable_drops_control_characters, crates/lune-ui-core/tests/input.rs::non_exhaustive_seam_enums_match_with_a_wildcard_downstream, crates/lune-ui-core/tests/input.rs::file_events_reach_the_app_and_change_no_widget_state, crates/lune-ui-core/tests/ui_access.rs::default_clicks_a_checkbox_and_sets_changed, crates/lune-ui-winit/tests/input.rs::translator_and_scripted_input_agree`; page `file-drop` (the Ui pages are driven by `ScriptedInput`); unverified here: real OS events (`platform.input`).
 
 ## Open questions
 
-- Lines per notch: `ScrollDelta::Lines` gives lines and nothing converts them to logical pixels; no source states a value. `layout.scroll-area` (M5) decides it.
-- IME offsets stay winit's byte offsets (D35); whether `text.ime` converts them to char offsets at the seam is M5's call.
-- NamedKey gaps: no ContextMenu, CapsLock or keypad keys; nothing in Lunegit's or Wane's specs needs one in the toolkit (the terminal's own keys stay in the terminal app, D8).
+- Answered: lines per notch. `layout.scroll-area` converts a line to 48 logical px (`LINE`, `crates/lune-ui-core/src/widgets/scroll_area.rs:32`); no source states a value, so it is the toolkit's choice.
+- Answered (D35, D103): IME offsets stay winit's byte offsets; the widget converts them to char offsets (`crates/lune-ui-core/tests/ime.rs::a_preedit_cursor_in_bytes_is_a_char_offset_in_the_widget`).
+- Still open, a limit: NamedKey gaps: no ContextMenu, CapsLock or keypad keys; nothing in Lunegit's or Wane's specs needs one in the toolkit (the terminal's own keys stay in the terminal app, D8).
 
 ## Notes for the planner
 
-Added in M2 step 6. No widget consumes `RawInput` yet; M4's focus and click handling is the first consumer.
+Added in M2 step 6; M4's focus and click handling was its first consumer.

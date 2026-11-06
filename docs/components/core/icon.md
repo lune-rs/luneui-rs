@@ -2,10 +2,10 @@
 id: core.icon
 title: Codicon glyph constants
 area: core
-status: in-progress
+status: done
 consumers: luneterm, wane
 source: crates/lune-ui-core/src/icon.rs
-owner: orch/toolkit-v1
+owner: —
 summary: Codicon glyph constants and a glyph helper; the app supplies the icon font
 ---
 
@@ -23,7 +23,7 @@ Constants such as `ADD`, `GEAR`, `ELLIPSIS`, `CHROME_CLOSE`, `CHECK`, `CHROME_MI
 
 ## Existing code
 
-`crates/lune-ui-core/src/icon.rs:7-19` (constants), `:22` (`glyph`); 24 lines.
+`crates/lune-ui-core/src/icon.rs:7-37` (29 constants), `:39` (`glyph`); the glyphs are the app's font, the toolkit holds code points only.
 
 ## Spec
 
@@ -80,19 +80,19 @@ n/a — the code points are not strings for the reader; the names are the consta
 
 ### Acceptance
 
-- Existing tests: none in `crates/lune-ui-core/src/icon.rs`.
-- Done standard still needs: each constant checked against the Codicons 0.0.45 table, and a pixel probe of the 16, 14, 13 and 12 px sizes.
+- The 29 constants against the Codicons 0.0.45 table, as literals with the source named (`crates/lune-ui-core/tests/icon.rs::every_constant_is_its_codicons_code_point`; `gear_is_settings_gear`, `the_table_covers_distinct_glyphs_in_the_private_use_block`, `a_glyph_spec_uses_the_mono_role_at_its_size`).
+- Pixel probe: `crates/lune-ui-wgpu/tests/text.rs::an_icon_glyph_has_ink_that_grows_with_its_size` (the plus at 12, 13, 14 and 16 px: ink exists at each, the box never shrinks and 16 px is larger than 12 px; an empty string leaves the target empty).
 
 ### Build
 
 - Milestone: M11 (done standard; code exists).
 - Depends on: core.painter, core.theme.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/icon.rs::every_constant_is_its_codicons_code_point, crates/lune-ui-core/tests/icon.rs::gear_is_settings_gear, crates/lune-ui-core/tests/icon.rs::a_glyph_spec_uses_the_mono_role_at_its_size, crates/lune-ui-wgpu/tests/text.rs::an_icon_glyph_has_ink_that_grows_with_its_size`; page n/a (constants; drawn by the legacy scenes `controls`, `menu`, `dropdown`); unverified here: none (the glyph shapes depend on the app's icon font).
 
 ## Open questions
 
-- Icon source for Wane's SVG icons: bundle a Codicon font or draw the SVG paths with the painter (Wane native note, [W docs/ui/components.md:179-192]); open.
-
-- The Codicon font licence is not in this repo's plans yet; whether the toolkit bundles the font is open (R-ext-4).
+- Answered (R-core-6, `THIRD_PARTY_NOTICES.md:13-14`): the icon source is the app's font; the toolkit holds Codicons code points only and bundles no Codicons font, so the SVG-path alternative is not built.
+- Answered (`THIRD_PARTY_NOTICES.md:25`): the Codicons licence is CC BY 4.0, noted there; no font file is bundled, so R-ext-4 asks for no licence text.
 
 ## Notes for the planner
 

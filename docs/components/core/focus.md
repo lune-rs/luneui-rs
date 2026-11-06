@@ -2,10 +2,10 @@
 id: core.focus
 title: Keyboard focus
 area: core
-status: in-progress
+status: done
 consumers: any
-source: crates/lune-ui-core/src/ui/focus.rs
-owner: orch/toolkit-v1
+source: crates/lune-ui-core/src/ui/focus.rs, crates/lune-ui-core/src/widgets/focus_ring.rs
+owner: —
 summary: Tab order by call order within focus scopes, focus-visible, scope push, trap and restore, roving focus in composites
 ---
 
@@ -26,7 +26,7 @@ focus to the widget focused before it opened, or to its anchor.
 
 ## Existing code
 
-None for focus itself. Today a widget takes `focused: bool` from the app: `field` and `combo` draw the
+Built in M4: tab stops, scopes and the focus-visible flag in `crates/lune-ui-core/src/ui/focus.rs`, the ring looks in `crates/lune-ui-core/src/widgets/focus_ring.rs`. Before it, a widget took `focused: bool` from the app (the Painter-form widgets still do): `field` and `combo` draw the
 accent border and a caret when told (`crates/lune-ui-core/src/widgets/mod.rs:50-66,119-142`);
 `RawInput.focused` and `Event::Focus` carry window focus (`crates/lune-ui-core/src/input.rs:23-24,61-62`); `NamedKey::Tab` exists
 (`crates/lune-ui-core/src/input.rs:102`).
@@ -137,11 +137,13 @@ None: no user-visible text.
 - Pixel probes at scale 2: ring 1 px outline = 2 device px, inset -1 on a button, offset 2 on a toggle (a 40 x 20 track gives an outline box 44 x 24 logical), colour `fg_secondary` [W docs/ui/mocks/css/components.css:125,174].
 - Conformance: the ring fade passes the 60 Hz harness under Full, Reduced and Off [D41].
 - Semantic node: the focused node id equals `FrameOutput`'s focused id; `AccessAction::Focus` focuses the target and shows no ring (it is not keyboard navigation) [infra.accessibility].
+- Tests, bullet by bullet. Tab order, ring on and off: `crates/lune-ui-core/tests/ui_focus.rs::tab_goes_a_b_c_a_and_shift_tab_reverses_skipping_disabled`, `focus_visible_after_tab_off_after_a_pointer_press_and_hidden_on_window_blur`, `a_press_on_a_non_focusable_widget_leaves_focus_alone`. Modal: `tab_inside_a_modal_never_leaves_it` (20 Tabs), `closing_restores_the_previous_focus`, `closing_restores_the_anchor_when_the_previous_widget_is_gone`. Radio group: `widget_radio_group.rs::tab_enters_once_on_the_selected_option_and_leaves_once`. Ring probes at scale 2: `crates/lune-ui-core/tests/focus_ring.rs` (`a_button_ring_sits_on_the_rects_own_edge_in_fg_secondary`, `an_offset_ring_clears_the_control_by_2_px_and_draws_1_px_outside_that`, `a_border_ring_is_the_accent_and_an_edge_ring_keeps_its_own_radius`, `a_ring_fades_with_its_opacity_and_is_absent_at_zero`). Conformance of the `focus` row under Full, Reduced and Off: `widget_button.rs::every_motion_row_conforms_under_every_tier`. Node: `ui_access.rs::the_focused_output_is_the_node_with_the_focused_state`, `focus_focuses_without_a_ring`. The scenes are on the `focus` page.
 
 ### Build
 
 - Milestone: M4. The radio row of `focus-ring-kinds` was deferred [D74] and landed with `widget.radio-group` in M6 [D116], [D120]; the scene's delta is the one allowed change of that step.
 - Depends on: core.ui, core.input, motion.transitions, infra.accessibility.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/ui_focus.rs::tab_goes_a_b_c_a_and_shift_tab_reverses_skipping_disabled, crates/lune-ui-core/tests/ui_focus.rs::focus_visible_after_tab_off_after_a_pointer_press_and_hidden_on_window_blur, crates/lune-ui-core/tests/ui_focus.rs::tab_inside_a_modal_never_leaves_it, crates/lune-ui-core/tests/ui_focus.rs::closing_restores_the_previous_focus, crates/lune-ui-core/tests/widget_radio_group.rs::tab_enters_once_on_the_selected_option_and_leaves_once, crates/lune-ui-core/tests/focus_ring.rs::an_offset_ring_clears_the_control_by_2_px_and_draws_1_px_outside_that, crates/lune-ui-core/tests/focus_ring.rs::a_ring_fades_with_its_opacity_and_is_absent_at_zero, crates/lune-ui-core/tests/widget_button.rs::every_motion_row_conforms_under_every_tier, crates/lune-ui-core/tests/ui_access.rs::focus_focuses_without_a_ring`; page `focus`; unverified here: none.
 
 ## Open questions
 

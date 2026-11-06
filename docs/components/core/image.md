@@ -2,10 +2,10 @@
 id: core.image
 title: Image drawing
 area: core
-status: in-progress
+status: done
 consumers: lunegit, wane
 source: crates/lune-ui-core/src/image.rs
-owner: orch/toolkit-v1
+owner: —
 summary: Image primitive: app-decoded RGBA drawn into a rect with a fit mode, alpha and optional corner radius; explicit resource lifetime
 ---
 
@@ -26,7 +26,7 @@ primitive.
 
 ## Existing code
 
-Built in M5 (D105, D106): `crates/lune-ui-core/src/image.rs` (`ImageStore`, `ImageData`, `ImageId`, `Fit`, `image_rect`), `Painter::image`, `image_rotated`, `text_rotated`, the wgpu image pipeline in `lune-ui-wgpu`; the fake is `testing::FakeImages`. Before it, the painter had no image, gradient, shadow, arc or rotation primitive (`crates/lune-ui-core/src/paint.rs`, fill :215, fill_radii :219, ring :231, acrylic :243, custom :254, text :274-306, stroke :329).
+Built in M5 (D105, D106): `crates/lune-ui-core/src/image.rs` (`ImageStore`, `ImageData`, `ImageId`, `Fit`, `image_rect`), `Painter::image`, `image_rotated`, `text_rotated`, the wgpu image pipeline in `lune-ui-wgpu`; the fake is `testing::FakeImages`. Before it, the painter had no image, gradient, shadow, arc or rotation primitive (`crates/lune-ui-core/src/paint.rs` at the M3 inventory).
 Lunegit: `src/Lunegit.Desktop/Views/FileViewerView.axaml:352-356`, `Views/MarkdownPreviewView.axaml:166-174` and `.axaml.cs:404-483`, `Views/EmptyRepositoryView.axaml:12-22`, `ViewModels/Explorer/FileViewerViewModel.cs:80-90,234-253,519-545,616-624`.
 
 ## Spec
@@ -106,18 +106,20 @@ None: no text of its own.
 - Lifetime: releasing an id frees the texture; drawing it afterwards draws nothing; registering a second image under a used id replaces it and frees the old one [L src/Lunegit.Desktop/ViewModels/Explorer/FileViewerViewModel.cs:621-624].
 - Limits: an image over the device limit is refused without a panic, and an RGBA buffer whose length is not `4 * width * height` is refused.
 - Conformance and semantic node: no transitions; the host widget's node carries role `image` and the alt text.
+- Tests, bullet by bullet. Geometry: `crates/lune-ui-core/tests/image.rs::contain_known_answers`, `contain_scales_up_and_aligns_to_the_end`, `nothing_to_fit_is_none`. Pixel probes at scale 2 (`crates/lune-ui-wgpu/tests/images.rs`, `SCALE` 2): `contain_fits_a_wide_picture_centred`, `four_exact_quadrants_at_an_integer_ratio`, `alpha_blends_over_a_fill`, `straight_alpha_is_premultiplied_on_upload`. Recording: `image.rs::an_image_is_recorded_with_layer_clip_and_scale`, `an_image_follows_the_transform_stack`, `images_replay_to_the_same_scene`; `FakeImages` meets the same contract as the GPU store (`image.rs::the_fake_meets_the_contract_with_and_without_a_limit`, `images.rs::the_gpu_store_meets_the_contract`); no wgpu type in a core signature is `scripts/check-boundaries.sh`. Lifetime: `images.rs::unknown_released_and_refused_ids_draw_nothing`, `replacing_an_id_draws_the_new_picture`; `image.rs::a_refused_picture_leaves_the_old_one`. Limits: `images.rs::an_oversize_or_short_picture_is_refused_before_the_gpu`, `image.rs::a_length_that_overflows_is_refused`. Node: the markdown image's node is `Role::Image` named by the alt text (`widget_markdown.rs`, `crates/lune-ui-core/src/widgets/markdown.rs:534`); the banner's is `banner.rs:195`.
 
 ### Build
 
-- Milestone: M5. Built in M5 (steps 5 and 6; the page is `image`, 7 scenes). Open for `done` (D47): M11 re-checks the whole bar on every entry; the Windows and Linux run time is unverified (the Linux and Windows lint is `scripts/check-targets.sh`).
+- Milestone: M5. Built in M5 (steps 5 and 6; the page is `image`, 7 scenes). M11 audited it against D47 (the `Done` line). Unverified here: the Windows and Linux run time (the lint for both is `scripts/check-targets.sh`).
 - Depends on: core.painter, core.scene, render.gpu, render.frame, render.surface
+- Done (D47, M11): tests `crates/lune-ui-core/tests/image.rs::contain_known_answers, crates/lune-ui-core/tests/image.rs::an_image_is_recorded_with_layer_clip_and_scale, crates/lune-ui-core/tests/image.rs::the_fake_meets_the_contract_with_and_without_a_limit, crates/lune-ui-core/tests/image.rs::a_length_that_overflows_is_refused, crates/lune-ui-wgpu/tests/images.rs::the_gpu_store_meets_the_contract, crates/lune-ui-wgpu/tests/images.rs::four_exact_quadrants_at_an_integer_ratio, crates/lune-ui-wgpu/tests/images.rs::contain_fits_a_wide_picture_centred, crates/lune-ui-wgpu/tests/images.rs::alpha_blends_over_a_fill, crates/lune-ui-wgpu/tests/images.rs::unknown_released_and_refused_ids_draw_nothing, crates/lune-ui-wgpu/tests/images.rs::replacing_an_id_draws_the_new_picture, crates/lune-ui-wgpu/tests/images.rs::an_oversize_or_short_picture_is_refused_before_the_gpu`; page `image`; unverified here: Windows and Linux run time.
 
 ## Open questions
 
 - Answered (D106): sampling filter: Lunegit leaves Avalonia's default; the toolkit picks bilinear for scaled draws and nearest for integer ratios, or states one filter; M5 decides and records the pixel probe.
 - Answered (D106, straight alpha in, premultiplied on upload): whether alpha-premultiplied input is accepted: the app passes straight-alpha RGBA; the painter's colours are straight alpha with premultiply helpers (R-core-3).
 - Answered (D105, `clip-rounded` applies to images): a rounded clip for avatars or thumbnails: none in Lunegit's uses; out of this entry until a consumer names it.
-- Still open (D106): texture memory budget and eviction: the app releases explicitly; a cache with a cap is not specified (D41 sets no memory target in v1).
+- Still open (D106): texture memory budget and eviction: the app releases explicitly; a cache with a cap is not specified (D41 sets no memory target in v1). It stays open because no consumer has asked for a cap (D4).
 
 ## Notes for the planner
 
