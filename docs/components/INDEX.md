@@ -12,8 +12,8 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | in-luneterm | 0 |
 | planned | 0 |
 | stub | 0 |
-| in-progress | 75 |
-| done | 18 |
+| in-progress | 72 |
+| done | 21 |
 | external | 4 |
 | **total** | **97** |
 
@@ -145,9 +145,9 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
-| [motion.animation-tiers](motion/animation-tiers.md) | Animation tiers and reduced motion | in-progress | any | Full, Reduced and Off motion tiers passed in by the app, with the per-token Reduced duration map |
-| [motion.curves](motion/curves.md) | Easing curves and menu motion | in-progress | luneterm | cubic_bezier easing and the menu open and close values; becomes the cubic-out and ease-in tokens |
-| [motion.transitions](motion/transitions.md) | Motion system and transitions | in-progress | any | Time, Easing, Tween, Spring, Keyframes and Transition evaluated in closed form, tier-aware, with a 60 Hz conformance harness |
+| [motion.animation-tiers](motion/animation-tiers.md) | Animation tiers and reduced motion | done | any | Full, Reduced and Off motion tiers passed in by the app, with the per-token Reduced duration map |
+| [motion.curves](motion/curves.md) | Easing curves and menu motion | done | luneterm | cubic_bezier easing and the menu open and close values; becomes the cubic-out and ease-in tokens |
+| [motion.transitions](motion/transitions.md) | Motion system and transitions | done | any | Time, Easing, Tween, Spring, Keyframes and Transition evaluated in closed form, tier-aware, with a 60 Hz conformance harness |
 
 ## infra
 

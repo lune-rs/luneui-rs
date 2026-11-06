@@ -2,10 +2,10 @@
 id: motion.animation-tiers
 title: Animation tiers and reduced motion
 area: motion
-status: in-progress
+status: done
 consumers: any
 source: crates/lune-ui-core/src/motion/tokens.rs
-owner: orch/toolkit-v1
+owner: —
 summary: Full, Reduced and Off motion tiers passed in by the app, with the per-token Reduced duration map
 ---
 
@@ -27,7 +27,7 @@ app decides, for example from its own settings.
 
 ## Existing code
 
-None in this repo. Lunegit: `src/Lunegit.Desktop/Theming/AnimationApplicator.cs` (mounts the Full or
+Built in M4: the tier is `MotionTier` and the Reduced map is data in `crates/lune-ui-core/src/motion/tokens.rs` (`MotionTokens::resolve`), applied by `ui.animate_*` (`src/ui/animate.rs`). Lunegit: `src/Lunegit.Desktop/Theming/AnimationApplicator.cs` (mounts the Full or
 Reduced style file, or neither, hot, on the UI thread), `src/Lunegit.Desktop/Themes/Animations.axaml`
 (632 lines, Full tier), `src/Lunegit.Desktop/Themes/AnimationsReduced.axaml` (Reduced tier),
 `src/Lunegit.Desktop/Services/DialogService.cs:87-92` (the exit retention per tier).
@@ -112,11 +112,13 @@ None: the tier names and the setting row are app text (Lunegit keeps them as `se
 - A tier change between frames takes effect on the next frame, and a settled page reports `Repaint::Idle` under all three tiers [D41].
 - Dialog exit retention is 180, 120 and 0 ms by tier, then Idle [L src/Lunegit.Desktop/Services/DialogService.cs:87-92], [core.ui].
 - Semantic tree and strings are unaffected by the tier.
+- Tests, bullet by bullet. Exact ends: `crates/lune-ui-core/tests/motion.rs::every_kind_conforms_under_every_tier` (all 15 kinds, Full, Reduced and Off, scalar and colour: settled within duration plus one frame, a snapping tier at once), `snapping_tiers_give_the_target_on_the_first_sample`, `resolve_table_over_tokens_kinds_and_tiers`, `an_explicit_reduced_token_overrides_the_map`. No transform under Reduced, targets at once under Off: `widget_dialog.rs::reduced_open_is_a_fade_without_scale_at_the_fast_length`, `off_opens_at_once`; `ui_overlays.rs::the_exit_painter_gets_transforms_false_under_the_reduced_fade`; `widget_menu.rs::reduced_fades_opacity_only`. A tier change takes effect on the next frame: `ui_core.rs::off_tier_snaps_and_a_tier_change_snaps_in_flight_values`. A settled page is `Idle` in all three tiers: `c4.rs::nothing_reports_now_while_nothing_moves`, `a_settled_dropdown_reports_idle_the_frame_after_the_change`. Exit retention 180, 120, 0 ms then `Idle`: `c4.rs::the_dialogs_exit_retention_per_tier_then_idle`, `ui_overlays.rs::an_overlay_the_app_stops_calling_keeps_drawing_until_its_close_ends`. The tree, strings and resting look do not depend on the tier: `c4.rs::a_settled_frame_has_the_same_tree_and_look_in_every_tier` and, for the gallery's panels, `apps/gallery/src/pages/motion.rs::a_tier_never_changes_the_resting_look`.
 
 ### Build
 
 - Milestone: M4.
 - Depends on: motion.transitions, core.ui.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/motion.rs::every_kind_conforms_under_every_tier, crates/lune-ui-core/tests/motion.rs::snapping_tiers_give_the_target_on_the_first_sample, crates/lune-ui-core/tests/ui_core.rs::off_tier_snaps_and_a_tier_change_snaps_in_flight_values, crates/lune-ui-core/tests/c4.rs::the_dialogs_exit_retention_per_tier_then_idle, crates/lune-ui-core/tests/c4.rs::a_settled_frame_has_the_same_tree_and_look_in_every_tier, crates/lune-ui-core/tests/c4.rs::nothing_reports_now_while_nothing_moves, apps/gallery/src/pages/motion.rs::a_tier_never_changes_the_resting_look`; page `motion` (scenes `motion-tiers`, `motion-tiers-settled`); unverified here: none.
 
 ## Open questions
 

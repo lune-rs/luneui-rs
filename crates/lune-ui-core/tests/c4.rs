@@ -705,6 +705,18 @@ fn nothing_reports_now_while_nothing_moves() {
     }
 }
 
+#[test]
+fn a_settled_frame_has_the_same_tree_and_look_in_every_tier() {
+    // The tier changes motion, never the resting look, the semantic tree or the strings in it.
+    let runs = [MotionTier::Full, MotionTier::Reduced, MotionTier::Off].map(run_script);
+    for i in (0..runs[0].len()).filter(|i| i % 3 == 0) {
+        for other in &runs[1..] {
+            assert!(runs[0][i].1.tree == other[i].1.tree, "tree, frame {i}");
+            assert!(runs[0][i].0 == other[i].0, "scene, frame {i}");
+        }
+    }
+}
+
 fn has_focused_state(out: &FrameOutput, k: &str) -> bool {
     node(out, id(k)).states.contains(State::Focused)
 }
