@@ -1,14 +1,14 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-06 (M10 in progress: steps 1 to 5 of 11 done; M9 is merged at 8f499d0)
+Last updated: 2026-11-06 (M10 in progress: steps 1 to 7 of 11 done; M9 is merged at 8f499d0)
 
 ## Now
 
 M10 (infra and platform: JSON reader, theme and locale files, shortcut platform mapping, file drop, clipboard, AccessKit, tray) is in
 progress on `orch/toolkit-v1`. Step 1 is in: `lune_ui::json` (D204), Lunegit's theme and locale files as gallery fixtures (D205, D206,
 no open licence: license or remove before any public release). Step 2: theme files (`Theme::from_json`, glass inside `Theme`, derived
-tokens, `AcrylicLevel`, a theme swap is a hard cut for colour transitions; D207 to D209). Step 3: `Catalog::from_json`, `StringTable::overlay` and `iter`, `audit_template` (D210). Step 4: file-drop events, `keymap()`, `Translator::access`, pure `plan_output` (D211, D212). Step 5: the clipboard adapter over `arboard`, 32 MiB cap, the gallery's stub retired (D213 to D215); the `--parity-only` lock check fails by design from here.
+tokens, `AcrylicLevel`, a theme swap is a hard cut for colour transitions; D207 to D209). Step 3: `Catalog::from_json`, `StringTable::overlay` and `iter`, `audit_template` (D210). Step 4: file-drop events, `keymap()`, `Translator::access`, pure `plan_output` (D211, D212). Step 5: the clipboard adapter over `arboard`, 32 MiB cap, the gallery's stub retired (D213 to D215); the `--parity-only` lock check fails by design from here. Step 7: the tray's pure half, `tray::{icon_bitmap, bar_from_tray, place_surface, TrayToggle, tray_surface}` and `Ui::flyout_window` / `Ui::menu_window` (D218 to D221).
 
 M9 (text views: code block, code editor view, markdown preview, diff view) is merged to main at 8f499d0
 (steps 1 to 9; DECISIONS D177 to D203), review rounds 1 to 4 fixed (D200 to D203), round 5 passed. `docs/architecture.md` has the module map,

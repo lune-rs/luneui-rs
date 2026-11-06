@@ -30,6 +30,7 @@
 //! - `backdrop` (the material seam: `GlassLayer`, `BackdropKind`, `Material` and the `Backdrop`
 //!   capability);
 //! - `window` (edge resize, double click, caption buttons);
+//! - `tray` (the tray icon rasterised on the CPU, where its flyout and menu go, the click rules);
 //! - `testing` (fakes of the seams for tests: the display-list recorder, a fake text system
 //!   and its contract suite, a scripted input source, a null material and its contract suite).
 //!
@@ -59,6 +60,7 @@ pub mod testing;
 pub mod text;
 pub mod text_edit;
 pub mod theme;
+pub mod tray;
 pub mod ui;
 pub mod widgets;
 pub mod window;

@@ -22,7 +22,7 @@ Windows tray left-click surface: header, stats, route list, action rows. Named b
 
 ## Existing code
 
-`crates/lune-ui-core/src/widgets/flyout.rs` (`Flyout`, `Ui::flyout`, `flyout_size`, `flyout_body`) over `Ui::popover` with `Surface::Glass`, `menu_rows` (the menu's row frame), `Ui::stat_strip` and `Ui::kv_list` [D145]; tests in `crates/lune-ui-core/tests/widget_flyout.rs`. The separate window and the tray anchoring wait for M10. Before M7 there was none in luneui-rs or Luneterm's `lune-ui` (Wane: partial: the glass popup surface exists (popup_panel widgets/mod.rs:200; menu glass widgets/menu.rs:109); the stats block and the separate window are missing). Design source (not code to move): Luneterm crates/lune-ui/src/widgets/menu.rs:109-111 (backdrop, glass fill, ring); Luneium src/renderer/shell/components/Popup.css:2; docs/mockups/Tray.dc.html (content).
+`crates/lune-ui-core/src/widgets/flyout.rs` (`Flyout`, `Ui::flyout`, `flyout_size`, `flyout_body`) over `Ui::popover` with `Surface::Glass`, `menu_rows` (the menu's row frame), `Ui::stat_strip` and `Ui::kv_list` [D145]; tests in `crates/lune-ui-core/tests/widget_flyout.rs`. M10 step 7 added `Ui::flyout_window`, the same body in a window of its own (the card fills the window, `tray::place_surface` places the window; D220). Before M7 there was none in luneui-rs or Luneterm's `lune-ui` (Wane: partial: the glass popup surface exists (popup_panel widgets/mod.rs:200; menu glass widgets/menu.rs:109); the stats block and the separate window are missing). Design source (not code to move): Luneterm crates/lune-ui/src/widgets/menu.rs:109-111 (backdrop, glass fill, ring); Luneium src/renderer/shell/components/Popup.css:2; docs/mockups/Tray.dc.html (content).
 
 ## Spec
 

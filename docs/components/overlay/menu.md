@@ -24,7 +24,7 @@ summary: Glass context menu with open and close motion
 
 ## Existing code
 
-`crates/lune-ui-core/src/widgets/menu.rs`: `Ui::menu`, `Ui::menu_with`, `menu_rows`, `menu_layout_at`, `menu_paint`, the free `menu`, `menu_open_anim`, `menu_close_anim`. Tests: `crates/lune-ui-core/tests/widget_menu.rs`, `tests/c4.rs`.
+`crates/lune-ui-core/src/widgets/menu.rs`: `Ui::menu`, `Ui::menu_with`, `menu_rows`, `menu_layout_at`, `menu_size`, `Ui::menu_window` (the menu filling a window of its own, M10 D220), `menu_paint`, the free `menu`, `menu_open_anim`, `menu_close_anim`. Tests: `crates/lune-ui-core/tests/widget_menu.rs`, `tests/c4.rs`.
 
 ## Spec
 

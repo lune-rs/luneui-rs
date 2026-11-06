@@ -2,10 +2,10 @@
 id: platform.tray-icon
 title: Tray icon with status dot
 area: platform
-status: planned
+status: in-progress
 consumers: wane
 source: —
-owner: —
+owner: orch/toolkit-v1
 summary: 16 px monochrome glyph with a status dot (green serving, amber degraded, grey paused), rendered to OS bitmaps at 1x and 2x; opens toolkit glass menus
 ---
 
@@ -30,7 +30,7 @@ OS notifications are app-side (D43).
 
 ## Existing code
 
-None in luneui-rs or Luneterm's `lune-ui` (Wane: missing). Design sources (not code to move): Wane `docs/ui/mocks/css/components.css:691-701` (the icon), `docs/ui/mocks/css/tokens.css:12,49,52,62,97` (colours), `docs/ui/mocks/tray.html?surface=icon-states` (the states, scene `tray-icon-states`, `docs/ui/mocks/scenes.txt:33`),
+M10 step 7 built the pure half in `crates/lune-ui-core/src/tray.rs` [D218 to D221]: `icon_bitmap` (the CPU raster, `TrayBitmap`, `TrayState`, `GlyphTone`), `bar_from_tray` and `place_surface` (`TraySurface`), `TrayToggle` and `TrayAction`, `tray_surface` (`TrayPlatform`); the surfaces in their own window are `Ui::flyout_window` and `Ui::menu_window` (`overlay.flyout`, `overlay.menu`). Tests: `crates/lune-ui-core/tests/tray.rs`, `tests/widget_flyout.rs`. The OS tray item and the popover window (step 8) and the gallery pages (step 9) are not built yet. Design sources (not code to move): Wane `docs/ui/mocks/css/components.css:691-701` (the icon), `docs/ui/mocks/css/tokens.css:12,49,52,62,97` (colours), `docs/ui/mocks/tray.html?surface=icon-states` (the states, scene `tray-icon-states`, `docs/ui/mocks/scenes.txt:33`),
 `docs/mockups/Tray.dc.html:44` (the provisional crescent).
 
 ## Spec
@@ -115,9 +115,7 @@ None: the tooltip texts are app strings [W docs/ui/components.md:758].
 
 ## Open questions
 
-- Bitmap size and dot placement: the mock's dot overhangs the 16 px glyph box by 2 px; M10 decides the bitmap size (for example 18 px) or the glyph scale.
-- The ring colour for a light and a dark tray: the mock uses the window grey; a real icon cannot know the tray colour [W docs/ui/components.md:218].
-- Template versus non-template image on macOS (D20): decided at M10 by a probe.
+- Bitmap size, the ring and the macOS image form are decided (D218): an 18 px bitmap (36 at 2x) with the dot's outer circle flush at the corner, a transparent ring, a non-template image with a white or black glyph.
 - The final glyph (the user's call) [W docs/ui/components.md:752].
 - Which upstream states turn the tray amber is a product rule, not the toolkit's [W docs/ui/components.md:755].
 
