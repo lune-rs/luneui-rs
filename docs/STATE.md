@@ -1,7 +1,7 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-06 (M10 built, steps 1 to 11 done on `orch/toolkit-v1`, awaiting review, the final gate and the merge; M9 is merged at 8f499d0)
+Last updated: 2026-11-06 (M10 built, steps 1 to 11 and review round 2 done on `orch/toolkit-v1`, awaiting the final gate and the merge; M9 is merged at 8f499d0)
 
 ## Now
 
@@ -20,8 +20,9 @@ next. What it added:
 - Gallery: pages `theme`, `tray` and `file-drop` (24 new scenes), the live tray (`popover.rs`) and `gallery --smoke-platform` (D225).
 - Step 10: the director accepted the tray icon and the two window surfaces in round 1 (D226, D227).
 - Step 11: `c4::m10`, the theme reach audit (below), the catalogue and architecture notes, and the checks.
+- Review round 2 fixed (D228 to D232): the tray's reopen guard is per surface and the focus watch follows the window (F1, F4); tray placement is in logical pixels (F2); a theme swap drops closing overlays (F3); a password field is `Role::PasswordInput` (S1); a one-line editor refuses an insert over 1 MiB (S2).
 
-Counts at the tip: gallery 73 pages, 413 scene names in `--list`; `cargo test --workspace -- --list` names 2,505 tests.
+Counts at the tip: gallery 73 pages, 413 scene names in `--list`; `cargo test --workspace -- --list` names 2,520 tests.
 Release size (macOS, `cargo build --release -p gallery`, strip, fat LTO): 9,448,688 bytes at the M9 merge (8f499d0), 9,869,408 at this tip, +420,720 (+4.45%);
 the AccessKit bridge is +237,728 of that (D216), the tray stack about +150,000 (a scratch estimate at step 8), `arboard` the rest.
 Checked here at the tip (not the final gate, which is the orchestrator's): `gallery --smoke-platform` exit 0 (a real tray item, its rect, a synthetic click, the surface in its window, 25 frames in the
