@@ -2,10 +2,10 @@
 id: text.ime
 title: IME composition input
 area: text
-status: in-progress
+status: done
 consumers: luneterm, lunegit, wane
-source: crates/lune-ui-core/src/widgets/field.rs
-owner: orch/toolkit-v1
+source: crates/lune-ui-core/src/widgets/field.rs, crates/lune-ui-core/src/text_edit.rs, crates/lune-ui-winit/src/input.rs
+owner: —
 summary: IME composition in text widgets: preedit drawn inline at the caret, commit, candidate-window area, byte offsets from the platform
 ---
 
@@ -28,7 +28,7 @@ the app's: every text widget needs it (decided by R-text-4 resolution, M3).
 
 Built in M5 (D103): `field` and `text_area` consume the events (`crates/lune-ui-core/src/widgets/field.rs`, `text_edit.rs`) and report `ime_area`; the editable code view (`text.code-editor-view`) does the same through `EditHost` on one line of many (M9, D195). The input side existed first: events and output, with nothing consuming them: `ImeEvent` (`crates/lune-ui-core/src/input.rs:141-153`), `FrameOutput.ime_area` (`:156-163`), the winit translation
 (`crates/lune-ui-winit/src/input.rs:149-161`) and the output side that enables the input method and sets the cursor area (`crates/lune-ui-winit/src/input.rs:278-312`); the scripted builder
-`ScriptedInput::ime` (`crates/lune-ui-core/src/testing/input.rs:148`); a translation test (`crates/lune-ui-winit/tests/input.rs:42-48`). No widget sets `ime_area`.
+`ScriptedInput::ime` (`crates/lune-ui-core/src/testing/input.rs:148`); a translation test (`crates/lune-ui-winit/tests/input.rs:42-48`). Widgets set `ime_area` since M5.
 
 ## Spec
 
@@ -116,11 +116,13 @@ None: no text of its own.
 - Conformance: n/a, no transitions.
 - Semantic-node test: the host's value excludes the preedit until commit.
 - Real typing with an input method is unverified here (no VM, no hands-on run); Luneterm's M9 run covers it [D15].
+- Tests (`crates/lune-ui-core/tests/ime.rs` unless named). Events: `enabled_preedit_commit_disabled_leaves_the_text_and_the_caret_after_it` (text "か", caret at char 1, no underline after, `ime_area` `None` once focus leaves); the winit side: `crates/lune-ui-winit/tests/input.rs::translator_and_scripted_input_agree` (the platform's events and byte offsets) and `plan_output_is_public_pure_and_starts_from_nothing_set` (the adapter enables IME when the area first appears). Offsets: `a_preedit_cursor_in_bytes_is_a_char_offset_in_the_widget` ("héllo", bytes (3, 3) is char 2), `the_preedit_shows_inline_and_the_text_after_it_shifts` (bytes (6, 6) of "かな" is char 2), `a_wild_cursor_is_clamped` (inside a character, past the end, reversed: no panic, no change). Clearing: `an_empty_preedit_clears_and_draws_no_underline`. `ime_area`: `the_area_lies_in_the_field_and_moves_with_the_caret`, `the_area_is_none_without_focus_read_only_disabled_or_a_password`. Keys: `keys_belong_to_the_input_method_while_composing`, `a_scroll_area_leaves_page_keys_to_the_input_method_while_composing`. Retention: `the_preedit_is_gone_after_focus_loss_and_nothing_is_committed`, `a_composition_does_not_survive_a_hidden_tab`. Node: `the_node_excludes_the_preedit_until_the_commit`. Pixel probes with real fonts (`crates/lune-ui-wgpu/tests/text_field.rs`): `the_underline_covers_exactly_the_preedit_with_real_fonts`, `the_text_after_the_caret_shifts_by_the_preedits_measured_width`. The look is `fg_primary` for the underline and `text_selection` for the clause (D103).
 
 ### Build
 
-- Milestone: M5. Built in M5 (steps 13 and 15; the page is `ime`, 6 scenes; the gallery bundles no CJK font, so the catalogue's "かな" preedit draws as boxes, D90). Open for `done` (D47): M11 re-checks the whole bar on every entry; real typing with an input method (R1) and bidi caret placement are unverified here, and so is the Windows and Linux run time.
+- Milestone: M5. Built in M5 (steps 13 and 15; the page is `ime`, 6 scenes; the gallery bundles no CJK font, so the catalogue's "かな" preedit draws as boxes, D90). M11 audited it against D47 (the `Done` line). Unverified here: real typing with an input method (R1; Luneterm's M9 run covers it, D15), bidi caret placement, and the Windows and Linux run time.
 - Depends on: text.text-edit, core.input, platform.input, core.ui, infra.accessibility
+- Done (D47, M11): tests `crates/lune-ui-core/tests/ime.rs::enabled_preedit_commit_disabled_leaves_the_text_and_the_caret_after_it, crates/lune-ui-winit/tests/input.rs::translator_and_scripted_input_agree, crates/lune-ui-winit/tests/input.rs::plan_output_is_public_pure_and_starts_from_nothing_set, crates/lune-ui-core/tests/ime.rs::a_preedit_cursor_in_bytes_is_a_char_offset_in_the_widget, crates/lune-ui-core/tests/ime.rs::a_wild_cursor_is_clamped, crates/lune-ui-core/tests/ime.rs::an_empty_preedit_clears_and_draws_no_underline, crates/lune-ui-core/tests/ime.rs::the_area_lies_in_the_field_and_moves_with_the_caret, crates/lune-ui-core/tests/ime.rs::keys_belong_to_the_input_method_while_composing, crates/lune-ui-core/tests/ime.rs::the_preedit_is_gone_after_focus_loss_and_nothing_is_committed, crates/lune-ui-core/tests/ime.rs::the_node_excludes_the_preedit_until_the_commit, crates/lune-ui-wgpu/tests/text_field.rs::the_underline_covers_exactly_the_preedit_with_real_fonts, crates/lune-ui-wgpu/tests/text_field.rs::the_text_after_the_caret_shifts_by_the_preedits_measured_width`; page `ime`; unverified here: real typing with an input method (Luneterm M9 run, D15), bidi caret placement, Windows and Linux run time.
 
 ## Open questions
 

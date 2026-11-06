@@ -174,6 +174,19 @@ fn an_empty_preedit_clears_and_draws_no_underline() {
 }
 
 #[test]
+fn a_preedit_cursor_in_bytes_is_a_char_offset_in_the_widget() {
+    // In "héllo" byte 3 lies after "hé" (h is one byte, é two): char 2, so the caret sits two
+    // columns into the preedit, not three.
+    let mut text = String::new();
+    let mut h = focused(&mut text);
+    preedit(&mut h, "h\u{e9}llo", Some((3, 3)));
+    let (scene, _, _) = run(&mut h, &mut text);
+    let c = carets(&scene);
+    assert_eq!(c.len(), 1);
+    assert_eq!(c[0].rect[0], TX + 2.0 * glyph() + 1.0);
+}
+
+#[test]
 fn a_wild_cursor_is_clamped() {
     let mut text = String::new();
     let mut h = focused(&mut text);
