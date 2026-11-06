@@ -10,9 +10,9 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | status | count |
 | --- | --- |
 | in-luneterm | 0 |
-| planned | 2 |
+| planned | 1 |
 | stub | 0 |
-| in-progress | 91 |
+| in-progress | 92 |
 | done | 0 |
 | external | 4 |
 | **total** | **97** |
@@ -158,7 +158,7 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | [infra.json](infra/json.md) | Bounded JSON reader | in-progress | any | Small JSON reader in core with input, depth and string limits, fail-closed errors and no panics; backs theme and locale loading |
 | [infra.localization](infra/localization.md) | Localization | in-progress | any | One string table of flat dotted keys in core, luneui. keys with English defaults, positional formatting; locale JSON loaded in M10 |
 | [infra.shortcut-routing](infra/shortcut-routing.md) | Keyboard shortcut routing | in-progress | any | A scoped chord registry resolved in three phases (preempt, focused widget, bubble); Lunegit has no central one |
-| [infra.theme-hot-reload](infra/theme-hot-reload.md) | Theme JSON loading and hot reload | planned | lunegit | Theme files as JSON mapped onto the Theme value, partial overrides over a baseline, acrylic level, swapped at a frame boundary by the app |
+| [infra.theme-hot-reload](infra/theme-hot-reload.md) | Theme JSON loading and hot reload | in-progress | lunegit | Theme files as JSON mapped onto the Theme value, partial overrides over a baseline, acrylic level, swapped at a frame boundary by the app |
 
 ## lunegit
 

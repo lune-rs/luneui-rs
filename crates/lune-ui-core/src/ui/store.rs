@@ -47,6 +47,9 @@ pub struct UiStore {
     pub(crate) anim_color: BTreeMap<WidgetId, Anim<[f32; 4]>>,
     /// The tier of the previous frame, `None` before the first.
     pub(crate) last_tier: Option<MotionTier>,
+    /// The theme of the previous frame, `None` before the first: a different one is a hard cut
+    /// for colour transitions (D5).
+    pub(crate) last_theme: Option<crate::theme::Theme>,
     /// Open, opening and closing overlays, in open order.
     pub(crate) overlays: Vec<OverlayRec>,
     /// The tag of the most recently opened overlay (0: none yet).

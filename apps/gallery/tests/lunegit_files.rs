@@ -6,6 +6,7 @@
 //! `catch_unwind`; the cases that must be errors say which.
 
 use lune_ui::json::{JsonErrorKind as K, MAX_KEY, MAX_STRING, Value, parse};
+use lune_ui::theme::{DARK, Skip, Theme, ThemeFile};
 use std::path::PathBuf;
 
 const THEMES: [(&str, usize); 5] = [
@@ -159,6 +160,81 @@ fn no_real_file_comes_near_a_limit() {
         assert!(s * 2 <= MAX_STRING, "{name}: longest string {s}");
         assert!(k * 2 <= MAX_KEY, "{name}: longest key {k}");
     }
+}
+
+// --- Themes ---------------------------------------------------------------------------------
+
+fn load_theme(name: &str) -> ThemeFile {
+    match Theme::from_json(&theme(name), &DARK) {
+        Ok(f) => f,
+        Err(e) => panic!("{name}: {e:?}"),
+    }
+}
+
+#[test]
+fn all_five_theme_files_load_and_skip_no_colour_and_no_opacity_as_bad() {
+    for (name, _) in THEMES {
+        let f = load_theme(name);
+        let bad: Vec<&Skip> = f
+            .skipped
+            .iter()
+            .filter(|s| matches!(s, Skip::BadColor(_) | Skip::BadAcrylic(_)))
+            .collect();
+        assert!(bad.is_empty(), "{name}: {bad:?}");
+        assert!(!f.name.is_empty(), "{name}");
+        assert_ne!(f.theme, DARK, "{name} changes the look");
+        // About fifty colour keys have no field; the rest are known.
+        let unknown = f
+            .skipped
+            .iter()
+            .filter(|s| matches!(s, Skip::UnknownColor(_)))
+            .count();
+        assert!(
+            (20..=70).contains(&unknown),
+            "{name}: {unknown} unknown colour keys"
+        );
+    }
+}
+
+#[test]
+fn the_entrys_known_answers() {
+    // dark-modern.json: "ForegroundPrimary": "#FFCCCCCC".
+    assert_eq!(
+        load_theme("dark-modern").theme.fg_primary,
+        [0xCC, 0xCC, 0xCC, 0xFF]
+    );
+    // blue.json: "AccentPrimaryColor": "#FF71B0F7".
+    assert_eq!(load_theme("blue").theme.accent, [0x71, 0xB0, 0xF7, 0xFF]);
+    // And its derived scrollbar thumb follows the accent.
+    assert_eq!(
+        load_theme("blue").theme.scroll_thumb,
+        [0x71, 0xB0, 0xF7, 0x8C]
+    );
+    // ARGB to RGBA: a theme that says "#CCFFFFFF" gets white at alpha 0xCC.
+    let f = Theme::from_json(
+        br##"{"name":"t","colors":{"ForegroundPrimary":"#CCFFFFFF"},"acrylic":{}}"##,
+        &DARK,
+    );
+    assert_eq!(f.map(|f| f.theme.fg_primary), Ok([0xFF, 0xFF, 0xFF, 0xCC]));
+}
+
+#[test]
+fn orange_tint_is_rrggbb_so_it_is_opaque() {
+    // orange.json: "GlassTintColor": "#1A0E08".
+    let g = load_theme("orange").theme.glass;
+    let tint = [0x1A, 0x0E, 0x08, 0xFF];
+    assert_eq!(
+        (g.window.tint, g.panel.tint, g.card.tint),
+        (tint, tint, tint)
+    );
+}
+
+#[test]
+fn dark_modern_material_opacity_reaches_the_window_layer() {
+    // dark-modern.json: "GlassMaterialDarkOpacity": 0.98.
+    let g = load_theme("dark-modern").theme.glass;
+    assert_eq!(g.window.material_opacity, 0.98);
+    assert_eq!(g.window.tint_opacity, 1.0);
 }
 
 // --- Negative fixtures made from the real files ---------------------------------------------

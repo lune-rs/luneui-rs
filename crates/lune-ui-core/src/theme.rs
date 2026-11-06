@@ -2,10 +2,18 @@
 //!
 //! A [`Theme`] is a plain `Copy` value carried by the [`Painter`](crate::paint::Painter), so one
 //! process can draw with more than one theme. [`lunegit_dark`] holds the values copied from
-//! Lunegit's `DarkTheme.axaml` and `App.axaml`, plus its glass layers.
+//! Lunegit's `DarkTheme.axaml` and `App.axaml`, plus its glass layers. A theme file (JSON, read by
+//! the bounded reader in [`crate::json`]) overlays some of those values: [`Theme::from_json`]. The
+//! table from a file's colour key to the [`Theme`] field it sets is [`COLOR_KEYS`] and `color_slot`
+//! below, in this file because the keys carry Lunegit's names.
 
+use crate::backdrop::GlassLayer;
 use crate::color::Rgba;
 use crate::motion::MotionTokens;
+
+mod file;
+
+pub use file::{Skip, ThemeError, ThemeFile};
 
 /// Colours (straight alpha), the font-size scale, the control radius and the motion tokens that
 /// widgets read.
@@ -108,6 +116,10 @@ pub struct Theme {
     /// reads them: a deliberate look deviation (D14).
     pub diff_added_mark: Rgba,
     pub diff_removed_mark: Rgba,
+    /// The three acrylic layers a file's `GlassTintColor` and opacity keys set (D3); the preset's
+    /// are [`lunegit_dark::WINDOW`], `PANEL` and `CARD`. Widgets still take their layer from their
+    /// options: the app passes these.
+    pub glass: ThemeGlass,
     pub font_s: f32,
     pub font_base: f32,
     pub font_m: f32,
@@ -116,6 +128,161 @@ pub struct Theme {
     pub item_radius: f32,
     /// Motion durations and the Reduced map (`docs/motion.md`).
     pub motion: MotionTokens,
+}
+
+/// The window, panel and card acrylic layers of a theme.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ThemeGlass {
+    pub window: GlassLayer,
+    pub panel: GlassLayer,
+    pub card: GlassLayer,
+}
+
+/// How opaque the glass materials are, applied over a theme with [`Theme::with_acrylic`]
+/// (Lunegit's `AcrylicLevel`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum AcrylicLevel {
+    /// The theme's own opacities.
+    #[default]
+    Default,
+    /// Each material opacity halved.
+    LessOpaque,
+    /// Each material opacity moved halfway to 1.
+    MoreOpaque,
+    /// Each material opacity 1.
+    Opaque,
+}
+
+impl Theme {
+    /// The theme with its three glass material opacities scaled by `level`, each clamped to
+    /// [0, 1]. Tint opacities never scale. (Lunegit `ThemeApplicator.ApplyAcrylicSettings`: 0.7
+    /// gives 0.35, 0.85 and 1; 0.8 gives 0.4, 0.9 and 1.)
+    #[must_use]
+    pub fn with_acrylic(mut self, level: AcrylicLevel) -> Theme {
+        let scale = |m: f32| match level {
+            AcrylicLevel::Default => m,
+            AcrylicLevel::LessOpaque => m * 0.5,
+            AcrylicLevel::MoreOpaque => m + (1.0 - m) * 0.5,
+            AcrylicLevel::Opaque => 1.0,
+        };
+        let g = &mut self.glass;
+        for layer in [&mut g.window, &mut g.panel, &mut g.card] {
+            layer.material_opacity = scale(layer.material_opacity).clamp(0.0, 1.0);
+        }
+        self
+    }
+
+    /// The colour a theme file's colour `key` sets in this theme (the first field it sets, when
+    /// it sets more than one), or `None` for a key that is not in [`COLOR_KEYS`].
+    pub fn color_key(&self, key: &str) -> Option<Rgba> {
+        let mut copy = *self;
+        color_slot(&mut copy, key).map(|slot| slot.get())
+    }
+}
+
+/// The fields one colour key writes.
+pub(crate) enum Slot<'a> {
+    One(&'a mut Rgba),
+    Two(&'a mut Rgba, &'a mut Rgba),
+    /// The tint of all three glass layers.
+    Tints(&'a mut ThemeGlass),
+}
+
+impl Slot<'_> {
+    pub(crate) fn set(self, c: Rgba) {
+        match self {
+            Slot::One(a) => *a = c,
+            Slot::Two(a, b) => {
+                *a = c;
+                *b = c;
+            }
+            Slot::Tints(g) => {
+                g.window.tint = c;
+                g.panel.tint = c;
+                g.card.tint = c;
+            }
+        }
+    }
+
+    fn get(&self) -> Rgba {
+        match self {
+            Slot::One(a) | Slot::Two(a, _) => **a,
+            Slot::Tints(g) => g.window.tint,
+        }
+    }
+}
+
+/// One table, two products: the key list [`COLOR_KEYS`] and `color_slot`, the `match` from a key
+/// to the fields it sets. Every key is Lunegit's resource name; its value in the dark preset
+/// equals the `Theme` field's (checked against `DarkTheme.axaml`).
+macro_rules! color_keys {
+    ($($key:literal => |$t:ident| $slot:expr),+ $(,)?) => {
+        /// The colour keys a theme file can set, in table order.
+        pub const COLOR_KEYS: &[&str] = &[$($key),+];
+
+        pub(crate) fn color_slot<'a>(theme: &'a mut Theme, key: &str) -> Option<Slot<'a>> {
+            match key {
+                $($key => {
+                    let $t = theme;
+                    Some($slot)
+                })+
+                _ => None,
+            }
+        }
+    };
+}
+
+color_keys! {
+    "ForegroundPrimary" => |t| Slot::One(&mut t.fg_primary),
+    "ForegroundSecondary" => |t| Slot::One(&mut t.fg_secondary),
+    "ForegroundTertiary" => |t| Slot::One(&mut t.fg_tertiary),
+    "ForegroundQuaternary" => |t| Slot::One(&mut t.fg_quaternary),
+    "ForegroundDim" => |t| Slot::One(&mut t.fg_dim),
+    "ForegroundFaint" => |t| Slot::One(&mut t.fg_faint),
+    "ForegroundMuted" => |t| Slot::One(&mut t.fg_muted),
+    "ForegroundSubtle" => |t| Slot::One(&mut t.fg_subtle),
+    "ForegroundBright" => |t| Slot::One(&mut t.fg_bright),
+    "SurfaceInput" => |t| Slot::One(&mut t.surface_input),
+    "SurfaceHover" => |t| Slot::One(&mut t.surface_hover),
+    "SurfaceSelected" => |t| Slot::One(&mut t.surface_selected),
+    "SurfaceOverlay" => |t| Slot::One(&mut t.surface_overlay),
+    "SurfaceActive" => |t| Slot::One(&mut t.surface_active),
+    "SurfaceSeparator" => |t| Slot::Two(&mut t.surface_separator, &mut t.menu_separator),
+    "SurfaceDivider" => |t| Slot::One(&mut t.surface_divider),
+    "SurfaceBorder" => |t| Slot::One(&mut t.border),
+    "SurfaceBorderSubtle" => |t| Slot::One(&mut t.border_subtle),
+    "AccentPrimaryColor" => |t| Slot::One(&mut t.accent),
+    "BackdropDark" => |t| Slot::One(&mut t.dropdown_bg),
+    "DialogBackdropBrush" => |t| Slot::One(&mut t.dialog_backdrop),
+    "DialogDarkerBlockBackground" => |t| Slot::One(&mut t.dialog_footer),
+    "PopupMenuOuterBorder" => |t| Slot::One(&mut t.menu_popup_border),
+    "PopupMenuItemHover" => |t| Slot::One(&mut t.menu_item_hover),
+    "PopupMenuItemPressed" => |t| Slot::One(&mut t.menu_item_pressed),
+    "PopupMenuDisabledForeground" => |t| Slot::One(&mut t.menu_text_disabled),
+    "ToastBackground" => |t| Slot::One(&mut t.toast_bg),
+    "ToastBorder" => |t| Slot::One(&mut t.toast_border),
+    "ToastInfoAccent" => |t| Slot::One(&mut t.toast_info),
+    "ToastSuccessAccent" => |t| Slot::One(&mut t.toast_success),
+    "ToastWarningAccent" => |t| Slot::One(&mut t.toast_warning),
+    "ToastErrorAccent" => |t| Slot::One(&mut t.toast_error),
+    "ToastTerminalBackground" => |t| Slot::One(&mut t.toast_log_bg),
+    "ToastTerminalForeground" => |t| Slot::One(&mut t.toast_log_fg),
+    "DirtyIndicator" => |t| Slot::One(&mut t.dirty_indicator),
+    "StatusDeleted" => |t| Slot::One(&mut t.count_badge),
+    "FileStatusAdded" => |t| Slot::One(&mut t.ok),
+    "FileStatusModified" => |t| Slot::One(&mut t.warn),
+    "FileStatusDeleted" => |t| Slot::One(&mut t.err),
+    "StatusWarning" => |t| Slot::One(&mut t.status_warning),
+    "StatusWarningLight" => |t| Slot::One(&mut t.status_warning_light),
+    "StatusWarningDark" => |t| Slot::One(&mut t.status_warning_dark),
+    "StatusError" => |t| Slot::One(&mut t.status_error),
+    "StatusErrorLight" => |t| Slot::One(&mut t.status_error_light),
+    "WindowFallbackBackground" => |t| Slot::One(&mut t.window_fallback),
+    "MarkdownLinkForeground" => |t| Slot::One(&mut t.link),
+    "MarkdownInlineCodeBackground" => |t| Slot::One(&mut t.code_inline),
+    "DiffAddedBackground" => |t| Slot::One(&mut t.diff_added),
+    "DiffRemovedBackground" => |t| Slot::One(&mut t.diff_removed),
+    "GlassTintColor" => |t| Slot::Tints(&mut t.glass),
 }
 
 /// The dark preset's theme under a neutral name, for code and tests that need a theme but not a
@@ -204,6 +371,11 @@ pub mod lunegit_dark {
         diff_removed: [0xE0, 0x6C, 0x75, 0x1A],
         diff_added_mark: [0x73, 0xC9, 0x91, 0x40],
         diff_removed_mark: [0xE0, 0x6C, 0x75, 0x40],
+        glass: super::ThemeGlass {
+            window: WINDOW,
+            panel: PANEL,
+            card: CARD,
+        },
         font_s: 11.0,
         font_base: 13.0,
         font_m: 14.0,
@@ -247,7 +419,14 @@ pub mod lunegit_dark {
 
 #[cfg(test)]
 mod tests {
-    use super::lunegit_dark::THEME;
+    use super::lunegit_dark::{CARD, PANEL, THEME, WINDOW};
+
+    #[test]
+    fn the_preset_glass_is_the_old_constants() {
+        assert_eq!(THEME.glass.window, WINDOW);
+        assert_eq!(THEME.glass.panel, PANEL);
+        assert_eq!(THEME.glass.card, CARD);
+    }
 
     #[test]
     fn the_status_and_surface_tokens_hold_their_values() {
