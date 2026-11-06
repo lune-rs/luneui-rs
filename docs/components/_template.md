@@ -88,6 +88,7 @@ Never animated: <what>.
 
 - Milestone: <M4 to M11>
 - Depends on: <entry ids>
+- Done (D47, M11): only on a `done` entry: tests `<path>.rs::<fn>`, ...; page `<id>` or n/a; unverified here: <list or none>.
 
 ## Open questions
 

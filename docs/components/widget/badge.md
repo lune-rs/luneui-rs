@@ -2,10 +2,10 @@
 id: widget.badge
 title: Badge
 area: widget
-status: in-progress
+status: done
 consumers: wane
-source: —
-owner: toolkit-v1 M6
+source: crates/lune-ui-core/src/widgets/badge.rs, crates/lune-ui-core/src/widgets/tone.rs
+owner: —
 summary: Badge: static 18 px tag with tone fill and border; neutral, ok, warn, err, data; Lunegit status-badge shape
 ---
 
@@ -85,11 +85,13 @@ None: the badge text is app data (live, upstream kind, verdict, risk level) [W d
 - Pixel probes at scale 2: height 36 px; radius 16 px; border 2 px at the 44 alpha tone; text 22 px (11 px at scale 1).
 - Conformance: n/a — no transition.
 - Semantic node: role static-text; name equals the text passed.
+- Tests, bullet by bullet. Pixel probes at scale 2 (`crates/lune-ui-core/tests/widget_badge.rs`): `at_scale_2_the_badge_is_36_px_high_with_a_16_px_radius_and_a_2_px_border`, `the_text_sits_7_px_in_and_centred_on_the_16_px_line`, `every_tone_uses_the_one_recipe`, `a_leading_dot_adds_one_circle_in_the_tone_and_moves_the_text`, `width_counts_padding_text_and_the_dot`. Node: `the_ui_badge_is_static_text_named_by_its_text_and_takes_no_input`; the `Ui` form draws what the painter form draws: `the_ui_badge_draws_what_paint_draws`.
 
 ### Build
 
 - Milestone: M6
 - Depends on: core.painter, text.shaping
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_badge.rs::at_scale_2_the_badge_is_36_px_high_with_a_16_px_radius_and_a_2_px_border, crates/lune-ui-core/tests/widget_badge.rs::every_tone_uses_the_one_recipe, crates/lune-ui-core/tests/widget_badge.rs::the_ui_badge_is_static_text_named_by_its_text_and_takes_no_input`; page `badge` (scene `badge-tones`); unverified here: none.
 
 ## Open questions
 

@@ -2,10 +2,10 @@
 id: widget.status-dot
 title: Status dot
 area: widget
-status: in-progress
+status: done
 consumers: wane
-source: —
-owner: toolkit-v1 M6
+source: crates/lune-ui-core/src/widgets/status_dot.rs
+owner: —
 summary: Status dot: static 8 px circle in ok, warn, err, data or paused tone; never alone, a word beside it carries the meaning
 ---
 
@@ -83,11 +83,13 @@ None: the status words come from the app.
 - Pixel probes at scale 2: 16 px circle; centre colour equals the tone token.
 - Conformance: n/a — no transition.
 - Semantic node: decorative dot is hidden; a dot with no adjacent word is a bug the test catches.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_status_dot.rs`: `every_tone_is_a_16_px_circle_at_scale_2_in_the_tone_colour`, `the_tones_are_the_token_colours`, `the_ui_dot_draws_the_circle_then_its_word_and_settles`, node `the_dot_node_is_a_hidden_image_and_the_word_is_static_text`, `an_empty_word_draws_nothing_and_emits_no_node` (the adjacent word is required: an empty one draws and names nothing).
 
 ### Build
 
 - Milestone: M6
 - Depends on: core.painter
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_status_dot.rs::every_tone_is_a_16_px_circle_at_scale_2_in_the_tone_colour, crates/lune-ui-core/tests/widget_status_dot.rs::the_tones_are_the_token_colours, crates/lune-ui-core/tests/widget_status_dot.rs::the_dot_node_is_a_hidden_image_and_the_word_is_static_text, crates/lune-ui-core/tests/widget_status_dot.rs::an_empty_word_draws_nothing_and_emits_no_node`; page `status-dot`; unverified here: none.
 
 ## Open questions
 

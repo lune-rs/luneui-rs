@@ -105,6 +105,8 @@ struct Board {
     error: bool,
     active: bool,
     added: u64,
+    /// Draw the board inside `with_enabled(false, ..)`.
+    disabled: bool,
 }
 
 fn board(columns: Vec<Col>, error: bool, active: bool) -> Box<dyn PageState> {
@@ -113,6 +115,17 @@ fn board(columns: Vec<Col>, error: bool, active: bool) -> Box<dyn PageState> {
         error,
         active,
         added: 100,
+        disabled: false,
+    })
+}
+
+fn disabled() -> Box<dyn PageState> {
+    Box::new(Board {
+        columns: model(),
+        error: false,
+        active: true,
+        added: 100,
+        disabled: true,
     })
 }
 
@@ -191,7 +204,7 @@ impl PageState for Board {
             under: CARD.premultiplied(),
             name: "",
         };
-        let r = ui.kanban_board("board", rect, &opts);
+        let r = ui.with_enabled(!self.disabled, |ui| ui.kanban_board("board", rect, &opts));
         if let Some(m) = r.moved {
             self.apply(m);
         }
@@ -252,7 +265,7 @@ const DROP: &[Step] = &[
 const SCENES: &[UiScene] = &[
     UiScene {
         id: "kanban-board-columns",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[],
@@ -261,7 +274,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "kanban-board-dragging",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: DRAG,
@@ -270,7 +283,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "kanban-board-error",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: errored,
         script: &[],
@@ -280,7 +293,7 @@ const SCENES: &[UiScene] = &[
     // Four stops in: the add-column button, the first column's two buttons, then the cards.
     UiScene {
         id: "kanban-board-focus",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[Step {
@@ -290,9 +303,30 @@ const SCENES: &[UiScene] = &[
         capture_ms: 400,
         expect: Expect::Settled,
     },
+    // The board is disabled (0.4 opacity): a drag from the first card to the second column and
+    // the release move nothing, no ghost or landing slot shows, and Tab finds no stop.
+    UiScene {
+        id: "kanban-board-disabled",
+        scale: 2.0,
+        tier: MotionTier::Full,
+        state: disabled,
+        script: &[
+            DROP[0],
+            DROP[1],
+            DROP[2],
+            DROP[3],
+            DROP[4],
+            Step {
+                at_ms: 500,
+                events: &[Ev::Tab],
+            },
+        ],
+        capture_ms: 900,
+        expect: Expect::Settled,
+    },
     UiScene {
         id: "kanban-board-inactive",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: inactive,
         script: &[],
@@ -301,7 +335,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "kanban-board-empty",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: empty,
         script: &[],
@@ -311,7 +345,7 @@ const SCENES: &[UiScene] = &[
     // The landing is `fast` (180 ms): half way at 90 ms after the release.
     UiScene {
         id: "kanban-board-settle-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: DROP,
@@ -436,6 +470,7 @@ mod tests {
             error: false,
             active: true,
             added: 100,
+            disabled: false,
         };
         let order = |b: &Board, c: usize| -> Vec<u64> {
             b.columns[c].cards.iter().map(|k| k.key).collect()

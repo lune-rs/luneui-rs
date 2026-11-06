@@ -2,10 +2,10 @@
 id: widget.nav-item
 title: Navigation item
 area: widget
-status: in-progress
+status: done
 consumers: wane
-source: —
-owner: toolkit-v1 M6
+source: crates/lune-ui-core/src/widgets/nav_item.rs
+owner: —
 summary: Navigation item: 32 px row, secondary text at rest, surface-selected fill and bright text when active, no accent bar
 ---
 
@@ -99,11 +99,13 @@ None: screen names are app data.
 - Pixel probes at scale 2: row 64 px high; radius 12 px; icon 32 px; rows 4 px apart.
 - Conformance: active fill over 60 Hz samples is monotonic, ends exact, settles within 180 ms + 1 frame; Reduced keeps the fill.
 - Semantic node: role list-item; selected follows the current screen.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_nav_item.rs`: keys `down_and_up_move_focus_without_navigating_and_do_not_wrap`, `enter_space_and_click_each_navigate_once`, `tab_enters_once_on_the_active_row_and_leaves_once`, `a_disabled_entry_is_skipped`, `a_disabled_entry_takes_no_click`, `the_default_action_navigates`; pixel probes `pixel_probes_at_scale_two`, `the_settled_looks_are_the_catalogue_states`; conformance `every_motion_row_conforms_under_every_tier`, `the_active_fill_rises_monotonically_ends_exact_and_settles_within_180_ms_and_a_frame`, `reduced_keeps_the_fill_change_and_off_snaps_it`; node `the_nodes_are_a_list_of_list_items_and_the_active_one_is_selected_and_current`.
 
 ### Build
 
 - Milestone: M6
 - Depends on: core.focus, core.ui, infra.accessibility, motion.transitions
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_nav_item.rs::down_and_up_move_focus_without_navigating_and_do_not_wrap, crates/lune-ui-core/tests/widget_nav_item.rs::enter_space_and_click_each_navigate_once, crates/lune-ui-core/tests/widget_nav_item.rs::the_default_action_navigates, crates/lune-ui-core/tests/widget_nav_item.rs::pixel_probes_at_scale_two, crates/lune-ui-core/tests/widget_nav_item.rs::the_active_fill_rises_monotonically_ends_exact_and_settles_within_180_ms_and_a_frame, crates/lune-ui-core/tests/widget_nav_item.rs::the_nodes_are_a_list_of_list_items_and_the_active_one_is_selected_and_current`; page `nav-item`; unverified here: none.
 
 ## Open questions
 

@@ -157,7 +157,7 @@ impl PageState for Specimens {
 const SCENES: &[UiScene] = &[
     UiScene {
         id: "nav-item-states",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: specimens,
         script: &[],
@@ -167,7 +167,7 @@ const SCENES: &[UiScene] = &[
     // Hover is `instant` (120 ms): half way at 60 ms.
     UiScene {
         id: "nav-item-hover-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[Step {
@@ -180,7 +180,7 @@ const SCENES: &[UiScene] = &[
     // The current screen changes at 200 ms: `fast` (180 ms), half way at 90 ms.
     UiScene {
         id: "nav-item-select-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: select_later,
         script: &[],
@@ -190,7 +190,7 @@ const SCENES: &[UiScene] = &[
     // Tab focuses the list's stop, the current row; the ring is `fast`: half way at 90 ms.
     UiScene {
         id: "nav-item-focus-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[Step {

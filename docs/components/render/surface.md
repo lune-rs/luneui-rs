@@ -5,7 +5,7 @@ area: render
 status: in-progress
 consumers: any
 source: crates/lune-ui-wgpu/src/surface.rs
-owner: orch/toolkit-v1
+owner: consumer's window run
 summary: One window's swapchain on the shared Gpu: acquire, present, resize; no winit dependency
 ---
 
@@ -19,7 +19,7 @@ summary: One window's swapchain on the shared Gpu: acquire, present, resize; no 
 
 ## Existing code
 
-`crates/lune-ui-wgpu/src/surface.rs:10` (`Acquired`), `:21` (`WindowSurface`), `:37` (`new`), `:97` (`resize`), `:106` (`acquire`), `:125` (`present`); 128 lines. Window mode is compile- and review-checked only in M2; the headless path is tested in `crates/lune-ui-wgpu/tests/targets.rs`.
+`crates/lune-ui-wgpu/src/surface.rs:10` (`Acquired`), `:21` (`WindowSurface`), `:37` (`new`), `:99` (`resize`), `:108` (`acquire`), `:127` (`present`); 130 lines. The headless path is tested in `crates/lune-ui-wgpu/tests/targets.rs`; the window path is run by the platform smoke (`gallery --smoke-platform`, a stage that resizes the hidden window's surface and acquires from it, M11).
 
 ## Spec
 
@@ -72,8 +72,10 @@ n/a — no drawing.
 
 ### Acceptance
 
-- Existing tests: none in `crates/lune-ui-wgpu/src/surface.rs`.
 - Done standard still needs: a resize-and-acquire test on a hidden window, and the pixel gate on a presented frame (open: the platform run is not in this milestone).
+- Resize and acquire on a hidden window: `apps/gallery/src/smoke.rs` `resize_stage` (`gallery --smoke-platform`, needs a logged-in GUI session): resizes the surface to a size that is not its own, checks `size()`, acquires (a frame, a skip or a redraw are answers; an error or a panic fails the smoke), resizes back and checks. Its last run in this environment (debug, logged-in macOS session): exit 0, surface resized (2080, 1320) -> (2144, 1352) and back, acquire answered skip (the window is hidden). It is not a `cargo test`, so no test cites it.
+- The headless target path, which shares the format and size handling: `crates/lune-ui-wgpu/tests/targets.rs::one_renderer_across_two_sizes_matches_a_fresh_renderer_at_each`.
+- Not done here: the pixel gate on a presented frame.
 
 ### Build
 
@@ -83,6 +85,7 @@ n/a — no drawing.
 ## Open questions
 
 - Window-mode presentation is not exercised by an automated test (no visible windows in the gates).
+- Class B (D234): this entry's own Acceptance says "the pixel gate on a presented frame (open: the platform run is not in this milestone)". A presented frame is what the OS composites to the screen; nothing here can read it back (reading it would need a `COPY_SRC` surface configuration for every app, D234). So the entry stays `in-progress` and `owner:` names the run that closes it: a consumer's window run that presents a frame and compares it.
 
 ## Notes for the planner
 

@@ -252,3 +252,35 @@ fn second_format_on_one_gpu_matches_a_fresh_gpu() {
     tc.draw(&mut gpu, &mut text, &scene);
     assert_same("Rgba8Unorm on a shared Gpu", &tc.read(&gpu), &ref_c);
 }
+
+/// The blur's offscreen textures follow the target's size: one `FrameRenderer` drawn at size A and
+/// then at size B (and back) draws the same pixels as a fresh renderer at that size, so a size
+/// change leaves no stale texture behind. Both scenes carry a backdrop request (the Popup menu).
+#[test]
+fn one_renderer_across_two_sizes_matches_a_fresh_renderer_at_each() {
+    let format = wgpu::TextureFormat::Bgra8Unorm;
+    let (Some(ref_a), Some(ref_b)) = (solo(A, format), solo(B, format)) else {
+        return;
+    };
+    assert_ne!(A.size(), B.size(), "the two sizes must differ");
+    let Some(mut gpu) = headless_gpu() else {
+        return;
+    };
+    let mut text = text_cache();
+    let mut renderer = FrameRenderer::new(&mut gpu, format);
+    let mut draw = |gpu: &mut Gpu, text: &mut TextCache, spec: SceneSpec| {
+        let scene = paint(spec, text);
+        let texture = dump::target(&gpu.device, format, spec.size());
+        let view = texture.create_view(&Default::default());
+        renderer
+            .draw(gpu, text, &scene, &view, spec.params())
+            .expect("draw");
+        let px = dump::read_rgba(&gpu.device, &gpu.queue, &texture).expect("readback");
+        gpu.end_frame(text);
+        px
+    };
+    assert_same("A, first", &draw(&mut gpu, &mut text, A), &ref_a);
+    assert_same("B after A", &draw(&mut gpu, &mut text, B), &ref_b);
+    assert_same("A after B", &draw(&mut gpu, &mut text, A), &ref_a);
+    assert_same("A again", &draw(&mut gpu, &mut text, A), &ref_a);
+}

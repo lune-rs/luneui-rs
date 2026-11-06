@@ -2,10 +2,10 @@
 id: widget.spinner
 title: Spinner
 area: widget
-status: in-progress
+status: done
 consumers: any
-source: —
-owner: toolkit-v1 M6
+source: crates/lune-ui-core/src/widgets/spinner.rs
+owner: —
 summary: Spinner: a 14 px glyph that turns a full revolution every 1.2 s while busy; static under Reduced and Off
 ---
 
@@ -95,11 +95,13 @@ None: the spinner has no text.
 - Pixel probes at scale 2: glyph 28 px; the rotation centre is the glyph centre.
 - Conformance: angle over 60 Hz samples is linear, wraps at 360, and is constant under Reduced and Off.
 - Semantic node: role progress; busy follows the flag.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_spinner.rs`: `the_angle_is_360_degrees_per_1200_ms_on_a_60_hz_grid_and_wraps`, `a_late_frame_does_not_slow_it`, `a_stop_holds_the_angle_and_a_restart_continues_from_it`, `reduced_and_off_draw_angle_0_and_report_idle`, `a_tier_change_drops_back_to_the_held_angle_not_a_jump`, `the_glyph_is_the_sync_icon_centred_on_the_given_point`, `paint_turns_by_the_degrees_given`, node `the_node_is_progress_named_busy_with_the_flag_and_has_no_value`.
 
 ### Build
 
 - Milestone: M6
 - Depends on: core.painter, core.ui, infra.accessibility, motion.transitions
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_spinner.rs::the_angle_is_360_degrees_per_1200_ms_on_a_60_hz_grid_and_wraps, crates/lune-ui-core/tests/widget_spinner.rs::a_stop_holds_the_angle_and_a_restart_continues_from_it, crates/lune-ui-core/tests/widget_spinner.rs::reduced_and_off_draw_angle_0_and_report_idle, crates/lune-ui-core/tests/widget_spinner.rs::the_glyph_is_the_sync_icon_centred_on_the_given_point, crates/lune-ui-core/tests/widget_spinner.rs::the_node_is_progress_named_busy_with_the_flag_and_has_no_value`; page `spinner`; unverified here: none.
 
 ## Open questions
 

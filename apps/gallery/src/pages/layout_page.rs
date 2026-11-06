@@ -218,7 +218,7 @@ const SCENES: &[UiScene] = &[
     // The wizard variant: header with subtitle and two actions, a short body, the pinned footer.
     UiScene {
         id: "page-header-footer",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: short,
         script: &[],
@@ -227,7 +227,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "page-header-footer",
-        scale: 1,
+        scale: 1.0,
         tier: MotionTier::Full,
         state: short,
         script: &[],
@@ -238,7 +238,7 @@ const SCENES: &[UiScene] = &[
     // bottom corners, where the rounded clip cuts them.
     UiScene {
         id: "page-body-scroll",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: tall_no_footer,
         script: &[
@@ -261,7 +261,7 @@ const SCENES: &[UiScene] = &[
     // The window is inactive: the solid fallback replaces the acrylic.
     UiScene {
         id: "page-inactive",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: inactive,
         script: &[],
@@ -271,7 +271,7 @@ const SCENES: &[UiScene] = &[
     // The swap is `moderate` (350 ms): half way at 175 ms after the first new-key frame.
     UiScene {
         id: "page-swap-opacity",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: short,
         script: SWAP,
@@ -281,7 +281,7 @@ const SCENES: &[UiScene] = &[
     // Reduced keeps the fade at the mapped duration (`fast`, 180 ms) and drops the slide.
     UiScene {
         id: "page-swap-reduced",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Reduced,
         state: short,
         script: SWAP,

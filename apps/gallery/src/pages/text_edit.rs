@@ -169,7 +169,7 @@ const SCENES: &[UiScene] = &[
     // Focused, the caret after the text ("lune" is 4 chars, the caret at 4).
     UiScene {
         id: "text-edit-caret",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: lune,
         script: &[FOCUS],
@@ -179,7 +179,7 @@ const SCENES: &[UiScene] = &[
     // Home, two Rights, then Shift-Right five times: chars 2 to 7 of "lune term" are "ne te".
     UiScene {
         id: "text-edit-selection",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: term,
         script: &[
@@ -204,7 +204,7 @@ const SCENES: &[UiScene] = &[
     // Wider than the box: the caret starts at the end, so the text scrolls to keep it in view.
     UiScene {
         id: "text-edit-scrolled",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: wide,
         script: &[FOCUS],
@@ -214,7 +214,7 @@ const SCENES: &[UiScene] = &[
     // The caret starts at the end of line 3; Up moves it to the end of line 2.
     UiScene {
         id: "text-edit-multiline",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: lines,
         script: &[
@@ -230,7 +230,7 @@ const SCENES: &[UiScene] = &[
     // Command-A selects everything; a read-only area keeps the selection and refuses edits.
     UiScene {
         id: "text-edit-readonly",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: read_only,
         script: &[
@@ -246,7 +246,7 @@ const SCENES: &[UiScene] = &[
     // The mask is 16 dots whatever the text: "sample" above and a 27-char phrase below match.
     UiScene {
         id: "text-edit-password",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: password,
         script: &[FOCUS],
@@ -255,7 +255,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "text-edit-disabled",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: disabled,
         script: &[],
@@ -264,7 +264,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "text-edit-error",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: error,
         script: &[],
@@ -274,7 +274,7 @@ const SCENES: &[UiScene] = &[
     // Tab focuses the field; the ring is `fast` (180 ms): half way at 90 ms.
     UiScene {
         id: "text-edit-focus-ring",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: lune,
         script: &[FOCUS],
@@ -284,7 +284,7 @@ const SCENES: &[UiScene] = &[
     // The pointer enters the box; hover is `instant` (120 ms): half way at 60 ms.
     UiScene {
         id: "text-edit-hover",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: lune,
         script: &[Step {

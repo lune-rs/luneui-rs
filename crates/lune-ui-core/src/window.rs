@@ -50,6 +50,7 @@ pub struct DoubleClick {
 }
 
 impl DoubleClick {
+    /// A detector that has seen no click.
     pub fn new() -> Self {
         Self::default()
     }
@@ -65,8 +66,27 @@ impl DoubleClick {
     }
 }
 
+/// The width of a caption button, in logical pixels.
+pub const CAPTION_BUTTON_WIDTH: f32 = 46.0;
+/// The size of a caption glyph, in logical pixels.
+pub const CAPTION_GLYPH_SIZE: f32 = 10.0;
+
+/// The rect of caption button `k` (0 minimize, 1 maximize or restore, 2 close) of a window of
+/// `win`'s width, `height` tall, in the window's own coordinates: right-aligned, along the top.
+/// Shared by the Painter form and [`Ui::caption_buttons`](crate::ui::Ui::caption_buttons).
+pub(crate) fn caption_rect(win: Rect, height: f32, k: usize) -> Rect {
+    Rect::new(
+        win.w - CAPTION_BUTTON_WIDTH * (3 - k) as f32,
+        0.0,
+        CAPTION_BUTTON_WIDTH,
+        height,
+    )
+}
+
 /// Windows 11 style caption buttons (minimize, maximize or restore, close) along the top right of
-/// `win`, each `height` tall. `hits` are the hit values for [minimize, maximize, close].
+/// `win`, each `height` tall. `hits` are the hit values for [minimize, maximize, close]. The `Ui`
+/// form, with hover motion, semantic nodes and strings, is
+/// [`Ui::caption_buttons`](crate::ui::Ui::caption_buttons).
 pub fn caption_buttons<H: Copy + PartialEq>(
     p: &mut Painter<'_, H>,
     win: Rect,
@@ -84,7 +104,7 @@ pub fn caption_buttons<H: Copy + PartialEq>(
     let glyphs = [icon::CHROME_MINIMIZE, restore, icon::CHROME_CLOSE];
     for (k, (glyph, hit)) in glyphs.into_iter().zip(hits).enumerate() {
         let is_close = k == 2;
-        let r = Rect::new(win.w - 46.0 * (3 - k) as f32, 0.0, 46.0, height);
+        let r = caption_rect(win, height, k);
         let hovered = p.hovered(hit);
         let mut fg = t.fg_primary;
         if hovered && is_close {
@@ -93,7 +113,7 @@ pub fn caption_buttons<H: Copy + PartialEq>(
         } else if hovered {
             p.fill(r, 0.0, t.surface_hover);
         }
-        p.text_centered(&icon::glyph(glyph, 10.0, fg), r);
+        p.text_centered(&icon::glyph(glyph, CAPTION_GLYPH_SIZE, fg), r);
         p.hit(r, hit);
     }
 }

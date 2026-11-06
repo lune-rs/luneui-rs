@@ -3,6 +3,7 @@
 /// RGBA, 8 bits per channel, straight (not premultiplied) alpha.
 pub type Rgba = [u8; 4];
 
+/// `c` with its colour channels multiplied by its alpha, every channel in 0 to 1.
 pub fn premul(c: Rgba) -> [f32; 4] {
     let a = f32::from(c[3]) / 255.0;
     [
@@ -13,6 +14,7 @@ pub fn premul(c: Rgba) -> [f32; 4] {
     ]
 }
 
+/// `top` over `below`, both premultiplied (see [`premul`]).
 pub fn over(top: [f32; 4], below: [f32; 4]) -> [f32; 4] {
     let k = 1.0 - top[3];
     [
@@ -23,6 +25,7 @@ pub fn over(top: [f32; 4], below: [f32; 4]) -> [f32; 4] {
     ]
 }
 
+/// `c` with its alpha scaled by `k`, rounded to the nearest step.
 pub fn with_alpha(c: Rgba, k: f32) -> Rgba {
     [c[0], c[1], c[2], (f32::from(c[3]) * k).round() as u8]
 }

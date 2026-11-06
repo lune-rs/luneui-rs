@@ -2,10 +2,10 @@
 id: widget.combo
 title: Combo box
 area: widget
-status: in-progress
+status: done
 consumers: luneterm, wane
 source: crates/lune-ui-core/src/widgets/combo.rs
-owner: orch/toolkit-v1
+owner: —
 summary: Combo box: value and chevron in an input box; opens overlay.dropdown on click or key
 ---
 
@@ -106,15 +106,17 @@ None: the value and option text are app data.
 - Pixel probes at scale 2: input-box radius 12 px; ring 2 px; value text starts 20 px from the box's left edge; chevron centre 36 px from the right edge (slot `right - 28`, 20 px wide, centre at 18 px at scale 1).
 - Conformance: hover fill over 60 Hz samples is monotonic, ends exact, settles within 120 ms + 1 frame.
 - Semantic node: role combo-box; expanded follows `open`; injected `AccessAction` expand opens.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_combo.rs`: `enter_space_and_down_each_open_it_once`, `a_click_opens_it_and_it_never_closes_itself` (the list closes it, with Esc: `widget_dropdown.rs`), `the_expand_and_default_actions_open_it`, `a_disabled_combo_reports_no_open`, `a_chord_on_the_combos_keys_is_a_shortcut_and_opens_nothing`, `a_combo_focused_then_disabled_keeps_its_keys_from_the_shortcuts`; pixel probes `pixel_probes_at_scale_two`, `open_and_focus_visible_draw_the_accent_border`; conformance `the_hover_fill_is_monotonic_and_settles_within_120_ms_and_a_frame`, `reduced_keeps_the_tween_and_off_snaps`, `every_motion_row_conforms_under_every_tier`; node `the_node_is_a_combo_box_whose_expanded_state_follows_open`.
 
 ### Build
 
 - Milestone: M4 (retrofit: transitions, focus, semantic node); done by M11. The list it opens is `Ui::dropdown` [overlay.dropdown]; opened above a dialog it draws and takes input on the `Raised` layer, chosen once at open [D137]. A third level that overlaps its parent shares that layer and interleaves (fills under text). The list can be glass and scroll [D143].
 - Depends on: core.ui, core.focus, infra.accessibility, motion.transitions, overlay.dropdown.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_combo.rs::enter_space_and_down_each_open_it_once, crates/lune-ui-core/tests/widget_combo.rs::a_disabled_combo_reports_no_open, crates/lune-ui-core/tests/widget_combo.rs::pixel_probes_at_scale_two, crates/lune-ui-core/tests/widget_combo.rs::the_hover_fill_is_monotonic_and_settles_within_120_ms_and_a_frame, crates/lune-ui-core/tests/widget_combo.rs::the_node_is_a_combo_box_whose_expanded_state_follows_open, crates/lune-ui-core/tests/widget_combo.rs::a_chord_on_the_combos_keys_is_a_shortcut_and_opens_nothing`; page `combo` / `dropdown` (the list is `overlay.dropdown`); unverified here: none.
 
 ## Open questions
 
-- Open (API, a later step): `Ui::combo` calls `Ui::dropdown`, so a combo has no path to the glass list of `DropdownOptions::glass` [D143]; Wane's combos draw a glass list.
+- Still open, an API gap (D237): `Ui::combo` calls `Ui::dropdown`, so a combo has no path to the glass list of `DropdownOptions::glass` [D143]; Wane's combos draw a glass list. No consumer has asked for the option.
 
 ## Notes for the planner
 

@@ -2,10 +2,10 @@
 id: render.dump
 title: Offscreen frame dump
 area: render
-status: in-progress
+status: done
 consumers: luneterm
 source: crates/lune-ui-wgpu/src/dump.rs
-owner: orch/toolkit-v1
+owner: —
 summary: Offscreen target, GPU readback and PNG writer for frame goldens
 ---
 
@@ -19,7 +19,7 @@ summary: Offscreen target, GPU readback and PNG writer for frame goldens
 
 ## Existing code
 
-`crates/lune-ui-wgpu/src/dump.rs:9` (`target`), `:31` (`read_rgba`), `:102` (`write_png`); 146 lines; tests at `:113`.
+`crates/lune-ui-wgpu/src/dump.rs:9` (`target`), `:31` (`read_rgba`), `:104` (`write_png`); 148 lines plus the PNG round-trip test; tests at `:115`. The compare tool is `tools/dump-compare`; the command is `scripts/pixel-gate.sh`.
 
 ## Spec
 
@@ -61,7 +61,7 @@ n/a — no text.
 
 ### Gallery scenes
 
-- The 14 gallery scene ids (`controls`, `menu`, `menu-opening`, `custom-draw`, `dropdown`, `dropdown-flipped`, `dialog-confirm`, `dialog-message`, `dialog-body`, `glass-off`, `unfocused`, `blur-contrast`, `chrome`, `acrylic`) are the pixel-gate set [R apps/gallery/src/scenes.rs:82-180].
+- Every scene `gallery --list` prints (421 names) is dumped by the pixel gate; the first 14 legacy ids (`controls`, `menu`, `menu-opening`, `custom-draw`, `dropdown`, `dropdown-flipped`, `dialog-confirm`, `dialog-message`, `dialog-body`, `glass-off`, `unfocused`, `blur-contrast`, `chrome`, `acrylic`) were the set when this entry was written [R apps/gallery/src/scenes.rs:82-180].
 
 ### Painter primitives
 
@@ -69,17 +69,18 @@ n/a — the dump reads the GPU target; it draws nothing.
 
 ### Acceptance
 
-- Existing tests (by path, `crates/lune-ui-wgpu/src/dump.rs`): `unpad_swizzles_bgra_and_keeps_alpha`, `unpad_passes_rgba_through`, `unpad_rejects_other_formats_and_short_buffers`.
-- Done standard still needs: the pixel gate's dump-and-compare command (CLAUDE.md, Commands, "Pixel gate": the exact command is set by the extraction plan and is not yet runnable).
+- Tests (`crates/lune-ui-wgpu/src/dump.rs`, module `tests`): `unpad_swizzles_bgra_and_keeps_alpha`, `unpad_passes_rgba_through`, `unpad_rejects_other_formats_and_short_buffers`, `write_png_round_trips_the_pixels_and_names_a_failure` (a 2 by 2 PNG decodes to the bytes written; an uncreatable path is an error naming `create`). `target` and `read_rgba` are the readback every GPU test in `crates/lune-ui-wgpu/tests/` uses.
+- The dump-and-compare command exists and runs: `scripts/pixel-gate.sh` (CLAUDE.md, Commands, "Pixel gate") dumps the scenes with `gallery --dump` and compares them with `tools/dump-compare`; M11's pre-audit run: 413 files identical against 55cfaaf.
 
 ### Build
 
 - Milestone: M11 (done standard; code exists).
 - Depends on: render.frame, render.gpu.
+- Done (D47, M11): tests `crates/lune-ui-wgpu/src/dump.rs::unpad_swizzles_bgra_and_keeps_alpha, crates/lune-ui-wgpu/src/dump.rs::unpad_passes_rgba_through, crates/lune-ui-wgpu/src/dump.rs::unpad_rejects_other_formats_and_short_buffers, crates/lune-ui-wgpu/src/dump.rs::write_png_round_trips_the_pixels_and_names_a_failure`; page n/a (a tool; the gate dumps every scene through it); unverified here: none.
 
 ## Open questions
 
-- The scene list and the compare tool live in the glass-ui spike, not in lune-ui; where they go is the extraction plan's call.
+- Answered: the scene list is `apps/gallery` (`--list`, `--dump`) and the compare tool is `tools/dump-compare`; both live in this repo, driven by `scripts/pixel-gate.sh`.
 
 ## Notes for the planner
 

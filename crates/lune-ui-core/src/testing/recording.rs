@@ -72,6 +72,7 @@ pub struct RecordingRenderer {
 }
 
 impl RecordingRenderer {
+    /// A recorder with no frame yet.
     pub fn new() -> Self {
         Self::default()
     }

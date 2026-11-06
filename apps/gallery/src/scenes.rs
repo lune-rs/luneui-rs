@@ -29,7 +29,7 @@ pub(crate) const BLUR_SATURATION: f32 = 1.8;
 /// Base under the glass layers when the window has no OS glass.
 const OPAQUE_BASE: Rgba = [0x1F, 0x1F, 0x1F, 0xFF];
 
-const TITLE_BAND: f32 = 34.0;
+pub(crate) const TITLE_BAND: f32 = 34.0;
 const CARD_MARGIN: f32 = 10.0;
 
 /// Hit regions of the gallery's controls (the painter is generic over the app's hit type).
@@ -640,5 +640,55 @@ fn acrylic_scene(p: &mut P<'_>, _t: f32) {
         let r = Rect::new(40.0 + i as f32 * 330.0, 120.0, 300.0, 400.0);
         p.acrylic(r, 8.0, layer.premultiplied(), premul(base), true);
         p.text_centered(&widgets::label(&t, name, t.fg_primary), r);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use lune_ui::scene::Acrylic;
+    use lune_ui::testing::FakeText;
+
+    fn scene_of(id: &str) -> Scene {
+        let row = EFFECTS.iter().find(|s| s.id == id).expect("scene row");
+        let (w, h) = (W * row.scale, H * row.scale);
+        row.paint(&mut FakeText, row.scale as f32, (w, h))
+    }
+
+    fn acrylics(scene: &Scene) -> Vec<Acrylic> {
+        scene
+            .layers
+            .iter()
+            .flat_map(|l| l.geometry.acrylic.iter().copied())
+            .collect()
+    }
+
+    /// The inactive window draws the solid fallback in place of the glass layers: the window and
+    /// the card are both `window_fallback`, premultiplied, with noise off, and no acrylic item
+    /// carries a glass layer's colour or noise. The fallback goes through the acrylic path (its
+    /// `Src` semantics antialias the card's corners against the panel), so the "fill" is an
+    /// acrylic item whose colour is the fallback, never a glass one. The focused scene beside it
+    /// shows the glass.
+    #[test]
+    fn the_unfocused_scene_draws_the_window_fallback_and_no_glass_layer() {
+        let fallback = premul(THEME.window_fallback);
+        let off = acrylics(&scene_of("unfocused"));
+        assert_eq!(off.len(), 2, "the window and the card");
+        for a in &off {
+            assert_eq!(a.shape.color, fallback, "an inactive layer is the fallback");
+            assert_eq!(a.shape.params[3], 0.0, "no noise on the fallback");
+        }
+        // The card's `under` is the window layer, which is the fallback too.
+        assert_eq!(off[1].shape.under, fallback);
+        // Instrument check: the same background with focus is the glass layers, with noise.
+        let mut text = FakeText;
+        let win = Rect::new(0.0, 0.0, W as f32, H as f32);
+        let mut p: Painter<'_, Hit> = Painter::new(2.0, win, &mut text, None, THEME);
+        background(&mut p, true, true, "t");
+        let on = acrylics(&p.scene);
+        assert_eq!(on.len(), 2);
+        assert_eq!(on[0].shape.color, THEME.glass.panel.premultiplied());
+        assert_eq!(on[1].shape.color, THEME.glass.card.premultiplied());
+        assert!(on.iter().all(|a| a.shape.params[3] == 1.0));
     }
 }

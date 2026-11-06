@@ -2,10 +2,10 @@
 id: widget.search-picker
 title: Search picker
 area: widget
-status: in-progress
+status: done
 consumers: lunegit
-source: Lunegit: src/Lunegit.Desktop/Controls/SearchPickerBase.cs
-owner: toolkit-v1 M6
+source: crates/lune-ui-core/src/widgets/search_picker.rs
+owner: —
 summary: Search picker: a field-style or link-style trigger that opens a searchable list; Escape closes, Enter picks the first match
 ---
 
@@ -95,6 +95,9 @@ None: placeholder and item text are owner data (`SearchPlaceholder`, `DisplayMem
 
 - `search-picker-field`: field trigger with a value, settled.
 - `search-picker-link`: link trigger with a value, settled.
+- `search-picker-focus-field`: Tab on the field trigger: the `RingKind::Edge` ring at the trigger's radius, settled.
+- `search-picker-focus-link`: Tab on the link trigger: the `RingKind::Button` ring, settled.
+- `search-picker-disabled`: both triggers disabled (0.4 opacity) with the pointer on the link and a click: no hover, no popup, settled.
 - `search-picker-open`: link trigger with the popup open, search text, filtered list; settled.
 
 ### Painter primitives
@@ -108,11 +111,13 @@ None: placeholder and item text are owner data (`SearchPlaceholder`, `DisplayMem
 - Pixel probes at scale 2: popup radius 16 px; search bar radius 8 px; dash 1 px stroke with a 2 px / 4 px pattern.
 - Conformance: n/a — no motion on the trigger.
 - Semantic node: role combo-box; expanded follows the open flag.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_search_picker.rs`: behaviour `a_trigger_click_opens_once_with_an_empty_search_and_focus_in_the_box`, `a_press_on_the_open_trigger_closes_once_and_does_not_reopen`, `escape_closes`, `enter_in_the_box_picks_the_first_match_as_an_index_into_items_and_closes`, `an_outside_press_closes_and_reaches_nothing`, `window_focus_loss_closes`; pixel probes at scale 2 `at_scale_2_the_popup_radius_is_16_the_search_bar_8_and_the_dash_is_1_px_in_a_2_4_pattern` (the 2 on, 4 off pattern is `paint_vector.rs::dash_one_two_at_scale_two_is_two_on_four_off`), `the_link_trigger_is_secondary_primary_on_hover_with_a_dashed_underline_as_wide_as_the_text`, `the_field_trigger_shows_the_value_on_the_surface_with_an_ellipsis`, `rows_show_selection_and_hover_at_radius_4`; no motion on the trigger `the_rest_trigger_settles_to_idle_and_the_ring_shows_on_the_keyboard`, `reduced_motion_opens_and_closes_all_the_same`; node `the_nodes_are_a_combo_box_a_text_input_and_a_list_of_items`.
 
 ### Build
 
 - Milestone: M6
 - Depends on: overlay.popover, widget.filter-bar, text.text-edit, core.focus, infra.accessibility
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_search_picker.rs::a_trigger_click_opens_once_with_an_empty_search_and_focus_in_the_box, crates/lune-ui-core/tests/widget_search_picker.rs::escape_closes, crates/lune-ui-core/tests/widget_search_picker.rs::enter_in_the_box_picks_the_first_match_as_an_index_into_items_and_closes, crates/lune-ui-core/tests/widget_search_picker.rs::an_outside_press_closes_and_reaches_nothing, crates/lune-ui-core/tests/widget_search_picker.rs::at_scale_2_the_popup_radius_is_16_the_search_bar_8_and_the_dash_is_1_px_in_a_2_4_pattern, crates/lune-ui-core/tests/widget_search_picker.rs::the_nodes_are_a_combo_box_a_text_input_and_a_list_of_items`; page `search-picker`; unverified here: real typing with an input method (Luneterm's M9 run, D15).
 
 ## Open questions
 

@@ -2,10 +2,10 @@
 id: overlay.dropdown
 title: Drop-down list
 area: overlay
-status: in-progress
+status: done
 consumers: luneterm, wane
 source: crates/lune-ui-core/src/widgets/dropdown.rs
-owner: toolkit-v1 M7
+owner: —
 summary: Combo drop-down option list that flips above its anchor near the window bottom
 ---
 
@@ -116,11 +116,13 @@ None: option texts come from the app (dropdown.rs:9-12).
 - Pixel probes at scale 2: row 64 px high, panel radius 16 px, check glyph 24 px, row radius 8 px. Source values in Anatomy.
 - Conformance: none (no motion).
 - Semantic node: `list` with `list-item` rows; selected row has the `selected` state.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_dropdown.rs`: behaviour `a_click_picks_an_enabled_row_once_and_never_a_disabled_one`, `the_keyboard_highlight_starts_at_the_selected_row_and_skips_disabled_ones`, `down_past_the_last_visible_row_reveals_it_and_enter_picks_it`, `a_selected_row_below_the_fold_opens_in_view_on_the_first_frame`, `the_wheel_scrolls_and_a_click_picks_the_row_under_the_pointer`, `max_rows_caps_the_panel_and_a_short_list_does_not_scroll`, `escape_and_an_outside_press_dismiss`, `it_opens_and_closes_at_once_and_focus_returns_to_the_combo`, `a_glass_dropdown_emits_the_backdrop_and_the_glass_fill`, `a_disabled_dropdown_takes_the_keys_picks_nothing_and_marks_every_node`; pixel probes `the_popup_panel_is_16_px_radius_with_a_2_px_ring_in_the_callers_fill`, `a_hovered_enabled_row_gets_the_hover_fill_and_a_disabled_one_does_not`; node `the_semantic_tree_is_a_list_of_list_items`. The flip above the anchor is `crates/lune-ui-core/src/widgets/popover.rs`'s placement, tested in `widget_popover.rs`.
 
 ### Build
 
 - Milestone: M4 (retrofit), M7 (the glass surface and the scrolling list, step 4).
 - Depends on: core.focus, infra.accessibility, overlay.popup-panel, widget.combo, layout.scroll-area.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_dropdown.rs::a_click_picks_an_enabled_row_once_and_never_a_disabled_one, crates/lune-ui-core/tests/widget_dropdown.rs::the_keyboard_highlight_starts_at_the_selected_row_and_skips_disabled_ones, crates/lune-ui-core/tests/widget_dropdown.rs::escape_and_an_outside_press_dismiss, crates/lune-ui-core/tests/widget_dropdown.rs::max_rows_caps_the_panel_and_a_short_list_does_not_scroll, crates/lune-ui-core/tests/widget_dropdown.rs::a_glass_dropdown_emits_the_backdrop_and_the_glass_fill, crates/lune-ui-core/tests/widget_dropdown.rs::the_popup_panel_is_16_px_radius_with_a_2_px_ring_in_the_callers_fill, crates/lune-ui-core/tests/widget_dropdown.rs::the_semantic_tree_is_a_list_of_list_items`; page `dropdown`; unverified here: none (limit: no type-ahead, D143).
 
 ## Open questions
 

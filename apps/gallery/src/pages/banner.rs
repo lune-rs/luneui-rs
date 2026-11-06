@@ -58,6 +58,7 @@ fn live() -> Box<dyn PageState> {
         busy: true,
         banner: true,
         view: true,
+        disabled: false,
     })
 }
 
@@ -67,6 +68,7 @@ fn banner_only() -> Box<dyn PageState> {
         busy: true,
         banner: true,
         view: false,
+        disabled: false,
     })
 }
 
@@ -76,6 +78,17 @@ fn view_only() -> Box<dyn PageState> {
         busy: false,
         banner: false,
         view: true,
+        disabled: false,
+    })
+}
+
+/// The empty view with its actions disabled.
+fn view_disabled() -> Box<dyn PageState> {
+    Box::new(Live {
+        busy: false,
+        banner: false,
+        view: true,
+        disabled: true,
     })
 }
 
@@ -83,6 +96,7 @@ struct Live {
     busy: bool,
     banner: bool,
     view: bool,
+    disabled: bool,
 }
 
 impl PageState for Live {
@@ -119,16 +133,18 @@ impl PageState for Live {
                 card.w,
                 card.y + card.h - bottom - 16.0,
             );
-            ui.empty_state(
-                "empty",
-                area,
-                &EmptyState {
-                    image: Some(LOGO),
-                    title: "No repository open",
-                    subtitle: SUBTITLE,
-                    actions: &ACTIONS,
-                },
-            );
+            ui.with_enabled(!self.disabled, |ui| {
+                ui.empty_state(
+                    "empty",
+                    area,
+                    &EmptyState {
+                        image: Some(LOGO),
+                        title: "No repository open",
+                        subtitle: SUBTITLE,
+                        actions: &ACTIONS,
+                    },
+                )
+            });
         }
     }
 
@@ -145,7 +161,7 @@ const SCENES: &[UiScene] = &[
     // The spinner runs from the first frame: a quarter turn at 300 ms.
     UiScene {
         id: "banner-shown",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: banner_only,
         script: &[],
@@ -154,17 +170,30 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "banner-empty-state",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: view_only,
         script: &[],
         capture_ms: 0,
         expect: Expect::Settled,
     },
+    // The view is disabled (0.4 opacity, inert) and the pointer rests on an action: no hover fill.
+    UiScene {
+        id: "banner-empty-state-disabled",
+        scale: 2.0,
+        tier: MotionTier::Full,
+        state: view_disabled,
+        script: &[Step {
+            at_ms: 0,
+            events: &[Ev::PointerOver(OPEN)],
+        }],
+        capture_ms: 400,
+        expect: Expect::Settled,
+    },
     // Press is `fast` (180 ms): half way at 90 ms.
     UiScene {
         id: "banner-empty-state-action-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: view_only,
         script: &[Step {
@@ -177,7 +206,7 @@ const SCENES: &[UiScene] = &[
     // Hover is `instant` (120 ms): half way at 60 ms.
     UiScene {
         id: "banner-empty-state-hover-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: view_only,
         script: &[Step {

@@ -2,10 +2,10 @@
 id: widget.tab-strip
 title: Tab strip
 area: widget
-status: in-progress
+status: done
 consumers: luneterm, lunegit
-source: —
-owner: toolkit-v1 M6
+source: crates/lune-ui-core/src/widgets/tab_strip.rs
+owner: —
 summary: Tab strip: tabs with close, new-tab button, overflow scrolling, drag reorder, and the connected tab outline with a running cue
 ---
 
@@ -162,15 +162,18 @@ The confirm and rename dialog texts, "Duplicate Tab" and "Copy Working Directory
 - Tier: Off gives the static outline; Reduced gives breath [L src/Lunegit.Core/Settings/TerminalOutlineAnimationResolver.cs:17-28].
 - Conformance: hover, slide, settle and content-swap transitions pass `motion::conformance`.
 - Semantic node: one `tab-list`, one `tab` per tab with `selected` on the active one; an injected `AccessAction` default activates the tab.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_tab_strip.rs`: behaviour `a_press_on_a_tab_activates_it_once`, `a_press_on_the_close_button_closes_and_neither_activates_nor_arms_a_drag`, `press_move_4_and_release_reorders`, `escape_cancels_with_no_reorder`, `the_arrows_rove_and_wrap_home_and_end_go_to_the_ends_and_focus_does_not_activate`; outline `the_notch_wraps_the_active_tab_and_a_flush_tab_keeps_the_card_corner`, `the_active_tab_cut_under_12_px_or_scrolled_away_has_no_notch` (and the geometry tests `chrome.rs`: see `core.tab-outline`); pixel probes `at_scale_2_the_strip_keeps_its_measures_in_device_px`, `widths_follow_the_title_within_the_limits_and_the_gap_is_between_tabs_only`; busy cue `the_sweep_is_two_passes_and_its_phase_is_time_over_2400_ms`, `the_comet_is_0_14_of_the_contour_and_travels_it_in_2400_ms`, `the_breath_runs_between_0_38_and_1_over_1800_ms`, `no_cue_is_idle_and_a_finished_cue_stops`; tier `reduced_forces_the_breath_and_off_is_static_and_idle`; conformance `every_motion_row_conforms_under_every_tier`, `the_content_swap_is_base_full_fast_reduced_and_nothing_off`; node `one_tab_list_a_tab_per_tab_and_the_active_one_selected`, `an_access_default_activates_and_a_close_default_closes`; disabled `a_disabled_strip_activates_nothing_from_enter_or_space_and_still_does_after_enabling`, `a_disabled_strip_nodes_are_disabled_and_offer_no_focus_or_action`.
 
 ### Build
 
 - Milestone: M6
 - Depends on: core.tab-outline, infra.drag-and-drop, layout.scroll-area, overlay.menu, widget.button, core.ui, core.focus, infra.accessibility, motion.transitions
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_tab_strip.rs::a_press_on_a_tab_activates_it_once, crates/lune-ui-core/tests/widget_tab_strip.rs::a_press_on_the_close_button_closes_and_neither_activates_nor_arms_a_drag, crates/lune-ui-core/tests/widget_tab_strip.rs::press_move_4_and_release_reorders, crates/lune-ui-core/tests/widget_tab_strip.rs::escape_cancels_with_no_reorder, crates/lune-ui-core/tests/widget_tab_strip.rs::the_active_tab_cut_under_12_px_or_scrolled_away_has_no_notch, crates/lune-ui-core/tests/widget_tab_strip.rs::at_scale_2_the_strip_keeps_its_measures_in_device_px, crates/lune-ui-core/tests/widget_tab_strip.rs::the_comet_is_0_14_of_the_contour_and_travels_it_in_2400_ms, crates/lune-ui-core/tests/widget_tab_strip.rs::reduced_forces_the_breath_and_off_is_static_and_idle, crates/lune-ui-core/tests/widget_tab_strip.rs::every_motion_row_conforms_under_every_tier, crates/lune-ui-core/tests/widget_tab_strip.rs::one_tab_list_a_tab_per_tab_and_the_active_one_selected`; page `tab-strip`; unverified here: none.
 
 ## Open questions
 
-- `role-gap: tab to panel association` (see Accessibility; stays open, [D122]).
+- Still open, a `role-gap` limit (D122; D237): `role-gap: tab to panel association` (see Accessibility).
+- Limit (Q23): a disabled strip closes its open menu (`disabling_the_strip_closes_an_open_menu`), so no widget holds focus that frame and the menu's keys reach a `Global` binding. Kept as the recorded behaviour.
 - Header tint: `Theme` has no token for the header's layer, so `TabStripOptions.header_tint` takes the colour from the app and `None` draws no tint; the gallery uses #00000024 ([D131]). It is a plain fill, drawn after the under shapes, so a hover fill sits under it, where Lunegit's sits over it.
 
 Closed by [D122]: the keyboard model, the disabled tab (none), all three busy treatments ship with Sweep as the default. `fg_muted` landed in M4 ([D58]).

@@ -2,10 +2,10 @@
 id: widget.steps
 title: Wizard steps
 area: widget
-status: in-progress
+status: done
 consumers: wane
-source: —
-owner: toolkit-v1 M6
+source: crates/lune-ui-core/src/widgets/steps.rs
+owner: —
 summary: Wizard steps: four 32 px rows in the sidebar slot with upcoming, current and done states; not clickable
 ---
 
@@ -82,11 +82,13 @@ None: step labels are app data.
 - Pixel probes at scale 2: row 64 px high; number circle 40 px; label column 296 px and never wraps.
 - Conformance: n/a — no transition.
 - Semantic node: role navigation over a list; the current item is selected and current; a long label is shortened, not wrapped.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_steps.rs`: pixel probes `at_scale_2_a_row_is_64_px_the_circle_40_and_the_label_column_296`, `four_rows_of_32_two_apart_with_the_current_one_filled_surface_selected`, `a_label_never_wraps_and_never_leaves_its_148_px_column`; looks `an_upcoming_step_is_tertiary_over_a_ring_number`, `the_current_step_is_bright_and_medium`, `a_done_step_is_an_accent_circle_with_a_12_px_check_and_a_secondary_label`; no input `steps_take_no_input_and_no_tab_stop`; node `the_node_is_a_navigation_over_a_list_of_items_with_selected_current_and_checked`, `a_long_label_is_named_in_full_on_its_node`.
 
 ### Build
 
 - Milestone: M6
 - Depends on: widget.nav-item, core.painter, text.shaping
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_steps.rs::at_scale_2_a_row_is_64_px_the_circle_40_and_the_label_column_296, crates/lune-ui-core/tests/widget_steps.rs::a_label_never_wraps_and_never_leaves_its_148_px_column, crates/lune-ui-core/tests/widget_steps.rs::a_done_step_is_an_accent_circle_with_a_12_px_check_and_a_secondary_label, crates/lune-ui-core/tests/widget_steps.rs::the_node_is_a_navigation_over_a_list_of_items_with_selected_current_and_checked`; page `steps`; unverified here: none.
 
 ## Open questions
 

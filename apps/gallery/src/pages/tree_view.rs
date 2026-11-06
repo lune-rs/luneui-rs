@@ -85,12 +85,24 @@ struct Live {
     seed: Option<(&'static [u64], Option<u64>)>,
     /// The text of the last row activated.
     activated: Option<&'static str>,
+    /// Draw the tree inside `with_enabled(false, ..)`.
+    disabled: bool,
 }
 
 fn state(open: &'static [u64], selected: Option<u64>) -> Box<dyn PageState> {
     Box::new(Live {
         seed: Some((open, selected)),
         activated: None,
+        disabled: false,
+    })
+}
+
+/// The selected tree, disabled.
+fn disabled() -> Box<dyn PageState> {
+    Box::new(Live {
+        seed: Some((&[SRC, GPU], Some(GPU))),
+        activated: None,
+        disabled: true,
     })
 }
 
@@ -142,7 +154,9 @@ impl PageState for Live {
             guides: true,
             toggle_on_row: false,
         };
-        let out = ui.tree_view("tree", TREE, &opts, size_cell);
+        let out = ui.with_enabled(!self.disabled, |ui| {
+            ui.tree_view("tree", TREE, &opts, size_cell)
+        });
         if let Some(key) = out.activated {
             self.activated = ROWS.iter().find(|r| r.key == key).map(|r| r.text);
         }
@@ -163,7 +177,7 @@ impl PageState for Live {
 const fn settled(id: &'static str, scale: u32, state: fn() -> Box<dyn PageState>) -> UiScene {
     UiScene {
         id,
-        scale,
+        scale: scale as f32,
         tier: MotionTier::Full,
         state,
         script: &[],
@@ -180,7 +194,7 @@ const SCENES: &[UiScene] = &[
     settled("tree-view-depth", 1, all_open),
     UiScene {
         id: "tree-view-hover",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: one_open,
         script: &[Step {
@@ -194,7 +208,7 @@ const SCENES: &[UiScene] = &[
     // The expand is base (250 ms): half way 125 ms after the key.
     UiScene {
         id: "tree-view-expand-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: closed,
         script: &[
@@ -211,10 +225,30 @@ const SCENES: &[UiScene] = &[
         expect: Expect::Moving,
     },
     settled("tree-view-selected", 2, selected),
+    // The scope is disabled (0.4 opacity): the pointer on a row draws no hover, Tab and Down
+    // find no stop, and the selected row keeps its fill.
+    UiScene {
+        id: "tree-view-disabled",
+        scale: 2.0,
+        tier: MotionTier::Full,
+        state: disabled,
+        script: &[
+            Step {
+                at_ms: 100,
+                events: &[Ev::PointerAt(SECOND_ROW.0, SECOND_ROW.1), Ev::Tab],
+            },
+            Step {
+                at_ms: 200,
+                events: &[Ev::Key(NamedKey::ArrowDown)],
+            },
+        ],
+        capture_ms: 500,
+        expect: Expect::Settled,
+    },
     // Tab enters on the first row, Down moves the cursor and its ring.
     UiScene {
         id: "tree-view-focus",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: one_open,
         script: &[
@@ -280,7 +314,7 @@ mod tests {
     fn run(id: &str, scale: u32) -> (Scene, FrameOutput) {
         let scene = SCENES
             .iter()
-            .find(|s| s.id == id && s.scale == scale)
+            .find(|s| s.id == id && s.scale == scale as f32)
             .expect("a scene");
         run_scene(PAGE.id, scene, &mut FakeText).expect("runs")
     }

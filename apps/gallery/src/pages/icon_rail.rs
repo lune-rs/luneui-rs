@@ -134,7 +134,7 @@ const SCENES: &[UiScene] = &[
     // Five buttons at the top; the first panel is open.
     UiScene {
         id: "icon-rail-top",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: plain,
         script: &[],
@@ -144,7 +144,7 @@ const SCENES: &[UiScene] = &[
     // Five docked at the bottom, the count badge on the third.
     UiScene {
         id: "icon-rail-bottom",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: counted,
         script: &[],
@@ -155,7 +155,7 @@ const SCENES: &[UiScene] = &[
     // tooltip is still pending.
     UiScene {
         id: "icon-rail-hover",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: plain,
         script: &[Step {
@@ -168,7 +168,7 @@ const SCENES: &[UiScene] = &[
     // Held down on the third button, settled at scale 0.98.
     UiScene {
         id: "icon-rail-pressed",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: plain,
         script: &[Step {
@@ -181,7 +181,7 @@ const SCENES: &[UiScene] = &[
     // Press is `fast` (180 ms): half way at 90 ms.
     UiScene {
         id: "icon-rail-press-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: plain,
         script: &[Step {
@@ -194,7 +194,7 @@ const SCENES: &[UiScene] = &[
     // The dot on the third top button (uncommitted changes).
     UiScene {
         id: "icon-rail-commit-dot",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: dotted,
         script: &[],

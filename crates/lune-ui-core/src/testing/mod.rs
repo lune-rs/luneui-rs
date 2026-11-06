@@ -10,7 +10,7 @@
 //! - [`FakeImages`]: the image seam's fake, a store that keeps sizes; and
 //!   [`image_store_contract`], the properties every [`ImageStore`](crate::image::ImageStore) must have.
 //! - [`ScriptedInput`]: the input seam's fake, a scripted window producing [`RawInput`](crate::input::RawInput)
-//!   frames.
+//!   frames; and [`scripted_input_contract`], the properties its frames must have.
 //! - [`UiHarness`]: a `Ui` test bench (store, fake text, default strings, scripted input); and
 //!   [`disabled_violations`], the nodes under a root that a disabled scope left enabled.
 
@@ -23,7 +23,7 @@ mod ui;
 
 pub use backdrop::{NullMaterial, backdrop_contract};
 pub use images::{FakeImages, image_store_contract};
-pub use input::ScriptedInput;
+pub use input::{ScriptedInput, scripted_input_contract};
 pub use recording::{DrawCall, RecordedFrame, RecordingRenderer};
 pub use text::{FakeText, SEGMENT_TABLE, SegmentCase, spec_line_contract, text_system_contract};
 pub use ui::{UiHarness, disabled_violations};

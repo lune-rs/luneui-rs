@@ -113,6 +113,7 @@ pub struct Extent {
 }
 
 impl Extent {
+    /// An extent of `width` by `height`.
     pub const fn new(width: f64, height: f64) -> Self {
         Self { width, height }
     }

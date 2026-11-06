@@ -113,10 +113,21 @@ impl PageState for Demo {
 const PRIMARY: &[&str] = &["primary"];
 
 const SCENES: &[UiScene] = &[
+    // The controls at a scale that is not a whole number of device pixels per logical one (R-nfr-6):
+    // 1560 by 990 physical px.
+    UiScene {
+        id: "ui-controls",
+        scale: 1.5,
+        tier: MotionTier::Full,
+        state: plain,
+        script: &[],
+        capture_ms: 0,
+        expect: Expect::Settled,
+    },
     // The pointer is over a page button under the open dialog: the button stays at rest.
     UiScene {
         id: "ui-modal-capture",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: modal,
         script: &[Step {
@@ -130,7 +141,7 @@ const SCENES: &[UiScene] = &[
     // (180 ms): half way at t0 + 90 ms.
     UiScene {
         id: "ui-exit-retention",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: stopped,
         script: &[
@@ -149,7 +160,7 @@ const SCENES: &[UiScene] = &[
     // The pointer is over the overlap of the primary button and the menu's first item.
     UiScene {
         id: "ui-popup-over-page",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: popup,
         script: &[
@@ -172,6 +183,22 @@ mod tests {
     use super::*;
     use crate::page::run_scene;
     use lune_ui::testing::FakeText;
+
+    /// R-nfr-6: the fractional scene exists, is named by its scale, is whole pixels (1560 by 990)
+    /// and draws the controls.
+    #[test]
+    fn the_controls_scene_at_1_5_is_named_sized_and_runs() {
+        let scene = SCENES
+            .iter()
+            .find(|s| s.scale == 1.5)
+            .expect("a 1.5x scene");
+        assert_eq!(scene.name(), "ui-controls@1.5x");
+        assert_eq!(scene.size(), (1560, 990));
+        // Every other name keeps its integer form.
+        assert_eq!(SCENES[1].name(), "ui-modal-capture@2x");
+        let (display, _) = run_scene("ui", scene, &mut FakeText).expect("runs");
+        assert!(display.layers.iter().any(|l| !l.texts.is_empty()));
+    }
 
     /// Under a modal dialog the pointer over a page button changes nothing: the scene equals the
     /// same scene without the pointer move.

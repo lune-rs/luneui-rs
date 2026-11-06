@@ -2,10 +2,10 @@
 id: widget.filter-bar
 title: Filter bar
 area: widget
-status: in-progress
+status: done
 consumers: lunegit
-source: Lunegit: src/Lunegit.Desktop/Controls/FilterBar.axaml
-owner: toolkit-v1 M6
+source: crates/lune-ui-core/src/widgets/filter_bar.rs
+owner: —
 summary: Filter bar: search field in an inset surface with a 14 px search icon, a clear button when text is present, and no focus ring
 ---
 
@@ -90,11 +90,13 @@ n/a — Lunegit has no motion selector for the filter bar and the clear button a
 - Pixel probes at scale 2: radius 8 px; icon 28 px at the left; clear button 36 px.
 - Conformance: n/a — no transition.
 - Semantic node: role text-input; value follows the text.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_filter_bar.rs`: `typing_sets_the_text_and_marks_it_changed`, `the_clear_button_shows_only_while_there_is_text`, `a_click_on_clear_empties_the_text_hides_it_and_leaves_focus_on_the_field`, `the_tab_order_is_the_field_then_clear_and_enter_clears`, `the_default_action_on_clear_clears`, `a_disabled_bar_takes_no_text_no_clear_and_no_focus`, pixel probes `pixel_probes_at_scale_2`, `focus_shows_the_caret_only_no_border_and_no_ring`, node `the_node_is_a_text_input_named_by_the_label_or_the_placeholder`.
 
 ### Build
 
 - Milestone: M6
 - Depends on: text.text-edit, widget.button, core.painter, text.shaping
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_filter_bar.rs::typing_sets_the_text_and_marks_it_changed, crates/lune-ui-core/tests/widget_filter_bar.rs::a_click_on_clear_empties_the_text_hides_it_and_leaves_focus_on_the_field, crates/lune-ui-core/tests/widget_filter_bar.rs::a_disabled_bar_takes_no_text_no_clear_and_no_focus, crates/lune-ui-core/tests/widget_filter_bar.rs::pixel_probes_at_scale_2, crates/lune-ui-core/tests/widget_filter_bar.rs::the_node_is_a_text_input_named_by_the_label_or_the_placeholder`; page `filter-bar`; unverified here: real typing with an input method (Luneterm's M9 run, D15).
 
 ## Open questions
 

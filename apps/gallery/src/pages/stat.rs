@@ -199,7 +199,7 @@ const CHANGE: Step = Step {
 const SCENES: &[UiScene] = &[
     UiScene {
         id: "stat-default",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: strip,
         script: &[],
@@ -208,7 +208,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "stat-gold",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: gold,
         script: &[],
@@ -217,7 +217,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "stat-no-data",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: no_data,
         script: &[],
@@ -226,7 +226,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "stat-meter",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: meter,
         script: &[],
@@ -235,7 +235,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "stat-compact",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: compact,
         script: &[],
@@ -244,7 +244,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "stat-value-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: value_change,
         script: &[CHANGE],

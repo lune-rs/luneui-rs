@@ -22,10 +22,11 @@ for the extraction; Luneterm's `docs/architecture.md` sections "lune-ui modules"
 - Lint: `cargo clippy --workspace --all-targets -- -D warnings`
 - Boundaries: `scripts/check-boundaries.sh`
 - Catalogue index (regenerate after adding or editing a component file): `scripts/gen-component-index.sh`
-- Acceptance bench (milestone acceptance only; runnable on a busy machine, D85: each run judged on its own p99 <= 16.6 ms and worst frame <= 33 ms, a page OVER only in at least half its runs, the self-test spread and load printed beside every verdict; exit 0): `cargo run --release -p gallery -- --bench` (`--runs 5` is the default; `--size 3456x2234` is report-only)
+- Acceptance bench (milestone acceptance only; a recorded reading that no gate, merge or fix waits on, and is not re-run to settle load noise, D235; runnable on a busy machine, D85: each run judged on its own p99 <= 16.6 ms and worst frame <= 33 ms, a page OVER only in at least half its runs, the self-test spread and load printed beside every verdict; exit 0): `cargo run --release -p gallery -- --bench` (`--runs 5` is the default; `--size 3456x2234` is report-only)
 - Gate (before every commit; must be green): `cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && cargo clippy -p lune-ui-winit --all-targets -- -D warnings && cargo test -p lune-ui-winit && scripts/check-boundaries.sh && scripts/gen-component-index.sh --check`
-- Pixel gate (any drawing change): `scripts/pixel-gate.sh [--base <rev>] [--allow <id>…]` dumps the
-  gallery's 15 reference scenes for `<rev>` (default `HEAD`) and for the working tree and compares them
+- Pixel gate (any drawing change): `scripts/pixel-gate.sh [--base <rev>] [--allow <id>…]` dumps
+  every scene `gallery --list` prints (431 at M11's close; the first 15 are the legacy Painter-API scenes) for `<rev>`
+  (default `HEAD`) and for the working tree and compares them
   (`dump-compare`); zero delta unless the look change is intended: name its scenes with `--allow <id>`
   and give the reason in a DECISIONS.md row in the same commit. Exit 0 pass, 1 delta, 2 setup error.
   The working tree dumps headless (no window); a base from before M2 step 4 (`52b11d6` and older)
@@ -36,6 +37,8 @@ for the extraction; Luneterm's `docs/architecture.md` sections "lune-ui modules"
   cannot build against the M2 API and exits 2; `--parity-only` checked that `Cargo.lock` holds no
   version Luneterm's lock lacks, and fails by design from M10 on: `arboard` and its tree are new, D213)
 - Cross-target (Windows clippy, Linux in Docker; skips Linux when Docker is not running): `scripts/check-targets.sh`
+- Snapshot export for an app that vendors the toolkit (D239; exit 0 done, 1 a check failed, 2 usage or setup; reads `git archive <rev>`, never the working tree; `docs/consuming.md` says how it is used): `scripts/export-snapshot.sh <dest> [--rev <rev>]`
+- Docs (every public function, method, type, trait and module has a doc comment, D242; must build clean): `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --exclude gallery --exclude dump-compare`
 
 Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, resolver 3: in
 `rust-toolchain.toml` and the root manifest.
@@ -68,7 +71,7 @@ Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, r
   an axis disables that axis (`Bars::unless_fits`), so the delta reaches the area around it (D176).
 - An overlay that opens above an active modal is put on `LayerId::Raised` by `Ui::overlay`, once at open (D137): a widget
   never names the layer. A widget in a `with_enabled(false, ..)` scope needs no rule of its own for its nodes (`Ui::node`
-  marks them, D140), but it consumes its keys before it gates on `enabled` (not every reader does yet: `docs/architecture.md`, "Disabled keys", is the one list, D159); `testing::disabled_violations` checks a subtree.
+  marks them, D140), but it consumes its keys before it gates on `enabled` (`docs/architecture.md`, "Disabled keys", is the one list, D159); `testing::disabled_violations` checks a subtree.
 - Each seam has a fake and a contract test in `lune_ui_core::testing` (`RecordingRenderer`, `FakeText`
   with `text_system_contract`, `FakeImages` with `image_store_contract`, `ScriptedInput`, `NullMaterial` with
   `backdrop_contract`); a new adapter
@@ -117,3 +120,4 @@ Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, r
 - `docs/components/INDEX.md` - generated catalogue index; open a component's file under
   `docs/components/<area>/<slug>.md` for its detail; `docs/components/README.md` explains how to add one
 - `docs/architecture.md` - crates, seams, module map, extension points, pixel gates
+- `docs/consuming.md` - how an app vendors the toolkit (the snapshot, its duties, release size, the migration map)

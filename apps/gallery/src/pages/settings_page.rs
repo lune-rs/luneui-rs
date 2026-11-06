@@ -48,6 +48,13 @@ fn live() -> Box<dyn PageState> {
     Box::new(Live::new(false, true, None))
 }
 
+/// The first row inside `with_enabled(false, ..)`.
+fn row_disabled() -> Box<dyn PageState> {
+    let mut live = Live::new(false, true, None);
+    live.row_disabled = true;
+    Box::new(live)
+}
+
 fn restart() -> Box<dyn PageState> {
     Box::new(Live::new(true, true, None))
 }
@@ -69,6 +76,8 @@ struct Live {
     font: usize,
     combo_open: bool,
     recent: u32,
+    /// Draw the first row inside `with_enabled(false, ..)`.
+    row_disabled: bool,
 }
 
 impl Live {
@@ -81,6 +90,7 @@ impl Live {
             font: 0,
             combo_open: false,
             recent: 10,
+            row_disabled: false,
         }
     }
 }
@@ -107,6 +117,7 @@ impl PageState for Live {
             &mut self.recent,
         );
         let mut changed = false;
+        let first_enabled = !self.row_disabled;
         let resp = ui.settings_page("page", PAGE_RECT, &page, |ui, vp| {
             let mut y = vp.y;
             let before = *updates;
@@ -117,14 +128,16 @@ impl PageState for Live {
                 control_w: TOGGLE_W,
             };
             y += 2.0
-                + ui.setting_row(
-                    "updates",
-                    Rect::new(vp.x + ROW_MARGIN, y, vp.w - 2.0 * ROW_MARGIN, 0.0),
-                    &row,
-                    |ui, slot| {
-                        ui.toggle("switch", slot, updates, "Check for updates");
-                    },
-                );
+                + ui.with_enabled(first_enabled, |ui| {
+                    ui.setting_row(
+                        "updates",
+                        Rect::new(vp.x + ROW_MARGIN, y, vp.w - 2.0 * ROW_MARGIN, 0.0),
+                        &row,
+                        |ui, slot| {
+                            ui.toggle("switch", slot, updates, "Check for updates");
+                        },
+                    )
+                });
             changed |= before != *updates;
 
             let row = SettingRow {
@@ -204,7 +217,7 @@ const SCENES: &[UiScene] = &[
     // Three rows, no banner, settled.
     UiScene {
         id: "settings-page-rows",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[],
@@ -214,7 +227,7 @@ const SCENES: &[UiScene] = &[
     // The restart flag set from the first frame: the banner, settled.
     UiScene {
         id: "settings-page-restart",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: restart,
         script: &[],
@@ -224,7 +237,7 @@ const SCENES: &[UiScene] = &[
     // The reveal is `base` (250 ms): the flag rises at 200 ms, half way 125 ms after.
     UiScene {
         id: "settings-page-restart-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: restart_later,
         script: &[Step {
@@ -234,10 +247,30 @@ const SCENES: &[UiScene] = &[
         capture_ms: 325,
         expect: Expect::Moving,
     },
+    // The first row is disabled (0.4 opacity): a click on its toggle changes nothing and raises no
+    // restart banner, and the row draws no hover fill, settled.
+    UiScene {
+        id: "settings-page-disabled",
+        scale: 2.0,
+        tier: MotionTier::Full,
+        state: row_disabled,
+        script: &[
+            Step {
+                at_ms: 0,
+                events: &[Ev::PointerAt(TOGGLE.0, TOGGLE.1)],
+            },
+            Step {
+                at_ms: 100,
+                events: &[Ev::Click],
+            },
+        ],
+        capture_ms: 600,
+        expect: Expect::Settled,
+    },
     // The window is inactive: the solid fallback replaces the glass.
     UiScene {
         id: "settings-page-inactive",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: inactive,
         script: &[],

@@ -224,3 +224,35 @@ fn the_m7_defaults_hold_their_text() {
         assert_eq!(default_text(key), Some(text), "{key}");
     }
 }
+
+/// D27: a table switched between two frames changes the text drawn on the second frame and
+/// nothing else: the same fills, the same one text item, a different key.
+#[test]
+fn switching_the_table_between_frames_changes_the_shaped_text_and_nothing_else() {
+    use lune_ui_core::paint::Rect;
+    use lune_ui_core::testing::UiHarness;
+    use lune_ui_core::widgets::button::ButtonKind;
+    let mut h = UiHarness::new((200.0, 100.0));
+    let draw = |h: &mut UiHarness| {
+        let (scene, _) = h.frame(|ui| {
+            let label = ui.tr("luneui.dialog.cancel").to_owned();
+            ui.button(
+                "b",
+                Rect::new(10.0, 10.0, 120.0, 32.0),
+                &label,
+                ButtonKind::Secondary,
+            );
+        });
+        scene
+    };
+    let english = draw(&mut h);
+    h.strings
+        .insert("luneui.dialog.cancel", "Abbrechen")
+        .expect("a default key");
+    h.at_ms(1000);
+    let german = draw(&mut h);
+    let (a, b) = (&english.layers[0], &german.layers[0]);
+    assert_eq!((a.texts.len(), b.texts.len()), (1, 1));
+    assert_ne!(a.texts[0].key, b.texts[0].key, "the text changed");
+    assert_eq!(a.geometry, b.geometry, "the shapes did not");
+}

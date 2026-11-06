@@ -99,6 +99,8 @@ fn unpad_to_rgba(
     Ok(rgba)
 }
 
+/// Writes `rgba` (8 bits per channel, `size` wide and high) to `path` as a PNG. Errors as a message
+/// naming what failed.
 pub fn write_png(path: &Path, size: (u32, u32), rgba: &[u8]) -> Result<(), String> {
     let file =
         std::fs::File::create(path).map_err(|e| format!("create {}: {e}", path.display()))?;
@@ -142,5 +144,25 @@ mod tests {
     fn unpad_rejects_other_formats_and_short_buffers() {
         assert!(unpad_to_rgba(&[0; 512], 2, 2, 256, wgpu::TextureFormat::R8Unorm).is_err());
         assert!(unpad_to_rgba(&[0; 100], 2, 2, 256, wgpu::TextureFormat::Bgra8Unorm).is_err());
+    }
+
+    #[test]
+    fn write_png_round_trips_the_pixels_and_names_a_failure() {
+        let rgba: Vec<u8> = (0..16).map(|i| i * 16).collect();
+        let path = std::env::temp_dir().join(format!("luneui-dump-{}.png", std::process::id()));
+        assert!(!path.exists(), "the scratch name is ours alone");
+        write_png(&path, (2, 2), &rgba).expect("writes");
+        let decoder = png::Decoder::new(std::io::BufReader::new(
+            std::fs::File::open(&path).expect("opens"),
+        ));
+        let mut reader = decoder.read_info().expect("a PNG");
+        let mut back = vec![0; reader.output_buffer_size().expect("sized")];
+        let info = reader.next_frame(&mut back).expect("decodes");
+        std::fs::remove_file(&path).expect("removes its own file");
+        assert_eq!((info.width, info.height), (2, 2));
+        assert_eq!(back[..16], rgba[..]);
+        // A path that cannot be created is an error naming it, not a panic.
+        let bad = path.join("no-such-dir").join("x.png");
+        assert!(write_png(&bad, (2, 2), &rgba).is_err_and(|e| e.contains("create")));
     }
 }

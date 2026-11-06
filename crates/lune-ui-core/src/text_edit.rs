@@ -182,6 +182,8 @@ pub struct SpecLayout<'a> {
 }
 
 impl<'a> SpecLayout<'a> {
+    /// A layout of `spec` through `system` at `scale`. A page motion crosses a default count of lines
+    /// until [`Self::with_page_rows`] sets it.
     pub fn new(system: &'a mut dyn TextSystem, spec: &'a Spec, scale: f32) -> Self {
         Self {
             system,
@@ -654,6 +656,7 @@ fn clean(text: &str, multiline: bool) -> String {
 }
 
 impl TextEdit {
+    /// An editor with no selection and the caret at 0.
     pub fn new() -> Self {
         Self::default()
     }

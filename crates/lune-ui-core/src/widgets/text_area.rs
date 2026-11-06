@@ -1,4 +1,4 @@
-//! The multi-line text box: the [field](super::field)'s box and engine over a
+//! The multi-line text box: the [field](super::field::field)'s box and engine over a
 //! [scroll area](super::scroll_area). Enter inserts a line break, and `wrap` passes the viewport's
 //! width to the text.
 //!

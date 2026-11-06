@@ -1,5 +1,5 @@
 //! Pure layout helpers: a parent rect and child sizes in, child rects out. [`stack`] (with
-//! [`row`] and [`column`]) lays children along one axis; [`grid`] resolves column and row tracks.
+//! [`row`] and [`column`](fn@column)) lays children along one axis; [`grid`] resolves column and row tracks.
 //! They draw nothing and keep nothing, so a frame's layout is a function of its inputs.
 //!
 //! A child's main-axis size is fixed, hug (the size the caller measured) or fill with a weight.
@@ -53,8 +53,10 @@ pub struct Insets {
 }
 
 impl Insets {
+    /// No inset on any side.
     pub const ZERO: Insets = Insets::all(0.0);
 
+    /// Insets of `left`, `top`, `right` and `bottom`.
     pub const fn new(left: f32, top: f32, right: f32, bottom: f32) -> Self {
         Self {
             left,
@@ -251,10 +253,12 @@ impl Grid {
         }
     }
 
+    /// How many columns the grid has.
     pub fn columns(&self) -> usize {
         self.cols.len()
     }
 
+    /// How many rows the grid has.
     pub fn rows(&self) -> usize {
         self.rows.len()
     }

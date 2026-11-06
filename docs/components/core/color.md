@@ -2,10 +2,10 @@
 id: core.color
 title: Colour helpers
 area: core
-status: in-progress
+status: done
 consumers: luneterm
 source: crates/lune-ui-core/src/color.rs
-owner: orch/toolkit-v1
+owner: —
 summary: Straight-alpha RGBA values with premultiply, blend-over and alpha helpers
 ---
 
@@ -19,7 +19,7 @@ summary: Straight-alpha RGBA values with premultiply, blend-over and alpha helpe
 
 ## Existing code
 
-`crates/lune-ui-core/src/color.rs:6` (`premul`), `:16` (`over`), `:26` (`with_alpha`); 28 lines.
+`crates/lune-ui-core/src/color.rs:7` (`premul`), `:18` (`over`), `:29` (`with_alpha`); 31 lines.
 
 ## Spec
 
@@ -71,13 +71,13 @@ n/a — no scene draws a colour function by itself; every scene uses `premul` th
 
 ### Acceptance
 
-- Existing tests: none in `crates/lune-ui-core/src/color.rs`.
-- Done standard still needs: known-answer tests for `premul`, `over` and `with_alpha` at the alpha extremes (0, 128, 255).
+- Known answers worked out by hand from the formulas and written as literals (`crates/lune-ui-core/tests/color.rs`): `premul_at_alpha_zero_is_all_zero`, `premul_at_alpha_255_is_straight_over_255`, `premul_at_alpha_128_scales_colour_by_128_over_255`; `over_with_transparent_top_is_the_layer_below`, `over_with_opaque_top_is_the_top`, `over_with_half_top_keeps_half_of_below`, `over_at_alpha_128_of_a_premultiplied_top`; `with_alpha_scales_only_alpha`, `with_alpha_at_alpha_0_128_255_rounds_and_saturates`.
 
 ### Build
 
 - Milestone: M11 (done standard; code exists).
 - Depends on: none.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/color.rs::premul_at_alpha_zero_is_all_zero, crates/lune-ui-core/tests/color.rs::premul_at_alpha_128_scales_colour_by_128_over_255, crates/lune-ui-core/tests/color.rs::over_at_alpha_128_of_a_premultiplied_top, crates/lune-ui-core/tests/color.rs::with_alpha_at_alpha_0_128_255_rounds_and_saturates`; page n/a (pure functions; every scene draws through `premul`); unverified here: none.
 
 ## Open questions
 

@@ -2,10 +2,10 @@
 id: layout.stack
 title: Stack, row, column and grid layout
 area: layout
-status: in-progress
+status: done
 consumers: any
 source: crates/lune-ui-core/src/layout.rs
-owner: orch/toolkit-v1
+owner: —
 summary: Pure layout helpers: stack, row, column and grid with gaps, alignment, insets and fixed, fill and hug sizing
 ---
 
@@ -96,11 +96,13 @@ None: layout has no text.
 - Pixel probes at scale 2: a gap of 8 logical px is 16 device px between two filled boxes; an inset of 12 is 24 device px from the parent edge.
 - Conformance lines: none, no transitions.
 - Semantic-node test: n/a, no node; the child order matches call order.
+- Tests, bullet by bullet (`crates/lune-ui-core/tests/layout.rs`). Behaviour: `a_weight_two_child_gets_twice_a_weight_one_childs_share`, `a_thousand_fill_children_tile_the_parent`, `a_gap_goes_only_between_children`, `cross_axis_alignment`, `a_column_runs_top_to_bottom`, `a_grid_of_auto_star_auto_columns_and_two_rows`, `fixed_and_hug_overflow_runs_past_the_parent_and_fills_get_nothing`. Totality: `bad_numbers_count_as_zero_and_every_rect_is_finite`, `bad_numbers_equal_zero_not_just_finite`, `an_empty_list_gives_an_empty_result`, and a single child of each size kind with a gap, a weight or an inset: `a_single_child_is_laid_out_whatever_its_size_kind_and_gap`. Pixel probes at scale 2, through the painter: `at_scale_2_a_gap_of_8_is_16_device_px_and_an_inset_of_12_is_24`. Child order: `rects_come_back_in_the_order_the_children_were_given`.
 
 ### Build
 
-- Milestone: M5. Built in M5 (steps 2 and 6; the page is `stack`). Open for `done` (D47): M11 re-checks the whole bar on every entry; the Windows and Linux run time is unverified (the Linux and Windows lint is `scripts/check-targets.sh`).
+- Milestone: M5. Built in M5 (steps 2 and 6; the page is `stack`). M11 audited it against D47 (the `Done` line). Unverified here: the Windows and Linux run time (the lint for both is `scripts/check-targets.sh`).
 - Depends on: core.ui
+- Done (D47, M11): tests `crates/lune-ui-core/tests/layout.rs::a_weight_two_child_gets_twice_a_weight_one_childs_share, crates/lune-ui-core/tests/layout.rs::a_thousand_fill_children_tile_the_parent, crates/lune-ui-core/tests/layout.rs::bad_numbers_count_as_zero_and_every_rect_is_finite, crates/lune-ui-core/tests/layout.rs::a_single_child_is_laid_out_whatever_its_size_kind_and_gap, crates/lune-ui-core/tests/layout.rs::at_scale_2_a_gap_of_8_is_16_device_px_and_an_inset_of_12_is_24, crates/lune-ui-core/tests/layout.rs::rects_come_back_in_the_order_the_children_were_given`; page `stack` (scenes `stack-*`); unverified here: Windows and Linux run time.
 
 ## Open questions
 

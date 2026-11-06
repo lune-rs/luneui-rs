@@ -1,5 +1,5 @@
 //! The diff view (`text.diff-view`, D15): a read-only diff of an app-supplied line model, unified or
-//! split, on the list frame ([`ListStyle`], D161).
+//! split, on the list frame (`ListStyle`, D161).
 //!
 //! The toolkit never runs a diff algorithm and never reads a repository (D45): the app passes
 //! [`DiffLine`]s typed added, removed, context or hunk, with their numbers, and for the split form the

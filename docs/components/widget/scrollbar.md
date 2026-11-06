@@ -2,10 +2,10 @@
 id: widget.scrollbar
 title: Scrollbars
 area: widget
-status: in-progress
+status: done
 consumers: lunegit, wane
 source: crates/lune-ui-core/src/widgets/scrollbar.rs
-owner: orch/toolkit-v1
+owner: —
 summary: Overlay scrollbar: 9 px transparent track, 6 px accent thumb, auto-hide while the pointer is away, thumb drag
 ---
 
@@ -119,11 +119,13 @@ None: the bar has no text and no tooltip in the style read [L src/Lunegit.Deskto
 - Pixel probes at scale 2: a vertical bar occupies 18 device px; the thumb is 12 px wide with radius 6 device px; the minimum thumb length is 56 device px; the thumb fill equals `accent` at alpha 0x8C, and at 0xE6 hovered (Wane's `--scroll-thumb-hover` is `#767d85e6`, [W docs/ui/mocks/css/tokens.css:45]).
 - Conformance: reveal and hover-colour transitions pass `motion::conformance`; Reduced runs the fade at 120 ms, Off snaps [motion].
 - Semantic node: n/a, no node; the scroll area's node follows the offset [infra.accessibility].
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_scrollbar.rs`: behaviour `dragging_by_half_the_travel_moves_the_offset_by_half_the_range`, `the_thumb_stays_visible_and_keeps_the_grab_after_the_pointer_leaves_the_area`, `a_press_on_the_thumb_or_the_empty_track_reaches_no_content`; pixel probes `at_scale_2_the_bar_is_18_device_px_and_the_thumb_12_wide_with_radius_6`, `at_scale_2_the_minimum_thumb_length_is_56_device_px`, `the_hovered_thumb_is_accent_at_0xe6`, `the_vertical_thumb_sits_one_px_from_the_right_and_is_proportional`, `the_horizontal_thumb_sits_one_px_from_the_bottom`; conformance `reveal_and_hover_colour_conform_in_every_tier`, `the_thumb_fades_in_monotonically_and_settles_within_180_ms_and_a_frame`, `a_settled_scroll_area_reports_idle`; shown or not `pointer_away_no_thumb_pointer_over_the_area_a_thumb_and_content_that_fits_none`, `hidden_and_disabled_bars_show_no_thumb`, `content_that_fits_or_bad_numbers_give_no_thumb`.
 
 ### Build
 
-- Milestone: M5. Built in M5 (steps 7 and 10; the page is `scrollbar`, 8 scenes). Open for `done` (D47): M11 re-checks the whole bar on every entry; the Windows and Linux run time is unverified (the Linux and Windows lint is `scripts/check-targets.sh`).
+- Milestone: M5. Built in M5 (steps 7 and 10; the page is `scrollbar`, 8 scenes). M11 audited it against D47 (the `Done` line). Unverified here: the Windows and Linux run time (the lint for both is `scripts/check-targets.sh`).
 - Depends on: layout.scroll-area, core.ui, motion.transitions
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_scrollbar.rs::dragging_by_half_the_travel_moves_the_offset_by_half_the_range, crates/lune-ui-core/tests/widget_scrollbar.rs::the_thumb_stays_visible_and_keeps_the_grab_after_the_pointer_leaves_the_area, crates/lune-ui-core/tests/widget_scrollbar.rs::a_press_on_the_thumb_or_the_empty_track_reaches_no_content, crates/lune-ui-core/tests/widget_scrollbar.rs::at_scale_2_the_bar_is_18_device_px_and_the_thumb_12_wide_with_radius_6, crates/lune-ui-core/tests/widget_scrollbar.rs::at_scale_2_the_minimum_thumb_length_is_56_device_px, crates/lune-ui-core/tests/widget_scrollbar.rs::the_hovered_thumb_is_accent_at_0xe6, crates/lune-ui-core/tests/widget_scrollbar.rs::reveal_and_hover_colour_conform_in_every_tier`; page `scrollbar` (8 scenes); unverified here: Windows and Linux run time.
 
 ## Open questions
 

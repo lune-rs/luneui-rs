@@ -705,6 +705,18 @@ fn nothing_reports_now_while_nothing_moves() {
     }
 }
 
+#[test]
+fn a_settled_frame_has_the_same_tree_and_look_in_every_tier() {
+    // The tier changes motion, never the resting look, the semantic tree or the strings in it.
+    let runs = [MotionTier::Full, MotionTier::Reduced, MotionTier::Off].map(run_script);
+    for i in (0..runs[0].len()).filter(|i| i % 3 == 0) {
+        for other in &runs[1..] {
+            assert!(runs[0][i].1.tree == other[i].1.tree, "tree, frame {i}");
+            assert!(runs[0][i].0 == other[i].0, "scene, frame {i}");
+        }
+    }
+}
+
 fn has_focused_state(out: &FrameOutput, k: &str) -> bool {
     node(out, id(k)).states.contains(State::Focused)
 }
@@ -3517,7 +3529,7 @@ mod nested_wheel {
     use lune_ui_core::widgets::code_editor::CodeOptions;
     use lune_ui_core::widgets::diff_view::{DiffLine, DiffMode, DiffOptions, LineKind, pair_rows};
     use lune_ui_core::widgets::markdown::{MdBlock, MdInline, MdOptions};
-    use lune_ui_core::widgets::scroll_area::{Extent, ScrollOptions};
+    use lune_ui_core::widgets::scroll_area::{Bars, Extent, ScrollOptions};
     use lune_ui_core::widgets::tab_strip::{Tab, TabKey, TabStripOptions};
     use lune_ui_core::widgets::table::{Cell, ColumnWidth, TableColumn, TableOptions};
     use lune_ui_core::widgets::text_area::AreaOptions;
@@ -3525,6 +3537,82 @@ mod nested_wheel {
     use lune_ui_core::widgets::tone::Tone;
     use lune_ui_core::widgets::tree_view::{TreeOptions, TreeRow};
     use lune_ui_core::widgets::virtual_list::{Heights, ListOptions, RowKey, SelectionMode};
+
+    /// F11: two non-modal overlays on one layer. The wheel over the part where the later one
+    /// (which has nothing to scroll) covers the earlier one (which does) goes to neither: the
+    /// topmost region is the later overlay's, and a region in an overlay opened before it is
+    /// under it. Per axis; the earlier overlay still scrolls where nothing covers it.
+    #[test]
+    fn a_wheel_over_a_fit_popover_does_not_reach_a_list_in_the_popover_under_it() {
+        use lune_ui_core::widgets::popover::PopoverOptions;
+        let under_at = Rect::new(100.0, 100.0, 200.0, 200.0);
+        let top_at = Rect::new(160.0, 160.0, 200.0, 200.0);
+        let at = |r: Rect| PopoverOptions {
+            gap: 0.0,
+            margin: 0.0,
+            ..PopoverOptions::new(Rect::new(r.x, r.y, 10.0, 0.0), (r.w, r.h))
+        };
+        // The offset of the earlier popover's area after a 60 px step at `point`.
+        let run = |point: (f32, f32), dx: f32, dy: f32, top_open: bool| -> (f64, f64) {
+            let mut offset = (0.0, 0.0);
+            let mut h = UiHarness::new(WIN);
+            let mut frame = |h: &mut UiHarness, ms: u64, top: bool| {
+                h.at_ms(ms).frame(|ui: &mut Ui<'_>| {
+                    ui.popover("under", &at(under_at), |ui, rect| {
+                        let o = ScrollOptions {
+                            extent: Some((900.0, 900.0)),
+                            ..ScrollOptions::default()
+                        };
+                        let a = ui
+                            .scroll_area("list", rect, &o, |_, _| ((), Extent::new(900.0, 900.0)));
+                        offset = a.offset;
+                    });
+                    if top {
+                        ui.popover("top", &at(top_at), |ui, rect| {
+                            // A composite with nothing to scroll: no live axis, so no scroll sense.
+                            let o = ScrollOptions {
+                                bars: (Bars::Disabled, Bars::Disabled),
+                                extent: Some((rect.w as f64, rect.h as f64)),
+                                ..ScrollOptions::default()
+                            };
+                            ui.scroll_area("fit", rect, &o, |_, _| {
+                                ((), Extent::new(rect.w as f64, rect.h as f64))
+                            });
+                        });
+                    }
+                });
+            };
+            frame(&mut h, 0, false);
+            frame(&mut h, 400, false);
+            if top_open {
+                frame(&mut h, 500, true);
+                frame(&mut h, 900, true);
+            }
+            h.input.pointer_to(point.0, point.1);
+            frame(&mut h, 1000, top_open);
+            h.input.scroll_pixels(dx, dy);
+            frame(&mut h, 1010, top_open);
+            frame(&mut h, 1400, top_open);
+            offset
+        };
+        let over_both = (250.0, 250.0);
+        let over_under_only = (120.0, 120.0);
+        // Instrument: with the later popover closed, the earlier one scrolls on each axis.
+        assert!(run(over_both, 0.0, -60.0, false).1 > 0.0, "y, alone");
+        assert!(run(over_both, -60.0, 0.0, false).0 > 0.0, "x, alone");
+        // Where the later popover covers it, neither axis reaches the earlier one.
+        assert_eq!(run(over_both, 0.0, -60.0, true), (0.0, 0.0), "y, covered");
+        assert_eq!(run(over_both, -60.0, 0.0, true), (0.0, 0.0), "x, covered");
+        // And off the covered part it still scrolls, with the later popover open.
+        assert!(
+            run(over_under_only, 0.0, -60.0, true).1 > 0.0,
+            "y, uncovered"
+        );
+        assert!(
+            run(over_under_only, -60.0, 0.0, true).0 > 0.0,
+            "x, uncovered"
+        );
+    }
 
     const INNER: Rect = Rect::new(40.0, 40.0, 400.0, 200.0);
     const FEW: usize = 2;
@@ -3887,12 +3975,33 @@ mod m10 {
     use lune_ui_core::widgets::radio_group::RadioOption;
     use lune_ui_core::widgets::slider::SliderOptions;
     use lune_ui_core::widgets::spinner::SpinnerOptions;
-    use lune_ui_core::widgets::tab_strip::{Tab, TabKey, TabStripOptions};
+    use lune_ui_core::widgets::tab_strip::{BusyCue, Tab, TabKey, TabStripOptions};
     use lune_ui_core::widgets::toast::{ToastKind, ToastSpec, Toasts};
     use lune_ui_core::widgets::tone::Tone;
     use std::time::Duration;
 
     type Rgb = [u8; 3];
+
+    // What `extras` draws beyond the controls and `more`.
+    use lune_ui_core::widgets::callout::CalloutOptions;
+    use lune_ui_core::widgets::caption::CaptionOptions;
+    use lune_ui_core::widgets::command_palette::{Palette, PaletteRow, PaletteSection};
+    use lune_ui_core::widgets::diff_view::{
+        DiffLine, DiffMark, DiffMode, DiffOptions, HunkAction, LineKind, pair_rows,
+    };
+    use lune_ui_core::widgets::flyout::Flyout;
+    use lune_ui_core::widgets::icon_rail::RailItem;
+    use lune_ui_core::widgets::kanban_board::{BoardOptions, KanbanCard, KanbanColumn};
+    use lune_ui_core::widgets::markdown::{MdBlock, MdInline, MdOptions};
+    use lune_ui_core::widgets::menu::{MenuItem, MenuRow};
+    use lune_ui_core::widgets::page::PageOptions;
+    use lune_ui_core::widgets::popover::{PlaceAlign, PopoverOptions, Side, Surface};
+    use lune_ui_core::widgets::scroll_area::{Extent, ScrollOptions};
+    use lune_ui_core::widgets::settings_page::SettingsPage;
+    use lune_ui_core::widgets::stat::StatOptions;
+    use lune_ui_core::widgets::table::{Cell, ColumnWidth, TableColumn, TableOptions};
+    use lune_ui_core::widgets::toolbar::ToolbarOptions;
+    use lune_ui_core::widgets::virtual_list::{RowKey, SelectionMode};
 
     /// Every colour field of a theme by name, in one list, the glass tints last. The destructuring
     /// below does not compile when `Theme` gains a field this list does not name.
@@ -4095,6 +4204,8 @@ mod m10 {
     struct Seen {
         fills: Vec<Rgb>,
         texts: Vec<Rgb>,
+        /// Every acrylic layer colour (premultiplied), which the glass recipe makes from a tint.
+        acrylics: Vec<[f32; 4]>,
     }
 
     fn straight(c: [f32; 4]) -> Option<Rgb> {
@@ -4116,6 +4227,12 @@ mod m10 {
                 colours.extend(g.strokes.iter().map(|v| v.color));
                 colours.extend(g.fills.iter().map(|v| v.color));
             }
+            self.acrylics.extend(
+                scene
+                    .layers
+                    .iter()
+                    .flat_map(|l| l.geometry.acrylic.iter().map(|a| a.shape.color)),
+            );
             self.fills.extend(colours.into_iter().filter_map(straight));
             self.texts.extend(rec.colours.iter().copied());
         }
@@ -4279,6 +4396,390 @@ mod m10 {
         ui.toasts("toasts", toasts);
     }
 
+    const UNDER: [f32; 4] = [0.05, 0.06, 0.07, 1.0];
+
+    const MARK: [DiffMark; 1] = [DiffMark { start: 5, end: 8 }];
+
+    fn text(s: &str) -> MdInline<'_> {
+        MdInline::Text {
+            text: s,
+            bold: false,
+            italic: false,
+            strike: false,
+        }
+    }
+
+    /// The widgets the controls and `more` leave out, in three windows: 1, the chrome (caption
+    /// buttons, toolbars, the rail, a scroll area, a menu, a stat); 2, content (markdown, a diff,
+    /// a table, the board); 3, the page shells and the overlays (page, settings page, callout,
+    /// flyout, a glass popover, the palette, a loading toast with its log, a busy tab).
+    fn extras(ui: &mut Ui<'_>, which: u8, toasts: &mut Toasts) {
+        let glass = ui.theme().glass;
+        ui.painter().on(LayerId::Page);
+        match which {
+            1 => {
+                let win = Rect::new(0.0, 0.0, 900.0, 700.0);
+                ui.caption_buttons("caption", win, CaptionOptions::default());
+                let bar = |active, g| ToolbarOptions {
+                    active,
+                    glass: g,
+                    under: UNDER,
+                    name: "Bar",
+                };
+                ui.toolbar(
+                    "bar-off",
+                    Rect::new(0.0, 60.0, 900.0, 52.0),
+                    &bar(false, glass.window),
+                    |ui, _| {
+                        ui.toolbar_label(
+                            "label",
+                            Rect::new(8.0, 68.0, 200.0, 36.0),
+                            icon::SYNC,
+                            "Label",
+                            "Label",
+                        );
+                    },
+                );
+                ui.toolbar(
+                    "bar-on",
+                    Rect::new(0.0, 120.0, 900.0, 52.0),
+                    &bar(true, glass.panel),
+                    |ui, _| {
+                        ui.toolbar_action(
+                            "act",
+                            Rect::new(8.0, 128.0, 36.0, 36.0),
+                            icon::SYNC,
+                            "Act",
+                            true,
+                        );
+                    },
+                );
+                let rail = [RailItem {
+                    key: 1,
+                    glyph: icon::SEARCH,
+                    name: "Search",
+                    active: true,
+                    enabled: true,
+                    dot: true,
+                    badge: Some(3),
+                    note: Some("3 unread"),
+                }];
+                ui.icon_rail(
+                    "rail",
+                    Rect::new(840.0, 200.0, 48.0, 300.0),
+                    &rail,
+                    &[],
+                    "Rail",
+                );
+                let o = ScrollOptions {
+                    extent: Some((300.0, 900.0)),
+                    ..ScrollOptions::default()
+                };
+                ui.scroll_area("sa", Rect::new(20.0, 200.0, 300.0, 200.0), &o, |_, _| {
+                    ((), Extent::new(300.0, 900.0))
+                });
+                let rows = [
+                    MenuRow::Item {
+                        glyph: Some(icon::COPY),
+                        text: "Copy",
+                        shortcut: "Cmd+C",
+                    },
+                    MenuRow::Separator,
+                    MenuRow::Entry(MenuItem {
+                        glyph: None,
+                        text: "Paste",
+                        shortcut: "Cmd+V",
+                        disabled: true,
+                        danger: false,
+                        chevron: false,
+                    }),
+                    MenuRow::Item {
+                        glyph: None,
+                        text: "Delete",
+                        shortcut: "",
+                    },
+                ];
+                ui.menu("menu", &rows, (400.0, 220.0));
+                ui.stat(
+                    "stat",
+                    Rect::new(20.0, 430.0, 220.0, 90.0),
+                    &StatOptions {
+                        label: "Saved",
+                        value: "1,204",
+                        number: None,
+                        live: false,
+                        sub: Some("this week"),
+                        sub_tone: Tone::Ok,
+                        gold: true,
+                        compact: false,
+                        text: false,
+                        meter: Some(0.4),
+                        no_data: false,
+                    },
+                );
+            }
+            2 => {
+                let title = [text("Guide")];
+                let para = [
+                    text("See the "),
+                    MdInline::Link {
+                        label: "docs",
+                        url: "docs/a.md",
+                    },
+                    text(" and "),
+                    MdInline::Code("cargo test"),
+                ];
+                let blocks = [
+                    MdBlock::Heading {
+                        level: 2,
+                        inlines: &title,
+                    },
+                    MdBlock::Paragraph(&para),
+                ];
+                ui.markdown(
+                    "md",
+                    Rect::new(10.0, 10.0, 400.0, 160.0),
+                    &blocks,
+                    &MdOptions {
+                        label: "Guide",
+                        tasks_live: true,
+                        identity: None,
+                    },
+                );
+                let lines = [
+                    DiffLine {
+                        hunk: Some(0),
+                        ..DiffLine::new(LineKind::Hunk, "@@ -1,3 +1,3 @@")
+                    },
+                    DiffLine {
+                        old: Some(1),
+                        new: Some(1),
+                        ..DiffLine::new(LineKind::Context, "alpha")
+                    },
+                    DiffLine {
+                        old: Some(2),
+                        marks: &MARK,
+                        ..DiffLine::new(LineKind::Removed, "beta old")
+                    },
+                    DiffLine {
+                        new: Some(2),
+                        marks: &MARK,
+                        ..DiffLine::new(LineKind::Added, "beta new")
+                    },
+                ];
+                let rows = pair_rows(&lines);
+                let hunk = [HunkAction {
+                    glyph: icon::ADD,
+                    label: "Stage hunk",
+                }];
+                ui.diff_view(
+                    "diff",
+                    Rect::new(10.0, 190.0, 700.0, 160.0),
+                    &lines,
+                    &DiffOptions {
+                        mode: DiffMode::Split(&rows),
+                        wrap: false,
+                        label: "Changes",
+                        actions: &hunk,
+                        identity: 1,
+                        widest_chars: 0,
+                    },
+                );
+                let cols = [
+                    TableColumn {
+                        key: 1,
+                        title: "Name",
+                        width: ColumnWidth::Fill(1.0),
+                        num: false,
+                        sortable: true,
+                    },
+                    TableColumn {
+                        key: 2,
+                        title: "Amount",
+                        width: ColumnWidth::Fixed(100.0),
+                        num: true,
+                        sortable: true,
+                    },
+                ];
+                ui.table(
+                    "table",
+                    Rect::new(10.0, 370.0, 400.0, 160.0),
+                    &TableOptions {
+                        columns: &cols,
+                        count: 4,
+                        selection: SelectionMode::Single,
+                        wrap: false,
+                        index_of: None,
+                        label: "Requests",
+                    },
+                    |i| RowKey(i as u64),
+                    |_, c| Cell::text(format!("{} {}", c.key.0, c.column)),
+                );
+                let names = ["Todo", "Doing"];
+                let cards = [
+                    [KanbanCard {
+                        key: 1,
+                        title: "One",
+                        tags: &["x"],
+                        assignee: Some("A"),
+                        note: true,
+                    }],
+                    [KanbanCard {
+                        key: 2,
+                        title: "Two",
+                        tags: &[],
+                        assignee: None,
+                        note: false,
+                    }],
+                ];
+                let columns: Vec<KanbanColumn<'_>> = names
+                    .iter()
+                    .zip(&cards)
+                    .enumerate()
+                    .map(|(i, (title, cards))| KanbanColumn {
+                        key: i as u64,
+                        title,
+                        cards,
+                    })
+                    .collect();
+                ui.kanban_board(
+                    "board",
+                    Rect::new(430.0, 370.0, 460.0, 300.0),
+                    &BoardOptions {
+                        title: "Roadmap",
+                        columns: &columns,
+                        error: None,
+                        active: true,
+                        glass: glass.card,
+                        under: UNDER,
+                        name: "",
+                    },
+                );
+            }
+            _ => {
+                let page = PageOptions {
+                    title: "Page",
+                    subtitle: Some("Sub"),
+                    active: true,
+                    glass: glass.panel,
+                    under: UNDER,
+                    actions_w: 0.0,
+                    footer: false,
+                    swap_key: 0,
+                    name: "",
+                };
+                ui.page(
+                    "page",
+                    Rect::new(10.0, 10.0, 420.0, 220.0),
+                    &page,
+                    |_, _| 10.0,
+                );
+                let settings = SettingsPage {
+                    active: true,
+                    glass: glass.window,
+                    under: UNDER,
+                    restart: true,
+                    name: "General",
+                };
+                ui.settings_page(
+                    "settings",
+                    Rect::new(450.0, 10.0, 430.0, 260.0),
+                    &settings,
+                    |_, _| 10.0,
+                );
+                ui.callout(
+                    "callout",
+                    Rect::new(10.0, 250.0, 420.0, 0.0),
+                    &CalloutOptions {
+                        tone: Tone::Err,
+                        icon: icon::INFO,
+                        text: "The proxy is offline",
+                        figure: Some("3"),
+                        action: Some("Retry"),
+                        announce: false,
+                    },
+                );
+                let fly = Flyout {
+                    anchor: Rect::new(700.0, 300.0, 24.0, 24.0),
+                    anchor_id: None,
+                    side: Side::Bottom,
+                    align: PlaceAlign::Start,
+                    mark: Some(icon::SYNC),
+                    wordmark: "App",
+                    state: "Serving",
+                    tone: Tone::Ok,
+                    stats: &[],
+                    routes: &[("model", "opus")],
+                    rows: &[MenuRow::Item {
+                        glyph: None,
+                        text: "Open",
+                        shortcut: "",
+                    }],
+                    name: "",
+                };
+                ui.flyout("fly", &fly);
+                let items = ["one"];
+                let _ = items;
+                let mut o =
+                    PopoverOptions::new(Rect::new(20.0, 400.0, 100.0, 30.0), (200.0, 100.0));
+                o.surface = Surface::Glass;
+                ui.popover("pop", &o, |_, _| ());
+                let rows = [PaletteRow {
+                    key: 1,
+                    text: "Reload",
+                    detail: None,
+                    icon: None,
+                    hint: Some("Cmd+R"),
+                    destructive: true,
+                }];
+                let secs = [PaletteSection {
+                    title: "COMMANDS",
+                    rows: &rows,
+                    more: false,
+                }];
+                let mut q = String::new();
+                ui.command_palette(
+                    "palette",
+                    &mut q,
+                    &Palette {
+                        sections: &secs,
+                        placeholder: "Search",
+                        footer_left: "Up/Down",
+                        error: Some("Index failed"),
+                        name: "",
+                    },
+                    &DialogGlass {
+                        panel: [0.1, 0.1, 0.12, 1.0],
+                        fill: [0.2, 0.2, 0.2, 0.62],
+                        noise: true,
+                    },
+                );
+                ui.toasts("toasts", toasts);
+                let tabs = [Tab {
+                    key: TabKey(1),
+                    title: "alpha",
+                    closable: true,
+                    progress: Some(Tone::Err),
+                }];
+                ui.tab_strip(
+                    "strip",
+                    Rect::new(450.0, 300.0, 400.0, 32.0),
+                    &tabs,
+                    &TabStripOptions {
+                        active: Some(TabKey(1)),
+                        panel_focused: true,
+                        busy: Some(BusyCue::Sweep),
+                        busy_tone: Tone::Err,
+                        card: Rect::new(450.0, 300.0, 400.0, 100.0),
+                        menu_extra: &[],
+                        name: "Documents",
+                        header_tint: None,
+                    },
+                );
+            }
+        }
+    }
+
     /// What is open and where the pointer is, for one run of frames.
     #[derive(Clone, Copy)]
     struct Setup {
@@ -4289,6 +4790,10 @@ mod m10 {
         tabs: u32,
         /// Press the pointer where it is, then select all with the command chord.
         select_all: bool,
+        /// Draw `extras(n)` in place of the controls and the extras beside them (0: those).
+        extras: u8,
+        /// Hold the primary button down where the pointer is.
+        press: bool,
     }
 
     const REST: Setup = Setup {
@@ -4298,6 +4803,8 @@ mod m10 {
         pointer: None,
         tabs: 0,
         select_all: false,
+        extras: 0,
+        press: false,
     };
 
     /// Three frames of the controls and the extras under `theme`; what the third, settled, one
@@ -4325,6 +4832,22 @@ mod m10 {
         ] {
             toasts.push(ToastSpec::new(kind, text), Duration::ZERO);
         }
+        // The extras' toasts: a loading one with its log open.
+        let mut loud = Toasts::default();
+        let id = loud.push(
+            ToastSpec {
+                log: vec!["step one".to_owned(), "step two".to_owned()],
+                ..ToastSpec::new(
+                    ToastKind::Loading {
+                        progress: Some(0.5),
+                        cancellable: true,
+                    },
+                    "Fetching",
+                )
+            },
+            Duration::ZERO,
+        );
+        loud.set_expanded(id, true);
         for (ms, last) in [(0_u64, false), (300, false), (700, false), (1500, true)] {
             h.at_ms(ms);
             if ms == 300 {
@@ -4348,10 +4871,18 @@ mod m10 {
                     .key_down(Key::Character("a".to_owned()), None)
                     .set_modifiers(Modifiers::default());
             }
+            if ms == 700 && setup.press {
+                h.input.press(P);
+            }
             rec.colours.clear();
+            let which = setup.extras;
             let scene = run(&mut h, &mut rec, |ui| {
-                page(ui, &mut app);
-                more(ui, &mut ex, &mut toasts);
+                if which == 0 {
+                    page(ui, &mut app);
+                    more(ui, &mut ex, &mut toasts);
+                } else {
+                    extras(ui, which, &mut loud);
+                }
             });
             if last {
                 seen.take(&scene, &rec);
@@ -4398,6 +4929,42 @@ mod m10 {
         v.push(Setup {
             pointer: Some(centre(FIELD)),
             select_all: true,
+            ..REST
+        });
+        // The widgets the controls page does not draw: chrome and menus, content, then overlays.
+        for extras in 1..=3 {
+            v.push(Setup { extras, ..REST });
+        }
+        // The caption's close button, the scroll area and its thumb, the stat.
+        for at in [
+            (877.0, 16.0),
+            (200.0, 300.0),
+            (315.0, 215.0),
+            (100.0, 560.0),
+        ] {
+            v.push(Setup {
+                extras: 1,
+                pointer: Some(at),
+                ..REST
+            });
+        }
+        // The diff's hunk action under the pointer.
+        v.push(Setup {
+            extras: 2,
+            pointer: Some((234.0, 200.0)),
+            ..REST
+        });
+        // A ghost button held down.
+        v.push(Setup {
+            pointer: Some((345.0, 26.0)),
+            press: true,
+            ..REST
+        });
+        // A menu row held down.
+        v.push(Setup {
+            extras: 1,
+            pointer: Some((420.0, 232.0)),
+            press: true,
             ..REST
         });
         v
@@ -4488,44 +5055,717 @@ mod m10 {
         assert!(hits.is_empty(), "hard-coded colours:\n{}", hits.join("\n"));
     }
 
-    /// The audit is only as wide as what it draws (the controls and a spread of the M6 and M7
-    /// widgets): 38 of the 71 colour fields are reached. The rest (scroll thumbs, the markdown
-    /// and diff colours, the glass tints of the page and panel, the caption buttons, the tab's
-    /// dirty mark, the count badge and a few text greys) belong to widgets this frame does not
-    /// draw; they are a limit of the audit, listed in `docs/STATE.md`, not a finding. The
-    /// literals in `widgets/` are covered by the grep recorded there.
+    /// The colour fields the frames do not reach, each with the reason. A field in this list that
+    /// the frames do reach fails the test, so the list cannot go stale; a field missing from it
+    /// that they do not reach fails it too.
+    const UNREACHED: &[(&str, &str)] = &[];
+
+    /// Whether the frames draw `name`'s colour. A glass tint is not drawn as it is: the recipe
+    /// (`GlassLayer::premultiplied`) blends it with the layer's luminosity, so it is reached when
+    /// an acrylic layer is drawn in the colour its layer makes from the audit theme's tint.
+    fn reached(seen: &Seen, theme: &Theme, name: &str, c: Rgba) -> bool {
+        let layer = match name {
+            "glass.window.tint" => Some(theme.glass.window),
+            "glass.panel.tint" => Some(theme.glass.panel),
+            "glass.card.tint" => Some(theme.glass.card),
+            _ => None,
+        };
+        if let Some(layer) = layer {
+            let want = layer.premultiplied();
+            return seen
+                .acrylics
+                .iter()
+                .any(|a| a.iter().zip(&want).all(|(x, y)| (x - y).abs() < 1e-3));
+        }
+        seen.fills
+            .iter()
+            .chain(&seen.texts)
+            .any(|s| same(*s, rgb(c)))
+    }
+
+    /// Every colour field of `Theme` is drawn by the frames, or is named above with its reason.
+    /// The frames are the controls, the widgets beside them and `extras`: scroll thumbs (held and
+    /// hovered), the glass menu, the rail with its dot and count, the caption buttons under the
+    /// pointer, both toolbars, markdown, the diff with its marks, the table, the board, the page
+    /// and settings page, the callout, the flyout, the palette, a loading toast with its log, a
+    /// busy tab and a stat.
     #[test]
-    fn the_audit_reaches_most_fields_and_names_those_it_does_not() {
+    fn the_audit_reaches_every_field_or_names_why_not() {
         let t = distinct();
         let seen = seen_under(t);
-        let mut missed = Vec::new();
+        let mut missed: Vec<&str> = Vec::new();
         for (name, c) in fields(&t) {
-            let hit = seen
-                .fills
-                .iter()
-                .chain(&seen.texts)
-                .any(|s| same(*s, rgb(c)));
-            if !hit {
+            if !reached(&seen, &t, name, c) {
                 missed.push(name);
             }
         }
-        let total = fields(&t).len();
-        println!("unreached ({} of {total}): {missed:?}", missed.len());
-        assert!(
-            total - missed.len() >= 36,
-            "only {} of {total} fields reached: missed {missed:?}",
-            total - missed.len()
+        let listed: Vec<&str> = UNREACHED.iter().map(|(n, _)| *n).collect();
+        println!(
+            "unreached ({} of {}): {missed:?}",
+            missed.len(),
+            fields(&t).len()
         );
-        // The ones every control reads.
-        for must in [
-            "fg_primary",
-            "fg_secondary",
-            "surface_input",
-            "border",
-            "accent",
-            "on_accent",
-        ] {
-            assert!(!missed.contains(&must), "{must} not reached: {missed:?}");
+        assert!(UNREACHED.len() <= 3, "at most three fields may be listed");
+        assert!(
+            UNREACHED.iter().all(|(_, why)| !why.is_empty()),
+            "every listed field says why"
+        );
+        assert_eq!(missed, listed, "unreached fields and the list disagree");
+        // The instrument: the check is not satisfied by looking at nothing.
+        assert!(!reached(&seen, &t, "fg_primary", [1, 2, 3, 255]));
+        assert!(reached(&seen, &t, "fg_primary", t.fg_primary));
+    }
+}
+
+/// M11, the key readers that took a chord or leaked when disabled (D140, D157), and the hosts of
+/// `Ui::button` and `icon_button` whose rows were probes. The table is `m9`'s, typed: each stop is
+/// one reader on a page of its own with a `Global` binding on each of 12 keys (a dialog's on
+/// `Scope::Overlay`, which a `Global` one cannot fail in, F19); it is focused with Tab, the keys it
+/// takes enabled are the ones that fire nothing, and a focused-then-disabled stop must take every
+/// one of them and fire none. The five readers fixed in M11 also run a chord on each key.
+mod m11 {
+    use super::*;
+
+    use std::time::Duration;
+
+    use lune_ui_core::GlassLayer;
+    use lune_ui_core::icon;
+    use lune_ui_core::shortcuts::{Binding, Chord, Scope};
+    use lune_ui_core::widgets::banner::EmptyState;
+    use lune_ui_core::widgets::callout::CalloutOptions;
+    use lune_ui_core::widgets::filter_bar::FilterOptions;
+    use lune_ui_core::widgets::search_picker::{PickerOptions, Trigger};
+    use lune_ui_core::widgets::settings_page::SettingsPage;
+    use lune_ui_core::widgets::slider::SliderOptions;
+    use lune_ui_core::widgets::tab_strip::{Tab, TabEvent, TabKey, TabStripOptions};
+    use lune_ui_core::widgets::toast::{ToastAction, ToastKind, ToastSpec, Toasts};
+    use lune_ui_core::widgets::tone::Tone;
+    use lune_ui_core::widgets::toolbar::{ACTION_SIZE, ToolbarOptions};
+
+    const M11_WIN: (f32, f32) = (900.0, 700.0);
+    const STEP_RANGE: StepRange = StepRange {
+        min: 0.0,
+        max: 99.0,
+        step: 1.0,
+    };
+    const GLASS: GlassLayer = GlassLayer {
+        tint: [10, 20, 30, 255],
+        tint_opacity: 0.8,
+        material_opacity: 0.7,
+    };
+    const UNDER: [f32; 4] = [0.05, 0.06, 0.07, 1.0];
+
+    /// A key a focused reader uses: a named key, or Command with a letter.
+    #[derive(Debug, Clone, Copy)]
+    enum Probe {
+        Named(NamedKey),
+        Cmd(&'static str),
+    }
+
+    const KEYS: [Probe; 12] = [
+        Probe::Named(NamedKey::ArrowUp),
+        Probe::Named(NamedKey::ArrowDown),
+        Probe::Named(NamedKey::ArrowLeft),
+        Probe::Named(NamedKey::ArrowRight),
+        Probe::Named(NamedKey::Home),
+        Probe::Named(NamedKey::End),
+        Probe::Named(NamedKey::PageUp),
+        Probe::Named(NamedKey::PageDown),
+        Probe::Named(NamedKey::Enter),
+        Probe::Named(NamedKey::Space),
+        Probe::Cmd("a"),
+        Probe::Cmd("c"),
+    ];
+
+    fn press(h: &mut UiHarness, p: Probe) {
+        match p {
+            Probe::Named(k) => key(h, k),
+            Probe::Cmd(c) => {
+                h.input.set_modifiers(Modifiers {
+                    logo: true,
+                    ..Modifiers::default()
+                });
+                h.input.key_down(Key::Character(c.to_owned()), None);
+                h.input.set_modifiers(Modifiers::default());
+            }
         }
+    }
+
+    /// Command held for one named key.
+    fn press_cmd(h: &mut UiHarness, k: NamedKey) {
+        h.input.set_modifiers(Modifiers {
+            logo: true,
+            ..Modifiers::default()
+        });
+        h.input.key_down(Key::Named(k), None);
+        h.input.set_modifiers(Modifiers::default());
+    }
+
+    fn plain_binding(p: Probe, scope: Scope) -> Binding {
+        match p {
+            Probe::Named(k) => Binding::new(scope, Chord::key(Key::Named(k)), format!("g-{k:?}")),
+            Probe::Cmd(c) => Binding::new(
+                scope,
+                Chord::key(Key::Character(c.to_owned())).primary(),
+                format!("g-cmd-{c}"),
+            ),
+        }
+    }
+
+    /// The app side: every value a stop's widget can change, and what its frames reported.
+    #[derive(Clone)]
+    struct Pg {
+        enabled: bool,
+        step: u32,
+        slide: f32,
+        picked: Option<usize>,
+        rating: u32,
+        active: u64,
+        text: String,
+        clicks: u32,
+        events: Vec<String>,
+        toasts: Toasts,
+    }
+
+    impl Pg {
+        fn new() -> Self {
+            Pg {
+                enabled: true,
+                step: 12,
+                slide: 50.0,
+                picked: None,
+                rating: 2,
+                active: 0,
+                text: "abc".to_owned(),
+                clicks: 0,
+                events: Vec::new(),
+                toasts: Toasts::default(),
+            }
+        }
+
+        /// Everything the keys of a reader could change.
+        fn state(&self) -> String {
+            format!(
+                "{} {} {:?} {} {} {} {} {:?}",
+                self.step,
+                self.slide.to_bits(),
+                self.picked,
+                self.rating,
+                self.active,
+                self.text,
+                self.clicks,
+                self.events
+            )
+        }
+    }
+
+    type Draw = fn(&mut Ui<'_>, &mut Pg);
+    type Setup = fn(&mut UiHarness, &mut Pg);
+
+    struct Stop {
+        name: &'static str,
+        draw: Draw,
+        want: fn(&Node) -> bool,
+        /// At least this many of `KEYS` fire nothing enabled (the instrument check).
+        least: usize,
+        /// The key of the overlay the bindings are scoped to; `None` is `Global`.
+        overlay: Option<&'static str>,
+        setup: Option<Setup>,
+    }
+
+    fn page_frame(h: &mut UiHarness, pg: &mut Pg, stop: &Stop, at: u64) -> FrameOutput {
+        h.at_ms(at);
+        let enabled = pg.enabled;
+        let (_, out) = h.frame(|ui: &mut Ui<'_>| {
+            ui.painter().on(LayerId::Page);
+            ui.with_enabled(enabled, |ui| (stop.draw)(ui, pg));
+        });
+        out
+    }
+
+    /// The stop focused by Tab on a page with a binding on every key of `KEYS` (and, with
+    /// `chords`, a Command chord on each named key); and the time.
+    fn focused(stop: &Stop, chords: bool) -> (UiHarness, Pg, u64) {
+        let mut h = UiHarness::new(M11_WIN);
+        let scope = stop
+            .overlay
+            .map_or(Scope::Global, |k| Scope::Overlay(id(k)));
+        for k in KEYS {
+            h.shortcuts.add(plain_binding(k, scope));
+            if chords && let Probe::Named(n) = k {
+                h.shortcuts.add(Binding::new(
+                    scope,
+                    Chord::key(Key::Named(n)).primary(),
+                    format!("c-{n:?}"),
+                ));
+            }
+        }
+        let mut pg = Pg::new();
+        if let Some(setup) = stop.setup {
+            setup(&mut h, &mut pg);
+        }
+        for at in [0, 500, 1000] {
+            page_frame(&mut h, &mut pg, stop, at);
+        }
+        let mut ms = 1000;
+        for _ in 0..12 {
+            key(&mut h, NamedKey::Tab);
+            ms += 100;
+            let out = page_frame(&mut h, &mut pg, stop, ms);
+            if out
+                .focused
+                .and_then(|f| out.tree.get(f))
+                .is_some_and(stop.want)
+            {
+                return (h, pg, ms);
+            }
+        }
+        panic!("{}: no Tab stop of that kind", stop.name);
+    }
+
+    /// The keys the stop takes while enabled: those that fire no binding.
+    fn used_keys(stop: &Stop) -> Vec<Probe> {
+        let mut used = Vec::new();
+        for k in KEYS {
+            let (mut h, mut pg, ms) = focused(stop, false);
+            press(&mut h, k);
+            if page_frame(&mut h, &mut pg, stop, ms + 100).fired.is_empty() {
+                used.push(k);
+            }
+        }
+        used
+    }
+
+    fn row(stop: &Stop) -> Vec<String> {
+        let used = used_keys(stop);
+        assert!(
+            used.len() >= stop.least,
+            "{} takes at least {} of the keys: {used:?}",
+            stop.name,
+            stop.least
+        );
+        let mut leaks = Vec::new();
+        for k in used {
+            let (mut h, mut pg, mut ms) = focused(stop, false);
+            pg.enabled = false;
+            let before = pg.state();
+            press(&mut h, k);
+            ms += 100;
+            let out = page_frame(&mut h, &mut pg, stop, ms);
+            if !out.fired.is_empty() {
+                leaks.push(format!("{}: {k:?} reached {:?}", stop.name, out.fired));
+            }
+            if pg.state() != before {
+                leaks.push(format!("{}: {k:?} changed the page", stop.name));
+            }
+        }
+        leaks
+    }
+
+    /// A Command chord on each named key the stop takes is a shortcut, enabled and disabled, and
+    /// changes nothing.
+    fn chord_row(stop: &Stop) -> Vec<String> {
+        let mut bad = Vec::new();
+        for k in used_keys(stop) {
+            let Probe::Named(n) = k else { continue };
+            for enabled in [true, false] {
+                let (mut h, mut pg, ms) = focused(stop, true);
+                pg.enabled = enabled;
+                let before = pg.state();
+                press_cmd(&mut h, n);
+                let out = page_frame(&mut h, &mut pg, stop, ms + 100);
+                let want = [format!("c-{n:?}")];
+                let fired: Vec<String> = out.fired.iter().map(|c| format!("{c:?}")).collect();
+                if out.fired.len() != 1 || !fired[0].contains(&want[0]) {
+                    bad.push(format!(
+                        "{}: Command+{n:?} enabled={enabled} fired {fired:?}",
+                        stop.name
+                    ));
+                }
+                if pg.state() != before {
+                    bad.push(format!(
+                        "{}: Command+{n:?} enabled={enabled} changed the page",
+                        stop.name
+                    ));
+                }
+            }
+        }
+        bad
+    }
+
+    // ---- the stops --------------------------------------------------------------------------
+
+    fn stepper(ui: &mut Ui<'_>, pg: &mut Pg) {
+        let r = ui.stepper(
+            "s",
+            Rect::new(20.0, 20.0, 140.0, 32.0),
+            pg.step,
+            STEP_RANGE,
+            "Count",
+        );
+        if let Some(d) = r.step {
+            pg.step = (pg.step as i32 + d).max(0) as u32;
+        }
+    }
+
+    fn slider(ui: &mut Ui<'_>, pg: &mut Pg) {
+        let opts = SliderOptions {
+            min: 0.0,
+            max: 100.0,
+            step: 10.0,
+            name: "Volume",
+        };
+        ui.slider(
+            "s",
+            Rect::new(100.0, 100.0, 400.0, 24.0),
+            &mut pg.slide,
+            &opts,
+        );
+    }
+
+    fn picker(ui: &mut Ui<'_>, pg: &mut Pg) {
+        let items = ["Apple", "Banana", "Cherry"];
+        let opts = PickerOptions {
+            trigger: Trigger::Field,
+            icon: None,
+            placeholder: "Find",
+            name: "Fruit",
+        };
+        ui.search_picker(
+            "p",
+            Rect::new(20.0, 20.0, 240.0, 32.0),
+            &items,
+            &mut pg.picked,
+            &opts,
+        );
+    }
+
+    fn tabs(ui: &mut Ui<'_>, pg: &mut Pg) {
+        let titles = ["one", "two", "three"];
+        let list: Vec<Tab<'_>> = titles
+            .iter()
+            .enumerate()
+            .map(|(i, t)| Tab {
+                key: TabKey(i as u64),
+                title: t,
+                closable: false,
+                progress: None,
+            })
+            .collect();
+        let opts = TabStripOptions {
+            active: Some(TabKey(pg.active)),
+            panel_focused: true,
+            busy: None,
+            busy_tone: Tone::Neutral,
+            card: Rect::new(20.0, 10.0, 600.0, 200.0),
+            menu_extra: &[],
+            name: "Sessions",
+            header_tint: None,
+        };
+        let events = ui
+            .tab_strip("s", Rect::new(20.0, 10.0, 600.0, 32.0), &list, &opts)
+            .events;
+        for e in events {
+            match e {
+                TabEvent::Activate(k) => pg.active = k.0,
+                other => pg.events.push(format!("{other:?}")),
+            }
+        }
+    }
+
+    fn stars(ui: &mut Ui<'_>, pg: &mut Pg) {
+        ui.star_rating("stars", (20.0, 20.0), &mut pg.rating, 5, "Rating");
+    }
+
+    fn toolbar(ui: &mut Ui<'_>, pg: &mut Pg) {
+        let opts = ToolbarOptions {
+            active: true,
+            glass: GLASS,
+            under: UNDER,
+            name: "Main toolbar",
+        };
+        ui.toolbar(
+            "bar",
+            Rect::new(0.0, 0.0, 900.0, 52.0),
+            &opts,
+            |ui, _cols| {
+                let r = ui.toolbar_action(
+                    "fetch",
+                    Rect::new(8.0, 6.0, ACTION_SIZE, ACTION_SIZE),
+                    icon::SYNC,
+                    "Fetch",
+                    true,
+                );
+                pg.clicks += u32::from(r.clicked);
+            },
+        );
+    }
+
+    fn filter(ui: &mut Ui<'_>, pg: &mut Pg) {
+        let opts = FilterOptions {
+            placeholder: "Filter",
+            label: None,
+            clear_unfocusable: false,
+        };
+        ui.filter_bar(
+            "f",
+            Rect::new(100.0, 100.0, 300.0, 30.0),
+            &mut pg.text,
+            &opts,
+        );
+    }
+
+    fn prompt(message: &str) -> ToastSpec {
+        ToastSpec {
+            actions: vec![ToastAction {
+                label: "Open".into(),
+                primary: true,
+                id: 2,
+            }],
+            ..ToastSpec::new(ToastKind::Info, message)
+        }
+    }
+
+    fn toast_setup(_: &mut UiHarness, pg: &mut Pg) {
+        pg.toasts.push(prompt("Update ready"), Duration::ZERO);
+    }
+
+    fn toasts(ui: &mut Ui<'_>, pg: &mut Pg) {
+        let r = ui.toasts("t", &mut pg.toasts);
+        pg.clicks += u32::from(r.action.is_some()) + u32::from(r.cancelled.is_some());
+    }
+
+    fn history_setup(_: &mut UiHarness, pg: &mut Pg) {
+        let id = pg.toasts.push(prompt("Archived"), Duration::ZERO);
+        pg.toasts.dismiss(id, Duration::ZERO);
+    }
+
+    fn history(ui: &mut Ui<'_>, pg: &mut Pg) {
+        let before = pg.toasts.history().count();
+        ui.toast_history("hist", Rect::new(0.0, 0.0, 320.0, 400.0), &mut pg.toasts);
+        pg.clicks += u32::try_from(before - pg.toasts.history().count()).unwrap_or(0);
+    }
+
+    fn settings(ui: &mut Ui<'_>, pg: &mut Pg) {
+        let page = SettingsPage {
+            active: true,
+            glass: GLASS,
+            under: UNDER,
+            restart: true,
+            name: "General",
+        };
+        let r = ui.settings_page("page", Rect::new(0.0, 0.0, 800.0, 600.0), &page, |_, _| {
+            10.0
+        });
+        pg.clicks += u32::from(r.restart);
+    }
+
+    fn dialog(ui: &mut Ui<'_>, pg: &mut Pg) {
+        let d = Dialog {
+            title: "Discard changes",
+            message: "The document has unsaved changes.",
+            extra_h: 0.0,
+            confirm: "Discard",
+            cancel: Cancel::Default,
+        };
+        let r = ui.dialog("d", &d, &glass(), |_: &mut Ui<'_>, _, _, _| {});
+        pg.clicks += u32::from(r.confirmed) + u32::from(r.cancelled);
+    }
+
+    fn empty(ui: &mut Ui<'_>, pg: &mut Pg) {
+        let s = EmptyState {
+            image: None,
+            title: "Nothing open",
+            subtitle: "Open a folder.",
+            actions: &["Open"],
+        };
+        pg.clicks += u32::from(
+            ui.empty_state("e", Rect::new(0.0, 100.0, 900.0, 500.0), &s)
+                .is_some(),
+        );
+    }
+
+    fn callout(ui: &mut Ui<'_>, pg: &mut Pg) {
+        let o = CalloutOptions {
+            tone: Tone::Neutral,
+            icon: icon::INFO,
+            text: "The proxy is offline",
+            figure: None,
+            action: Some("Retry"),
+            announce: false,
+        };
+        let r = ui.callout("c", Rect::new(20.0, 20.0, 500.0, 0.0), &o);
+        pg.clicks += u32::from(r.action.is_some_and(|a| a.clicked));
+    }
+
+    fn named(n: &Node, role: Role, name: &str) -> bool {
+        n.role == role && n.name == name
+    }
+
+    /// The five readers M11 fixed.
+    fn readers() -> Vec<Stop> {
+        vec![
+            Stop {
+                name: "stepper",
+                draw: stepper,
+                want: |n| n.role == Role::SpinButton,
+                least: 2,
+                overlay: None,
+                setup: None,
+            },
+            Stop {
+                name: "slider",
+                draw: slider,
+                want: |n| n.role == Role::Slider,
+                least: 4,
+                overlay: None,
+                setup: None,
+            },
+            Stop {
+                name: "search picker trigger",
+                draw: picker,
+                want: |n| n.role == Role::ComboBox,
+                least: 2,
+                overlay: None,
+                setup: None,
+            },
+            Stop {
+                name: "tab strip",
+                draw: tabs,
+                want: |n| n.role == Role::Tab,
+                least: 2,
+                overlay: None,
+                setup: None,
+            },
+            Stop {
+                name: "star rating",
+                draw: stars,
+                want: |n| n.name.ends_with(" of 5"),
+                least: 2,
+                overlay: None,
+                setup: None,
+            },
+        ]
+    }
+
+    /// The hosts of `Ui::button` and `icon_button` (Probe rows) and the "not checked" ones.
+    fn hosts() -> Vec<Stop> {
+        vec![
+            Stop {
+                name: "dialog confirm",
+                draw: dialog,
+                want: |n| named(n, Role::Button, "Discard"),
+                least: 2,
+                overlay: Some("d"),
+                setup: None,
+            },
+            Stop {
+                name: "dialog cancel",
+                draw: dialog,
+                want: |n| named(n, Role::Button, "Cancel"),
+                least: 2,
+                overlay: Some("d"),
+                setup: None,
+            },
+            Stop {
+                name: "toolbar action",
+                draw: toolbar,
+                want: |n| named(n, Role::Button, "Fetch"),
+                least: 2,
+                overlay: None,
+                setup: None,
+            },
+            Stop {
+                name: "filter bar clear",
+                draw: filter,
+                want: |n| n.id == id("f").with("clear"),
+                least: 2,
+                overlay: None,
+                setup: None,
+            },
+            Stop {
+                name: "tab strip new tab",
+                draw: tabs,
+                want: |n| named(n, Role::Button, "New tab"),
+                least: 2,
+                overlay: None,
+                setup: None,
+            },
+            Stop {
+                name: "toast action",
+                draw: toasts,
+                want: |n| named(n, Role::Button, "Open"),
+                least: 2,
+                overlay: None,
+                setup: Some(toast_setup),
+            },
+            Stop {
+                name: "toast dismiss",
+                draw: toasts,
+                want: |n| named(n, Role::Button, "Dismiss"),
+                least: 2,
+                overlay: None,
+                setup: Some(toast_setup),
+            },
+            Stop {
+                name: "settings restart",
+                draw: settings,
+                want: |n| named(n, Role::Button, "Restart now"),
+                least: 2,
+                overlay: None,
+                setup: None,
+            },
+            Stop {
+                name: "empty state action",
+                draw: empty,
+                want: |n| named(n, Role::Button, "Open"),
+                least: 2,
+                overlay: None,
+                setup: None,
+            },
+            Stop {
+                name: "callout action",
+                draw: callout,
+                want: |n| named(n, Role::Button, "Retry"),
+                least: 2,
+                overlay: None,
+                setup: None,
+            },
+            Stop {
+                name: "toast history clear",
+                draw: history,
+                want: |n| named(n, Role::Button, "Clear all"),
+                least: 2,
+                overlay: None,
+                setup: Some(history_setup),
+            },
+        ]
+    }
+
+    #[test]
+    fn a_disabled_reader_takes_every_key_it_takes_enabled_and_fires_no_global_binding() {
+        let mut leaks = Vec::new();
+        for stop in readers() {
+            leaks.extend(row(&stop));
+        }
+        assert_eq!(leaks, Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_disabled_host_of_a_button_takes_enter_and_space_and_fires_no_binding() {
+        let mut leaks = Vec::new();
+        for stop in hosts() {
+            leaks.extend(row(&stop));
+        }
+        assert_eq!(leaks, Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_chord_on_the_keys_of_the_five_readers_is_a_shortcut_enabled_and_disabled() {
+        let mut bad = Vec::new();
+        for stop in readers() {
+            bad.extend(chord_row(&stop));
+        }
+        assert_eq!(bad, Vec::<String>::new());
     }
 }

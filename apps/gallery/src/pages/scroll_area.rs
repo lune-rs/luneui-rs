@@ -152,7 +152,7 @@ const TO_40: Ev = Ev::Scroll {
 const SCENES: &[UiScene] = &[
     UiScene {
         id: "scroll-area-rest",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[],
@@ -162,7 +162,7 @@ const SCENES: &[UiScene] = &[
     // The pointer is over the area, the content is at 40 percent: the thumb shows part way down.
     UiScene {
         id: "scroll-area-hover",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[
@@ -180,7 +180,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "scroll-area-fits",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: fits,
         script: &[Step {
@@ -192,7 +192,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "scroll-area-disabled",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: disabled,
         script: &[Step {
@@ -205,7 +205,7 @@ const SCENES: &[UiScene] = &[
     // One line is added at 400 ms: follow-tail takes the area to the new end.
     UiScene {
         id: "scroll-area-follow-tail",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: log,
         script: &[
@@ -225,7 +225,7 @@ const SCENES: &[UiScene] = &[
     // pointer entered the area 300 ms before, so the thumb has finished its own reveal.
     UiScene {
         id: "scroll-area-wheel",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[
@@ -248,7 +248,7 @@ const SCENES: &[UiScene] = &[
     // The app asks at 300 ms for the line one viewport down: `scroll` kind, `fast`, sine-in-out.
     UiScene {
         id: "scroll-area-into-view",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: into_view,
         script: &[Step {
@@ -261,7 +261,7 @@ const SCENES: &[UiScene] = &[
     // The pointer enters the area at 300 ms: the thumb fades in over `fast`.
     UiScene {
         id: "scroll-area-thumb-reveal",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[Step {

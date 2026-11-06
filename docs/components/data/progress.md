@@ -2,10 +2,10 @@
 id: data.progress
 title: Progress bar
 area: data
-status: in-progress
+status: done
 consumers: wane
-source: —
-owner: toolkit-v1 M6
+source: crates/lune-ui-core/src/widgets/progress.rs
+owner: —
 summary: 4 px track with an accent fill; warn and err only for meaning
 ---
 
@@ -88,6 +88,8 @@ None: the head text is app text.
 - `progress-determinate` (new): fills at 40%, with a head, settled.
 - `progress-variants` (new): default, warn and err bars, settled.
 - `progress-pending` (new): the pending row the probe scene uses instead of an indeterminate bar, settled.
+- `progress-indeterminate`: the 3 px indeterminate bar, the segment a quarter of the way along its 2400 ms travel, t = 600 ms.
+- `progress-indeterminate-reduced`: the same under Reduced, where the fill breathes over 1800 ms, fully up at t = 900 ms.
 
 ### Painter primitives
 
@@ -96,15 +98,17 @@ None: the head text is app text.
 
 ### Acceptance
 
-- Behaviour (scripted input, injected time): the fill width equals the value fraction at 0, 50 and 100%; a value outside 0–100 clamps. None exists.
+- Behaviour (scripted input, injected time): the fill width equals the value fraction at 0, 50 and 100%; a value outside 0–100 clamps.
 - Pixel probes at scale 2: track 8 px high, radius 4 px (indeterminate: 6 px high, radius 3 px), head 26 px line height, 8 px gap below the head.
 - Conformance: none (no motion).
 - Semantic node: `progress` with min 0 and max 100; no value when indeterminate.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_progress.rs`: behaviour `the_fill_width_is_the_fraction_of_the_track_at_0_half_and_1`, `a_value_outside_the_range_clamps_and_nan_is_zero`, `the_fill_colour_is_accent_for_neutral_and_the_tone_otherwise`; pixel probes `at_scale_2_the_track_is_8_px_high_with_a_4_px_radius`, `the_indeterminate_track_is_3_high_with_half_that_radius`, `the_head_value_ends_at_the_right_edge`, `heights_and_the_head`; the indeterminate motion (the entry has some, though its Conformance bullet says none: it is the busy loop outside the motion scale, D118) `the_segment_is_30_percent_of_the_track_travelling_left_to_right_clipped_by_it`, `the_travel_phase_is_closed_in_time_and_wraps`, `full_and_reduced_keep_asking_for_frames_and_off_is_idle`, `reduced_breathes_a_full_width_fill_between_038_and_1`, `off_holds_a_static_full_fill_at_038`; the determinate bar never animates `the_ui_bar_matches_paint_and_never_animates_when_determinate`; node `the_node_is_progress_valued_0_to_100_and_has_none_when_indeterminate`.
 
 ### Build
 
 - Milestone: M6.
 - Depends on: core.painter, core.theme.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_progress.rs::the_fill_width_is_the_fraction_of_the_track_at_0_half_and_1, crates/lune-ui-core/tests/widget_progress.rs::a_value_outside_the_range_clamps_and_nan_is_zero, crates/lune-ui-core/tests/widget_progress.rs::at_scale_2_the_track_is_8_px_high_with_a_4_px_radius, crates/lune-ui-core/tests/widget_progress.rs::the_segment_is_30_percent_of_the_track_travelling_left_to_right_clipped_by_it, crates/lune-ui-core/tests/widget_progress.rs::reduced_breathes_a_full_width_fill_between_038_and_1, crates/lune-ui-core/tests/widget_progress.rs::the_node_is_progress_valued_0_to_100_and_has_none_when_indeterminate`; page `progress` (scenes `progress-*`, indeterminate included); unverified here: none.
 
 ## Open questions
 

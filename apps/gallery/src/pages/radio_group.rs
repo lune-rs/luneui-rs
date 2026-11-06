@@ -133,7 +133,7 @@ impl PageState for Specimens {
 const SCENES: &[UiScene] = &[
     UiScene {
         id: "radio-group-states",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: specimens,
         script: &[],
@@ -144,7 +144,7 @@ const SCENES: &[UiScene] = &[
     // 90 ms.
     UiScene {
         id: "radio-select-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[
@@ -163,7 +163,7 @@ const SCENES: &[UiScene] = &[
     // Hover is `instant` (120 ms): half way at 60 ms.
     UiScene {
         id: "radio-hover-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[Step {
@@ -176,7 +176,7 @@ const SCENES: &[UiScene] = &[
     // Tab focuses the group's stop, the selected row; the ring is `fast`: half way at 90 ms.
     UiScene {
         id: "radio-focus-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[Step {

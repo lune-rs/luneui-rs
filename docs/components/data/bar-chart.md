@@ -2,10 +2,10 @@
 id: data.bar-chart
 title: Stacked bar chart
 area: data
-status: in-progress
+status: done
 consumers: wane
 source: crates/lune-ui-core/src/widgets/bar_chart.rs
-owner: toolkit-v1 M8
+owner: —
 summary: Hourly stacked columns, two series, three grid lines
 ---
 
@@ -96,15 +96,17 @@ One toolkit key, `luneui.bar-chart.name` ("Bar chart"), the fallback name. Axis 
 
 ### Acceptance
 
-- Behaviour (scripted input, injected time): a hover on a column opens its tooltip with the exact value; an empty chart draws no bars. None exists.
+- Behaviour (scripted input, injected time): a hover on a column opens its tooltip with the exact value; an empty chart draws no bars.
 - Pixel probes at scale 2: plot 320 px high; bar width 24 px; grid lines 2 px; y gutter 80 px.
 - Conformance: the `Kind::Value` row on Full, Reduced and Off (`widget_bar_chart.rs`).
 - Semantic node: `image` plot with a name; legend `static-text`.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_bar_chart.rs`: behaviour `a_column_shows_its_tip_after_the_delay_and_an_empty_tip_shows_none`, `hovered_reports_the_slot_under_the_pointer`, `an_empty_chart_keeps_the_grid_and_the_x_labels`, `values_that_are_not_numbers_never_panic_and_count_as_zero`, `a_stack_above_max_is_cut_at_the_top_of_the_plot`; pixel probes `the_entry_probes_at_scale_2_plot_320_bar_24_grid_2_gutter_80`, `series_0_is_at_the_bottom_and_segments_are_1_px_apart`, `the_legend_names_the_series_with_swatches_of_8_px_radius_3`; conformance `the_value_row_conforms_under_every_tier`, `a_change_of_value_animates_once_and_ends_exactly_at_its_height`, `off_and_reduced_snap`, `idle_at_rest`; node `the_chart_is_an_image_named_by_the_app_over_its_legend`, `an_empty_label_falls_to_the_toolkit_string_through_the_table`, `a_disabled_scope_marks_every_node`.
 
 ### Build
 
 - Milestone: M8.
 - Depends on: core.painter, core.theme, overlay.tooltip, infra.accessibility.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_bar_chart.rs::a_column_shows_its_tip_after_the_delay_and_an_empty_tip_shows_none, crates/lune-ui-core/tests/widget_bar_chart.rs::an_empty_chart_keeps_the_grid_and_the_x_labels, crates/lune-ui-core/tests/widget_bar_chart.rs::the_entry_probes_at_scale_2_plot_320_bar_24_grid_2_gutter_80, crates/lune-ui-core/tests/widget_bar_chart.rs::the_value_row_conforms_under_every_tier, crates/lune-ui-core/tests/widget_bar_chart.rs::a_change_of_value_animates_once_and_ends_exactly_at_its_height, crates/lune-ui-core/tests/widget_bar_chart.rs::the_chart_is_an_image_named_by_the_app_over_its_legend`; page `bar-chart`; unverified here: none.
 
 ## Open questions
 

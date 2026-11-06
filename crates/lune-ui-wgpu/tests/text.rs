@@ -390,3 +390,154 @@ fn generated_text_meets_the_line_properties() {
     failures.truncate(12);
     assert_eq!(n, 0, "{failures:#?}");
 }
+
+// ── Pixel probes: drawn through the real renderer at scale 2, read back ────────────────────────
+
+mod ink {
+    use lune_ui_core::icon;
+    use lune_ui_core::paint::{Painter, Rect};
+    use lune_ui_core::scene::Scene;
+    use lune_ui_core::text::{Spec, Style};
+    use lune_ui_core::theme::DARK;
+    use lune_ui_wgpu::dump;
+    use lune_ui_wgpu::frame::{FrameParams, FrameRenderer};
+    use lune_ui_wgpu::gpu::{self, Gpu};
+    use lune_ui_wgpu::text_cache::TextCache;
+
+    const SCALE: f32 = 2.0;
+    const SIZE: (u32, u32) = (400, 120);
+    const WHITE: [u8; 4] = [255, 255, 255, 255];
+
+    fn headless_gpu() -> Option<Gpu> {
+        match pollster::block_on(Gpu::new(gpu::instance(None), None)) {
+            Ok(g) => Some(g),
+            Err(e) => {
+                let required = std::env::var("LUNEUI_REQUIRE_GPU").is_ok_and(|v| v == "1");
+                assert!(!required, "no GPU adapter: {e}");
+                println!("skipped: no GPU adapter");
+                None
+            }
+        }
+    }
+
+    /// Draws one spec at (10, 10) logical on an empty window and returns the RGBA read back.
+    fn draw(gpu: &mut Gpu, text: &mut TextCache, spec: &Spec) -> Vec<u8> {
+        let win = Rect::new(0.0, 0.0, SIZE.0 as f32 / SCALE, SIZE.1 as f32 / SCALE);
+        let mut p: Painter<'_, u8> = Painter::new(SCALE, win, text, None, DARK);
+        p.text(spec, 10.0, 10.0);
+        let scene: Scene = p.scene;
+        let format = wgpu::TextureFormat::Rgba8Unorm;
+        let mut renderer = FrameRenderer::new(gpu, format);
+        let texture = dump::target(&gpu.device, format, SIZE);
+        let view = texture.create_view(&Default::default());
+        let params = FrameParams {
+            size: SIZE,
+            scale: SCALE,
+            blur_sigma: 4.0,
+            saturation: 1.0,
+        };
+        renderer
+            .draw(gpu, text, &scene, &view, params)
+            .expect("draw");
+        dump::read_rgba(&gpu.device, &gpu.queue, &texture).expect("readback")
+    }
+
+    /// The ink: the box of the pixels whose alpha is over 32 (device px, width and height) and
+    /// the sum of every pixel's alpha.
+    fn ink(img: &[u8]) -> ((usize, usize), u64) {
+        let (w, h) = (SIZE.0 as usize, SIZE.1 as usize);
+        let (mut x0, mut y0, mut x1, mut y1) = (w, h, 0, 0);
+        let mut sum = 0u64;
+        for y in 0..h {
+            for x in 0..w {
+                let a = img[(y * w + x) * 4 + 3];
+                sum += u64::from(a);
+                if a > 32 {
+                    (x0, y0, x1, y1) = (x0.min(x), y0.min(y), x1.max(x), y1.max(y));
+                }
+            }
+        }
+        if x1 < x0 {
+            return ((0, 0), sum);
+        }
+        ((x1 - x0 + 1, y1 - y0 + 1), sum)
+    }
+
+    fn cache() -> TextCache {
+        super::with_fonts()
+    }
+
+    #[test]
+    fn an_icon_glyph_has_ink_that_grows_with_its_size() {
+        let Some(mut gpu) = headless_gpu() else {
+            return;
+        };
+        let mut text = cache();
+        // Instrument check: an empty string leaves the target empty.
+        let blank = draw(
+            &mut gpu,
+            &mut text,
+            &Spec::plain("", Style::ui(14.0, WHITE)),
+        );
+        assert_eq!(ink(&blank), ((0, 0), 0));
+        // The plus at the toolkit's four icon sizes, in device px.
+        let mut boxes = Vec::new();
+        for size in [12.0, 13.0, 14.0, 16.0] {
+            let img = draw(&mut gpu, &mut text, &icon::glyph(icon::ADD, size, WHITE));
+            let (b, sum) = ink(&img);
+            assert!(b.0 > 0 && b.1 > 0 && sum > 0, "no ink at {size} px");
+            boxes.push((size, b));
+        }
+        for pair in boxes.windows(2) {
+            let ((s0, a), (s1, b)) = (pair[0], pair[1]);
+            assert!(
+                b.0 >= a.0 && b.1 >= a.1,
+                "the ink box shrank from {s0} px {a:?} to {s1} px {b:?}"
+            );
+        }
+        let (first, last) = (boxes[0].1, boxes[3].1);
+        assert!(
+            last.0 > first.0 && last.1 > first.1,
+            "16 px ink {last:?} is not larger than 12 px ink {first:?}"
+        );
+    }
+
+    const WORD: &str = "Hamburgefonstiv";
+
+    fn word_ink(gpu: &mut Gpu, text: &mut TextCache, style: Style) -> ((usize, usize), u64) {
+        ink(&draw(gpu, text, &Spec::plain(WORD, style)))
+    }
+
+    #[test]
+    fn medium_is_heavier_than_regular() {
+        let Some(mut gpu) = headless_gpu() else {
+            return;
+        };
+        let mut text = cache();
+        let regular = word_ink(&mut gpu, &mut text, Style::ui(20.0, WHITE));
+        let medium = word_ink(&mut gpu, &mut text, Style::ui(20.0, WHITE).medium());
+        assert!(regular.1 > 0);
+        assert!(
+            medium.1 > regular.1,
+            "medium ink {} is not heavier than regular {}",
+            medium.1,
+            regular.1
+        );
+    }
+
+    /// No bold face is bundled (RznSans Regular and Medium only), so bold does not get a face of
+    /// its own: the font database falls back to the nearest weight it has. This pins what happens
+    /// today: bold draws exactly as medium does, and so is heavier than regular.
+    #[test]
+    fn bold_falls_back_to_the_nearest_bundled_weight() {
+        let Some(mut gpu) = headless_gpu() else {
+            return;
+        };
+        let mut text = cache();
+        let regular = word_ink(&mut gpu, &mut text, Style::ui(20.0, WHITE));
+        let medium = word_ink(&mut gpu, &mut text, Style::ui(20.0, WHITE).medium());
+        let bold = word_ink(&mut gpu, &mut text, Style::ui(20.0, WHITE).bold());
+        assert!(bold.1 > regular.1, "bold {} regular {}", bold.1, regular.1);
+        assert_eq!(bold, medium, "bold is not the medium face");
+    }
+}

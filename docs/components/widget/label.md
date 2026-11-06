@@ -2,10 +2,10 @@
 id: widget.label
 title: Label
 area: widget
-status: in-progress
+status: done
 consumers: luneterm, wane
 source: crates/lune-ui-core/src/widgets/label.rs
-owner: orch/toolkit-v1
+owner: —
 summary: Label: UI-font text at the theme base size; colour from the caller; section and title roles from the font scale
 ---
 
@@ -87,15 +87,17 @@ None: the label text is app text.
 - Pixel probes at scale 2: 13 px base text cap height and line box match `controls` at zero delta.
 - Conformance: n/a — no transition.
 - Semantic node: role static-text; name equals the text passed.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_label.rs`: `the_controls_label_lines_draw_exactly_what_the_painter_text_does` (13 px base text equals the `controls` look), `each_role_draws_with_its_label_md_size_weight_and_colour`, `the_node_is_static_text_named_and_valued_by_the_text`.
 
 ### Build
 
 - Milestone: M4 (retrofit: transitions, focus, semantic node); done by M11.
 - Depends on: text.shaping, infra.accessibility.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_label.rs::the_controls_label_lines_draw_exactly_what_the_painter_text_does, crates/lune-ui-core/tests/widget_label.rs::each_role_draws_with_its_label_md_size_weight_and_colour, crates/lune-ui-core/tests/widget_label.rs::the_node_is_static_text_named_and_valued_by_the_text`; page `label`; unverified here: none.
 
 ## Open questions
 
-- `variant-gap`: the title (18/24 Medium) and mono and strong roles have no moved code or theme field (`crates/lune-ui-core/src/theme.rs:12-41`); M4 adds the sizes or the roles.
+- Answered: the title (18/24 Medium), mono and strong roles exist as `LabelRole` (`crates/lune-ui-core/src/widgets/label.rs:20`), with `font_title` and `line_title` in the theme; `each_role_draws_with_its_label_md_size_weight_and_colour` holds them.
 
 ## Notes for the planner
 

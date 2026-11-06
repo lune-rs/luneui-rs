@@ -14,8 +14,8 @@
 //! and the scroll offsets the areas left last frame: a wheel step moves the picture one frame
 //! before it moves the drop target.
 //!
-//! A card's drawn position has one owner, [`BoardMem`]. It is its `y` (a slide to its slot) while it
-//! rests; the pointer while it drags, with its dimmed source held in place; and a [`Landing`] after
+//! A card's drawn position has one owner, `BoardMem`. It is its `y` (a slide to its slot) while it
+//! rests; the pointer while it drags, with its dimmed source held in place; and a `Landing` after
 //! that, whatever ended the drag: the ghost runs from where it was to wherever the slot is now, and
 //! replaces the body until it arrives. An accepted move, a refused one, a cancel and a keyboard move
 //! across columns are that one path.

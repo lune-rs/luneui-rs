@@ -143,7 +143,7 @@ pub(crate) enum Expect {
 pub(crate) struct UiScene {
     pub(crate) id: &'static str,
     /// Device pixels per logical pixel in dump mode.
-    pub(crate) scale: u32,
+    pub(crate) scale: f32,
     pub(crate) tier: MotionTier,
     /// The state the scene starts from.
     pub(crate) state: fn() -> Box<dyn PageState>,
@@ -158,6 +158,15 @@ impl UiScene {
     /// `<id>@<scale>x`, the listing name.
     pub(crate) fn name(&self) -> String {
         format!("{}@{}x", self.id, self.scale)
+    }
+
+    /// The dump's size in physical pixels: the window times the scale, whole at 1.5 (1560 by 990).
+    pub(crate) fn size(&self) -> (u32, u32) {
+        let (w, h) = (
+            (W as f32 * self.scale).round(),
+            (H as f32 * self.scale).round(),
+        );
+        (w as u32, h as u32)
     }
 }
 
@@ -272,7 +281,7 @@ impl Player {
             page,
             (scene.state)(),
             (W as f32, H as f32),
-            scene.scale as f32,
+            scene.scale,
             scene.tier,
         )
     }
@@ -602,7 +611,7 @@ mod tests {
     fn probe_scene(script: &'static [Step], capture_ms: u32, expect: Expect) -> UiScene {
         UiScene {
             id: "probe",
-            scale: 1,
+            scale: 1.0,
             tier: MotionTier::Full,
             state: || Box::new(Probe::default()),
             script,
@@ -651,5 +660,37 @@ mod tests {
         run(50, &[Ev::Access(&["a"], Action::Default)]);
         assert_eq!(clicks.get(), 2);
         assert_eq!(path_id("p", &["a"]), WidgetId::ROOT.with("p").with("a"));
+    }
+    /// The `*-disabled` scenes of the D47 pass (M11 review round 1): each draws a scope in
+    /// `with_enabled(false, ..)`, so a node is `Disabled`, and its pointer, click, Tab or key
+    /// script leaves no widget focused.
+    #[test]
+    fn the_disabled_scenes_hold_a_disabled_node_and_no_focus() {
+        use lune_ui::access::State;
+        const SCENES: [(&str, &str); 8] = [
+            ("toolbar", "toolbar-disabled"),
+            ("search-picker", "search-picker-disabled"),
+            ("banner", "banner-empty-state-disabled"),
+            ("tree-view", "tree-view-disabled"),
+            ("settings-page", "settings-page-disabled"),
+            ("kanban-board", "kanban-board-disabled"),
+            ("command-palette", "command-palette-disabled"),
+            ("code-editor-view", "code-editor-view-disabled"),
+        ];
+        for (page, id) in SCENES {
+            let PageKind::Ui(ui) = PAGES.iter().find(|p| p.id == page).expect("a page").kind else {
+                panic!("{page} is a Ui page");
+            };
+            let scene = ui.scenes.iter().find(|s| s.id == id).expect("a scene");
+            let (_, out) = run_scene(page, scene, &mut FakeText).expect("runs");
+            assert!(
+                out.tree
+                    .nodes
+                    .iter()
+                    .any(|n| n.states.contains(State::Disabled)),
+                "{id}: a Disabled node"
+            );
+            assert!(out.focused.is_none(), "{id}: nothing focused");
+        }
     }
 }

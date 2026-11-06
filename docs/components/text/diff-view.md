@@ -2,10 +2,10 @@
 id: text.diff-view
 title: Diff view (unified, split, hunk actions)
 area: text
-status: in-progress
+status: done
 consumers: lunegit, wane
 source: crates/lune-ui-core/src/widgets/diff_view.rs
-owner: toolkit-v1 M9
+owner: —
 summary: Unified and split diff over an app-supplied line model: line numbers, add and remove tints, hunk header rows with actions, row selection, intra-line marks
 ---
 
@@ -27,7 +27,7 @@ needs a before and after diff for what a compression stage changed.
 
 ## Existing code
 
-None in `lune-ui`. Design sources (not code to move): Lunegit `src/Lunegit.Desktop/Views/DiffView.axaml` (210 lines, header and mode switch), `Views/UnifiedDiffView.axaml` (202), `Views/SplitDiffView.axaml` (314) and `.axaml.cs` (276, selection and scroll sync),
+Built in M9 step 6: `crates/lune-ui-core/src/widgets/diff_view.rs` (`Ui::diff_view`, `DiffLine`, `SplitRow`, `pair_rows`, `DiffOptions`), tests `crates/lune-ui-core/tests/widget_diff_view.rs`. Design sources (not code to move): Lunegit `src/Lunegit.Desktop/Views/DiffView.axaml` (210 lines, header and mode switch), `Views/UnifiedDiffView.axaml` (202), `Views/SplitDiffView.axaml` (314) and `.axaml.cs` (276, selection and scroll sync),
 `Converters/DiffLineBackgroundConverter.cs`, `Converters/DiffLineForegroundConverter.cs`, `Converters/DiffLinePrefixConverter.cs`.
 
 ## Spec
@@ -148,11 +148,13 @@ Hunk and line action labels (Lunegit: "Stage hunk", "Unstage hunk", "Stage line"
 - Pixel probes at scale 2: row slot at least 40 device px, number column 96 px, prefix column 20 px, split separator 2 px, hunk button 36 px with radius 10; added fill `#1A73C991` over the dark preset's surface.
 - Conformance: the two transitions pass `motion::conformance`; Reduced keeps them, Off snaps [motion].
 - Semantic node: role `table`, one `row` per built line, `selected` follows the key set; an injected `AccessAction` default on a hunk action invokes it.
+- Tests, bullet by bullet (`crates/lune-ui-core/tests/widget_diff_view.rs`). Behaviour: `click_selects_one_row_meta_toggles_and_shift_selects_from_the_anchor`, `the_copy_shortcut_writes_the_selected_lines_in_row_order_in_one_request`, `split_rows_show_the_halves_and_a_press_in_one_pane_clears_the_other`, `a_selection_made_by_keys_clears_the_other_pane_and_the_copy_reads_the_new_one`. Hunk actions: `a_press_on_a_hunk_button_reports_the_hunk_and_action_and_selects_no_row`, `without_actions_there_are_no_buttons_and_no_extra_tab_stops`, `the_default_action_of_a_hunk_button_invokes_it`. Preservation: `the_same_identity_keeps_the_offset_and_the_selection_a_new_one_starts_at_the_top`. Synced split scroll: `scrolling_the_left_pane_puts_the_right_at_the_same_offset_with_no_echo`, `scrolling_the_right_pane_moves_the_left_on_the_catch_up_frame`. Spans: `a_mark_past_the_line_end_is_clamped_and_empty_or_inverted_ones_add_nothing`, `spans_colour_runs_of_a_line`. Scale: `a_hundred_thousand_rows_build_only_the_window_in_both_modes`, `pairing_a_hundred_thousand_lines_is_one_pass`. Pixel probes at scale 2: `at_scale_2_the_row_is_40_the_number_column_96_the_prefix_20_and_the_fill_the_added_tint`, `at_scale_2_the_hunk_button_is_36_with_radius_10_and_the_pill_is_rounded_20`, `split_panes_are_equal_with_a_one_pixel_separator`. Conformance: `the_hover_and_press_transitions_conform_at_every_tier`, `rows_never_animate_a_selection_change_is_there_in_its_frame`. Node: `the_tree_is_a_table_of_rows_with_cells_descriptions_and_selected`, `each_split_pane_says_which_half_it_is_and_the_unified_one_keeps_the_label`, `a_disabled_diff_marks_its_whole_subtree`.
 
 ### Build
 
 - Milestone: M9. Built in M9 step 6: `Ui::diff_view`, `Ui::diff_selected_text`, `DiffLine`, `LineKind`, `DiffMark`, `SplitRow`, `DiffMode`, `HunkAction`, `DiffOptions`, `DiffResponse`, `pair_rows`, `widest_chars`, 14 scenes on the page `diff-view`.
 - Depends on: text.code-editor-view, layout.virtualized-list, layout.scroll-area, widget.scrollbar, overlay.menu, widget.toolbar, platform.clipboard, core.ui, core.focus, infra.accessibility, motion.transitions
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_diff_view.rs::click_selects_one_row_meta_toggles_and_shift_selects_from_the_anchor, crates/lune-ui-core/tests/widget_diff_view.rs::the_copy_shortcut_writes_the_selected_lines_in_row_order_in_one_request, crates/lune-ui-core/tests/widget_diff_view.rs::a_press_on_a_hunk_button_reports_the_hunk_and_action_and_selects_no_row, crates/lune-ui-core/tests/widget_diff_view.rs::the_same_identity_keeps_the_offset_and_the_selection_a_new_one_starts_at_the_top, crates/lune-ui-core/tests/widget_diff_view.rs::scrolling_the_left_pane_puts_the_right_at_the_same_offset_with_no_echo, crates/lune-ui-core/tests/widget_diff_view.rs::a_mark_past_the_line_end_is_clamped_and_empty_or_inverted_ones_add_nothing, crates/lune-ui-core/tests/widget_diff_view.rs::a_hundred_thousand_rows_build_only_the_window_in_both_modes, crates/lune-ui-core/tests/widget_diff_view.rs::at_scale_2_the_row_is_40_the_number_column_96_the_prefix_20_and_the_fill_the_added_tint, crates/lune-ui-core/tests/widget_diff_view.rs::the_hover_and_press_transitions_conform_at_every_tier, crates/lune-ui-core/tests/widget_diff_view.rs::the_tree_is_a_table_of_rows_with_cells_descriptions_and_selected`; page `diff-view` (14 scenes); unverified here: the OS clipboard the copy reaches (`platform.clipboard`).
 
 ## Open questions
 

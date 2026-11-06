@@ -17,6 +17,8 @@
 //! pixels from the offscreen target's readback (no screen or window capture).
 
 mod bench;
+#[cfg(test)]
+mod catalogue;
 mod custom;
 mod page;
 mod pages;
@@ -182,8 +184,8 @@ fn dump_scenes(r: &mut Renderer, dir: &Path) -> Result<(), String> {
             }
             PageKind::Ui(ui) => {
                 for scene in ui.scenes {
-                    let s = scene.scale as f32;
-                    let size = (W * scene.scale, H * scene.scale);
+                    let s = scene.scale;
+                    let size = scene.size();
                     let images = register_images(&mut r.gpu, (scene.state)().images())
                         .map_err(|e| format!("scene {}: {e}", scene.name()))?;
                     let (display, out) = run_scene(page.id, scene, &mut r.text)

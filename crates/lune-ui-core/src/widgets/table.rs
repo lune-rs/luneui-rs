@@ -1,5 +1,5 @@
 //! The data table (`data.table`, D162): a sortable header over a virtualized body on the list frame
-//! ([`ListStyle`], D161). 28 px rows with hairlines, numeric columns in mono, tones for the cell
+//! (`ListStyle`, D161). 28 px rows with hairlines, numeric columns in mono, tones for the cell
 //! text, controls in cells.
 //!
 //! The app owns the data and the sorting: it passes the columns and a closure per visible cell,

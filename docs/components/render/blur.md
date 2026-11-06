@@ -2,10 +2,10 @@
 id: render.blur
 title: Backdrop blur pass
 area: render
-status: in-progress
+status: done
 consumers: luneterm
-source: crates/lune-ui-wgpu/src/blur.rs
-owner: orch/toolkit-v1
+source: crates/lune-ui-wgpu/src/blur.rs, crates/lune-ui-wgpu/src/blur.wgsl
+owner: —
 summary: Backdrop blur pass with its WGSL shader
 ---
 
@@ -19,7 +19,7 @@ summary: Backdrop blur pass with its WGSL shader
 
 ## Existing code
 
-`crates/lune-ui-wgpu/src/blur.rs:190` (`Blur`), `:315` (`scene_view`), `:383` (`dump`), `:20` (`BackdropUniform`); 405 lines; `blur.wgsl` 95 lines. No tests of its own; covered by the gallery's blur scenes.
+`crates/lune-ui-wgpu/src/blur.rs:190` (`Blur`), `:317` (`scene_view`), `:385` (`dump`), `:20` (`BackdropUniform`); 407 lines; `blur.wgsl` 95 lines. No unit tests in the file; the integration tests in `crates/lune-ui-wgpu/tests/` (Acceptance) and the gallery's blur scenes cover it.
 
 ## Spec
 
@@ -27,7 +27,7 @@ summary: Backdrop blur pass with its WGSL shader
 
 Pinned: this repo fa2958b. Read: `crates/lune-ui-wgpu/src/blur.rs:1-2,187-196,315-318,383-386` (module doc, `Blur` struct, `scene_view`, `dump`);
 `crates/lune-ui-core/src/paint.rs:189` (`backdrop`, the painter call that requests the blur).
-Conflicts: none. The menu glass in Wane is `blur(30px) saturate(1.8)` [W docs/ui/components.md:543-556]; the repo's blur takes its strength from the backdrop request, and the saturate has no parameter (Open questions).
+Conflicts: none. The menu glass in Wane is `blur(30px) saturate(1.8)` [W docs/ui/components.md:543-556]; the repo's blur takes its strength and saturation from the backdrop request, or from the frame's `FrameParams` when the request says 0 (M7, [D138]).
 
 ### Anatomy
 
@@ -74,13 +74,16 @@ n/a — no text.
 
 ### Acceptance
 
-- Existing tests: none in `crates/lune-ui-wgpu/src/blur.rs`.
-- Done standard still needs: a pixel gate on `blur-contrast` and `menu` at zero delta, and a test that the scene texture is rebuilt on a size change.
+- Pixel probes on a headless device (`crates/lune-ui-wgpu/tests/primitives.rs`): `a_glass_panel_on_raised_blurs_the_modal_layer_under_it` (inside the glass the black/white edge is blurred, outside it stays sharp), `a_popup_backdrop_leaves_the_modal_layer_sharp_and_on_top` (the split: layers from the request's up are not blurred), `a_backdrop_with_its_own_sigma_and_saturation_differs_from_the_frames` (sigma 4 and saturation 1 by value equal the frame's look; sigma 8 reaches further; saturation 2 differs).
+- The scene texture follows the target's size: `crates/lune-ui-wgpu/tests/targets.rs::one_renderer_across_two_sizes_matches_a_fresh_renderer_at_each` (one `FrameRenderer` drawn at A, B, A, A equals a fresh renderer at each size, pixel for pixel).
+- One blur per frame and the split: `crates/lune-ui-core/tests/painter.rs::of_two_backdrops_the_lower_layer_keeps_it_in_either_draw_order`, `on_one_layer_the_last_backdrop_wins`, `the_recording_renderer_puts_the_backdrop_at_the_split`.
+- The pixel gate on `blur-contrast` and `menu` at zero delta: `scripts/pixel-gate.sh` (the orchestrator's gate; M11's pre-audit run, base 55cfaaf, held 413 of 413 identical).
 
 ### Build
 
 - Milestone: M11 (done standard; code exists).
 - Depends on: render.frame, render.gpu, core.scene.
+- Done (D47, M11): tests `crates/lune-ui-wgpu/tests/primitives.rs::a_glass_panel_on_raised_blurs_the_modal_layer_under_it, crates/lune-ui-wgpu/tests/primitives.rs::a_popup_backdrop_leaves_the_modal_layer_sharp_and_on_top, crates/lune-ui-wgpu/tests/primitives.rs::a_backdrop_with_its_own_sigma_and_saturation_differs_from_the_frames, crates/lune-ui-wgpu/tests/targets.rs::one_renderer_across_two_sizes_matches_a_fresh_renderer_at_each, crates/lune-ui-core/tests/painter.rs::of_two_backdrops_the_lower_layer_keeps_it_in_either_draw_order, crates/lune-ui-core/tests/painter.rs::the_recording_renderer_puts_the_backdrop_at_the_split`; page n/a (a renderer pass, drawn by the scenes `blur-contrast` and `menu`); unverified here: none (the tests skip without a GPU adapter; with `LUNEUI_REQUIRE_GPU=1` they fail instead).
 
 ## Open questions
 

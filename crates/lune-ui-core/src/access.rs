@@ -123,14 +123,17 @@ pub enum State {
 pub struct States(u16);
 
 impl States {
+    /// Whether `state` is in the set.
     pub fn contains(self, state: State) -> bool {
         self.0 & (1 << state as u16) != 0
     }
 
+    /// Adds `state`.
     pub fn insert(&mut self, state: State) {
         self.0 |= 1 << state as u16;
     }
 
+    /// Removes `state`.
     pub fn remove(&mut self, state: State) {
         self.0 &= !(1 << state as u16);
     }
@@ -158,14 +161,17 @@ pub enum Action {
 pub struct Actions(u16);
 
 impl Actions {
+    /// Whether `action` is in the set.
     pub fn contains(self, action: Action) -> bool {
         self.0 & (1 << action as u16) != 0
     }
 
+    /// Adds `action`.
     pub fn insert(&mut self, action: Action) {
         self.0 |= 1 << action as u16;
     }
 
+    /// Removes `action`.
     pub fn remove(&mut self, action: Action) {
         self.0 &= !(1 << action as u16);
     }

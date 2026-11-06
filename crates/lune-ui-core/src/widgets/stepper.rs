@@ -179,12 +179,15 @@ impl Ui<'_> {
         if plus.enabled && plus.clicked {
             step += 1;
         }
-        if r.enabled {
-            if self.consume_key(id, NamedKey::ArrowUp) {
-                step += 1;
-            }
-            if self.consume_key(id, NamedKey::ArrowDown) {
-                step -= 1;
+        // Both keys are taken whether or not the stepper is enabled (D140), a Control, Alt or
+        // Command chord on them is left to the shortcuts (D157), and only an enabled stepper acts.
+        for (k, delta) in [(NamedKey::ArrowUp, 1), (NamedKey::ArrowDown, -1)] {
+            if r.enabled {
+                if self.consume_plain_key(id, k) {
+                    step += delta;
+                }
+            } else {
+                while self.consume_plain_key(id, k) {}
             }
         }
         let set = match r.set_value.clone() {

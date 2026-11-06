@@ -2,10 +2,10 @@
 id: motion.transitions
 title: Motion system and transitions
 area: motion
-status: in-progress
+status: done
 consumers: any
 source: crates/lune-ui-core/src/motion/transition.rs
-owner: orch/toolkit-v1
+owner: —
 summary: Time, Easing, Tween, Spring, Keyframes and Transition evaluated in closed form, tier-aware, with a 60 Hz conformance harness
 ---
 
@@ -28,8 +28,8 @@ target, token)`, which reports `Repaint::Now` while any transition is in flight.
 
 ## Existing code
 
-None for the model. The only moved motion code is `motion.curves`
-(`crates/lune-ui-core/src/widgets/menu.rs:21-57`). Lunegit has the tokens and the Full and Reduced
+Built in M4: `crates/lune-ui-core/src/motion/` (`easing.rs`, `tween.rs`, `transition.rs`, `tokens.rs`, `conformance.rs`) and `ui.animate_*` (`src/ui/animate.rs`). The moved code is `motion.curves`
+(`crates/lune-ui-core/src/widgets/menu.rs:33-57`). Lunegit has the tokens and the Full and Reduced
 stylesheets (`src/Lunegit.Desktop/App.axaml:151-155`, `Themes/Animations.axaml`,
 `Themes/AnimationsReduced.axaml`) but no code-side model: its transitions are Avalonia's.
 
@@ -90,7 +90,7 @@ None: no user-visible text.
 
 ### Gallery scenes
 
-- `motion-easings`: the seven easings plotted as curves over a unit square, each labelled with its token name; settled.
+- `motion-easings`: the seven easings (linear, quad-out, quad-in, sine-in-out, back-out, cubic-out, ease-in) plotted as curves over a unit square, each labelled with its token name; settled.
 - `motion-kinds`: one swatch per kind of `docs/motion.md` showing its change at t = half its default duration (hover 60 ms, press 90 ms, focus 90 ms, appear 125 ms, dismiss 90 ms, page-swap 175 ms, drawer 175 ms, pop 125 ms, selection 90 ms, move 90 ms, expand 125 ms, value 90 ms, scroll 90 ms, settle 90 ms; spin at 300 ms).
 - `motion-kinds-settled`: the same swatches settled.
 - `motion-retarget`: one `move` retargeted at t = 60 ms of its 180 ms run, drawn at t = 120 ms, showing the path leaves from the current value without a jump.
@@ -108,16 +108,18 @@ None: no user-visible text.
 - Conformance (60 Hz): all 15 kinds under Full, Reduced and Off: no jump above the bound, exact end, settled within duration plus one frame, no NaN [D41].
 - `ui.animate_*` reports `Repaint::Now` while in flight and `Idle` once every id settled; an unused transient id is gone after one frame; an exit-retained id completes then reports Idle [core.ui].
 - Determinism: two runs with the same input script yield identical frames (no clock read; boundary script rule 4 stays green).
+- Tests, bullet by bullet (`crates/lune-ui-core/tests/motion.rs` unless named). Easings: `easing_known_answers`, `easings_clamp_progress_and_hit_their_ends`, `cubic_out_and_ease_in_are_the_moved_menu_curves_bit_for_bit`. Tween and retarget: `tween_holds_from_before_start_and_to_exactly_at_the_end`, `an_in_flight_retarget_keeps_position_and_velocity` (first sample after within 1e-4 of the last before, and the velocity), `an_in_flight_retarget_is_continuous_for_every_easing_pair`. Spring: `spring_known_answer` (2 / e), `spring_never_crosses_its_target_when_moving_away_or_at_rest`. Conformance: `every_kind_conforms_under_every_tier` (15 kinds, three tiers) and the instrument's own checks `the_instrument_catches_a_jump`, `_an_inexact_end`, `_a_nan`, `_a_late_restart`. Repaint: `ui_core.rs::repaint_follows_the_animation`, `repaint_at_the_earliest_future_request`, `an_unused_transient_id_is_gone_after_one_frame`, `ui_overlays.rs::an_overlay_the_app_stops_calling_keeps_drawing_until_its_close_ends`. Determinism: `conformance_is_deterministic`, `ui_core.rs::a_script_run_in_two_fresh_stores_gives_identical_frames`, `c4.rs::the_script_is_deterministic`.
 
 ### Build
 
 - Milestone: M4.
 - Depends on: core.ui, motion.curves, motion.animation-tiers.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/motion.rs::easing_known_answers, crates/lune-ui-core/tests/motion.rs::tween_holds_from_before_start_and_to_exactly_at_the_end, crates/lune-ui-core/tests/motion.rs::an_in_flight_retarget_keeps_position_and_velocity, crates/lune-ui-core/tests/motion.rs::spring_known_answer, crates/lune-ui-core/tests/motion.rs::every_kind_conforms_under_every_tier, crates/lune-ui-core/tests/motion.rs::conformance_is_deterministic, crates/lune-ui-core/tests/ui_core.rs::repaint_follows_the_animation, crates/lune-ui-core/tests/ui_core.rs::a_script_run_in_two_fresh_stores_gives_identical_frames`; page `motion` (scenes `motion-easings`, `motion-kinds`, `motion-kinds-settled`, `motion-retarget`); unverified here: none.
 
 ## Open questions
 
-- `Spring` stiffness and default `w`: no catalogue entry needs a spring today (every kind uses a tween token), and neither Lunegit nor Wane has one. M4 builds the type per the animation model and picks no default rate until a component needs one.
-- `ui.animate_*` return types beyond `f32` and colour (points, rects): added per component as its entry needs them; none is required by an entry yet.
+- Still open, a limit: `Spring` stiffness and default `w`: no catalogue entry needs a spring today (every kind uses a tween token), and neither Lunegit nor Wane has one. M4 built the type per the animation model and picks no default rate until a component needs one (D237: no consumer has asked).
+- Still open, a limit: `ui.animate_*` return types beyond `f32` and colour (points, rects): added per component as its entry needs them; none is required by an entry yet (D237).
 
 ## Notes for the planner
 

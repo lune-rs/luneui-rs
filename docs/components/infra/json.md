@@ -2,7 +2,7 @@
 id: infra.json
 title: Bounded JSON reader
 area: infra
-status: in-progress
+status: done
 consumers: any
 source: crates/lune-ui-core/src/json.rs
 owner: —
@@ -106,12 +106,14 @@ n/a — the reader draws nothing; it is exercised through the theme loader, whic
 - Bounded work: parse time is linear in the input size; a 1,048,576-byte input of 16-deep arrays finishes without stack growth beyond 16 frames [derived: the depth limit].
 - Pixel probes and conformance: n/a (no drawing, no transitions).
 - Semantic-node test: n/a.
-- Security review (D12): the reader is parsing user-editable files; M10's review (the orchestrator's, after step 11) checks the limits and the error paths. The tests above are done (M10 step 1, `crates/lune-ui-core/tests/json.rs`, `apps/gallery/tests/lunegit_files.rs`).
+- Security review (D12): the reader parses user-editable files; M10's security review checked the limits and the error paths (its fix rounds are D231 to D233). The tests above are done (M10 step 1, `crates/lune-ui-core/tests/json.rs`, `apps/gallery/tests/lunegit_files.rs`).
+- Tests, bullet by bullet. Known answers: `apps/gallery/tests/lunegit_files.rs::every_theme_parses_to_an_object_of_five_keys`, `en_json_yields_1019_strings`. Limits (`crates/lune-ui-core/tests/json.rs`): `input_at_the_limit_parses_and_one_over_is_too_large`, `size_is_checked_before_anything_else`, `depth_16_parses_and_17_is_too_deep`, `string_4096_parses_and_4097_is_too_long`, `key_256_parses_and_257_is_too_long`, `object_8192_members_parse_and_8193_is_too_many`, `values_65536_parse_and_65537_is_too_many`. Fail closed: `duplicate_keys_are_an_error_at_the_second`, `syntax_errors_carry_their_offset`, `bad_escapes_are_invalid_escape_at_the_backslash` (a lone surrogate), `invalid_utf8_is_refused_at_the_first_bad_byte`, `a_number_past_f64_is_out_of_range_and_underflow_is_a_value`. No panics: `a_pseudo_random_walk_over_json_like_bytes_always_returns_a_result`, and over the real files `every_prefix_of_every_theme_returns_a_result`, `every_single_byte_deletion_of_every_theme_returns_a_result` (`lunegit_files.rs`; a byte flipped at 97 places and `en.json` cut at every 97th byte are in the same file). Bounded work: `sixteen_deep_arrays_filling_a_megabyte_finish`, `a_megabyte_of_open_brackets_is_too_deep_not_a_stack_overflow`, `many_keys_in_one_object_are_not_checked_quadratically`.
 
 ### Build
 
 - Milestone: M10
 - Depends on: infra.localization, infra.theme-hot-reload
+- Done (D47, M11): tests `crates/lune-ui-core/tests/json.rs::depth_16_parses_and_17_is_too_deep, crates/lune-ui-core/tests/json.rs::input_at_the_limit_parses_and_one_over_is_too_large, crates/lune-ui-core/tests/json.rs::duplicate_keys_are_an_error_at_the_second, crates/lune-ui-core/tests/json.rs::a_pseudo_random_walk_over_json_like_bytes_always_returns_a_result, crates/lune-ui-core/tests/json.rs::sixteen_deep_arrays_filling_a_megabyte_finish, apps/gallery/tests/lunegit_files.rs::en_json_yields_1019_strings, apps/gallery/tests/lunegit_files.rs::every_prefix_of_every_theme_returns_a_result`; page n/a (a pure reader; the theme loader's scenes render through it); unverified here: none.
 
 ## Open questions
 

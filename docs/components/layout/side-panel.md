@@ -2,10 +2,10 @@
 id: layout.side-panel
 title: Side panel host and panels
 area: layout
-status: in-progress
+status: done
 consumers: lunegit
-source: Lunegit: src/Lunegit.Desktop/Views/SidePanelView.axaml
-owner: toolkit-v1 M7
+source: crates/lune-ui-core/src/widgets/side_panel.rs
+owner: —
 summary: Side panel host that shows one of nine panels by key, with a fade and 6 px slide on show
 ---
 
@@ -102,15 +102,17 @@ None: the host draws no text; panel titles are app text.
 
 ### Acceptance
 
-- Behaviour (scripted input, injected time): changing the active key shows exactly one panel; the hidden panels draw nothing; the inactive window draws the fallback fill. None exists.
+- Behaviour (scripted input, injected time): changing the active key shows exactly one panel; the hidden panels draw nothing; the inactive window draws the fallback fill.
 - Pixel probes at scale 2: host radius 16 px; ring 2 px in `border`; content 22 px in; slide 12 px at scale 2 (−6 px) at the start of the show.
 - Conformance: show reaches opacity 1 and offset 0 at 350 ms; Reduced fades opacity only; Off snaps.
 - Semantic node: `group` named by the panel title; hidden panels are not in the tree.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_side_panel.rs`: behaviour `exactly_one_panels_nodes_exist_and_hidden_panels_emit_none`, `a_hidden_panels_scroll_offset_and_text_edit_survive_600_undrawn_frames`, `a_hide_snaps_the_old_panel_is_gone_on_the_first_frame_of_the_change`, `a_show_moves_no_focus`, `inactive_draws_the_fallback_fill_and_no_acrylic`; pixel probes `pixel_probes_at_scale_two`, `the_card_is_the_acrylic_at_radius_8_with_the_given_under_and_content_inside_ring_and_10`; conformance `show_conforms_in_three_tiers`, `reduced_fades_the_opacity_only_and_off_snaps`, `a_show_fades_the_panel_in_and_slides_it_from_the_left_and_leaves_the_card`, `the_first_frame_of_a_host_does_not_animate`; node `the_tree_of_a_frame_has_the_host_group_first`; `a_disabled_host_is_disabled_all_the_way_down_and_consumes_no_key`.
 
 ### Build
 
 - Milestone: M7.
 - Depends on: core.acrylic, core.painter, layout.icon-rail, layout.panel, motion.transitions.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_side_panel.rs::exactly_one_panels_nodes_exist_and_hidden_panels_emit_none, crates/lune-ui-core/tests/widget_side_panel.rs::a_hidden_panels_scroll_offset_and_text_edit_survive_600_undrawn_frames, crates/lune-ui-core/tests/widget_side_panel.rs::pixel_probes_at_scale_two, crates/lune-ui-core/tests/widget_side_panel.rs::inactive_draws_the_fallback_fill_and_no_acrylic, crates/lune-ui-core/tests/widget_side_panel.rs::show_conforms_in_three_tiers, crates/lune-ui-core/tests/widget_side_panel.rs::the_tree_of_a_frame_has_the_host_group_first`; page `side-panel`; unverified here: none.
 
 ## Open questions
 

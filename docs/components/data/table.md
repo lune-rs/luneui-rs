@@ -2,10 +2,10 @@
 id: data.table
 title: Data table
 area: data
-status: in-progress
+status: done
 consumers: wane
 source: crates/lune-ui-core/src/widgets/table.rs
-owner: toolkit-v1 M8
+owner: —
 summary: 28 px rows with hairlines, numeric columns in mono, sortable header look, selectable rows
 ---
 
@@ -113,16 +113,18 @@ All at scale 2 on the `table` page (100,000 rows live; six rows or fewer in the 
 - Pixel probes at scale 2: row 56 px; header 56 px; hairline 2 px (none under the last row); the first cell inset 32 px, a middle cell 16 px; the `num` text ends at the cell's padded edge; the flat fill spans the slot at radius 0 while a plain list keeps its inset; tone colours by text key.
 - Conformance: `HEADER_FADE` on the Full, Reduced and Off tiers; the table is idle at rest.
 - Semantic node: as Accessibility, checked through the tree; the disabled and chord rules for the header keys and through the body.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_table.rs`: behaviour `a_click_selects_one_row_and_a_second_replaces_it`, `the_keys_move_the_selection_through_the_list_frame`, `a_press_on_a_control_cell_reaches_the_control_and_not_the_selection`, `the_row_stays_lit_while_the_pointer_is_over_a_control_in_it`, `a_dialog_over_the_table_lights_no_row`, `header_clicks_report_ascending_then_descending_and_another_column_ascending`, `enter_and_space_on_a_focused_header_sort`, `left_right_home_and_end_rove_over_the_sortable_headers_only`, `the_sorted_header_is_the_stop_and_a_table_has_two_stops`, `with_nothing_sortable_the_table_has_one_stop`, `selection_survives_a_re_sort_and_scrolling_out_of_view`, `a_hundred_thousand_rows_build_only_the_window`, `an_access_default_action_sorts_on_a_header_and_selects_on_a_row`; pixel probes `at_scale_2_the_header_and_rows_are_56_the_hairlines_2_and_the_insets_32_and_16`, `the_last_row_has_no_hairline`, `mono_and_num_cells_use_the_mono_face_and_num_ends_at_the_right_edge`, `the_flat_fill_spans_the_slot_at_radius_0_and_a_plain_list_keeps_its_inset`, `each_tone_has_its_colour_and_a_selected_rows_text_is_bright_whatever_the_tone`; conformance `the_header_fades_over_fast_and_the_reduced_and_off_tiers_agree_at_rest`, `a_table_at_rest_is_idle_and_stays_idle_with_a_sort_and_a_selection`; node `the_tree_is_a_table_with_a_header_row_of_column_headers_and_a_group_of_rows_of_cells`, `a_control_cells_nodes_nest_under_its_cell`; disabled `a_header_focused_then_disabled_takes_its_keys_and_changes_nothing`, `a_body_focused_then_disabled_takes_its_keys_and_changes_nothing`, `a_chord_on_the_tables_keys_stays_a_shortcut`, `a_disabled_table_is_inert_and_its_nodes_are_disabled`.
 
 ### Build
 
-- Milestone: M8 (steps 1 and 2, D160 to D163). Open for `done` (D47): M11 re-checks the whole bar on every entry.
+- Milestone: M8 (steps 1 and 2, D160 to D163).
 - Depends on: layout.virtualized-list, core.painter, core.focus, core.ui, infra.accessibility, widget.combo, widget.button, widget.toggle, widget.badge
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_table.rs::a_click_selects_one_row_and_a_second_replaces_it, crates/lune-ui-core/tests/widget_table.rs::a_press_on_a_control_cell_reaches_the_control_and_not_the_selection, crates/lune-ui-core/tests/widget_table.rs::header_clicks_report_ascending_then_descending_and_another_column_ascending, crates/lune-ui-core/tests/widget_table.rs::left_right_home_and_end_rove_over_the_sortable_headers_only, crates/lune-ui-core/tests/widget_table.rs::selection_survives_a_re_sort_and_scrolling_out_of_view, crates/lune-ui-core/tests/widget_table.rs::a_hundred_thousand_rows_build_only_the_window, crates/lune-ui-core/tests/widget_table.rs::at_scale_2_the_header_and_rows_are_56_the_hairlines_2_and_the_insets_32_and_16, crates/lune-ui-core/tests/widget_table.rs::the_header_fades_over_fast_and_the_reduced_and_off_tiers_agree_at_rest, crates/lune-ui-core/tests/widget_table.rs::the_tree_is_a_table_with_a_header_row_of_column_headers_and_a_group_of_rows_of_cells, crates/lune-ui-core/tests/widget_table.rs::a_chord_on_the_tables_keys_stays_a_shortcut`; page `table`; unverified here: none (limit: no column resize or reorder, Q15).
 
 ## Open questions
 
 - Answered (D162): tone colours: Wane's, muted `fg_secondary`, warn, err, dim `fg_tertiary`, strong `fg_bright`; keyboard row navigation: the list frame's keys, with the header as a second roving stop; toolkit or app: a toolkit component, the app passing columns and a cell closure.
-- Still open (D163, needs the user, reversible): column resize and reorder. Wane calls them requirements, not mocked, and no screen shows them; `TableColumn.width` and the column order are the app's arguments, so both gestures are additive later with no API break.
+- Still open, a limit (Q15, D163: deferred, reversible; D237): column resize and reorder. Wane calls them requirements, not mocked, and no screen shows them; `TableColumn.width` and the column order are the app's arguments, so both gestures are additive later with no API break.
 - Native rendering: plain drawing; the page's bench runs scroll, select and sort over 100,000 rows.
 
 ## Notes for the planner

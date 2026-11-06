@@ -1093,3 +1093,42 @@ fn a_closed_picker_with_no_value_has_no_value_node_and_settles() {
     assert_eq!(s.tree.get(id()).expect("a node").value, None);
     assert_eq!(s.repaint, Repaint::Idle);
 }
+
+#[test]
+fn at_scale_2_the_popup_radius_is_16_the_search_bar_8_and_the_dash_is_1_px_in_a_2_4_pattern() {
+    use lune_ui_core::testing::ScriptedInput;
+    let mut app = App::new();
+    let mut h = UiHarness::new(WIN);
+    h.input = ScriptedInput::new(WIN, 2.0);
+    let mut ms = 0;
+    frame(&mut h, &mut app);
+    click(&mut h, ON_TRIGGER);
+    let s = settle(&mut h, &mut app, &mut ms);
+    assert!(s.expanded());
+    let radii: Vec<f32> = s.scene.layers[LayerId::Popup as usize]
+        .geometry
+        .under
+        .iter()
+        .map(|x| x.radii[0])
+        .collect();
+    assert!(radii.contains(&16.0), "the popup panel: {radii:?}");
+    assert!(
+        radii.contains(&8.0),
+        "the search bar and the rows: {radii:?}"
+    );
+    // The link trigger's underline: 1 logical px wide (half width 1 in device px), dashed 1 on,
+    // 2 off in logical px, which is 2 and 4 device px (the pattern itself: `paint_vector.rs`).
+    assert_eq!(lune_ui_core::widgets::search_picker::DASH, (1.0, 2.0));
+    let mut link = App::new();
+    link.trigger = Trigger::Link;
+    link.selected = Some(1);
+    let mut h = UiHarness::new(WIN);
+    h.input = ScriptedInput::new(WIN, 2.0);
+    let s = frame(&mut h, &mut link);
+    let strokes = &s.scene.layers[0].geometry.strokes;
+    assert!(!strokes.is_empty());
+    assert!(
+        strokes.iter().all(|v| v.style[1] == 1.0),
+        "2 device px wide"
+    );
+}

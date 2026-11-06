@@ -402,7 +402,7 @@ const EDGE: Step = Step {
 const SCENES: &[UiScene] = &[
     UiScene {
         id: "dnd-idle",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: tabs,
         script: &[],
@@ -412,7 +412,7 @@ const SCENES: &[UiScene] = &[
     // Pressed 3 px from the press point: under the 4 px threshold, still armed.
     UiScene {
         id: "dnd-armed",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: tabs,
         script: &[
@@ -430,7 +430,7 @@ const SCENES: &[UiScene] = &[
     // (180 ms) has ended; the pointer stays down.
     UiScene {
         id: "dnd-dragging",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: tabs,
         script: &[PRESS, CROSS, FAR],
@@ -442,7 +442,7 @@ const SCENES: &[UiScene] = &[
     // capture is 60 ms after the far move, well before the strip reaches its end.
     UiScene {
         id: "dnd-autoscroll",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: overflow,
         script: &[PRESS, CROSS, EDGE],
@@ -453,7 +453,7 @@ const SCENES: &[UiScene] = &[
     // the column's hover fill.
     UiScene {
         id: "dnd-kanban-target",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: board,
         script: &[CARD_PRESS, CARD_CROSS, CARD_ONTO_COLUMN_2],
@@ -464,7 +464,7 @@ const SCENES: &[UiScene] = &[
     // line and no hovered column.
     UiScene {
         id: "dnd-kanban-no-target",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: board,
         script: &[CARD_PRESS, CARD_CROSS, CARD_BETWEEN],
@@ -474,7 +474,7 @@ const SCENES: &[UiScene] = &[
     // Escape ends the drag: the offsets are cleared and the tabs are back where they were.
     UiScene {
         id: "dnd-cancelled",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: tabs,
         script: &[
@@ -493,7 +493,7 @@ const SCENES: &[UiScene] = &[
     // slots over `fast` (180 ms); 90 ms later they are half way.
     UiScene {
         id: "dnd-slide",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: tabs,
         script: &[
@@ -511,7 +511,7 @@ const SCENES: &[UiScene] = &[
     // its slot, 90 ms into `settle` at the capture.
     UiScene {
         id: "dnd-settle",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: tabs,
         script: &[
@@ -529,7 +529,7 @@ const SCENES: &[UiScene] = &[
     // The source card dims over `selection` (`fast`, linear) once the drag starts at 10 ms.
     UiScene {
         id: "dnd-dim",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: board,
         script: &[CARD_PRESS, CARD_CROSS],

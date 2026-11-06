@@ -2,10 +2,10 @@
 id: core.tab-outline
 title: Tab outline geometry
 area: core
-status: in-progress
+status: done
 consumers: luneterm
 source: crates/lune-ui-core/src/chrome.rs
-owner: orch/toolkit-v1
+owner: —
 summary: Tab-chrome outline loop geometry
 ---
 
@@ -19,7 +19,7 @@ summary: Tab-chrome outline loop geometry
 
 ## Existing code
 
-`crates/lune-ui-core/src/chrome.rs:6-9` (constants), `:14` (`TabSpan`), `:20` (`outline`); 226 lines; tests at `:172`.
+`crates/lune-ui-core/src/chrome.rs:6-9` (constants), `:16` (`TabSpan`), `:22` (`outline`); 228 lines; tests at `:175`.
 
 ## Spec
 
@@ -83,18 +83,20 @@ n/a — no text.
 
 ### Acceptance
 
-- Existing tests (by path, `crates/lune-ui-core/src/chrome.rs`): `notched_loop_reaches_card_top_only_at_the_tab` (:186 region), `flush_left_tab_uses_card_corner` (:206 region), `no_tab_loop_stays_below_seam` (:221 region).
-- The comet's share and travel and the sweep's phase around a translated centre are probed at scale 2 (`crates/lune-ui-wgpu/tests/primitives.rs`).
-- Done standard still needs: a sweep-table probe (the four breakpoints).
+- Geometry (`crates/lune-ui-core/src/chrome.rs`, module `tests`): `notched_loop_reaches_card_top_only_at_the_tab`, `flush_left_tab_uses_card_corner`, `no_tab_loop_stays_below_seam`.
+- The comet's share and travel and the sweep's phase around a translated centre are probed at scale 2 (`crates/lune-ui-wgpu/tests/primitives.rs`: `a_comet_lights_its_fraction_of_the_loop_at_scale_2`, `a_comet_travels_with_its_phase`, `a_sweep_is_brightest_at_its_phase_around_a_translated_centre`).
+- The sweep table at its breakpoints, at scale 2: `primitives.rs::the_sweep_table_holds_at_its_four_breakpoints_at_scale_2` (ten turns on a 360-point ring, within 8 levels of the table written in the test from `shader.wgsl:155-163`: alpha 1, 64/255 at 0.1528, 0 from 0.3056 to 0.6944, 64/255 at 0.8472, 1 at the end).
+- The pixel gate on `chrome` at zero delta is the orchestrator's gate (M11's pre-audit run held 413 of 413).
 
 ### Build
 
 - Milestone: M11 (done standard; code exists).
 - Depends on: core.painter, core.theme, widget.tab-strip.
+- Done (D47, M11): tests `crates/lune-ui-core/src/chrome.rs::notched_loop_reaches_card_top_only_at_the_tab, crates/lune-ui-core/src/chrome.rs::flush_left_tab_uses_card_corner, crates/lune-ui-core/src/chrome.rs::no_tab_loop_stays_below_seam, crates/lune-ui-wgpu/tests/primitives.rs::the_sweep_table_holds_at_its_four_breakpoints_at_scale_2, crates/lune-ui-wgpu/tests/primitives.rs::a_comet_lights_its_fraction_of_the_loop_at_scale_2, crates/lune-ui-wgpu/tests/primitives.rs::a_sweep_is_brightest_at_its_phase_around_a_translated_centre`; page n/a (drawn by the scene `chrome` and the tab strip's busy scenes `tab-strip-busy-sweep`, `tab-strip-busy-comet`, `tab-strip-busy-breath`); unverified here: none.
 
 ## Open questions
 
-- The name `chrome` and its tab-bar assumption read as app-shaped; whether it is generic is for the planner.
+- Still open, a naming question: the name `chrome` and its tab-bar assumption read as app-shaped; whether it is generic is for the planner. It changes no behaviour, and no consumer has asked for a rename (D237).
 
 ## Notes for the planner
 

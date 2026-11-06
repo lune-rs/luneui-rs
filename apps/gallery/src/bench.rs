@@ -287,7 +287,7 @@ fn scene_named(id: &str, scale: u32) -> &'static LegacyScene {
 struct Seg {
     page: &'static str,
     state: fn() -> Box<dyn PageState>,
-    scale: u32,
+    scale: f32,
     tier: MotionTier,
     steps: &'static [Step],
 }
@@ -333,7 +333,7 @@ impl Timeline {
             segs.push(Seg {
                 page: page.id,
                 state: ui.state,
-                scale: 2,
+                scale: 2.0,
                 tier: MotionTier::Full,
                 steps: ui.bench,
             });
@@ -349,7 +349,7 @@ impl Timeline {
     /// The next frame's display list and its scale.
     fn frame(&mut self, text: &mut dyn TextSystem) -> Result<(Scene, f32), String> {
         let seg = &self.segs[self.at];
-        let scale = seg.scale as f32;
+        let scale = seg.scale;
         let run = self.run.get_or_insert_with(|| {
             let logical = (self.size.0 as f32 / scale, self.size.1 as f32 / scale);
             Run {

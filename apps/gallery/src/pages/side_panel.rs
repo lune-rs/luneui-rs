@@ -128,7 +128,7 @@ const SCENES: &[UiScene] = &[
     // The first panel shown, settled.
     UiScene {
         id: "side-panel-shown",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[],
@@ -138,7 +138,7 @@ const SCENES: &[UiScene] = &[
     // The window is inactive: the solid fallback replaces the glass.
     UiScene {
         id: "side-panel-inactive",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: inactive,
         script: &[],
@@ -148,7 +148,7 @@ const SCENES: &[UiScene] = &[
     // The show is `moderate` (350 ms): half way 175 ms after the first frame of the new panel.
     UiScene {
         id: "side-panel-show-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: show_later,
         script: &[Step {

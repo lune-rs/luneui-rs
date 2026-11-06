@@ -2,10 +2,10 @@
 id: text.shaping
 title: Shaped-text cache
 area: text
-status: in-progress
+status: done
 consumers: luneterm
 source: crates/lune-ui-core/src/text.rs, crates/lune-ui-wgpu/src/text_cache.rs
-owner: orch/toolkit-v1
+owner: —
 summary: TextSystem seam in core; glyphon TextCache behind it, keyed by content and scale; the app registers its fonts
 ---
 
@@ -20,7 +20,7 @@ Core: the `TextSystem` trait (`prepare(spec, scale)` returns a `TextKey` and a l
 
 ## Existing code
 
-`crates/lune-ui-core/src/text.rs:110` (`TextSystem`), `:71` (`Spec`), `:105` (`TextKey`); `crates/lune-ui-wgpu/src/text_cache.rs:19` (`TextCache`), `:31` (`TextCache::new`), `:68` (`impl TextSystem`); contract tests in `crates/lune-ui-wgpu/tests/text.rs`.
+`crates/lune-ui-core/src/text.rs:172` (`TextSystem`), `:89` (`Spec`), `:125` (`TextKey`); `crates/lune-ui-wgpu/src/text_cache.rs:70` (`TextCache`), `:82` (`TextCache::new`), `:367` (`impl TextSystem`); contract tests in `crates/lune-ui-wgpu/tests/text.rs`.
 
 ## Spec
 
@@ -75,16 +75,20 @@ n/a — the strings belong to the caller's `Spec`.
 
 ### Acceptance
 
-- Existing tests (by path): `crates/lune-ui-wgpu/tests/text.rs` `text_cache_with_fonts_meets_the_contract`, `text_cache_without_fonts_meets_the_contract`; `crates/lune-ui-core/src/testing/text.rs` `fake_text_meets_the_contract`, `fake_text_sizes_follow_its_formula`.
-- Done standard still needs: a wrapped-text test at a fixed width against the pixel gate, and the medium and bold face probes.
+- The contract on the real shaper and on the fake: `crates/lune-ui-wgpu/tests/text.rs::text_cache_with_fonts_meets_the_contract`, `text_cache_without_fonts_meets_the_contract` (no font database never panics, Q4), `text_cache_without_fonts_lays_out_nothing`; `crates/lune-ui-core/src/testing/text.rs::fake_text_meets_the_contract`, `fake_text_sizes_follow_its_formula`.
+- Wrapped text at a fixed width: `text.rs::a_wrapped_line_breaks_into_rows_and_the_break_offset_starts_the_next` (width 60), `a_dropped_leading_space_belongs_to_its_lines_row`, `the_rows_stay_in_text_order`; the queries (caret, hit, lines, segments): `the_caret_at_the_end_is_the_width_and_lines_follow_the_endings`, `the_segment_table_matches_unicode_segmentation`, `right_to_left_and_mixed_text_answer_without_panicking`, `generated_text_meets_the_line_properties`. The pixel gate on `controls` (wrapped and unwrapped text at scale 2) at zero delta is the orchestrator's gate.
+- The weights (`crates/lune-ui-wgpu/tests/text.rs`): `medium_is_heavier_than_regular` (the same string, more ink). No bold face is bundled (RznSans Regular and Medium only), so `bold_falls_back_to_the_nearest_bundled_weight` pins what happens: bold draws exactly as medium. Anything that asks for bold (a heading, a strong run) shows the Medium face.
+- Eliding: `elided_cluster_text_stays_within_the_width`, `elided_mixed_direction_text_stays_within_the_width`.
 
 ### Build
 
 - Milestone: M11 (done standard; code exists). M5 added the queries (step 11); the done standard stays with M11.
 - Depends on: core.painter, core.theme.
+- Done (D47, M11): tests `crates/lune-ui-wgpu/tests/text.rs::text_cache_with_fonts_meets_the_contract, crates/lune-ui-wgpu/tests/text.rs::text_cache_without_fonts_meets_the_contract, crates/lune-ui-wgpu/tests/text.rs::a_wrapped_line_breaks_into_rows_and_the_break_offset_starts_the_next, crates/lune-ui-wgpu/tests/text.rs::generated_text_meets_the_line_properties, crates/lune-ui-wgpu/tests/text.rs::medium_is_heavier_than_regular, crates/lune-ui-wgpu/tests/text.rs::bold_falls_back_to_the_nearest_bundled_weight, crates/lune-ui-core/src/testing/text.rs::fake_text_meets_the_contract`; page n/a (the shaper under every scene; `controls` shows the text at scale 2); unverified here: bold (no face bundled), bidi caret placement on real mixed-direction text beyond the contract's cases, Windows and Linux font fallback.
 
 ## Open questions
 
+- Still open, a limit: no bold face is bundled, so bold shows as medium (D237: the bundled-font limit stays; a consumer that wants bold bundles the face and passes it to `TextCache::new`). A shaping feature such as `tnum` is not covered either, and no consumer has asked for it.
 - None on the seam (M2 step 5): the trait has no glyphon type in its signature. `R-text-5` (selection, caret) is covered since M5 by the caret, hit, lines and segments queries (D86, D94); a shaping feature such as `tnum` is not covered yet.
 
 ## Notes for the planner

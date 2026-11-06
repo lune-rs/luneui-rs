@@ -21,10 +21,12 @@ use crate::ui::WidgetId;
 pub struct CommandId(pub Cow<'static, str>);
 
 impl CommandId {
+    /// A command id from a static name; usable in a `const`.
     pub const fn new(name: &'static str) -> Self {
         Self(Cow::Borrowed(name))
     }
 
+    /// The command's name.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -72,31 +74,37 @@ impl Chord {
         }
     }
 
+    /// Requires the platform's primary modifier.
     pub fn primary(mut self) -> Self {
         self.mods.primary = true;
         self
     }
 
+    /// Requires Shift.
     pub fn shift(mut self) -> Self {
         self.mods.shift = true;
         self
     }
 
+    /// Requires Alt.
     pub fn alt(mut self) -> Self {
         self.mods.alt = true;
         self
     }
 
+    /// Requires Control.
     pub fn ctrl(mut self) -> Self {
         self.mods.ctrl = true;
         self
     }
 
+    /// Requires Logo (Command on macOS, the Windows key elsewhere).
     pub fn logo(mut self) -> Self {
         self.mods.logo = true;
         self
     }
 
+    /// Requires Control or Logo, either one.
     pub fn ctrl_or_logo(mut self) -> Self {
         self.mods.ctrl_or_logo = true;
         self
@@ -228,16 +236,19 @@ impl Binding {
         }
     }
 
+    /// Sees the press before the focused widget (see the module doc).
     pub fn preempt(mut self) -> Self {
         self.preempt = true;
         self
     }
 
+    /// Fires on key repeat as well as on the first press.
     pub fn repeating(mut self) -> Self {
         self.repeat = true;
         self
     }
 
+    /// Turns the binding on or off; a disabled one never fires and consumes nothing.
     pub fn enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
         self
@@ -251,6 +262,7 @@ pub struct Shortcuts {
 }
 
 impl Shortcuts {
+    /// Appends `binding`; table order decides which of two matching bindings in one scope fires.
     pub fn add(&mut self, binding: Binding) -> &mut Self {
         self.bindings.push(binding);
         self
@@ -263,10 +275,12 @@ impl Shortcuts {
         }
     }
 
+    /// Removes every binding.
     pub fn clear(&mut self) {
         self.bindings.clear();
     }
 
+    /// The bindings, in table order.
     pub fn bindings(&self) -> &[Binding] {
         &self.bindings
     }

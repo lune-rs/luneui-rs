@@ -2,10 +2,10 @@
 id: widget.toolbar
 title: Main toolbar
 area: widget
-status: in-progress
+status: done
 consumers: lunegit
-source: Lunegit: src/Lunegit.Desktop/Views/ToolbarView.axaml
-owner: toolkit-v1 M6
+source: crates/lune-ui-core/src/widgets/toolbar.rs
+owner: —
 summary: Toolbar: three-column command bar of 40 px toolbar-action buttons with 20 px icons on a glass material
 ---
 
@@ -87,6 +87,7 @@ None. The tooltips and labels are the app's commands: `Ui::toolbar_action` and `
 
 - `toolbar-actions`: three action buttons and the branch label button, rest and hover on the second, its tooltip shown; settled.
 - `toolbar-inactive`: the window inactive, fallback background shown; settled.
+- `toolbar-disabled`: the push action disabled (0.4 opacity, transparent) with the pointer on it: no hover fill, the tooltip still shown (a disabled anchor keeps it); settled.
 - `toolbar-action-mid`: press on the first action, t = 90 ms (half of `fast`).
 - `toolbar-hover-mid`: second action rest → hover, t = 60 ms (half of `instant`).
 
@@ -101,11 +102,13 @@ None. The tooltips and labels are the app's commands: `Ui::toolbar_action` and `
 - Pixel probes at scale 2: action button 80 x 80 px; icon 40 px; hover radius 12 px.
 - Conformance: press scale over 60 Hz samples settles within 180 ms + 1 frame; Reduced keeps the background tween and snaps the scale.
 - Semantic node: role toolbar; each button named by its tooltip.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_toolbar.rs`: `each_action_runs_once_by_click_and_by_key`, `a_disabled_action_does_not_run_and_is_marked_disabled`, `pixel_probes_at_scale_two`, `the_columns_are_the_padded_grid_with_a_zero_wide_middle`, `active_draws_the_glass_layer_and_no_fallback_fill`, `inactive_draws_the_window_fallback_fill_and_no_acrylic`, conformance `press_and_hover_conform_and_reduced_snaps_only_the_scale`, tooltip `a_tooltip_shows_after_the_delay_and_names_the_action`, label button `a_short_label_is_drawn_whole_and_a_long_one_is_elided`, `the_label_button_runs_once_and_has_a_node_named_by_the_owner`, node `the_bar_is_a_toolbar_node_holding_the_named_actions`.
 
 ### Build
 
 - Milestone: M6
 - Depends on: widget.button, material, core.focus, infra.accessibility, motion.transitions
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_toolbar.rs::each_action_runs_once_by_click_and_by_key, crates/lune-ui-core/tests/widget_toolbar.rs::a_disabled_action_does_not_run_and_is_marked_disabled, crates/lune-ui-core/tests/widget_toolbar.rs::pixel_probes_at_scale_two, crates/lune-ui-core/tests/widget_toolbar.rs::inactive_draws_the_window_fallback_fill_and_no_acrylic, crates/lune-ui-core/tests/widget_toolbar.rs::press_and_hover_conform_and_reduced_snaps_only_the_scale, crates/lune-ui-core/tests/widget_toolbar.rs::the_bar_is_a_toolbar_node_holding_the_named_actions`; page `toolbar`; unverified here: none.
 
 ## Open questions
 

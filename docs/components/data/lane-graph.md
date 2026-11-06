@@ -2,10 +2,10 @@
 id: data.lane-graph
 title: Lane graph (row)
 area: data
-status: in-progress
+status: done
 consumers: lunegit
 source: crates/lune-ui-core/src/widgets/lane_graph.rs
-owner: toolkit-v1 M8
+owner: —
 summary: One row of a lane graph: connection curves between lanes, vertical lane lines, and a node dot in its lane; generalised from commits to app data
 ---
 
@@ -99,15 +99,17 @@ None: the control draws no text; the row's text is the owner's.
 
 ### Acceptance
 
-- Behaviour (scripted input, injected time): a row with a dot in lane 2 draws the dot at x = 20 + 2 × 25 = 70 on the centre line 22.5; a lane that continues above starts at y = 0. None exists.
+- Behaviour (scripted input, injected time): a row with a dot in lane 2 draws the dot at x = 20 + 2 × 25 = 70 on the centre line 22.5; a lane that continues above starts at y = 0.
 - Pixel probes at scale 2: row 90 px; node dot diameter 20 device px (10 logical; the earlier "10 px" was logical) at x = 40 + lane × 50; edge 5 px wide.
 - Conformance: none (no motion; never animated).
 - Semantic node: none (decorative); the owner's list-item carries the row.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_lane_graph.rs`: behaviour `the_dot_is_in_lane_2_at_x_70_on_the_centre_line`, `a_line_continuing_above_starts_at_the_row_top_and_one_not_at_the_centre`, `edge_points_start_at_the_child_and_end_at_the_parent`, `a_branch_out_goes_across_first_then_down_and_a_merge_goes_down_first`, `the_passes_draw_in_order_edges_then_lane_lines_then_the_dot`, `huge_empty_and_far_input_never_panics_and_never_makes_a_nan`; pixel probes `probes_at_scale_2_row_90_dot_20_at_40_plus_lane_times_50_and_an_edge_5_wide`, `the_flattened_corner_stays_within_a_quarter_device_pixel_at_scale_2`; node `the_row_is_decorative_no_node_no_region`. Also the dot over a line in real pixels: `crates/lune-ui-wgpu/tests/primitives.rs::a_lane_graph_dot_is_a_disc_of_diameter_10_over_a_line_of_another_colour`.
 
 ### Build
 
 - Milestone: M8.
 - Depends on: core.painter, layout.virtualized-list, infra.accessibility.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_lane_graph.rs::the_dot_is_in_lane_2_at_x_70_on_the_centre_line, crates/lune-ui-core/tests/widget_lane_graph.rs::a_branch_out_goes_across_first_then_down_and_a_merge_goes_down_first, crates/lune-ui-core/tests/widget_lane_graph.rs::probes_at_scale_2_row_90_dot_20_at_40_plus_lane_times_50_and_an_edge_5_wide, crates/lune-ui-core/tests/widget_lane_graph.rs::the_row_is_decorative_no_node_no_region, crates/lune-ui-wgpu/tests/primitives.rs::a_lane_graph_dot_is_a_disc_of_diameter_10_over_a_line_of_another_colour`; page `lane-graph`; unverified here: none.
 
 ## Open questions
 

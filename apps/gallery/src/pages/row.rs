@@ -191,7 +191,7 @@ const HOVER_ROW: (f32, f32) = (X + 200.0, TOP + 58.0 + 28.0);
 const SCENES: &[UiScene] = &[
     UiScene {
         id: "row-setting",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: setting,
         script: &[],
@@ -200,7 +200,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "row-item-cols",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: items,
         script: &[],
@@ -209,7 +209,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "row-states",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: states,
         script: &[Step {
@@ -222,7 +222,7 @@ const SCENES: &[UiScene] = &[
     // Hover is `instant` (120 ms): half way at 60 ms.
     UiScene {
         id: "row-hover-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: setting,
         script: &[Step {
@@ -236,7 +236,7 @@ const SCENES: &[UiScene] = &[
     // (180 ms): half way at 100 ms.
     UiScene {
         id: "row-off-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: setting,
         script: &[

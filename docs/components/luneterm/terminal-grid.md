@@ -45,7 +45,7 @@ crates/lune-ui-core/src/paint.rs:253-270, apps/gallery/src/scenes.rs:108-115, do
 
 ## Open questions
 
-- Which of Luneterm's `lune_ui` imports (`custom`, `paint::Rect`, `color::Rgba`, `dump`) the facade must keep re-exporting is checked when Luneterm adopts the toolkit (its M9); this entry does not verify the facade's export list.
+- None on the facade's exports. Checked at M11 in a scratch clone of Luneterm 296cfdc holding the snapshot of `2f066e9`: `cargo check --offline -p lune-termview --all-targets` passes with no source change, so `custom`, `paint::Rect`, `color::Rgba` and `dump` resolve (the run and the `glass-ui` migration map are in `docs/consuming.md`). Luneterm itself is not changed; it adopts the toolkit in its own M9 (D16).
 
 ## Notes for the planner
 

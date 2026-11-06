@@ -2,10 +2,10 @@
 id: widget.button
 title: Button
 area: widget
-status: in-progress
+status: done
 consumers: luneterm, wane
 source: crates/lune-ui-core/src/widgets/button.rs
-owner: orch/toolkit-v1
+owner: —
 summary: Button: primary and secondary fills, measured width, hover and press motion
 ---
 
@@ -107,11 +107,13 @@ None: the label is app text.
 - Pixel probes at scale 2: radius 12 px (6 at scale 1); primary rest centre fill = `accent`; secondary rest fill = `surface_hover` over the glass.
 - Conformance: hover fill over 60 Hz samples is monotonic, ends exact, settles within 120 ms + 1 frame; Reduced snaps the press scale and keeps the hover tween.
 - Semantic node: role button; injected `AccessAction` default activates.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_button.rs`: activation `enter_and_space_activate_once_each`, `an_enabled_button_takes_one_activation_key_and_leaves_the_other`, `a_pointer_click_and_the_default_action_activate`, `a_disabled_button_reports_no_activation_and_is_marked_disabled`, and a chord on Enter or Space stays a shortcut (`a_chord_on_enter_or_space_is_a_shortcut_and_clicks_nothing`, `a_disabled_button_leaves_a_chord_to_the_shortcuts_as_an_enabled_one_does`, `a_disabled_widget_keeps_the_keys_it_handles_from_the_shortcuts`). Pixel probes at scale 2: `pixel_probes_at_scale_two`, `pressed_scales_about_the_centre_and_the_ring_follows_focus_visible`. Conformance: `every_motion_row_conforms_under_every_tier`, `the_ghost_and_icon_rows_conform_in_every_tier`. Node: `the_node_names_the_button_and_follows_focus`. Variants: `a_small_button_is_24_high_with_radius_4_and_keeps_the_top`, `the_ghost_look_is_transparent_hover_active_with_secondary_text`, `an_icon_button_is_a_named_ghost_that_clicks_once_by_pointer_enter_and_space`, `a_labelled_icon_draws_the_glyph_and_the_label_and_is_named_by_the_label`. The `Ui` form equals the painter form at rest: `at_rest_the_ui_button_draws_exactly_what_the_painter_button_does`.
 
 ### Build
 
 - Milestone: M4 (retrofit: transitions, focus, semantic node); done by M11. The variants (small, icon, ghost) were deferred by [D74] and are built in M6 step 3 ([D116]): `ButtonKind::Ghost`, `ButtonOptions { kind, small, icon }` with `Ui::button_with` and `button_width_with`, `IconButton` with `Ui::icon_button`; the small button is 24 high (the top of the caller's rect kept), radius 4, padding 0 12; a labelled icon is a 16 px glyph, an 8 gap; fill width needs no code (the caller's rect is the width). The ring follows the corner radius (`RingKind::Edge`).
 - Depends on: core.ui, core.focus, infra.accessibility, motion.transitions.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_button.rs::enter_and_space_activate_once_each, crates/lune-ui-core/tests/widget_button.rs::a_disabled_button_reports_no_activation_and_is_marked_disabled, crates/lune-ui-core/tests/widget_button.rs::pixel_probes_at_scale_two, crates/lune-ui-core/tests/widget_button.rs::every_motion_row_conforms_under_every_tier, crates/lune-ui-core/tests/widget_button.rs::the_node_names_the_button_and_follows_focus, crates/lune-ui-core/tests/widget_button.rs::a_chord_on_enter_or_space_is_a_shortcut_and_clicks_nothing, crates/lune-ui-core/tests/widget_button.rs::a_small_button_is_24_high_with_radius_4_and_keeps_the_top, crates/lune-ui-core/tests/widget_button.rs::at_rest_the_ui_button_draws_exactly_what_the_painter_button_does`; page `button`; unverified here: none.
 
 ## Open questions
 

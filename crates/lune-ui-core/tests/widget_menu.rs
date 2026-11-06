@@ -1178,3 +1178,37 @@ fn a_row_the_pointer_lit_loses_its_fill_at_once_when_disabled() {
     draw(&mut h, 520, &on);
     assert_eq!(lit(&draw(&mut h, 800, &on).0, &on), [1]);
 }
+
+/// The measures of the entry's Acceptance at scale 2: the panel is at least 380 device px wide
+/// with a radius of 18, a row is 56 high, a separator 22, a hovered row is filled #FFFFFF16.
+#[test]
+fn at_scale_2_the_panel_is_380_wide_with_radius_18_rows_56_high_and_separators_22() {
+    use lune_ui_core::testing::ScriptedInput;
+    let rows = [
+        entry("Alpha", false),
+        MenuRow::Separator,
+        entry("Beta", false),
+    ];
+    let lay = layout_of(&rows);
+    // The layout is logical: half of each device measure.
+    assert_eq!((lay.rows[0].h, lay.rows[1].h), (28.0, 11.0));
+    let mut h = UiHarness::new(WIN);
+    h.input = ScriptedInput::new(WIN, 2.0);
+    draw(&mut h, 0, &rows);
+    let (x, y) = centre_of(&rows, 0);
+    h.input.pointer_to(x, y);
+    draw(&mut h, 300, &rows);
+    let (scene, _, _) = draw(&mut h, 600, &rows);
+    let under = &scene.layers[LayerId::Popup as usize].geometry.under;
+    let panel = under
+        .iter()
+        .max_by(|a, b| (a.rect[2] * a.rect[3]).total_cmp(&(b.rect[2] * b.rect[3])))
+        .expect("the panel");
+    assert_eq!(panel.rect[2], 380.0, "the minimum width");
+    assert_eq!(panel.radii, [18.0; 4]);
+    let lit = under
+        .iter()
+        .find(|s| s.rect[3] == 56.0 && s.color[3] > 0.0 && s.rect[2] < panel.rect[2])
+        .expect("a lit 56 px row");
+    assert_fill(lit, [255, 255, 255, 0x16]);
+}

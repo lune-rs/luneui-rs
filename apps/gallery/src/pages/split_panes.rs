@@ -164,7 +164,7 @@ const SCENES: &[UiScene] = &[
     // Two columns and two rows, the strips transparent, settled.
     UiScene {
         id: "split-panes-two",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[],
@@ -174,7 +174,7 @@ const SCENES: &[UiScene] = &[
     // The first column hidden: the second takes the whole width, no strip.
     UiScene {
         id: "split-panes-collapsed",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: collapsed,
         script: &[],
@@ -184,7 +184,7 @@ const SCENES: &[UiScene] = &[
     // The column strip pressed and dragged 200 px to the right, held.
     UiScene {
         id: "split-panes-drag-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[
@@ -212,7 +212,7 @@ const SCENES: &[UiScene] = &[
     // The row strip dragged 70 px up: the panel below grows.
     UiScene {
         id: "split-panes-rows",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[
@@ -239,7 +239,7 @@ const SCENES: &[UiScene] = &[
     // Tab past the button onto the column strip: it fills with the accent.
     UiScene {
         id: "split-panes-focus",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[

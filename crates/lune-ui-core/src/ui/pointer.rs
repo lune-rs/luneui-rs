@@ -244,8 +244,9 @@ impl PointerState {
     }
 
     /// A scroll gesture at `pos`: each axis of the delta goes to the topmost scroll region live on
-    /// that axis that is not on a layer below the topmost region's (D178). A region live on both
-    /// axes takes both components, as one live on one takes its own.
+    /// that axis that is not on a layer below the topmost region's, nor in an overlay opened
+    /// before the topmost region's on the same layer (D178, F11). A region live on both axes takes
+    /// both components, as one live on one takes its own.
     pub(crate) fn scroll(
         &mut self,
         pos: (f32, f32),
@@ -257,10 +258,15 @@ impl PointerState {
         let Some(top) = self.target(pos, cx) else {
             return;
         };
-        let layer = top.layer;
+        let (layer, tag) = (top.layer, top.tag);
         let region = |on: fn(&HitRecord) -> bool| {
             topmost(cx.hits, pos, &|h| {
-                (cx.eligible)(h) && h.enabled && h.sense.scroll && h.layer >= layer && on(h)
+                (cx.eligible)(h)
+                    && h.enabled
+                    && h.sense.scroll
+                    && h.layer >= layer
+                    && h.tag >= tag
+                    && on(h)
             })
         };
         let (map, x, y) = match delta {

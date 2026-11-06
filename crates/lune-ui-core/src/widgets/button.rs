@@ -272,6 +272,8 @@ fn paint_content<H: Copy + PartialEq>(
     }
 }
 
+/// Draws a primary or secondary button in `r` and registers `hit` over it. The Painter form: a
+/// [`Ui`] has [`Ui::button`], which also handles focus, keys and the accessibility node.
 pub fn button<H: Copy + PartialEq>(
     p: &mut Painter<'_, H>,
     r: Rect,
@@ -293,6 +295,7 @@ pub fn button<H: Copy + PartialEq>(
     p.hit(r, hit);
 }
 
+/// The width [`button`] needs for `text`: the label and 16 px each side.
 pub fn button_width<H: Copy + PartialEq>(p: &mut Painter<'_, H>, text: &str) -> f32 {
     let t = p.theme;
     p.measure(&label(&t, text, t.fg_primary)).0 + 32.0

@@ -10,6 +10,14 @@ DECISIONS rows it rests on.
 Nothing here is a design: the designs are the component specs in `docs/components/` and the motion
 standard in `docs/motion.md`. Numbers appear where a source states one.
 
+**State at close (M11, 2026-11-07).** Every requirement below is met or is explained where it is not,
+and none is `[open]`. The catalogue holds 97 entries: 91 `done` (the done standard of DECISIONS D47
+holds for each by something that runs here, `docs/components/README.md` "Status"), 2 `in-progress` by
+their own text (`platform.material` and `render.surface`: what they name needs a real OS run, D234)
+and 4 `external`. Ids no entry cites are met by a script, a rule or a manifest, said on the id
+(R-nfr-2, R-nfr-4, R-nfr-7, R-ext-3, R-ext-5). What only a real OS shows is listed in
+`docs/STATE.md`, "Unverified here"; none of it is ticked.
+
 ## Consumers
 
 - **Luneterm** (this author's terminal, `/Users/ijat/Projects/Luneterm`): its milestones M9 to M11
@@ -172,23 +180,31 @@ standard in `docs/motion.md`. Numbers appear where a source states one.
   Enforced by `scripts/check-boundaries.sh` rule 4.
 - R-nfr-2 [new] App-agnostic: no app, terminal or domain words in library source (boundary
   rules 1 to 3). Not met by today's Luneterm `crates/lune-ui`: it names Lunegit in docs and in the
-  `lunegit_dark` preset (21 lines in 11 files under rule 3 as written here). The extraction plan
-  must rename or allow-list those before the move passes the gate (`scripts/boundaries.allow`).
+  `lunegit_dark` preset (21 lines in 11 files under rule 3 as written here). Met since M1: the
+  extraction renamed or allow-listed those (`scripts/boundaries.allow`), and
+  `scripts/check-boundaries.sh` (rules 1 to 3, in the gate) holds it.
 - R-nfr-3 [existing] `unsafe` only in platform modules, each block with a `// SAFETY:` comment
   (boundary rule 6, `CLAUDE.md` hard rule 3). Luneterm's three blocks are in `material/macos.rs`.
 - R-nfr-4 [existing] Size: the release profile is LTO, one codegen unit, abort on panic, stripped;
   adding a dependency means measuring the release binary and noting the change. No numeric budget
   in v1: each dependency commit carries a size note (hard rule 5), and M11 reports the release size.
+  Met by the manifest: `[profile.release]` in the root `Cargo.toml` (`lto = "fat"`,
+  `codegen-units = 1`, `panic = "abort"`, `strip = true`). The M11 figure for `cargo build --release
+  -p gallery` is in `docs/STATE.md` and `docs/consuming.md` (9,869,520 bytes at a9d1292).
 - R-nfr-5 [new] Performance targets, decided by D41: every transition passes the 60 Hz conformance
-  harness, a bench budget (p99 frame time at most 16.6 ms, no frame over 33 ms after warm-up) holds on
-  every gallery page at milestone acceptance, and a settled page reports Idle. No memory target in
-  v1. The running-outline CPU budget of at most 3 percentage points (Luneterm
+  harness, a settled page reports Idle, and `gallery --bench` reads p99 frame time at most 16.6 ms
+  and no frame over 33 ms after warm-up on every gallery page (the budget half is a recorded
+  reading, not a gate: D235, the user's waiver of 2026-11-07; D85 says how it is judged). No
+  memory target in v1. The running-outline CPU budget of at most 3 percentage points (Luneterm
   `docs/lunegit-bug-ledger.md` row 16, roadmap M11) stays Luneterm's.
 - R-nfr-6 [new] HiDPI: scale is a per-window, per-frame input and any positive scale works (the text
   cache already takes the scale per call, D27). Proven at scale 1 and 2 by M2's two-target test;
-  fractional scales get a 1.5x gallery scene in M11 coverage.
+  fractional scales get a 1.5x gallery scene in M11 coverage: `ui-controls@1.5x`, 1560 by 990
+  physical px, in the page `ui` and the catalogue entry `render.frame` (D243).
 - R-nfr-7 [existing] Platforms: macOS and Windows get glass, Linux gets an opaque fallback
-  (Luneterm decision 3). CI on all three OSes is not set up here yet (STATE.md).
+  (Luneterm decision 3). Met by `Material` and `lune_ui_platform::material` (`platform.material`)
+  and held at compile time by `scripts/check-targets.sh` (Windows clippy, Linux in Docker); the run
+  time on Windows and Linux is unverified here, and CI stays out (D15, kept: the repo has no remote).
 - R-nfr-8 [new] Testability: each seam (text shaping, GPU, glass, windowing) gets a contract test
   and a fake (headless target, null material) once the extraction plan introduces it.
 
@@ -200,13 +216,18 @@ standard in `docs/motion.md`. Numbers appear where a source states one.
   after, compare at zero delta with its `dump_compare` tool, until a change is deliberate and
   re-baselined with its reason. The baseline form is decided: dumps are regenerated from
   `git archive <base>`, not committed (D11).
+  Since M2 the gate is `scripts/pixel-gate.sh` over the gallery's own scenes (every name `gallery --list`
+  prints, 431 at M11's close), the 18 spike scenes having served M1 only.
 - R-ext-3 [new] Luneterm switches from its in-tree `lune-ui` to this repo's. How it depends on it
   before a remote exists is a vendored snapshot (D13); a git dependency follows once a remote exists.
+  Met by `scripts/export-snapshot.sh` (D239) and `docs/consuming.md`, which also holds the migration
+  map; `lune-termview --all-targets` checks against the snapshot with no source change.
 - R-ext-4 [new] Every bundled asset or code has its licence text in `licenses/` and a row in
   `THIRD_PARTY_NOTICES.md`: the Avalonia noise texture and colour formulas, any font the toolkit
-  ships, any shader taken from elsewhere. The repo has neither file yet.
+  ships, any shader taken from elsewhere. Both exist: `licenses/` and `THIRD_PARTY_NOTICES.md`.
 - R-ext-5 [new] Crate names and split are set by the extraction plan; `lune-termview` stays in
-  Luneterm (D8).
+  Luneterm (D8). Met by the manifest: `members` in the root `Cargo.toml` and `crates/` (five crates,
+  `docs/architecture.md` "Workspace layout"); the snapshot's `members` is `["crates/*"]` (D239).
 
 ## Out of scope
 

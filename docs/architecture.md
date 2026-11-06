@@ -1,6 +1,6 @@
 # Architecture
 
-State after M10 (infra and platform): the toolkit is five crates. A pure core (`lune-ui-core`, no
+State after M11 (the close): the toolkit is five crates. A pure core (`lune-ui-core`, no
 dependencies) holds the painter, the display list, the per-window `Ui` frame, the motion system,
 the string table, the semantic tree, widgets, the theme and the four seam types; three adapter
 crates implement the seams on wgpu/glyphon, winit and the OS glass; the facade `lune-ui` re-exports
@@ -17,7 +17,10 @@ code editor over a line-indexed document (`CodeDoc`, one editing engine generic 
 preview on virtual blocks and the diff view, unified and split on the list frame (D177 to D199). M10 finished the infra and platform layer: a
 bounded JSON reader, theme files (the glass moved into `Theme`, a swap is a hard cut) and locale catalogs, file-drop events and the
 platform keymap, the OS clipboard (`arboard`), an AccessKit bridge behind a cargo feature, and the tray icon (a CPU raster) with the
-flyout and the menu in windows of their own (D204 to D227).
+flyout and the menu in windows of their own (D204 to D227). M11 closed the program (D234 to D245): the window's caption buttons
+through the `Ui` (`widgets/caption.rs`, the page `window`), `Gpu::is_lost`, the key readers that leaked or took a chord, a 1.5x scene,
+the rustdoc bar, the done-standard audit of the whole catalogue with the check that keeps it true (`apps/gallery/src/catalogue.rs`),
+and the vendored snapshot (`scripts/export-snapshot.sh`, `docs/consuming.md`).
 
 ## Workspace layout
 
@@ -30,13 +33,14 @@ flyout and the menu in windows of their own (D204 to D227).
 | `crates/lune-ui` | Facade: `lib.rs` only, re-exports the four crates at the old paths |
 | `apps/gallery` | A page registry (legacy Painter-API pages and `Ui` pages), a glass window, `--dump <dir>` (offscreen PNG frames on a headless device, no window), `--list`, `--bench` (frame-time probes). App code, outside `crates/` (D12): it bundles fonts |
 | `tools/dump-compare` | Compares two dirs of PNG frame dumps pixel by pixel (the pixel gate's compare tool) |
-| `scripts/` | Gates and generators, see "Boundary rules" and "Pixel gates" |
+| `scripts/` | Gates and generators, see "Boundary rules" and "Pixel gates"; `export-snapshot.sh` writes the snapshot an app vendors (D239) |
+| `docs/consuming.md` | How an app takes the toolkit in before a remote exists: what the snapshot holds, the app's duties, the release size, the migration map from Luneterm 296cfdc |
 | `docs/components/` | Catalogue, one file per component; `docs/components/INDEX.md` is generated |
 | `licenses/`, `THIRD_PARTY_NOTICES.md` | Licence texts and the per-asset notice rows |
 
 Scripts: `scripts/check-boundaries.sh` (rules 1 to 12, see below; fixed-string exceptions in
 `scripts/boundaries.allow`), `scripts/gen-component-index.sh` (catalogue index; `--check` is in the
-gate), `scripts/pixel-gate.sh`, `scripts/pixel-gate-luneterm.sh`, `scripts/check-targets.sh`.
+gate), `scripts/pixel-gate.sh`, `scripts/pixel-gate-luneterm.sh`, `scripts/check-targets.sh`, `scripts/export-snapshot.sh`.
 
 ## Crates and modules
 
@@ -63,7 +67,8 @@ app passes time, sizes, fonts, theme, scale and hit values in), so frames are de
 | `code_doc` (`code_doc.rs`) | The code editor's document (D179): one `String` and a line index, verbatim, with `\n`, `\r\n` and a lone `\r` ending a line; an edit costs O(log lines) | `CodeDoc` (`new`, `text`, `set_text`, `line_count`, `line`, `line_of`), implements `EditText` and `EditBuffer` |
 | `drag` (`drag.rs`) | The in-window drag machines and their `Ui` glue (D89, D104) | `ReorderDrag`, `FreeDrag` (with `pressed`), `Metrics`, `Strip`, `Column`, `DropResult`, `FreeResult`, `paint_drop_line`, `edge_step` (the auto-scroll zone math, shared by the strip and the board; D168) |
 | `backdrop` (`backdrop.rs`) | The material seam | `Backdrop`, `Material`, `BackdropKind`, `GlassLayer` |
-| `window` (`window.rs`) | Edge resize, double click, caption buttons (no windowing type) | `ResizeEdge`, `edge_at`, `DoubleClick`, `caption_buttons` |
+| `window` (`window.rs`) | Edge resize, double click, the caption buttons' Painter form and their shared geometry (no windowing type) | `ResizeEdge`, `edge_at`, `DoubleClick`, `caption_buttons`, `CAPTION_BUTTON_WIDTH` |
+| `widgets::caption` (`widgets/caption.rs`) | The caption buttons through the `Ui` (D240): hover through the `hover` kind, `caption_close_hover`, nodes named from `luneui.window.*`, no Tab stop; the app turns the answer into a `WindowCommand` | `Ui::caption_buttons`, `CaptionButton`, `CaptionOptions` |
 | `icon` (`icon.rs`) | Codicon codepoints as Nerd Font glyphs; no font file bundled | `glyph`, `ADD`, `GEAR`, `CHECK`, ... |
 | `ui` (`ui.rs`, `ui/{access,animate,focus,id,keys,overlay,pointer,response,store}.rs`) | The per-window frame (see "The `Ui` frame" below) | `Ui`, `UiStore`, `FrameConfig`, `WidgetId`, `Response`, `Sense`, `OverlayOptions`, `OverlayFrame`, `OverlayPhase`, `Dismissal` |
 | `access` (`access.rs`) | The semantic tree and the actions that come back; plain data the `Ui` fills and routes | `Node`, `SemanticTree`, `Role` (37), `State` (15), `Action` (10), `Value`, `AccessAction`; `Node.level` (a tree row's depth + 1) |
@@ -72,7 +77,7 @@ app passes time, sizes, fonts, theme, scale and hit values in), so frames are de
 | `widgets` (`widgets/<name>.rs`, `widgets/mod.rs`) | One file per control, generic over `H` for the Painter API; each has a `Look`, a `paint` function, the old function as a wrapper and a `Ui` method (D60) | `button`, `toggle`, `checkbox`, `label`, `combo`, `stepper`, `field` (text field with its variants), `text_area`, `input_box` (shared look), `focus_ring`, `popup_panel`, `scroll_area`, `scrollbar`, `virtual_list`, `popover`, `tooltip`; M6 added `badge`, `status_dot`, `verdict_row`, `progress`, `spinner`, `callout`, `stat`, `kv_list` (with `selectable`, the read-only selectable text of D125), `row`, `list_row`, `form_field`, `steps`, `nav_item` (`Ui::nav_list`), `radio_group`, `star_rating`, `slider`, `filter_bar`, `search_picker`, `tab_strip`, `toolbar`, `banner` (with the empty state) and `tone` (the one tone recipe, D129); `button` gained `Ghost`, `ButtonOptions` (`Ui::button_with`) and `IconButton` (`Ui::icon_button`, D116); M7 added `flyout` (`Ui::flyout`), `toast` (the `Toasts` model, `Ui::toasts`, `Ui::toast_history`), `command_palette` (`Ui::command_palette`), `page` and `panel` (`Ui::page`, `Ui::panel`: one closure called per slot), `sidebar`, `side_panel` and `icon_rail` (`Ui::sidebar`, `Ui::side_panel`, `Ui::icon_rail`), `split_panes` (`Ui::split_panes`, `Ui::split_state`), `tree_view` (`Ui::tree_view`, `Ui::tree_state`) and `settings_page` (`Ui::settings_page`); M8 added `table` (`Ui::table`, `Ui::table_state`, `Ui::table_selection`: the list frame with a header, sort requests and tones; `virtual_list` gained a crate-private `ListStyle`, D161), `bar_chart` (`Ui::bar_chart`), `pie_chart` (`Ui::pie_chart`), `lane_graph` (`Ui::lane_graph_row`, a stateless `paint`) and `kanban_board` (`Ui::kanban_board`, `landed_index`); M9 added `text_lines` (`HighlightSpan`, `Highlighter`, `PlainHighlighter`, the rich-line spec and `range_boxes` across runs), `code_editor` (`Ui::code_editor`, `Ui::code_line_rect`: lines on `RowHeights` and the scroll area, read-only or editable, wrapped or not, synced panes), `code_block` (`Ui::code_block`, `code_block::height`: the same frame read-only with a copy button), `markdown` (`Ui::markdown` over the `MdBlock` model: top-level blocks as virtual rows) and `diff_view` (`Ui::diff_view`, `pair_rows`, `widest_chars`: the list frame, twice for split); M10 added `Ui::flyout_window` and `Ui::menu_window` (the flyout's and the menu's body filling a window of its own over `Ui::popover`, D220) and the public `menu_size` |
 | `widgets::menu`, `dropdown`, `dialog` | The overlays: the old Painter functions and `Ui::menu`, `Ui::dropdown`, `Ui::dialog` on the overlay stack; M7 added `menu_with` (`MenuOptions`, `MenuPlace`: anchored menus and the node name; rows `MenuRow::Entry` and `Header`; one highlight), `dropdown_with` (`DropdownOptions`: glass, `max_rows`), `dialog_with` (`DialogOptions`: `DialogWidth::{Confirm, Form}`, scrim blur, disabled confirm) and `dialog::modal_host`, which the palette shares | `menu`, `MenuRow`, `MenuItem`, `menu_open_anim`; `dropdown`; `dialog`, `Dialog`, `DialogGlass`, `Cancel` |
 | `chrome` (`chrome.rs`) | Tab chrome outline geometry | `outline`, `TabSpan` |
-| `testing` (`testing/`) | Fakes and contract suites of the seams, public so apps can use them | `RecordingRenderer`, `FakeText`, `text_system_contract`, `FakeImages`, `image_store_contract`, `ScriptedInput`, `NullMaterial`, `backdrop_contract`, `UiHarness` |
+| `testing` (`testing/`) | Fakes and contract suites of the seams, public so apps can use them | `RecordingRenderer`, `FakeText`, `text_system_contract`, `FakeImages`, `image_store_contract`, `ScriptedInput`, `scripted_input_contract`, `NullMaterial`, `backdrop_contract`, `UiHarness` |
 
 `lib.rs` re-exports `Backdrop`, `BackdropKind`, `GlassLayer` and `theme::lunegit_dark`. Tests: unit
 tests in the modules and the files under `tests/` (`window`, `painter`, `motion`, `strings`, `ui_*`,
@@ -195,6 +200,14 @@ the hunk actions are hosts of `icon_button`; the diff's panes are `virtual_list`
 own disabled tests for these (`widget_markdown`, `widget_code_editor`, `widget_diff_view`) bind no shortcut on the key, so none of
 them fails under any of those mutants: they hold the walk and the reports, not the keys.
 
+Re-run for M11 (`c4::m11`, `m9`'s typed form: one stop per reader on a page of its own, a `Global` binding on 12 keys, the dialog's
+on `Scope::Overlay`): the three "Does not hold" readers (`stepper`, `slider`, `search_picker`'s trigger) and the two that took a
+Control, Alt or Command chord (`tab_strip`, `star_rating`) now take their keys through `consume_plain_key`, `activation_keys` or the
+slider's event filter, taking them whether or not they are enabled and acting only when enabled; a chord on them is a shortcut. All
+five run a Command chord on each named key they take, enabled and disabled. Each of the five has a mutant (its reader put back as it
+was) that fails the disabled test or the chord test or both, and `activation_keys` leaving a disabled key fails the readers' test
+(the search picker's trigger and the tab strip) and the hosts' test (the dialog's two buttons first). The Probe rows became Test rows.
+
 A new reader, or a change to one, gets its row here. **Test** means a named test fails when that reader is made to leak
 (a mutant of it, run at 406f780). **Probe** means only the scratch probe showed it: nothing in the repo holds it.
 
@@ -205,8 +218,8 @@ Holds, for the keys listed:
 | `button`, `icon_button`, `toolbar_label` | Enter, Space | Test: `widget_button::a_disabled_widget_keeps_the_keys_it_handles_from_the_shortcuts` |
 | `checkbox`, `toggle` | Space | Test: the same |
 | `radio_group` | Space, arrows, Home, End | Test: the same |
-| Hosts of `Ui::button` or `icon_button`: `dialog`'s confirm and cancel, `toolbar_action`, the filter bar's clear, the tab strip's new tab | Enter, Space | Probe. `widget_dialog`'s `enter_and_space_on_a_disabled_confirm_...` binds `Global`, so it cannot fail (review F19) |
-| `star_rating` | Enter, Space, arrows, Home, End | Probe; no test failed under a mutant of its keys or of its `rove_keys` |
+| Hosts of `Ui::button` or `icon_button`: `dialog`'s confirm and cancel, `toolbar_action`, the filter bar's clear, the tab strip's new tab | Enter, Space | Test (M11): `c4::m11::a_disabled_host_of_a_button_takes_enter_and_space_and_fires_no_binding` (the dialog's two on `Scope::Overlay`: `widget_dialog`'s own test binds `Global`, which cannot fail there, review F19); mutant: `activation_keys` leaving a disabled key fails it |
+| `star_rating` | Enter, Space, arrows, Home, End | Test (M11): `c4::m11::a_disabled_reader_takes_every_key_it_takes_enabled_and_fires_no_global_binding` (Enter, Space, the arrows, Home, End), and Command on them: `a_chord_on_the_keys_of_the_five_readers_is_a_shortcut_enabled_and_disabled`; mutant: the reader back on `consume_key` gated on `enabled` fails both |
 | `nav_list`, so `sidebar` | Enter, Space, Up, Down, Home, End | Test: `widget_sidebar::a_focused_row_turned_disabled_keeps_its_keys_and_leaves_its_chords` (Enter, Space), `c4::m7::a_disabled_page_takes_every_key_a_focused_composite_takes_and_fires_no_global_binding` (the rest) |
 | `icon_rail` | Enter, Space, Up, Down, Home, End | Test: `c4`, the same |
 | `split_panes` | arrows, Home, End | Test: `c4`, the same, and `widget_split_panes::a_strip_that_was_focused_and_is_then_disabled_still_takes_its_keys_and_acts_on_none` |
@@ -215,9 +228,13 @@ Holds, for the keys listed:
 | `flyout`, its rows (`menu_rows`) | Enter, Space, Up, Down, Home, End | Test: `widget_flyout::a_disabled_flyout_closes_on_escape_picks_nothing_and_marks_every_node` |
 | `dropdown`, with and without `max_rows` | Enter, Up, Down | Test: `widget_dropdown::a_disabled_dropdown_takes_the_keys_picks_nothing_and_marks_every_node` |
 | `tree_view` | Enter, Space, arrows, Home, End, PageUp, PageDown | Test: `widget_tree_view::a_disabled_tree_toggles_and_selects_nothing_takes_its_keys_and_passes_the_walk` |
-| `toasts`, the action buttons | Enter, Space | Probe (`toast.rs:954`: no test failed under a mutant) |
-| `toasts`, Cancel and Dismiss (`icon_button`, the `button` row's reader) | Enter, Space | Test: `widget_toast::the_toast_is_called_in_a_disabled_scope_and_every_node_says_so` holds Cancel; probe (Dismiss) |
-| `settings_page`, the restart action | Enter, Space | Probe. `widget_settings_page::a_disabled_page_reports_nothing_and_leaves_the_keys_to_shortcuts` never focuses it |
+| `toasts`, the action buttons | Enter, Space | Test (M11): `c4::m11::a_disabled_host_of_a_button_takes_enter_and_space_and_fires_no_binding` (the `toast action` stop); mutant: the same `activation_keys` one |
+| `toasts`, Cancel and Dismiss (`icon_button`, the `button` row's reader) | Enter, Space | Test: `widget_toast::the_toast_is_called_in_a_disabled_scope_and_every_node_says_so` holds Cancel; Dismiss (M11): the c4 test above (the `toast dismiss` stop) |
+| `settings_page`, the restart action | Enter, Space | Test (M11): the c4 test above (the `settings restart` stop, focused); `widget_settings_page::a_disabled_page_reports_nothing_and_leaves_the_keys_to_shortcuts` never focuses it |
+| `Ui::empty_state`'s and `Ui::callout`'s actions, `Ui::toast_history`'s clear (`Ui::button`, `icon_button`) | Enter, Space | Test (M11): the c4 test above (the `empty state action`, `callout action` and `toast history clear` stops) |
+| `stepper` | Up, Down | Test (M11): `c4::m11::a_disabled_reader_takes_every_key_it_takes_enabled_and_fires_no_global_binding`; mutant: back on `consume_key` gated on `enabled` fails it and the chord test. Chords: `a_chord_on_the_keys_of_the_five_readers_is_a_shortcut_enabled_and_disabled` |
+| `slider` | arrows | Test (M11): the same two c4 tests; mutant: the event filter back on `enabled` with no chord check fails both |
+| `search_picker`, the trigger (`activation_keys`) | Enter, Space | Test (M11): the same two c4 tests; mutant: back on `consume_key` gated on `enabled` fails both. An open picker closes when disabled and focus returns to the trigger one frame later, so the frame that disables it has nothing to hold the box's keys; that is the close, not a reader |
 | `command_palette`, its own keys | Up, Down, Enter | Test: `widget_command_palette::a_disabled_palette_takes_its_keys_activates_nothing_and_passes_the_walk` (`Scope::Overlay`) |
 | `combo` | Enter, Space, Down | Test (D160): `widget_combo::a_combo_focused_then_disabled_keeps_its_keys_from_the_shortcuts`; a chord on them stays a shortcut, enabled and disabled: `a_chord_on_the_combos_keys_is_a_shortcut_and_opens_nothing` |
 | `virtual_list`, so the list frame the table runs on | Up, Down, Home, End, PageUp, PageDown; Command+C with a selection | Test (D160): `widget_virtual_list::a_list_focused_then_disabled_takes_its_keys_and_changes_nothing`, `command_c_on_a_list_focused_then_disabled_copies_nothing_and_fires_no_binding`; chords: `a_chord_on_the_lists_keys_stays_a_shortcut` |
@@ -237,15 +254,6 @@ Holds, for the keys listed:
 | Hosts of `Ui::icon_button`: the copy buttons of the code block and of markdown's fenced code, the diff's hunk actions | Enter, Space | Test (M9): the same (copy and hunk stops); mutant: `activation_keys` leaving a disabled key leaks `code block copy`, `diff hunk action`, `markdown link` and `markdown task box` |
 | `diff_view`, the unified pane and each split pane, through `virtual_list` | Up, Down, Home, End, PageUp, PageDown | Test (M9): the same (body, left and right stops); mutant: `virtual_list` consuming only when enabled leaks all three. Command+C with a selection is the `virtual_list` row above, run on a list, not on a diff pane |
 
-Does not hold: each key listed fired nothing enabled and fired its binding disabled, with focus kept. All by probe;
-nothing acted. Each gates on `enabled` or a focus that is false in a disabled scope before it takes the key.
-
-| Reader | Keys that reach the shortcut |
-|---|---|
-| `stepper` | Up, Down |
-| `slider` | arrows |
-| `search_picker`, the trigger | Enter, Space. An open picker closes when disabled and focus returns to the trigger, so this row is what is left of its box |
-
 Not a leak: Escape in a pointer drag (`consume_key_while_pressed`: the splitter, `drag_gesture`) fired nothing enabled
 and fired its binding once the scope turned disabled mid-drag (probe, splitter and tab strip). From reading: `Ui::interact`
 reports no press in a disabled scope, so the drag has ended and Escape has nothing to cancel, which `drag.rs` leaves to
@@ -260,8 +268,7 @@ dialog's disabled confirm. A disabled radio option takes its keys, and the arrow
 
 Not checked, from reading only:
 
-- `Ui::empty_state`'s and `Ui::callout`'s actions (`Ui::button`), not run. `Ui::toast_history`'s clear (`icon_button`) holds Enter and Space by probe, with no test.
-- The tab strip's menu (`menu`), not run.
+- The tab strip's menu (`menu`): the strip closes it when it turns disabled (`disabling_the_strip_closes_an_open_menu` pins that), so no widget holds the key focus afterwards and the keys of the closed menu reach the shortcuts for the frame in which it closed. A menu opened in a disabled scope is the `menu` row, which holds. Ran in a scratch probe at M11 (`c4::m11` with the menu as a stop: Up, Down, Home, End, Enter and Space reached a `Global` binding); not a reader that takes a key, so no row.
 - `free_drag_gesture`: no library caller, not run.
 - Keys outside the 27, such as Alt word moves in a text field and Control chords. D157 leaves chords to the shortcuts where it applies.
 - A closure host (`dialog` body, `popover`, `panel`, `page`, `side_panel`, `form_field`, `setting_row`, and a table's cell closure) reads no key: what it
@@ -294,7 +301,7 @@ monotone steps, the exact end and that it finishes within its duration plus one 
 
 | Module (file) | Purpose | Key items |
 |---|---|---|
-| `gpu` (`gpu.rs`, `shader.wgsl`) | The GPU every target shares: device, queue, noise texture, per colour format the pipelines and the glyph atlas; headless-capable | `Gpu`, `instance`, `Uploaded`, `Globals` |
+| `gpu` (`gpu.rs`, `shader.wgsl`) | The GPU every target shares: device, queue, noise texture, per colour format the pipelines and the glyph atlas; headless-capable; since M11 it reports a lost device and the app rebuilds (D241) | `Gpu` (`is_lost`), `instance`, `Uploaded`, `Globals` |
 | `frame` (`frame.rs`) | One target's renderer: the scene, blur, target pass sequence over a core `Scene` | `FrameRenderer`, `FrameParams` |
 | `images` (`images.rs`, `image.wgsl`) | The image pipeline and the picture store: premultiply on upload, nearest at an integer ratio without rotation, else linear; rotated text is a raster of the shaped text drawn through it (D105, D106) | `Gpu::register`, `Gpu::release` (the `ImageStore` impl) |
 | `blur` (`blur.rs`, `blur.wgsl`) | Backdrop blur | `Blur` |
@@ -306,7 +313,7 @@ monotone steps, the exact end and that it finishes within its duration plus one 
 
 Asset: `assets/acrylic-noise.png` (Avalonia's texture). Tests: `tests/text.rs` (text contract),
 `tests/targets.rs` (two targets on one `Gpu`), `tests/images.rs` (the image contract on the `Gpu`),
-`tests/primitives.rs` and `tests/text_field.rs` (pixel probes on real fonts).
+`tests/primitives.rs` and `tests/text_field.rs` (pixel probes on real fonts), `tests/device_lost.rs` (a destroyed device reports lost and a rebuild draws) and `tests/custom_draw.rs` (the hook through `draw_with`).
 
 ### `lune-ui-winit` (`crates/lune-ui-winit/src/`)
 
@@ -331,7 +338,7 @@ only with the feature; the gate runs the crate both ways).
 | `popover` (`popover.rs`) | The guard of a tray surface's window (D223, D224) | `PopoverWindow`, `frontmost_app` |
 | `platform` (private; `platform.rs`, `platform/{item,macos,windows,other}.rs`) | The OS half of both: `item.rs` is the `tray-icon` wrapper macOS and Windows share, `macos.rs` the panel class swap. With `material/macos.rs`, the only `unsafe` | `Panel`, `TrayItem` |
 
-Tests: unit tests in `tray.rs` (the click rule, image sizes, an unplaced rect) and `platform/other.rs` (`Unsupported`, so they run in the Linux half of `scripts/check-targets.sh`). Nothing in the gate opens a window or a status item.
+Tests: unit tests in `tray.rs` (image sizes, an unplaced rect), `platform/item.rs` (the click rule) and `platform/other.rs` (`Unsupported`, so they run in the Linux half of `scripts/check-targets.sh`). Nothing in the gate opens a window or a status item.
 
 ### `lune-ui` (facade, `crates/lune-ui/src/lib.rs`)
 
@@ -439,13 +446,13 @@ functions; mid-transition and interaction scenes are live scripted `Ui` frames. 
 `nav_item`, `radio_group`, `star_rating`, `slider`, `filter_bar`, `search_picker`, `tab_strip`, `toolbar` and `banner`, and from M7
 `flyout`, `toast-notifications`, `command-palette`, `page`, `panel`, `sidebar`, `side-panel`, `icon-rail`, `split-panes`,
 `tree-view` and `settings-page`, from M8 `table`, `bar-chart`, `pie-chart`, `kanban-board` and `lane-graph`, and from M9 `code-block`,
-`code-editor-view`, `markdown-preview` and `diff-view`, and from M10 `theme`, `tray` and `file-drop`
-(73 pages in all, 413 scene names; every page of the same pattern: a live state, scripted scenes, a bench timeline); `apps/gallery/src/pages/controls_ui.rs` is the shared composition of every M4 widget that the
+`code-editor-view`, `markdown-preview` and `diff-view`, from M10 `theme`, `tray` and `file-drop`, and from M11 `window`
+(74 pages in all, 431 scene names, one of them at scale 1.5, `ui-controls@1.5x`, D243; every page of the same pattern: a live state, scripted scenes, a bench timeline); `apps/gallery/src/pages/controls_ui.rs` is the shared composition of every M4 widget that the
 core pages draw. Window mode builds a `Ui` per frame over the page's live state; dump and bench
 drive the same state through a `Player` (a scripted input, the retained store and the page state). A scene's `Expect` is `Settled` (`Idle`),
 `Moving` (`Now`) or, for a pending tooltip, `Waiting` (`At`). `Ev` scripts pointer, scroll, typed text, keys
 with modifiers, IME preedit and commit, the clipboard's answer, file hover and drop, and a cue (a script's way to ask for what a pointer would, as the theme swap does); the window answers a clipboard
-request from the OS clipboard (D215; `--dump` never builds one). A page may also name a theme and a tray state (`PageState::theme`, `tray_state`), read by the `Player` and by window mode. `gallery --smoke-platform` (a logged-in GUI session; exit 2 without one) puts a real item in the tray for about 2 seconds and prints each fact it measured (D225). The bundled fonts have no CJK glyph, so the IME scenes'
+request from the OS clipboard (D215; `--dump` never builds one). `UiScene.scale` is an `f32`. A page may also name a theme and a tray state (`PageState::theme`, `tray_state`), read by the `Player` and by window mode. `gallery --smoke-platform` (a logged-in GUI session; exit 2 without one) puts a real item in the tray for about 2 seconds and prints each fact it measured (D225). The bundled fonts have no CJK glyph, so the IME scenes'
 "かな" draws as boxes (D90). A shown overlay fades from the first frame that draws it, so a scene that wants
 it visible needs a frame at the due time. Window mode and the bench draw the list page with 1,000,000 rows, the code editor page with a 1,000,000-line document, the table, lane graph and diff pages with 100,000 rows or lines, and the markdown page with a document of 2,800 blocks (400 sections).
 
@@ -457,6 +464,12 @@ page is `OVER` only when at least half its runs are, and a minority of over runs
 its `ok`. The self-test's spread (p99 and worst above its p50) and the load average are printed with
 every verdict; nothing refuses a busy machine (D85). It is the milestone acceptance run, not part of
 the per-commit gate.
+
+The catalogue is checked by `apps/gallery/src/catalogue.rs` (unit tests, in the gate; no dependency): every scene an
+entry claims is a scene or page of the gallery and every gallery scene is claimed; a non-external entry names a scene or says
+`n/a —`; a `done` entry has no owner, a `source:` that exists, no open "still needs" and a `- Done (D47, M11):` line whose cited
+tests exist (D236); every requirement id is cited or listed; every motion kind and easing is named where its scene is claimed;
+and the `in-progress` entries are exactly the two Class B ones (D234). Each check is shown to fire on a wrong inline entry.
 
 ## Boundary rules
 
@@ -488,16 +501,22 @@ seam, in `platform/` or `material/` files, so the Windows DX12 choice is in
 
 The two M1 deviations are resolved: the inline `cfg(target_os)` in `gpu.rs` and `window.rs` moved
 into `platform/` files (step 8), and `Gpu::new` takes an optional compatible surface, so a headless
-device needs no window (steps 3 and 4). Carried limits at the end of M5, none of them fixed here: an
-overlay above a modal is unsupported, so a popover or tooltip inside a dialog draws under it; the
-menu's node name; text cannot be cut by a rounded clip (it gets the bounding rect); text draws above
-fills, so overlapping labels show through during a drag; and nothing here verifies real typing with an
-input method, bidi caret placement or the Windows and Linux run time.
+device needs no window (steps 3 and 4). The limits that remain are choices with a row or an entry,
+not missing parts (D237, D245): an overlay above a modal goes one level (D137) and a frame has one
+blur (D138); text cannot be cut by a rounded clip (it gets the bounding rect) and draws above the
+fills of its layer, so overlapping labels show through during a drag; the bundled fonts have no bold,
+CJK or italic face; a ring's width follows the device scale only; the tab strip closes its menu when
+disabled; the API gaps marked in the entries. `docs/STATE.md`, "Carried limits", lists them with
+the milestone limits. What nothing here verifies is real typing with an input method, bidi caret
+placement, a screen reader, and the Windows and Linux run time (`docs/STATE.md`, "Unverified here").
 
 ## API changes since M1
 
-For M11's migration map (Luneterm's `lune-termview` uses `color`, `custom`, `paint`, `dump`; the
-facade keeps those paths):
+The migration map for Luneterm is built (`docs/consuming.md`, "Migration map"; Luneterm's `lune-termview`
+uses `color`, `custom`, `paint`, `dump`, and the facade keeps those paths, so it checks against the
+snapshot with no source change). This section stays the log; the map links it.
+
+From M1 to M3:
 
 - `Painter::new` takes `&mut dyn TextSystem` (was `&mut TextCache` plus a global scale); the painter
   has a `scene` field (the display list) instead of GPU geometry;
@@ -513,6 +532,22 @@ facade keeps those paths):
 - `theme::DARK`, a neutral alias of `lunegit_dark::THEME`;
 - new: `RawInput`, `FrameOutput`, `Translator`, `OutputState`, `Backdrop::apply`, `WindowBackdrop`,
   the `testing` module.
+
+Since M11 (D234 to D245; nothing public was removed; the workspace version is 0.2.0, D238):
+
+- `Ui::caption_buttons(key, win, CaptionOptions) -> Option<CaptionButton>` and the types `CaptionButton` and
+  `CaptionOptions` (`widgets::caption`, D240); `window::CAPTION_BUTTON_WIDTH` and `CAPTION_GLYPH_SIZE` (and the crate-private `caption_rect`) are
+  the geometry both forms share; `luneui.window.minimize`, `maximize`, `restore` and `close` join the default strings;
+- `Gpu::is_lost(&self) -> bool` (D241; the callback sets an `Arc<AtomicBool>`, no `unsafe`);
+- `testing::scripted_input_contract`, the fourth contract suite beside the text, image and backdrop ones;
+- the wheel's region rule takes a hit's call-order tag as well as its layer (F11, `h.tag >= tag` beside `h.layer >= layer`), so a wheel over a fit composite in a top popover does
+  not reach a list in a popover under it;
+- `stepper`, `slider`, the search picker's trigger, the tab strip and the star rating take their keys through `activation_keys`,
+  `consume_plain_key` or the slider's event filter: they take every key enabled or disabled and act only when enabled, and a chord on
+  them is a shortcut ("Disabled keys");
+- gallery: `UiScene.scale` is `f32` and the 74th page `window` adds seven scenes; `apps/gallery/src/catalogue.rs` is the catalogue check;
+- `scripts/export-snapshot.sh` (D239); every public function, method, type, trait and module has a doc comment and `cargo doc`
+  is clean under `-D warnings` (D242).
 
 Since M10 (D204 to D227; nothing public was removed; `Theme` gained a field, so a `Theme { .. }` literal outside the toolkit needs `glass`):
 
@@ -679,11 +714,11 @@ only under `target/`, except that `scripts/pixel-gate.sh` extracts its base sour
 | Gate | Proves | Compare | Exit codes |
 |---|---|---|---|
 | `scripts/pixel-gate-luneterm.sh` | M1 only: this repo's `lune-ui` drew the same pixels as Luneterm's. Phases: lock parity (every registry package in this repo's `Cargo.lock` is in Luneterm's lock at the rev; `--parity-only` stops here and still applies), run A (Luneterm's own crate), run B (the scratch clone's `lune-ui` repointed at this repo's crate), compare with Luneterm's `dump_compare`. Since M2 step 2 run B cannot build against the new API, so a full run exits 2 by design (roadmap D4) | `18 files, 18 identical, 0 differ, max delta 0` | 0 pass; 1 parity mismatch or pixel difference; 2 usage or setup error |
-| `scripts/pixel-gate.sh [--base <rev>] [--allow <id>...]` | A change since `<rev>` (default `HEAD`) leaves the gallery's reference scenes unchanged (the 15 legacy scenes stay on the Painter API, so the gate keeps proving the moved drawing code is untouched; scenes a later change adds are reported as new, D59). Dumps `git archive <rev>` and the working tree, compares with `dump-compare --allow-new`. `--allow <id>` names a scene whose frames may differ (reported only); an id not in `gallery --list` is an error | `15 files, 15 identical` | 0 pass; 1 delta or scene missing from the candidate; 2 usage or setup error (a base without `apps/gallery` included: nothing to compare is not a pass) |
+| `scripts/pixel-gate.sh [--base <rev>] [--allow <id>...]` | A change since `<rev>` (default `HEAD`) leaves every scene `gallery --list` prints unchanged (431 at M11's close; the 15 legacy scenes stay on the Painter API, so the gate keeps proving the moved drawing code is untouched; scenes a later change adds are reported as new, D59). Dumps `git archive <rev>` and the working tree, compares with `dump-compare --allow-new`. `--allow <id>` names a scene whose frames may differ (reported only); an id not in `gallery --list` is an error | `15 files, 15 identical` | 0 pass; 1 delta or scene missing from the candidate; 2 usage or setup error (a base without `apps/gallery` included: nothing to compare is not a pass) |
 | `scripts/check-targets.sh [--skip-linux]` | The workspace lints and builds beyond the host: Windows `clippy` (needs the `x86_64-pc-windows-msvc` target) and Linux fmt, clippy and tests in a `rust:1.92` container. Not a pixel gate; it covers the code the host `cfg` hides | `windows: passed`, `linux: passed` or `skipped (<reason>)` | 0 every half that ran passed; 1 a check failed; 2 usage |
 
 Dump file names: the gallery writes `<id>@<scale>x.png` (logical 1040x660; `gallery --list` prints
-the 15 legacy names first, then the Ui pages' scenes: 62 names after M4, 152 after M5, 231 after M6, 305 after M7, 332 after M8, 389 after M9, 413 after M10); Luneterm's spike writes `NN-<name>@<scale>x.png` (18 scenes). `tools/dump-compare`
+the 15 legacy names first, then the Ui pages' scenes: 62 names after M4, 152 after M5, 231 after M6, 305 after M7, 332 after M8, 389 after M9, 413 after M10, 431 after M11); Luneterm's spike writes `NN-<name>@<scale>x.png` (18 scenes). `tools/dump-compare`
 (`cargo run -p dump-compare -- <baseline> <candidate> [--max-delta N] [--allow-new]`) compares per
 pixel, max channel delta including alpha; a file missing from the candidate, a file only in the
 candidate (unless `--allow-new`), a size or colour-type mismatch or a delta above `N` (default 0)

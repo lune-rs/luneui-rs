@@ -2,10 +2,10 @@
 id: widget.text-field
 title: Text field
 area: widget
-status: in-progress
+status: done
 consumers: luneterm, wane
 source: crates/lune-ui-core/src/widgets/field.rs
-owner: orch/toolkit-v1
+owner: —
 summary: Single-line text box: 32 px, radius 6, placeholder, caret when focused; variants fill, small, mono, password, search and date; editing engine from text.text-edit
 ---
 
@@ -129,11 +129,13 @@ The placeholder and the label are app text.
 - Sizes: `sm` is 48 device px high; the search variant's text starts 66 device px from the left edge [W docs/ui/components.md:350,352].
 - Conformance: the hover and focus transitions pass `motion::conformance`; Reduced keeps them, Off snaps [motion].
 - Semantic node: role `text-input`; value follows the text; invalid follows the error flag; an injected `AccessAction` set-value changes the text.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_text_field.rs`: behaviour `a_click_focuses_and_places_the_caret`, `typing_changes_the_text_and_reports_changed`, `a_click_focuses_and_tab_moves_focus_away`, `a_disabled_field_ignores_the_click`, `a_password_copies_nothing_and_its_selection_fills_the_mask`, `a_press_on_clear_empties_the_text_and_keeps_focus`; pixel probes `pixel_probes_at_scale_two`, `small_is_24_high_whatever_the_rect` (48 device px), `the_search_variant_insets_its_text_and_shows_the_clear_button_while_non_empty`, `at_rest_the_ui_field_draws_exactly_what_the_painter_field_does` (the `controls` look); conformance `every_motion_row_conforms_under_every_tier`; node `the_node_is_a_text_input_named_by_the_placeholder`, `the_node_carries_text_selection_and_states`, `set_value_replaces_the_text_and_marks_changed`; the bare chrome `a_bare_field_draws_no_fill_border_or_ring_and_the_box_field_does`; disabled `a_text_field_focused_then_disabled_takes_its_keys_and_changes_nothing`.
 
 ### Build
 
-- Milestone: M4 (retrofit: focus, semantic node, transitions) and M5 (the editing engine, variants, IME); done by M11. Deferred to M5 [D74]: variants, typing, search clear and IME composition, with the scenes `text-field-variants`, `text-field-search-clear` and `text-field-composing`. M5 built the engine wiring, the variants, search clear and IME composition (`text_field_with`, `text_area`; D88); the deferred scenes `text-field-variants`, `text-field-search-clear` and `text-field-composing` exist. M6 step 3 adds `FieldOptions.chrome: FieldChrome::{Box, Bare}` ([D116]): `Bare` draws no fill, border or ring and puts the caret in `fg_tertiary`, for the filter bar, which draws its own frame; editing, focus, IME and the node are the box field's. Open for `done` (D47): M11 re-checks the whole bar on every entry; real typing with an input method (R1) and bidi caret placement are unverified here, and so is the Windows and Linux run time.
+- Milestone: M4 (retrofit: focus, semantic node, transitions) and M5 (the editing engine, variants, IME); done by M11. Deferred to M5 [D74]: variants, typing, search clear and IME composition, with the scenes `text-field-variants`, `text-field-search-clear` and `text-field-composing`. M5 built the engine wiring, the variants, search clear and IME composition (`text_field_with`, `text_area`; D88); the deferred scenes `text-field-variants`, `text-field-search-clear` and `text-field-composing` exist. M6 step 3 adds `FieldOptions.chrome: FieldChrome::{Box, Bare}` ([D116]): `Bare` draws no fill, border or ring and puts the caret in `fg_tertiary`, for the filter bar, which draws its own frame; editing, focus, IME and the node are the box field's. M11 audited it against D47 (the `Done` line). Unverified here: real typing with an input method (R1; Luneterm's M9 run covers it, D15), bidi caret placement, and the Windows and Linux run time.
 - Depends on: core.ui, core.focus, infra.accessibility, motion.transitions, text.text-edit, text.ime, platform.clipboard
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_text_field.rs::a_click_focuses_and_places_the_caret, crates/lune-ui-core/tests/widget_text_field.rs::typing_changes_the_text_and_reports_changed, crates/lune-ui-core/tests/widget_text_field.rs::a_disabled_field_ignores_the_click, crates/lune-ui-core/tests/widget_text_field.rs::a_press_on_clear_empties_the_text_and_keeps_focus, crates/lune-ui-core/tests/widget_text_field.rs::pixel_probes_at_scale_two, crates/lune-ui-core/tests/widget_text_field.rs::small_is_24_high_whatever_the_rect, crates/lune-ui-core/tests/widget_text_field.rs::every_motion_row_conforms_under_every_tier, crates/lune-ui-core/tests/widget_text_field.rs::the_node_carries_text_selection_and_states, crates/lune-ui-core/tests/widget_text_field.rs::a_text_field_focused_then_disabled_takes_its_keys_and_changes_nothing`; page `text-field`; unverified here: real typing with an input method (Luneterm's M9 run, D15), bidi caret placement, Windows and Linux run time.
 
 ## Open questions
 

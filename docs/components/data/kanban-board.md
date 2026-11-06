@@ -2,10 +2,10 @@
 id: data.kanban-board
 title: Kanban board
 area: data
-status: in-progress
+status: done
 consumers: lunegit
 source: crates/lune-ui-core/src/widgets/kanban_board.rs
-owner: toolkit-v1 M8
+owner: —
 summary: Horizontal board of columns with card lists, card drag between columns by manual pointer capture, and an error state for a corrupt board
 ---
 
@@ -119,6 +119,7 @@ Every way a card's position could jump is one path: an accepted drop, a refused 
 - `kanban-board-focus` (new): the cards' stop with its ring, settled.
 - `kanban-board-inactive` (new): the fallback fill, settled.
 - `kanban-board-empty` (new): three empty columns with their hints, settled.
+- `kanban-board-disabled` (new): the board at 0.4 opacity after a drag attempt from the first card to the second column and a Tab: no ghost, no landing slot, no ring, the cards where they were, settled.
 - `kanban-board-settle-mid` (new): a card landing half way, in motion.
 
 ### Painter primitives
@@ -138,12 +139,14 @@ Every way a card's position could jump is one path: an accepted drop, a refused 
 - Pixel probes at scale 2: column 544 px, card radius 12, threshold 8 px.
 - Conformance: `SLIDE`, `SETTLE`, `DIM` on three tiers.
 - Semantic nodes: the tree above, `testing::disabled_violations`.
+- Tests, bullet by bullet. Every clause of the bullets above is a named test in `crates/lune-ui-core/tests/widget_kanban_board.rs`: behaviour `a_press_under_the_threshold_is_a_click_and_opens`, `a_move_across_columns_lands_in_the_model_where_the_line_said`, `moves_down_and_up_its_own_column_match_the_model`, `a_drop_at_its_own_place_or_outside_every_column_reports_nothing`, `the_drop_line_sits_in_the_gap_of_the_slot_and_the_target_fills`, `the_buttons_report_their_presses`; the two classes `an_accepted_drop_lands_in_the_new_slot_without_a_jump`, `a_refused_drop_lands_back_without_a_jump`, `a_drop_outside_escape_and_capture_loss_land_back_without_a_jump`, `nothing_outlives_what_a_drag_stood_on`; the ghost `the_ghost_is_above_the_board_cut_by_no_clip_and_hits_nothing`, `inside_a_dialog_the_ghost_is_raised_and_a_close_replays_none`; auto-scroll `a_pointer_at_the_board_s_edge_scrolls_by_dt_to_the_end_and_idles`; keys `arrows_home_and_end_walk_the_board`, `shift_with_an_arrow_reports_the_same_move_as_a_drop`, `all_the_cards_are_one_tab_stop_and_it_remembers_the_cursor`, `a_chord_on_a_card_stays_a_shortcut_enabled_and_disabled`; pixel probes `a_card_and_a_column_sit_at_the_anatomy_s_numbers`; conformance `the_rows_conform_in_three_tiers`, `reduced_and_off_have_no_landing_and_reduced_keeps_the_dim_fade`; nodes `the_tree_is_a_list_of_groups_of_items`, `the_disabled_walk_is_clean_and_nothing_activates`.
 
 ### Build
 
 - Milestone: M8.
 - Built in M8 (step 5).
 - Depends on: infra.drag-and-drop, layout.scroll-area, widget.button, core.focus, infra.accessibility, core.acrylic.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_kanban_board.rs::a_press_under_the_threshold_is_a_click_and_opens, crates/lune-ui-core/tests/widget_kanban_board.rs::a_move_across_columns_lands_in_the_model_where_the_line_said, crates/lune-ui-core/tests/widget_kanban_board.rs::a_drop_at_its_own_place_or_outside_every_column_reports_nothing, crates/lune-ui-core/tests/widget_kanban_board.rs::an_accepted_drop_lands_in_the_new_slot_without_a_jump, crates/lune-ui-core/tests/widget_kanban_board.rs::nothing_outlives_what_a_drag_stood_on, crates/lune-ui-core/tests/widget_kanban_board.rs::the_ghost_is_above_the_board_cut_by_no_clip_and_hits_nothing, crates/lune-ui-core/tests/widget_kanban_board.rs::a_card_and_a_column_sit_at_the_anatomy_s_numbers, crates/lune-ui-core/tests/widget_kanban_board.rs::the_rows_conform_in_three_tiers, crates/lune-ui-core/tests/widget_kanban_board.rs::the_tree_is_a_list_of_groups_of_items`; page `kanban-board`; unverified here: none (the access tree's move action is the `role-gap` of `infra.drag-and-drop`, D55).
 
 ## Open questions
 

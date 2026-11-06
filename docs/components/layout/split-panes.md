@@ -2,10 +2,10 @@
 id: layout.split-panes
 title: Resizable split panes
 area: layout
-status: in-progress
+status: done
 consumers: lunegit
-source: Lunegit: src/Lunegit.Desktop/MainWindow.axaml
-owner: toolkit-v1 M7
+source: crates/lune-ui-core/src/widgets/split_panes.rs
+owner: —
 summary: Resizable columns and rows between panels and content, with a 4 px splitter that snaps columns shown or hidden
 ---
 
@@ -99,11 +99,13 @@ None: the splitter draws no text.
 - Pixel probes at scale 2: the strip is 8 device px (4 logical) and its hit 16 (8 logical); the focus fill is the 4 px strip in `accent`.
 - Conformance: the size never animates, so a hidden pane snaps in every tier; only the focus fill fades (`focus`, snaps under Off).
 - Semantic node: role `separator` [D55]; the size is exposed as a number value.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_split_panes.rs`: behaviour `a_drag_of_n_changes_the_size_by_n_on_both_axes_and_sides`, `the_drag_clamps_at_min_max_and_the_room_left_for_the_other_pane`, `min_wins_when_nothing_fits`, `a_smaller_window_clamps_what_is_drawn_and_not_what_is_stored`, `the_arrows_along_the_axis_move_the_strip_16_px`, `home_and_end_go_to_the_sized_panes_ends_and_keys_clamp`, `escape_during_a_drag_restores_the_press_size_and_is_consumed_and_a_release_ends_it`, `a_drag_across_a_panes_button_clicks_nothing`, `the_size_survives_keep_alive_and_frames_it_was_not_drawn`; pixel probes `pixel_probes_at_scale_two`, `the_hit_is_8_px_over_the_4_px_strip_and_a_pane_beside_it_keeps_its_own`, `focus_visible_fills_the_4_px_strip_with_accent_and_nothing_else_does`; conformance `the_focus_fill_conforms_in_three_tiers`, `hidden_gives_the_other_pane_the_whole_rect_with_no_strip_no_node_and_no_hit`; node `the_node_is_a_separator_with_the_sizes_as_a_number_and_the_three_actions`; disabled `a_disabled_split_does_not_drag_or_move_and_the_walk_holds`.
 
 ### Build
 
 - Milestone: M7.
 - Depends on: core.ui, core.focus, infra.accessibility.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_split_panes.rs::a_drag_of_n_changes_the_size_by_n_on_both_axes_and_sides, crates/lune-ui-core/tests/widget_split_panes.rs::the_drag_clamps_at_min_max_and_the_room_left_for_the_other_pane, crates/lune-ui-core/tests/widget_split_panes.rs::the_arrows_along_the_axis_move_the_strip_16_px, crates/lune-ui-core/tests/widget_split_panes.rs::escape_during_a_drag_restores_the_press_size_and_is_consumed_and_a_release_ends_it, crates/lune-ui-core/tests/widget_split_panes.rs::the_size_survives_keep_alive_and_frames_it_was_not_drawn, crates/lune-ui-core/tests/widget_split_panes.rs::pixel_probes_at_scale_two, crates/lune-ui-core/tests/widget_split_panes.rs::the_focus_fill_conforms_in_three_tiers, crates/lune-ui-core/tests/widget_split_panes.rs::the_node_is_a_separator_with_the_sizes_as_a_number_and_the_three_actions`; page `split-panes`; unverified here: none.
 
 ## Open questions
 

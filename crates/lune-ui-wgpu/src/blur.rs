@@ -312,6 +312,8 @@ impl Blur {
         });
     }
 
+    /// The texture the scene pass draws into, which the blur reads; `None` before the first size is
+    /// set.
     pub fn scene_view(&self) -> Option<&wgpu::TextureView> {
         self.targets.as_ref().map(|t| &t.scene)
     }

@@ -2,10 +2,10 @@
 id: motion.curves
 title: Easing curves and menu motion
 area: motion
-status: in-progress
+status: done
 consumers: luneterm
 source: crates/lune-ui-core/src/widgets/menu.rs
-owner: orch/toolkit-v1
+owner: —
 summary: cubic_bezier easing and the menu open and close values; becomes the cubic-out and ease-in tokens
 ---
 
@@ -23,9 +23,9 @@ tokens. The general easings, tiers and kinds are `motion.transitions` and `motio
 
 ## Existing code
 
-`crates/lune-ui-core/src/widgets/menu.rs:28` (`cubic_bezier`), `:25` (`MenuAnim`), `:21-22`
-(`MENU_IN`, `MENU_OUT`), `:46` (`menu_open_anim`), `:52` (`menu_close_anim`); three unit tests at
-`:167`, `:177`, `:185`. Drawn in the gallery's `menu` and `menu-opening` scenes
+`crates/lune-ui-core/src/widgets/menu.rs:40` (`cubic_bezier`), `:33-34`
+(`MENU_IN`, `MENU_OUT`), `:45` (`menu_open_anim`), `:51` (`menu_close_anim`); three unit tests at
+`:893`, `:903`, `:911`. The two curves are also `Easing::CUBIC_OUT` and `EASE_IN` (`crates/lune-ui-core/src/motion/easing.rs`). Drawn in the gallery's `menu` and `menu-opening` scenes
 (`apps/gallery/src/scenes.rs:96,103`).
 
 ## Spec
@@ -97,15 +97,17 @@ None: no user-visible text.
 
 ### Acceptance
 
-- Existing unit tests keep passing unchanged: `cubic_bezier_endpoints`, `open_curve_ends_at_rest`, `close_curve_ends_at_none` [R crates/lune-ui-core/src/widgets/menu.rs:167,177,185].
+- Existing unit tests keep passing unchanged: `cubic_bezier_endpoints`, `open_curve_ends_at_rest`, `close_curve_ends_at_none` [R crates/lune-ui-core/src/widgets/menu.rs:893,903,911].
 - Zero pixel delta on `menu` and `menu-opening` before and after the move into `motion` (the pixel gate, CLAUDE.md) [R apps/gallery/src/scenes.rs:96,103].
 - Known-answer table: `Easing::CUBIC_OUT` at t = 0.25, 0.5, 0.75 equals `cubic_bezier(0.215, 0.61, 0.355, 1, t)` to 1e-6; `menu_open_anim(0.5)` unchanged to the bit against the moved function [derived: the old and new paths must agree exactly].
 - Conformance: both curves pass `motion::conformance` (monotonic, exact end, no NaN, within duration plus one frame) [D41].
+- Tests, bullet by bullet. Unit tests in `crates/lune-ui-core/src/widgets/menu.rs`: `cubic_bezier_endpoints`, `open_curve_ends_at_rest`, `close_curve_ends_at_none`. Known answers: `crates/lune-ui-core/tests/motion.rs::cubic_out_and_ease_in_are_the_moved_menu_curves_bit_for_bit` (at t = 0, 0.25, 0.5, 0.75, 1, bit-equal to `cubic_bezier(0.215, 0.61, 0.355, 1, t)` and `(0.42, 0, 1, 1)`), `menu_open_anim_is_unchanged_against_the_moved_function` (at 0.5, to the bit). Conformance: `crates/lune-ui-core/tests/widget_menu.rs::the_curves_conform_under_every_tier_and_opacity_is_monotone_through_the_ui`, `exit_retention_is_120_ms_full_120_reduced_and_none_off`. The zero pixel delta on `menu` and `menu-opening` is the orchestrator's gate (M11's pre-audit run held 413 of 413).
 
 ### Build
 
 - Milestone: M4 (becomes `Easing::CubicBezier` and the two constants); done by M11.
 - Depends on: motion.transitions.
+- Done (D47, M11): tests `crates/lune-ui-core/src/widgets/menu.rs::cubic_bezier_endpoints, crates/lune-ui-core/src/widgets/menu.rs::open_curve_ends_at_rest, crates/lune-ui-core/src/widgets/menu.rs::close_curve_ends_at_none, crates/lune-ui-core/tests/motion.rs::cubic_out_and_ease_in_are_the_moved_menu_curves_bit_for_bit, crates/lune-ui-core/tests/motion.rs::menu_open_anim_is_unchanged_against_the_moved_function, crates/lune-ui-core/tests/widget_menu.rs::the_curves_conform_under_every_tier_and_opacity_is_monotone_through_the_ui`; page `menu` (scenes `curves-menu-closing`) and `motion` (`motion-curve-cubic-out`, `motion-curve-ease-in`); unverified here: none.
 
 ## Open questions
 

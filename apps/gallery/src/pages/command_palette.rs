@@ -104,6 +104,8 @@ struct Live {
     confirming: bool,
     /// The text of the last row that finished its work.
     done: Option<&'static str>,
+    /// Draw the palette inside `with_enabled(false, ..)`.
+    disabled: bool,
 }
 
 fn state(open: bool, query: &str) -> Box<dyn PageState> {
@@ -113,6 +115,19 @@ fn state(open: bool, query: &str) -> Box<dyn PageState> {
         expanded: [false; 2],
         confirming: false,
         done: None,
+        disabled: false,
+    })
+}
+
+/// The destructive command's palette, disabled.
+fn disabled() -> Box<dyn PageState> {
+    Box::new(Live {
+        open: true,
+        query: "clear".to_owned(),
+        expanded: [false; 2],
+        confirming: false,
+        done: None,
+        disabled: true,
     })
 }
 
@@ -249,7 +264,10 @@ impl PageState for Live {
                 error: found.error,
                 name: "",
             };
-            let out = ui.command_palette("palette", &mut self.query, &palette, &glass());
+            let (query, enabled) = (&mut self.query, !self.disabled);
+            let out = ui.with_enabled(enabled, |ui| {
+                ui.command_palette("palette", query, &palette, &glass())
+            });
             if let Some(i) = out.show_more {
                 self.expanded[i] = true;
             }
@@ -310,7 +328,7 @@ const FOCUSED: &[Step] = &[Step {
 const fn settled(id: &'static str, state: fn() -> Box<dyn PageState>) -> UiScene {
     UiScene {
         id,
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state,
         script: FOCUSED,
@@ -330,7 +348,7 @@ const SCENES: &[UiScene] = &[
     // A Down moves the selection from the first row to the second.
     UiScene {
         id: "command-palette-selected",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: results,
         script: &[Step {
@@ -344,7 +362,7 @@ const SCENES: &[UiScene] = &[
     // and has settled by 1400 ms.
     UiScene {
         id: "command-palette-destructive",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: clear_only,
         script: &[
@@ -361,10 +379,34 @@ const SCENES: &[UiScene] = &[
         expect: Expect::Settled,
     },
     settled("command-palette-date-error", failing),
+    // The palette is disabled: the pointer rests on the destructive row and Enter is pressed, but
+    // no dialog opens. The overlay layer is not dimmed by the scope; the row's tooltip still shows.
+    UiScene {
+        id: "command-palette-disabled",
+        scale: 2.0,
+        tier: MotionTier::Full,
+        state: disabled,
+        script: &[
+            Step {
+                at_ms: 400,
+                events: &[Ev::PointerAt(DESTRUCTIVE_AT.0, DESTRUCTIVE_AT.1)],
+            },
+            Step {
+                at_ms: 600,
+                events: &[Ev::Key(NamedKey::Enter)],
+            },
+            Step {
+                at_ms: 1300,
+                events: &[],
+            },
+        ],
+        capture_ms: 1600,
+        expect: Expect::Settled,
+    },
     // The open is `pop`, base (250 ms): half way at 125 ms.
     UiScene {
         id: "command-palette-opening",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: results,
         script: &[],

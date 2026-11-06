@@ -200,7 +200,7 @@ const fn row_at(i: usize) -> (f32, f32) {
 const SCENES: &[UiScene] = &[
     UiScene {
         id: "list-row-badge-states",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: specimens,
         script: &[],
@@ -210,7 +210,7 @@ const SCENES: &[UiScene] = &[
     // Hover is `instant` (120 ms): half way at 60 ms.
     UiScene {
         id: "list-row-badge-hover-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[Step {
@@ -223,7 +223,7 @@ const SCENES: &[UiScene] = &[
     // Selecting is `selection` (180 ms): half way at 90 ms.
     UiScene {
         id: "list-row-badge-select-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[Step {
@@ -237,7 +237,7 @@ const SCENES: &[UiScene] = &[
     // opacity at once (it has no fade of its own), so the frame at 90 ms is already settled.
     UiScene {
         id: "list-row-badge-focus-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[Step {

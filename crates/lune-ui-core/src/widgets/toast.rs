@@ -286,6 +286,7 @@ impl Toasts {
         self.unread
     }
 
+    /// Sets the unread count to 0.
     pub fn mark_read(&mut self) {
         self.unread = 0;
     }

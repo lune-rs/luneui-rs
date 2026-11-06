@@ -2,10 +2,10 @@
 id: overlay.dialog
 title: Modal dialog
 area: overlay
-status: in-progress
+status: done
 consumers: luneterm, wane
 source: crates/lune-ui-core/src/widgets/dialog.rs
-owner: toolkit-v1 M7
+owner: —
 summary: Modal dialog card: dim backdrop, 448 px acrylic card, darker footer, app-supplied body
 ---
 
@@ -116,16 +116,18 @@ size and the content inside it (laid out once per open, [R crates/lune-ui-core/s
 
 ### Acceptance
 
-- Behaviour (scripted input, injected time): Cancel, confirm, Esc, Enter and scrim click each fire once; Tab does not leave the dialog. None exists yet (dialog.rs has no tests).
+- Behaviour (scripted input, injected time): Cancel, confirm, Esc, Enter and scrim click each fire once; Tab does not leave the dialog.
 - Pixel probes at scale 2: card 896 px wide, footer 136 px high, buttons 64 px high, card corner radius 16 px, scrim colour #00000080. Source values in Anatomy.
 - Conformance: open reaches opacity 1 and scale 1 at 250 ms; close hides the host at 180 ms (Full), 120 ms (Reduced), 0 ms (Off).
 - Semantic node: role `dialog`, modal, name = title; default action fires confirm.
 - Variants: the form card is 600 wide and centred (1200 at scale 2); the blur request is on Modal at sigma 8, saturation 1, faded at half open and half close; a glass menu above a blurred scrim loses the arbitration (the scrim's blur stays) and draws its fill; a disabled confirm is `Disabled`, not focusable, offers no action, draws at 0.4 open and closing, and Enter and Space on it reach no Global binding; a confirm, cancel, Escape or scrim click inside a nested dialog reaches only the top (`widget_dialog`, gallery `dialog` tests).
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_dialog.rs`: behaviour `a_click_on_confirm_fires_once`, `a_click_on_cancel_fires_once`, `escape_cancels_once`, `enter_confirms_once_at_open`, `enter_on_the_focused_cancel_cancels`, `a_scrim_click_cancels_once_and_a_card_click_does_nothing`, `tab_never_leaves_the_dialog`; pixel probes `pixel_probes_at_scale_two`, `the_form_scale_two_probes`; conformance `open_reaches_opacity_one_and_scale_one_at_250_ms`, `reduced_open_is_a_fade_without_scale_at_the_fast_length`, `off_opens_at_once`, `close_hides_at_180_120_and_0_ms`; node `the_node_is_a_modal_dialog_named_by_its_title`, `the_default_action_confirms_and_dismiss_cancels`; variants `the_form_card_is_600_wide_and_centred_and_holds_two_columns`, `the_scrim_blur_asks_for_the_window_at_sigma_eight_on_the_modal_layer`, `the_blur_fades_with_the_scrim_opening_and_closing`, `a_glass_menu_above_a_blurred_scrim_loses_the_blur_and_draws_its_fill`, `a_disabled_confirm_draws_at_the_disabled_opacity_open_and_closing`, `enter_and_space_on_a_disabled_confirm_do_nothing_and_reach_no_shortcut`, `confirm_and_cancel_inside_a_nested_dialog_reach_only_the_top`.
 
 ### Build
 
 - Milestone: M4 (retrofit), M7 (variants, overlays above the dialog).
 - Depends on: core.ui, core.focus, infra.accessibility, motion.transitions, widget.button.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_dialog.rs::a_click_on_confirm_fires_once, crates/lune-ui-core/tests/widget_dialog.rs::escape_cancels_once, crates/lune-ui-core/tests/widget_dialog.rs::a_scrim_click_cancels_once_and_a_card_click_does_nothing, crates/lune-ui-core/tests/widget_dialog.rs::tab_never_leaves_the_dialog, crates/lune-ui-core/tests/widget_dialog.rs::pixel_probes_at_scale_two, crates/lune-ui-core/tests/widget_dialog.rs::close_hides_at_180_120_and_0_ms, crates/lune-ui-core/tests/widget_dialog.rs::the_node_is_a_modal_dialog_named_by_its_title, crates/lune-ui-core/tests/widget_dialog.rs::the_scrim_blur_asks_for_the_window_at_sigma_eight_on_the_modal_layer, crates/lune-ui-core/tests/widget_dialog.rs::a_nested_dialog_draws_on_raised_over_the_dialog`; page `dialog`; unverified here: none (limits with rows, in `## Limits`: one level above a modal on `Raised` (D137), one blur per frame (D138)).
 
 ## Open questions
 

@@ -79,7 +79,7 @@ impl PageState for States {
 
 const SCENES: &[UiScene] = &[UiScene {
     id: "verdict-row-states",
-    scale: 2,
+    scale: 2.0,
     tier: MotionTier::Full,
     state: states,
     script: &[],

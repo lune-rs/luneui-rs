@@ -2,10 +2,10 @@
 id: text.markdown-preview
 title: Markdown preview
 area: text
-status: in-progress
+status: done
 consumers: lunegit
 source: crates/lune-ui-core/src/widgets/markdown.rs
-owner: toolkit-v1 M9
+owner: —
 summary: Renders an app-supplied Markdown block model: headings, paragraphs with inline marks, lists with task boxes, quotes, tables, code, images; links raise an event
 ---
 
@@ -27,7 +27,7 @@ shown for the file viewer and for scratchpad notes.
 
 ## Existing code
 
-None in `lune-ui`. Design sources (not code to move): Lunegit `src/Lunegit.Desktop/Views/MarkdownPreviewView.axaml` (323 lines) and `.axaml.cs` (484), `Markdown/MarkdownBlocks.cs` (the block model, 97 lines),
+Built in M9 step 7: `crates/lune-ui-core/src/widgets/markdown.rs` (`Ui::markdown`, `MdBlock`, `MdInline`, `MdOptions`, `is_actionable`), tests `crates/lune-ui-core/tests/widget_markdown.rs`. Design sources (not code to move): Lunegit `src/Lunegit.Desktop/Views/MarkdownPreviewView.axaml` (323 lines) and `.axaml.cs` (484), `Markdown/MarkdownBlocks.cs` (the block model, 97 lines),
 `Markdown/MarkdownInlineRenderer.cs` (inline marks and links), `Markdown/MarkdownTableRenderer.cs`, `Markdown/IMarkdownPreviewHost.cs` (what the view asks of its host), `Markdown/MarkdownTaskToggler.cs` (app-side write-back).
 
 ## Spec
@@ -142,11 +142,13 @@ n/a — the preview is document content: no change in it animates (a document re
 - Pixel probes at scale 2: block gap 16 device px, margin 24, quote bar 6 px wide, rule 2 px high, table border 2 px.
 - Conformance: none, no transitions.
 - Semantic node: the document `group`, a `link` node per actionable link, a `checkbox` per task item; an injected `AccessAction` default on a link raises the click.
+- Tests, bullet by bullet (`crates/lune-ui-core/tests/widget_markdown.rs`). Links: `is_actionable_gives_the_entrys_known_answers`, `a_press_on_an_actionable_link_raises_it_once_and_starts_no_selection`, `a_press_beside_the_link_selects_text_and_raises_nothing`, `an_inert_link_is_plain_coloured_text_with_no_region_node_or_cursor`, `enter_and_space_on_the_focused_link_raise_it`, `the_link_node_has_the_label_for_name_the_url_for_description_and_a_default_action`. Headings: `headings_take_their_size_and_colour_by_level_and_clamp` (22, 18, 14, 13, 13, 13; primary to tertiary), `a_heading_is_a_static_text_node_with_its_level`. Tables: `a_table_has_a_border_a_header_fill_a_rule_per_row_and_right_aligned_cells`, `a_column_is_as_wide_as_its_widest_cell_and_80_at_least`, `the_table_nodes_are_a_table_of_rows_with_column_headers_and_cells`. Images: `a_resolved_image_is_at_most_640_wide_and_keeps_its_aspect`, `an_unresolved_or_failed_image_shows_its_alt_or_its_target`, `a_remote_target_is_never_drawn_even_with_a_picture_and_says_so`. Tasks (the widget never changes its model; the toggle write-back is the app's): `a_task_box_shows_the_model_and_a_click_reports_its_id_when_live`, `task_boxes_on_a_read_only_host_report_nothing_and_still_draw`, `space_on_the_focused_task_box_reports_it`. HTML: `html_is_drawn_as_inert_text_on_the_code_fill`. Pixel probes at scale 2: `the_column_has_a_12_margin_and_8_between_blocks_at_scale_2` (24 and 16 device px), `a_quote_has_a_bar_3_wide_a_fill_and_nests`, `a_rule_is_1_high_in_surface_active_with_6_above_and_below`. Node: `the_document_is_a_group_named_by_its_label`, `lists_draw_markers_in_fg_secondary_and_nest_with_list_and_item_nodes`. Scale: `a_frame_costs_the_same_at_1_000_and_10_000_blocks_and_rests`, `only_the_blocks_in_view_are_built`.
 
 ### Build
 
 - Milestone: M9. Built in M9 step 7: `Ui::markdown`, `MdBlock`, `MdInline`, `MdItem`, `MdTask`, `MdRow`, `MdAlign`, `MdImage`, `MdOptions`, `MdResponse`, `is_actionable`, 16 scenes on the page `markdown-preview`.
 - Depends on: text.code-block, text.text-edit, layout.scroll-area, widget.scrollbar, widget.checkbox, core.image, core.ui, core.focus, infra.accessibility
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_markdown.rs::is_actionable_gives_the_entrys_known_answers, crates/lune-ui-core/tests/widget_markdown.rs::a_press_on_an_actionable_link_raises_it_once_and_starts_no_selection, crates/lune-ui-core/tests/widget_markdown.rs::headings_take_their_size_and_colour_by_level_and_clamp, crates/lune-ui-core/tests/widget_markdown.rs::a_table_has_a_border_a_header_fill_a_rule_per_row_and_right_aligned_cells, crates/lune-ui-core/tests/widget_markdown.rs::a_resolved_image_is_at_most_640_wide_and_keeps_its_aspect, crates/lune-ui-core/tests/widget_markdown.rs::a_remote_target_is_never_drawn_even_with_a_picture_and_says_so, crates/lune-ui-core/tests/widget_markdown.rs::a_task_box_shows_the_model_and_a_click_reports_its_id_when_live, crates/lune-ui-core/tests/widget_markdown.rs::html_is_drawn_as_inert_text_on_the_code_fill, crates/lune-ui-core/tests/widget_markdown.rs::the_column_has_a_12_margin_and_8_between_blocks_at_scale_2, crates/lune-ui-core/tests/widget_markdown.rs::the_link_node_has_the_label_for_name_the_url_for_description_and_a_default_action`; page `markdown-preview` (16 scenes); unverified here: the OS clipboard and the app's link handling.
 
 ## Open questions
 

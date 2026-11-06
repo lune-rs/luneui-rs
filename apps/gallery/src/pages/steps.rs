@@ -47,7 +47,7 @@ impl PageState for States {
 
 const SCENES: &[UiScene] = &[UiScene {
     id: "steps-states",
-    scale: 2,
+    scale: 2.0,
     tier: MotionTier::Full,
     state: states,
     script: &[],

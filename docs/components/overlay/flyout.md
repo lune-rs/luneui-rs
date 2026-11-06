@@ -2,10 +2,10 @@
 id: overlay.flyout
 title: Tray flyout
 area: overlay
-status: in-progress
+status: done
 consumers: wane
-source: —
-owner: toolkit-v1 M7
+source: crates/lune-ui-core/src/widgets/flyout.rs
+owner: —
 summary: Windows tray left-click surface: header, stats, route list, action rows
 ---
 
@@ -115,17 +115,19 @@ None of its own: the header, stats, route and action labels are app text (Wane m
 - Pixel probes at scale 2: window width 680 px; radius 18 px; header padding 12 px vertical and 16 px horizontal.
 - Conformance: the open and close curves match `overlay.menu`.
 - Semantic node: role `menu` for the actions; the status node polite; the state text follows the tray state.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_flyout.rs`: behaviour `escape_an_outside_press_and_focus_loss_dismiss`, `a_click_picks_once_and_a_disabled_row_picks_nothing`, `focus_lands_on_the_first_row_and_enter_and_space_pick_once`, `arrows_wrap_and_skip_a_disabled_row`, `the_size_is_the_drawn_card_at_the_three_states`, `empty_stats_and_routes_take_no_height_and_neighbours_share_a_margin`; pixel probes `pixel_probes_at_scale_2`, `no_text_is_closer_than_9_px_to_the_card`; conformance `the_curves_are_the_menus_under_every_tier`, `a_closing_flyout_replays_its_blur_with_the_fade`; node `the_nodes_are_a_menu_a_status_and_two_groups`, `the_state_node_is_polite_and_follows_the_state_text`; the window form `a_window_flyout_card_fills_the_window_at_the_three_states`, `a_window_flyout_dismisses_on_escape_and_focus_loss_and_not_on_its_own_card`, `a_window_flyout_opens_and_closes_with_the_menus_curves_and_goes_idle`; disabled `a_disabled_flyout_closes_on_escape_picks_nothing_and_marks_every_node`.
 
 ### Build
 
 - Milestone: M7 step 4 built the surface (header, stats strip, routes, action rows, open and close motion, drawn from the app's anchor point; `flyout_body` is the body M10 runs in its own window) and M10 (placement from the tray icon's rect and the separate glass window, with `platform.tray-icon`). M7 uses `data.stat` and `data.kv-list` (both M6) and `overlay.menu` (M7).
 - Depends on: overlay.popup-panel, overlay.menu, data.stat, data.kv-list, platform.tray-icon, platform.window, render.blur.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_flyout.rs::escape_an_outside_press_and_focus_loss_dismiss, crates/lune-ui-core/tests/widget_flyout.rs::focus_lands_on_the_first_row_and_enter_and_space_pick_once, crates/lune-ui-core/tests/widget_flyout.rs::arrows_wrap_and_skip_a_disabled_row, crates/lune-ui-core/tests/widget_flyout.rs::the_size_is_the_drawn_card_at_the_three_states, crates/lune-ui-core/tests/widget_flyout.rs::pixel_probes_at_scale_2, crates/lune-ui-core/tests/widget_flyout.rs::the_curves_are_the_menus_under_every_tier, crates/lune-ui-core/tests/widget_flyout.rs::the_nodes_are_a_menu_a_status_and_two_groups, crates/lune-ui-core/tests/widget_flyout.rs::a_window_flyout_card_fills_the_window_at_the_three_states`; page `flyout`; unverified here: the OS glass window behind the tray, a real tray click (`platform.tray-icon`).
 
 ## Open questions
 
-- Open (API, a later step): a route's state note ("loaded", Wane's `.c-flyout__note`, sans 11 tertiary after the id) has no place in `routes: &[(&str, &str)]`.
+- Still open, an API gap (D237): a route's state note ("loaded", Wane's `.c-flyout__note`, sans 11 tertiary after the id) has no place in `routes: &[(&str, &str)]`.
 - Resolved [D145]: a toolkit component, so every consumer gets the surface and the keys.
-- Native rendering: needs a separate borderless, always-on-top, non-activating glass window anchored to the tray rect, with the in-app blur over the real desktop (platform work, section 5). The mock fixes its position; the real window must be placed from the tray icon's rect and kept on screen.
+- Answered (M10): native rendering is `Ui::flyout_window` in its own borderless window placed from the tray icon's rect (`platform.tray-icon`, `place_surface`); the in-app blur over the real desktop is the OS material (`platform.material`), which is not run here.
 - Resolved [D145]: the menu's keys carry over, and focus-visible is the highlight.
 
 ## Notes for the planner

@@ -190,7 +190,7 @@ impl PageState for Specimens {
 const SCENES: &[UiScene] = &[
     UiScene {
         id: "slider-states",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: specimens,
         script: &[],
@@ -201,7 +201,7 @@ const SCENES: &[UiScene] = &[
     // way at 90 ms.
     UiScene {
         id: "slider-value-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[
@@ -220,7 +220,7 @@ const SCENES: &[UiScene] = &[
     // Hover is `instant` (120 ms): half way at 60 ms.
     UiScene {
         id: "slider-hover-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[Step {
@@ -233,7 +233,7 @@ const SCENES: &[UiScene] = &[
     // Tab focuses the first slider; the ring is `fast`: half way at 90 ms.
     UiScene {
         id: "slider-focus-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[Step {

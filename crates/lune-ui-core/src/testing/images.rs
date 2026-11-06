@@ -22,6 +22,7 @@ impl Default for FakeImages {
 }
 
 impl FakeImages {
+    /// A store with no size limit.
     pub fn new() -> Self {
         Self::default()
     }

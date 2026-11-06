@@ -282,7 +282,7 @@ const HOVER_THIRD: Step = Step {
 const SCENES: &[UiScene] = &[
     UiScene {
         id: "tab-strip-rest",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: rest,
         script: &[],
@@ -292,7 +292,7 @@ const SCENES: &[UiScene] = &[
     // Hovered and settled, with the tooltip's 800 ms still to run.
     UiScene {
         id: "tab-strip-hover",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: rest,
         script: &[HOVER_THIRD],
@@ -301,7 +301,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "tab-strip-unfocused",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: unfocused,
         script: &[],
@@ -311,7 +311,7 @@ const SCENES: &[UiScene] = &[
     // Each spinner turned a quarter.
     UiScene {
         id: "tab-strip-progress",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: progress,
         script: &[],
@@ -321,7 +321,7 @@ const SCENES: &[UiScene] = &[
     // Phase 0.25 of the 2400 ms loop.
     UiScene {
         id: "tab-strip-busy-sweep",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: busy_sweep,
         script: &[],
@@ -330,7 +330,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "tab-strip-busy-comet",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: busy_comet,
         script: &[],
@@ -340,7 +340,7 @@ const SCENES: &[UiScene] = &[
     // The brightest point of the 1800 ms breath.
     UiScene {
         id: "tab-strip-busy-breath",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: busy_breath,
         script: &[],
@@ -349,7 +349,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "tab-strip-overflow",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: overflow,
         script: &[
@@ -375,7 +375,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "tab-strip-long-title",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: long_title,
         script: &[],
@@ -384,7 +384,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "tab-strip-empty",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: empty,
         script: &[],
@@ -393,7 +393,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "tab-strip-dragging",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: dragged,
         script: &[PRESS, CROSS, FAR],
@@ -403,7 +403,7 @@ const SCENES: &[UiScene] = &[
     // Half of `instant`.
     UiScene {
         id: "tab-strip-hover-fade",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: rest,
         script: &[HOVER_THIRD],
@@ -413,7 +413,7 @@ const SCENES: &[UiScene] = &[
     // Half of `fast`, from the frame the neighbours started.
     UiScene {
         id: "tab-strip-slide",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: dragged,
         script: &[PRESS, CROSS, FAR],
@@ -423,7 +423,7 @@ const SCENES: &[UiScene] = &[
     // Half of `fast` after the release.
     UiScene {
         id: "tab-strip-settle",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: dragged,
         script: &[PRESS, CROSS, FAR, RELEASE],
@@ -433,7 +433,7 @@ const SCENES: &[UiScene] = &[
     // Half of `base` after the activation.
     UiScene {
         id: "tab-strip-content-swap",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: rest,
         script: &[Step {

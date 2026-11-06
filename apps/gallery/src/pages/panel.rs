@@ -235,7 +235,7 @@ fn unavailable_panel(ui: &mut Ui<'_>, at: Rect) {
 const SCENES: &[UiScene] = &[
     UiScene {
         id: "panel-flush",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: flush,
         script: &[],
@@ -244,7 +244,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "panel-strip",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: strip,
         script: &[],
@@ -253,7 +253,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "panel-card",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: nested,
         script: &[],
@@ -262,7 +262,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "panel-card",
-        scale: 1,
+        scale: 1.0,
         tier: MotionTier::Full,
         state: nested,
         script: &[],
@@ -271,7 +271,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "panel-unavailable",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: unavailable,
         script: &[],

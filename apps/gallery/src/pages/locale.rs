@@ -129,7 +129,7 @@ impl PageState for Locale {
 
 const SCENES: &[UiScene] = &[UiScene {
     id: "locale-pseudo",
-    scale: 2,
+    scale: 2.0,
     tier: MotionTier::Full,
     state: pseudo,
     script: &[Step {

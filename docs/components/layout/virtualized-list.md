@@ -2,10 +2,10 @@
 id: layout.virtualized-list
 title: Virtualized list
 area: layout
-status: in-progress
+status: done
 consumers: lunegit, wane
 source: crates/lune-ui-core/src/widgets/virtual_list.rs
-owner: orch/toolkit-v1
+owner: —
 summary: Builds only the visible rows; selection as a set of row keys (single, multi, range); keyboard navigation; no row animation while scrolling
 ---
 
@@ -132,16 +132,18 @@ None: rows carry app text.
 - Pixel probes at scale 2: row slot 90 device px, highlight inset 8 px left and right and 2 px top and bottom, selected fill = the `selected` token.
 - Conformance: the two transitions pass `motion::conformance`; a scripted scroll over 600 frames starts no transition (zero rows in flight) [motion].
 - Semantic node: role `list`, one `list-item` per built row, `selected` follows the key set; an injected `AccessAction` default selects the row.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_virtual_list.rs`: behaviour `a_click_selects_one_row_and_sets_the_anchor`, `the_primary_modifier_toggles_and_keeps_the_rest`, `shift_selects_anchor_to_row_replacing_the_set`, `up_and_down_move_the_cursor_and_the_selection`, `the_moved_row_is_revealed_with_the_least_movement`, `the_primary_modifier_with_c_reports_the_keys_in_key_order`; retention `a_selected_row_scrolled_out_and_back_stays_selected`, `six_hundred_undrawn_frames_under_keep_alive_keep_selection_and_offset`, `without_keep_alive_the_state_goes_after_one_undrawn_frame`; virtualization `a_million_rows_build_at_most_the_bound_each_frame_at_every_scroll_position`, `a_frames_work_does_not_depend_on_the_row_count`, `fixed_rows_are_arithmetic_and_keep_exact_positions_at_a_million`; pixel probes `at_scale_2_the_slot_is_90_px_and_the_highlight_inset_8_and_2`, `the_fill_follows_hover_and_selection_and_rest_is_transparent`; conformance `the_two_transitions_conform_at_every_tier`, `a_scripted_scroll_over_600_frames_starts_no_row_transition`; node `the_tree_has_the_list_a_list_item_per_built_row_and_selected_follows_the_set`, `an_access_default_action_selects_the_row`; disabled `a_disabled_list_is_inert_and_draws_at_0_4`, `a_list_focused_then_disabled_takes_its_keys_and_changes_nothing`.
 
 ### Build
 
-- Milestone: M5. Built in M5 (steps 8 and 10; the page is `virtualized-list`, 11 scenes, 1,000,000 rows in window mode and the bench). Open for `done` (D47): M11 re-checks the whole bar on every entry; the Windows and Linux run time is unverified (the Linux and Windows lint is `scripts/check-targets.sh`).
+- Milestone: M5. Built in M5 (steps 8 and 10; the page is `virtualized-list`, 11 scenes, 1,000,000 rows in window mode and the bench). M11 audited it against D47 (the `Done` line). Unverified here: the Windows and Linux run time (the lint for both is `scripts/check-targets.sh`).
 - Depends on: layout.scroll-area, widget.scrollbar, core.ui, core.focus, infra.accessibility, motion.transitions
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_virtual_list.rs::a_click_selects_one_row_and_sets_the_anchor, crates/lune-ui-core/tests/widget_virtual_list.rs::shift_selects_anchor_to_row_replacing_the_set, crates/lune-ui-core/tests/widget_virtual_list.rs::up_and_down_move_the_cursor_and_the_selection, crates/lune-ui-core/tests/widget_virtual_list.rs::six_hundred_undrawn_frames_under_keep_alive_keep_selection_and_offset, crates/lune-ui-core/tests/widget_virtual_list.rs::a_million_rows_build_at_most_the_bound_each_frame_at_every_scroll_position, crates/lune-ui-core/tests/widget_virtual_list.rs::at_scale_2_the_slot_is_90_px_and_the_highlight_inset_8_and_2, crates/lune-ui-core/tests/widget_virtual_list.rs::a_scripted_scroll_over_600_frames_starts_no_row_transition, crates/lune-ui-core/tests/widget_virtual_list.rs::the_tree_has_the_list_a_list_item_per_built_row_and_selected_follows_the_set`; page `virtual-list` (11 scenes); unverified here: Windows and Linux run time.
 
 ## Open questions
 
 - Answered (D97, D100): measured (variable) row heights: no Lunegit list read needs them (the commit list is a fixed 45 px); the strategy (a height cache with an estimated height) is for M5.
-- Still open (D100: no new state): `role-gap: multi-selectable` (see Accessibility).
+- Still open, a `role-gap` limit (D100: no new state; D237): `role-gap: multi-selectable` (see Accessibility).
 - Answered (D100, the app): whether the commit list pages data in the toolkit or in the app: Lunegit pages in app code on scroll [L src/Lunegit.Desktop/Views/RepositoryContentView.axaml.cs:74-75]; this entry assumes the app.
 
 ## Notes for the planner

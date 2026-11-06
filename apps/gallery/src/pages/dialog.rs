@@ -401,7 +401,7 @@ const SAVE_ALL: &[&str] = &["save-all"];
 const fn settled(id: &'static str, state: fn() -> Box<dyn PageState>) -> UiScene {
     UiScene {
         id,
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state,
         script: &[],
@@ -413,7 +413,7 @@ const fn settled(id: &'static str, state: fn() -> Box<dyn PageState>) -> UiScene
 const SCENES: &[UiScene] = &[
     UiScene {
         id: "dialog-closed",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[],
@@ -423,7 +423,7 @@ const SCENES: &[UiScene] = &[
     // The open is `pop`, base (250 ms): half way at 125 ms.
     UiScene {
         id: "dialog-opening",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: opening,
         script: &[],
@@ -434,7 +434,7 @@ const SCENES: &[UiScene] = &[
     // half way at 390 ms.
     UiScene {
         id: "dialog-closing",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: closing,
         script: &[
@@ -462,7 +462,7 @@ const SCENES: &[UiScene] = &[
     // settled by 1100 ms.
     UiScene {
         id: "dialog-tooltip",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: tooltip,
         script: &[

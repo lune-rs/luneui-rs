@@ -2,10 +2,10 @@
 id: core.painter
 title: Immediate-mode painter
 area: core
-status: in-progress
+status: done
 consumers: luneterm
-source: crates/lune-ui-core/src/paint.rs
-owner: orch/toolkit-v1
+source: crates/lune-ui-core/src/paint.rs, crates/lune-ui-core/src/paint/path.rs
+owner: —
 summary: Painter: ordered layers, fills, rings, strokes, acrylic, text, clip, transform and hit regions, building a plain-data Scene; holds the aggregate table of new primitives
 ---
 
@@ -20,7 +20,7 @@ summary: Painter: ordered layers, fills, rings, strokes, acrylic, text, clip, tr
 
 ## Existing code
 
-`crates/lune-ui-core/src/paint.rs:109` (`Painter`), `:14` (`Rect`), `:64` (`StrokeStyle`), `:431` (`polyline_length`); 507 lines; tests at `:440`.
+`crates/lune-ui-core/src/paint.rs:216` (`Painter`), `:19` (`Rect`), `:86` (`StrokeStyle`), `:113` (`Xform`), `:1287` (`polyline_length`); 1,378 lines, with the path geometry in `paint/path.rs`; unit tests at `:1297`.
 
 ## Spec
 
@@ -90,15 +90,20 @@ Not needed by any entry (no row): `linear-gradient` and `shadow`. No Lunegit or 
 
 ### Acceptance
 
-- Existing tests (`crates/lune-ui-core/src/paint.rs`, module `tests` from :440): `custom_records_physical_clip_on_base`, `custom_is_cut_by_the_current_clip`, `custom_outside_the_window_records_nothing`, `custom_lands_on_the_current_layer`.
+- Existing tests (`crates/lune-ui-core/src/paint.rs`, module `tests` from :1297): `custom_records_physical_clip_on_base`, `custom_is_cut_by_the_current_clip`, `custom_outside_the_window_records_nothing`, `custom_lands_on_the_current_layer`.
 - The pixel gate: the 15 gallery scenes dumped before and after any painter change compare at zero delta (CLAUDE.md "Pixel gate").
-- Done standard (D47) still needs, per primitive in the table: a recording-fake test that the right `Scene` item lands on the right layer under the current clip and `Xform`; a gallery scene from the table above; a pixel probe at scale 2 taken from the owner entry's Anatomy; and no wgpu type in a core signature (`scripts/check-boundaries.sh`).
-- Also still needed for the existing set: a test per method for the `Xform` scale and alpha (only `custom` has tests today).
+- Recording (the right `Scene` item on the right layer, under the clip and the `Xform`'s scale and alpha), per primitive: `image` and `text_rotated` (`crates/lune-ui-core/tests/painter.rs`: `image_lands_on_the_current_layer_under_the_clip_and_xform`, `text_rotated_lands_on_the_current_layer_under_the_clip_and_xform`); `dash` (`dash_respects_layer_clip_scale_and_alpha`); `clip-rounded` (`a_rounded_clip_travels_on_shapes_strokes_and_fills`, `the_radius_is_limited_to_half_the_short_side_and_scales_with_the_transform`); `sector`, `path-fill` (`strokes_fans_and_polygons_take_the_layer_clip_scale_and_alpha_of_the_xform`); `arc` (`an_arc_is_clipped_and_lands_on_its_layer`, `an_arc_radius_takes_the_xform_scale`).
+- The existing set under an `Xform`: `fill`, `fill_radii`, `fill_over`, `ring`, `backdrop` (`fills_rings_and_backdrops_take_the_layer_clip_scale_and_alpha_of_the_xform`), `text` (`text_takes_the_layer_clip_scale_and_alpha_of_the_xform`), `stroke` (the strokes test above), `acrylic` (`acrylic_opacity_comes_from_the_stack`), `fill` once more (`single_entry_uses_the_one_transform_formulas`, `nested_known_answer`). The ring's width follows the device scale only, not the `Xform`'s; no test pins that.
+- Pixel probes at scale 2 (`crates/lune-ui-wgpu/tests`): `dash`, `sector`, `path-fill`, `clip-rounded`, `arc` in `primitives.rs`; `image` and `text_rotated` in `images.rs` (`four_exact_quadrants_at_an_integer_ratio`, `rotated_text_is_drawn_through_buffer_draw`).
+- Gallery scenes: the table above; the `primitives` and `image` pages hold the seven.
+- No wgpu type in a core signature: `scripts/check-boundaries.sh` (in the gate).
+- The pixel gate: the gallery scenes dumped before and after any painter change compare at zero delta (CLAUDE.md "Pixel gate").
 
 ### Build
 
-- Milestone: M5 (the seven new primitives, R-core-10) and M11 (done standard; the existing code is moved). M5 built the seven primitives (steps 4 and 5; the page is `primitives`); `core.painter` stays `in-progress` until M11's done standard. M8 put `sector` to use (the pie chart) and used no new primitive. M6 put the rotate and dash rows to use (the spinner and the search picker's link trigger) and added the two stroke helpers `Painter::stroke_sweep` and `Painter::stroke_comet` over `StrokeStyle.mode`, which the tab strip's busy cue draws (D122).
+- Milestone: M5 (the seven new primitives, R-core-10) and M11 (done standard; the existing code is moved). M5 built the seven primitives (steps 4 and 5; the page is `primitives`); M8 put `sector` to use (the pie chart) and used no new primitive. M6 put the rotate and dash rows to use (the spinner and the search picker's link trigger) and added the two stroke helpers `Painter::stroke_sweep` and `Painter::stroke_comet` over `StrokeStyle.mode`, which the tab strip's busy cue draws (D122).
 - Depends on: core.scene, core.theme, text.shaping, core.image.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/painter.rs::image_lands_on_the_current_layer_under_the_clip_and_xform, crates/lune-ui-core/tests/painter.rs::text_rotated_lands_on_the_current_layer_under_the_clip_and_xform, crates/lune-ui-core/tests/painter.rs::fills_rings_and_backdrops_take_the_layer_clip_scale_and_alpha_of_the_xform, crates/lune-ui-core/tests/painter.rs::strokes_fans_and_polygons_take_the_layer_clip_scale_and_alpha_of_the_xform, crates/lune-ui-core/tests/painter.rs::text_takes_the_layer_clip_scale_and_alpha_of_the_xform, crates/lune-ui-core/tests/painter.rs::an_arc_radius_takes_the_xform_scale, crates/lune-ui-core/tests/paint_vector.rs::dash_respects_layer_clip_scale_and_alpha, crates/lune-ui-core/tests/paint_vector.rs::an_arc_is_clipped_and_lands_on_its_layer, crates/lune-ui-core/tests/paint_vector.rs::a_rounded_clip_travels_on_shapes_strokes_and_fills, crates/lune-ui-wgpu/tests/primitives.rs::an_arc_is_a_stroked_ring_piece_from_its_start_turning_clockwise_at_scale_2, crates/lune-ui-wgpu/tests/primitives.rs::a_sector_has_an_antialiased_edge_and_a_solid_inside, crates/lune-ui-wgpu/tests/primitives.rs::a_dashed_line_has_its_runs_and_gaps, crates/lune-ui-wgpu/tests/images.rs::rotated_text_is_drawn_through_buffer_draw`; page `primitives`; unverified here: none.
 
 ## Open questions
 

@@ -264,10 +264,11 @@ impl<'a> Ui<'a> {
         let was_open = st.open;
 
         let mut r = self.interact(id, rect, Sense::CLICK_FOCUS);
+        // The trigger's keys are taken whether or not the picker is enabled (D140), and a chord on
+        // them stays a shortcut (D157).
+        let activated = self.activation_keys(id, r.enabled, &[NamedKey::Enter, NamedKey::Space]);
         if r.enabled {
-            let enter = self.consume_key(id, NamedKey::Enter);
-            let space = self.consume_key(id, NamedKey::Space);
-            r.clicked |= enter || space;
+            r.clicked |= activated;
             if r.clicked {
                 st.open = !st.open;
                 if st.open {

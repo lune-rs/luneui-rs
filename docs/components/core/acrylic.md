@@ -2,10 +2,10 @@
 id: core.acrylic
 title: Acrylic colour math and noise opacity
 area: core
-status: in-progress
+status: done
 consumers: luneterm
 source: crates/lune-ui-core/src/acrylic.rs
-owner: orch/toolkit-v1
+owner: —
 summary: Avalonia acrylic colour math with tests, and the noise opacity
 ---
 
@@ -20,7 +20,7 @@ summary: Avalonia acrylic colour math with tests, and the noise opacity
 
 ## Existing code
 
-`crates/lune-ui-core/src/acrylic.rs:16` (`NOISE_OPACITY`), `:20` (`AcrylicColors`), `:30` (`acrylic_colors`), `:52` (`premultiplied`); tests at `:99`.
+`crates/lune-ui-core/src/acrylic.rs:16` (`NOISE_OPACITY`), `:20` (`AcrylicColors`), `:30` (`acrylic_colors`), `:52` (`premultiplied`); tests at `:100`.
 
 ## Spec
 
@@ -41,7 +41,7 @@ Conflicts: none. The repo CARD layer (material 0.8) and Lunegit's content acryli
 | solid (Lunegit only) | black | 1.0 | 0.35 | [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:232-233] |
 
 - Noise opacity 0.0225 [R crates/lune-ui-core/src/acrylic.rs:16].
-- Inactive window: solid `INACTIVE_FALLBACK` #333333FF instead of the layers [R crates/lune-ui-core/src/theme.rs:111-113].
+- Inactive window: `window_fallback` (#333333FF, the theme's `window_fallback`) instead of the layers [R crates/lune-ui-core/src/theme.rs:111-113]. The background still draws two acrylic items, the window and the card, both in `window_fallback` with noise off, so the card's corners antialias against the panel; it draws no glass layer's colour and no noise.
 - White tint suppressed to 20% (test `white_tint_is_suppressed_to_twenty_percent`, acrylic.rs:130).
 
 ### States
@@ -49,7 +49,7 @@ Conflicts: none. The repo CARD layer (material 0.8) and Lunegit's content acryli
 | state | look | cite |
 |---|---|---|
 | active window | the layer stack above | [R crates/lune-ui-core/src/theme.rs:90-109] |
-| inactive window | solid fallback | [R crates/lune-ui-core/src/theme.rs:113] |
+| inactive window | two acrylic items (window and card) in `window_fallback`, noise off | [R crates/lune-ui-core/src/theme.rs:113] |
 
 ### Transitions
 
@@ -87,16 +87,18 @@ n/a — no text.
 ### Acceptance
 
 - Existing tests (by path, `crates/lune-ui-core/src/acrylic.rs`): `window_layer_matches_avalonia` (:106), `panel_layer_matches_avalonia` (:113), `card_layer_matches_avalonia` (:120 region), `white_tint_is_suppressed_to_twenty_percent` (:130 region).
-- Done standard still needs: a pixel probe of the `acrylic` scene at scale 2 against the pixel gate (zero delta), and a probe of the inactive fallback in `unfocused`.
+- The inactive fallback: `apps/gallery/src/scenes.rs`, module `tests`: `the_unfocused_scene_draws_the_window_fallback_and_no_glass_layer` (two acrylic items, both `premul(window_fallback)`, `params[3]` 0 for no noise; the focused background beside it is the glass layers with noise).
+- Pixel probes (`crates/lune-ui-wgpu/tests/acrylic_fade.rs::fade_blends_between_the_base_and_the_card`: opacity 1 replaces the base with the premultiplied card colour, within one level; `primitives.rs::acrylic_radii_cuts_only_the_corner_it_names`, scale 2) and the pixel gate on the `acrylic`, `glass-off`, `unfocused` and `chrome` scenes at zero delta (the orchestrator's gate; M11's pre-audit run held 413 of 413).
 
 ### Build
 
 - Milestone: M11 (done standard; code exists).
 - Depends on: core.theme, render.frame, render.gpu.
+- Done (D47, M11): tests `crates/lune-ui-core/src/acrylic.rs::window_layer_matches_avalonia, crates/lune-ui-core/src/acrylic.rs::panel_layer_matches_avalonia, crates/lune-ui-core/src/acrylic.rs::card_layer_matches_avalonia, crates/lune-ui-core/src/acrylic.rs::white_tint_is_suppressed_to_twenty_percent, apps/gallery/src/scenes.rs::the_unfocused_scene_draws_the_window_fallback_and_no_glass_layer, crates/lune-ui-wgpu/tests/acrylic_fade.rs::fade_blends_between_the_base_and_the_card`; page n/a (a colour formula; drawn by the legacy scenes `acrylic`, `glass-off`, `unfocused`, `chrome`); unverified here: none (what the OS composites under the layers is `platform.material`).
 
 ## Open questions
 
-- Licence text for the Avalonia formulas: Luneterm has `licenses/avalonia-LICENSE`; this repo has none yet.
+- Answered: the licence text for the Avalonia formulas is `licenses/avalonia-LICENSE`, with its row in `THIRD_PARTY_NOTICES.md:8`.
 
 ## Notes for the planner
 
