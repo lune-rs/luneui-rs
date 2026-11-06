@@ -12,8 +12,8 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | in-luneterm | 0 |
 | planned | 0 |
 | stub | 0 |
-| in-progress | 91 |
-| done | 2 |
+| in-progress | 90 |
+| done | 3 |
 | external | 4 |
 | **total** | **97** |
 
@@ -38,7 +38,7 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
-| [render.blur](render/blur.md) | Backdrop blur pass | in-progress | luneterm | Backdrop blur pass with its WGSL shader |
+| [render.blur](render/blur.md) | Backdrop blur pass | done | luneterm | Backdrop blur pass with its WGSL shader |
 | [render.custom-draw](render/custom-draw.md) | App-owned drawing hook | in-progress | luneterm | CustomDraw trait: app-owned GPU drawing inside a layer |
 | [render.dump](render/dump.md) | Offscreen frame dump | in-progress | luneterm | Offscreen target, GPU readback and PNG writer for frame goldens |
 | [render.frame](render/frame.md) | Frame pass sequence | in-progress | luneterm | FrameRenderer: one target's scene, blur, target pass sequence over the core Scene |
