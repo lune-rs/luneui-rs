@@ -90,7 +90,7 @@ None: the error texts are the app's (the reader gives structured errors, not sen
 
 ### Gallery scenes
 
-n/a — the reader draws nothing; it is exercised through the theme loader, which the `controls` scene (existing) renders under a loaded theme once M10 lands.
+n/a — the reader draws nothing; it is exercised through the theme loader, which the `theme-*` scenes of `infra.theme-hot-reload` render (M10).
 
 ### Painter primitives
 
@@ -106,7 +106,7 @@ n/a — the reader draws nothing; it is exercised through the theme loader, whic
 - Bounded work: parse time is linear in the input size; a 1,048,576-byte input of 16-deep arrays finishes without stack growth beyond 16 frames [derived: the depth limit].
 - Pixel probes and conformance: n/a (no drawing, no transitions).
 - Semantic-node test: n/a.
-- Security review (D12): the reader is parsing user-editable files; M10's review checks the limits and the error paths; nothing here is run before that review.
+- Security review (D12): the reader is parsing user-editable files; M10's review (the orchestrator's, after step 11) checks the limits and the error paths. The tests above are done (M10 step 1, `crates/lune-ui-core/tests/json.rs`, `apps/gallery/tests/lunegit_files.rs`).
 
 ### Build
 

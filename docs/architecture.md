@@ -1,6 +1,6 @@
 # Architecture
 
-State after M9 (text views): the toolkit is five crates. A pure core (`lune-ui-core`, no
+State after M10 (infra and platform): the toolkit is five crates. A pure core (`lune-ui-core`, no
 dependencies) holds the painter, the display list, the per-window `Ui` frame, the motion system,
 the string table, the semantic tree, widgets, the theme and the four seam types; three adapter
 crates implement the seams on wgpu/glyphon, winit and the OS glass; the facade `lune-ui` re-exports
@@ -14,7 +14,10 @@ flyout, toasts, the command palette, the page, panel, sidebar, side panel, icon 
 page (D137 to D154). M8 added the data views: the table on the list frame, the bar and pie charts with value
 transitions, the lane graph row and the kanban board with its drag across columns (D160 to D174). M9 added the text views: a
 code editor over a line-indexed document (`CodeDoc`, one editing engine generic over the text it edits), the code block, the markdown
-preview on virtual blocks and the diff view, unified and split on the list frame (D177 to D199).
+preview on virtual blocks and the diff view, unified and split on the list frame (D177 to D199). M10 finished the infra and platform layer: a
+bounded JSON reader, theme files (the glass moved into `Theme`, a swap is a hard cut) and locale catalogs, file-drop events and the
+platform keymap, the OS clipboard (`arboard`), an AccessKit bridge behind a cargo feature, and the tray icon (a CPU raster) with the
+flyout and the menu in windows of their own (D204 to D227).
 
 ## Workspace layout
 
@@ -45,12 +48,14 @@ app passes time, sizes, fonts, theme, scale and hit values in), so frames are de
 | Module (file) | Purpose | Key items |
 |---|---|---|
 | `color` (`color.rs`) | Straight-alpha colour and blend helpers | `Rgba = [u8; 4]`, `premul`, `over`, `with_alpha` |
-| `theme` (`theme.rs`) | Theme tokens widgets read; the dark preset with its glass layers | `Theme`, `DARK`, `lunegit_dark::{THEME, WINDOW, PANEL, CARD, ...}` |
+| `theme` (`theme.rs`, `theme/file.rs`) | Theme tokens widgets read; the dark preset; since M10 the three glass layers travel in the theme (`Theme.glass`) and a theme file overlays it. `theme.rs` holds the key table (Lunegit's names, one macro: `COLOR_KEYS`, 50 keys, and the key-to-field `match`); `theme/file.rs` the loader (D207 to D209) | `Theme`, `ThemeGlass`, `DARK`, `lunegit_dark::{THEME, WINDOW, PANEL, CARD, ...}`, `Theme::from_json`, `ThemeFile`, `Skip`, `ThemeError`, `AcrylicLevel`, `Theme::with_acrylic`, `COLOR_KEYS` |
+| `json` (`json.rs`) | The bounded JSON reader for files a user can edit (D204): strict, recursive descent bounded by the depth limit, linear work, a leading byte-order mark skipped, an integer above 2^53 flagged inexact; the loaders choose what to forgive | `parse`, `Value`, `Number`, `JsonError`, `JsonErrorKind`, `MAX_INPUT` (1 MiB), `MAX_DEPTH` (16), `MAX_STRING`, `MAX_KEY`, `MAX_MEMBERS`, `MAX_VALUES` |
+| `tray` (`tray.rs`) | The tray's pure half (D218 to D221, D226): the icon rastered on the CPU by signed distance (a transparent ring, a coloured dot), where the flyout and the menu go from the icon's rect, and the click rules | `icon_bitmap`, `TrayBitmap`, `TrayState`, `GlyphTone`, `bar_from_tray`, `place_surface`, `TraySurface`, `TrayToggle`, `TrayAction`, `tray_surface`, `TrayPlatform` |
 | `acrylic` (`acrylic.rs`) | Avalonia acrylic colour math and the noise opacity | `AcrylicColors`, `NOISE_OPACITY` |
 | `paint` (`paint.rs`, `paint/path.rs`) | Immediate-mode painter: six layers, clip and rounded clip (`push_clip_rounded`), a transform stack (D66) and `push_translate`, the seven M5 primitives (image, rotate, dash, rounded clip, sector, path fill, arc; D105), hit regions generic over the app's hit type `H` and tagged with the overlay they belong to, an op recorder (`start_recording`, `take_recording`, replayed by exit painters), faded acrylic, `acrylic_radii` (one radius per corner) and `backdrop_with` (the glass's own layer, sigma and saturation; D137, D138), `stroke_sweep` and `stroke_comet` over `StrokeStyle.mode` (the busy cue's conic arc and dash, D122), `Painter::elide` (see `text`); builds a `Scene`; holds `&mut dyn TextSystem` | `Painter<H>`, `Rect`, `StrokeStyle`, `Xform`, `Ops` |
 | `scene` (`scene.rs`) | The display list: plain data plus the draw-order contract | `Scene`, `Layer`, `LayerGeometry`, `Shape`, `Acrylic` (a shape and its opacity, D61), `StrokeVertex`, `TextItem`, `CustomItem`, `BackdropRequest` (rect, radius, alpha, `layer`, `sigma`, `saturation`), `ImageItem`, `RoundClip`, `LayerId` (Base, Page, Popup, Modal, Raised, Toast; D54, D137), `LAYER_COUNT` (6), `SCENE_LAYERS`, `Scene::split`, `FrameParams` |
 | `text` (`text.rs`) | Text specs and the text seam, with the caret, hit, line and segment queries (D86, D94) | `TextSystem` (`prepare`, `measure`, `caret`, `hit`, `lines`, `segments`), `TextKey`, `Spec`, `Style`, `Font`, `CaretPos`, `LineSpan`, `Unit`, `elide` (D114: one line cut on a grapheme boundary, U+2026 in the last kept run's style, found by binary search over `caret`; a spec that fits comes back unchanged) |
-| `input` (`input.rs`) | The input seam: what the app hands in, what the toolkit asks back | `RawInput`, `Event` (with `Access`, `ClipboardText`, `ClipboardUnavailable`), `Key`, `NamedKey`, `Modifiers`, `ImeEvent`, `FocusEvent`, `Keymap` (`MAC`, `PC`; D92), `FrameOutput` (with `repaint`, `clipboard`, `tree`, `focused`, `cursor`, `ime_area`, `fired`), `Repaint`, `ClipboardRequest`, `WindowCommand`, `CursorIcon` (with `ALL`), `printable` |
+| `input` (`input.rs`) | The input seam: what the app hands in, what the toolkit asks back | `RawInput`, `Event` (with `Access`, `ClipboardText`, `ClipboardUnavailable` and, since M10, `FileHover`, `FileHoverCancelled`, `FileDrop`: a `PathBuf` and the last pointer position, nothing opens the path; D211), `Key`, `NamedKey`, `Modifiers`, `ImeEvent`, `FocusEvent`, `Keymap` (`MAC`, `PC`; D92), `FrameOutput` (with `repaint`, `clipboard`, `tree`, `focused`, `cursor`, `ime_area`, `fired`), `Repaint`, `ClipboardRequest`, `WindowCommand`, `CursorIcon` (with `ALL`), `printable` |
 | `image` (`image.rs`) | The picture seam: the app decodes, registers by id, releases explicitly; fit geometry | `ImageStore`, `ImageData`, `ImageId`, `ImageError`, `Fit`, `ImageAlign`, `image_rect` |
 | `layout` (`layout.rs`) | Pure stack, row, column and grid helpers: rects out, nothing drawn or stored (D108) | `stack`, `row`, `column`, `grid`, `Size`, `Align`, `Insets`, `Track` |
 | `shortcuts` (`shortcuts.rs`) | The scoped chord registry, resolved by the frame (D93) | `Shortcuts`, `Binding`, `Chord`, `Scope`, `CommandId`, `Chord::hint` |
@@ -63,15 +68,15 @@ app passes time, sizes, fonts, theme, scale and hit values in), so frames are de
 | `ui` (`ui.rs`, `ui/{access,animate,focus,id,keys,overlay,pointer,response,store}.rs`) | The per-window frame (see "The `Ui` frame" below) | `Ui`, `UiStore`, `FrameConfig`, `WidgetId`, `Response`, `Sense`, `OverlayOptions`, `OverlayFrame`, `OverlayPhase`, `Dismissal` |
 | `access` (`access.rs`) | The semantic tree and the actions that come back; plain data the `Ui` fills and routes | `Node`, `SemanticTree`, `Role` (36), `State` (15), `Action` (10), `Value`, `AccessAction`; `Node.level` (a tree row's depth + 1) |
 | `motion` (`motion.rs`, `motion/{easing,tween,transition,tokens,conformance}.rs`) | Closed-form motion: every value is a function of the app's `Time` and stored parameters; the 60 Hz conformance harness | `Time`, `Easing`, `Tween`, `Spring`, `Keyframes`, `Transition`, `Token`, `Kind`, `Motion`, `MotionTier`, `MOTION`, `conformance` |
-| `strings` (`strings.rs`) | The string table: keys, `{n}` and `{n:spec}` placeholders, the toolkit's defaults | `StringTable`, `DEFAULTS`, `ArgFormat`, `DisplayFormat`, `format_template` |
-| `widgets` (`widgets/<name>.rs`, `widgets/mod.rs`) | One file per control, generic over `H` for the Painter API; each has a `Look`, a `paint` function, the old function as a wrapper and a `Ui` method (D60) | `button`, `toggle`, `checkbox`, `label`, `combo`, `stepper`, `field` (text field with its variants), `text_area`, `input_box` (shared look), `focus_ring`, `popup_panel`, `scroll_area`, `scrollbar`, `virtual_list`, `popover`, `tooltip`; M6 added `badge`, `status_dot`, `verdict_row`, `progress`, `spinner`, `callout`, `stat`, `kv_list` (with `selectable`, the read-only selectable text of D125), `row`, `list_row`, `form_field`, `steps`, `nav_item` (`Ui::nav_list`), `radio_group`, `star_rating`, `slider`, `filter_bar`, `search_picker`, `tab_strip`, `toolbar`, `banner` (with the empty state) and `tone` (the one tone recipe, D129); `button` gained `Ghost`, `ButtonOptions` (`Ui::button_with`) and `IconButton` (`Ui::icon_button`, D116); M7 added `flyout` (`Ui::flyout`), `toast` (the `Toasts` model, `Ui::toasts`, `Ui::toast_history`), `command_palette` (`Ui::command_palette`), `page` and `panel` (`Ui::page`, `Ui::panel`: one closure called per slot), `sidebar`, `side_panel` and `icon_rail` (`Ui::sidebar`, `Ui::side_panel`, `Ui::icon_rail`), `split_panes` (`Ui::split_panes`, `Ui::split_state`), `tree_view` (`Ui::tree_view`, `Ui::tree_state`) and `settings_page` (`Ui::settings_page`); M8 added `table` (`Ui::table`, `Ui::table_state`, `Ui::table_selection`: the list frame with a header, sort requests and tones; `virtual_list` gained a crate-private `ListStyle`, D161), `bar_chart` (`Ui::bar_chart`), `pie_chart` (`Ui::pie_chart`), `lane_graph` (`Ui::lane_graph_row`, a stateless `paint`) and `kanban_board` (`Ui::kanban_board`, `landed_index`); M9 added `text_lines` (`HighlightSpan`, `Highlighter`, `PlainHighlighter`, the rich-line spec and `range_boxes` across runs), `code_editor` (`Ui::code_editor`, `Ui::code_line_rect`: lines on `RowHeights` and the scroll area, read-only or editable, wrapped or not, synced panes), `code_block` (`Ui::code_block`, `code_block::height`: the same frame read-only with a copy button), `markdown` (`Ui::markdown` over the `MdBlock` model: top-level blocks as virtual rows) and `diff_view` (`Ui::diff_view`, `pair_rows`, `widest_chars`: the list frame, twice for split) |
+| `strings` (`strings.rs`) | The string table: keys, `{n}` and `{n:spec}` placeholders, the toolkit's defaults; since M10 a locale file loads as a `Catalog` (strict: an unknown `luneui.` key fails the file, D210), overlays a table, and a template can be audited with the scanner the formatter uses | `StringTable` (`overlay`, `iter`), `DEFAULTS`, `ArgFormat`, `DisplayFormat`, `format_template`, `Catalog`, `CatalogError`, `audit_template`, `TemplateAudit` |
+| `widgets` (`widgets/<name>.rs`, `widgets/mod.rs`) | One file per control, generic over `H` for the Painter API; each has a `Look`, a `paint` function, the old function as a wrapper and a `Ui` method (D60) | `button`, `toggle`, `checkbox`, `label`, `combo`, `stepper`, `field` (text field with its variants), `text_area`, `input_box` (shared look), `focus_ring`, `popup_panel`, `scroll_area`, `scrollbar`, `virtual_list`, `popover`, `tooltip`; M6 added `badge`, `status_dot`, `verdict_row`, `progress`, `spinner`, `callout`, `stat`, `kv_list` (with `selectable`, the read-only selectable text of D125), `row`, `list_row`, `form_field`, `steps`, `nav_item` (`Ui::nav_list`), `radio_group`, `star_rating`, `slider`, `filter_bar`, `search_picker`, `tab_strip`, `toolbar`, `banner` (with the empty state) and `tone` (the one tone recipe, D129); `button` gained `Ghost`, `ButtonOptions` (`Ui::button_with`) and `IconButton` (`Ui::icon_button`, D116); M7 added `flyout` (`Ui::flyout`), `toast` (the `Toasts` model, `Ui::toasts`, `Ui::toast_history`), `command_palette` (`Ui::command_palette`), `page` and `panel` (`Ui::page`, `Ui::panel`: one closure called per slot), `sidebar`, `side_panel` and `icon_rail` (`Ui::sidebar`, `Ui::side_panel`, `Ui::icon_rail`), `split_panes` (`Ui::split_panes`, `Ui::split_state`), `tree_view` (`Ui::tree_view`, `Ui::tree_state`) and `settings_page` (`Ui::settings_page`); M8 added `table` (`Ui::table`, `Ui::table_state`, `Ui::table_selection`: the list frame with a header, sort requests and tones; `virtual_list` gained a crate-private `ListStyle`, D161), `bar_chart` (`Ui::bar_chart`), `pie_chart` (`Ui::pie_chart`), `lane_graph` (`Ui::lane_graph_row`, a stateless `paint`) and `kanban_board` (`Ui::kanban_board`, `landed_index`); M9 added `text_lines` (`HighlightSpan`, `Highlighter`, `PlainHighlighter`, the rich-line spec and `range_boxes` across runs), `code_editor` (`Ui::code_editor`, `Ui::code_line_rect`: lines on `RowHeights` and the scroll area, read-only or editable, wrapped or not, synced panes), `code_block` (`Ui::code_block`, `code_block::height`: the same frame read-only with a copy button), `markdown` (`Ui::markdown` over the `MdBlock` model: top-level blocks as virtual rows) and `diff_view` (`Ui::diff_view`, `pair_rows`, `widest_chars`: the list frame, twice for split); M10 added `Ui::flyout_window` and `Ui::menu_window` (the flyout's and the menu's body filling a window of its own over `Ui::popover`, D220) and the public `menu_size` |
 | `widgets::menu`, `dropdown`, `dialog` | The overlays: the old Painter functions and `Ui::menu`, `Ui::dropdown`, `Ui::dialog` on the overlay stack; M7 added `menu_with` (`MenuOptions`, `MenuPlace`: anchored menus and the node name; rows `MenuRow::Entry` and `Header`; one highlight), `dropdown_with` (`DropdownOptions`: glass, `max_rows`), `dialog_with` (`DialogOptions`: `DialogWidth::{Confirm, Form}`, scrim blur, disabled confirm) and `dialog::modal_host`, which the palette shares | `menu`, `MenuRow`, `MenuItem`, `menu_open_anim`; `dropdown`; `dialog`, `Dialog`, `DialogGlass`, `Cancel` |
 | `chrome` (`chrome.rs`) | Tab chrome outline geometry | `outline`, `TabSpan` |
 | `testing` (`testing/`) | Fakes and contract suites of the seams, public so apps can use them | `RecordingRenderer`, `FakeText`, `text_system_contract`, `FakeImages`, `image_store_contract`, `ScriptedInput`, `NullMaterial`, `backdrop_contract`, `UiHarness` |
 
 `lib.rs` re-exports `Backdrop`, `BackdropKind`, `GlassLayer` and `theme::lunegit_dark`. Tests: unit
 tests in the modules and the files under `tests/` (`window`, `painter`, `motion`, `strings`, `ui_*`,
-one `widget_*` file per control, and `c4`, the cross-widget contract suite, with a section for the M6 set, one for the M7 set, one for the M8 set (the table, both charts, a lane graph row and the board in one frame) and one for the M9 set (the block, the editor, the document and the diff in one frame, unified and split): roles, names and states of every interactive widget in one frame, accessibility actions, one tab stop per composite, the disabled walk, idle at rest, and the overlays over a dialog); none needs a
+one `widget_*` file per control, and `c4`, the cross-widget contract suite, with a section for the M6 set, one for the M7 set, one for the M8 set (the table, both charts, a lane graph row and the board in one frame) one for the M9 set (the block, the editor, the document and the diff in one frame, unified and split) and one for M10 (the theme reach audit: a theme with every colour field distinct drawn through the controls and a spread of other widgets, and no fill or text may hold a preset colour): roles, names and states of every interactive widget in one frame, accessibility actions, one tab stop per composite, the disabled walk, idle at rest, and the overlays over a dialog); none needs a
 GPU or a window.
 
 ### The `Ui` frame
@@ -307,12 +312,13 @@ Asset: `assets/acrylic-noise.png` (Avalonia's texture). Tests: `tests/text.rs` (
 
 | Module (file) | Purpose | Key items |
 |---|---|---|
-| `input` (`input.rs`) | winit events to `RawInput`; `FrameOutput` onto a window | `Translator`, `OutputState`, `cursor_icon` |
+| `input` (`input.rs`) | winit events to `RawInput` (since M10 the file-drop events, stamped with the last pointer position because winit gives none; `Translator::access` queues an assistive action); `FrameOutput` onto a window, its change detection the pure `OutputState::plan_output`; `keymap()` answers `Keymap::MAC` on macOS and `Keymap::PC` elsewhere (D211, D212) | `Translator`, `OutputState`, `OutputPlan`, `cursor_icon`, `keymap` |
+| `clipboard` (`clipboard.rs`) | The OS text clipboard (D213): one `Clipboard` per app, opened on first use, behind a crate-private backend trait; `service` runs a frame's requests in order. A paste over `MAX_PASTE_BYTES` (32 MiB) is refused whole, a write over it dropped, a failed write silent | `Clipboard`, `MAX_PASTE_BYTES` |
 | `window` (`window.rs`) | Glass and popover window attributes, `ResizeEdge` to winit's direction | `glass_attributes`, `popover_attributes`, `resize_direction` |
 | `access` (`access.rs`; feature `accesskit`) | The semantic tree out to AccessKit and its actions back. AccessKit calls the handlers on its own thread: they touch only `Shared` (a flag, a queue capped at 256, the app's `wake`), and the frame reads it on the app's thread. No lock is held across `wake`. | `AccessBridge`, `tree_update`, `action_from`, `NodeCache`, `RootInfo`, `BridgeError` |
-| `platform` (private; `platform/{macos,windows,other}.rs`) | Per-platform window attributes | `glass`, `popover` |
+| `platform` (private; `platform/{macos,windows,other}.rs`) | Per-platform window attributes and the keymap | `glass`, `popover`, `keymap` |
 
-Tests: `tests/input.rs` (translator against `ScriptedInput`, key, button, cursor and edge mappings);
+Tests: `tests/input.rs` (translator against `ScriptedInput`, key, button, cursor and edge mappings, the file-drop events); `tests/clipboard.rs` (on a fake backend; one `#[ignore]`d `real_round_trip` on macOS, run by hand);
 `tests/access.rs` (the bridge with no window, each update replayed into `accesskit_consumer`, run
 only with the feature; the gate runs the crate both ways).
 
@@ -332,7 +338,7 @@ Tests: unit tests in `tray.rs` (the click rule, image sizes, an unplaced rect) a
 One `pub use` per module keeps every `lune_ui::<module>` path. Five modules merge a core and an
 adapter part: `text` (core text plus `TextCache`), `window` (core window helpers plus the winit
 attributes), `input` (core model plus the winit translation), `access` (core model plus, with the
-facade's `accesskit` feature, the bridge), `tray` (core raster, placement and click rules plus the OS item). The facade also re-exports `testing`.
+facade's `accesskit` feature, the bridge), `tray` (core raster, placement and click rules plus the OS item). The facade also re-exports `testing`, `json`, `clipboard` and `popover`.
 Boundary rule 11 keeps it free of items.
 
 ## Seams
@@ -348,6 +354,9 @@ and a contract test the real adapter passes too (R-nfr-8).
 | Input and output | `input::{RawInput, FrameOutput}` | `lune-ui-winit`: `Translator`, `OutputState` | `ScriptedInput` | `lune-ui-winit/tests/input.rs` (translator and scripted input agree) |
 | OS glass | `backdrop::Backdrop` (`best_supported`, `apply`) | `lune-ui-platform`: `WindowBackdrop` over `apply` | `NullMaterial` | `backdrop_contract`, run on `NullMaterial`; OS glass is not run headless |
 | Windowing | the core's window helpers and `FrameOutput::commands`; the app owns the event loop | `lune-ui-winit` | `ScriptedInput` | as input |
+| Clipboard (M10) | `input::ClipboardRequest` in `FrameOutput`, and `Event::ClipboardText` or `ClipboardUnavailable` back (D213) | `lune-ui-winit`: `Clipboard::service` over `arboard` | `ScriptedInput::clipboard_text`, `clipboard_unavailable`; a fake backend in the adapter's tests | `lune-ui-winit/tests/clipboard.rs` (the gate never touches the OS clipboard; one `#[ignore]`d `real_round_trip`, run by hand) |
+| Accessibility (M10) | `access::{SemanticTree, Node, AccessAction}` filled by the `Ui` (D46) | `lune-ui-winit`, feature `accesskit`: `AccessBridge`, `tree_update`, `action_from` (D216, D217) | `ScriptedInput::access` for the actions; the tree is plain data | `lune-ui-winit/tests/access.rs`: each update replayed into `accesskit_consumer`; the crate is built and tested with and without the feature |
+| Tray (M10) | `tray::{icon_bitmap, bar_from_tray, place_surface, TrayToggle}`, pure (D218 to D221) | `lune-ui-platform`: `Tray` over `tray-icon`, `PopoverWindow` (D222 to D224); `Unsupported` on Linux | none: the core half takes rects and times in and bitmaps and actions out, so it needs none | `lune-ui-core/tests/tray.rs`; the adapter's unit tests; `gallery --smoke-platform` by hand (a logged-in GUI session) |
 
 ## Dependencies
 
@@ -387,7 +396,8 @@ One `Gpu` and one `TextCache` serve the whole app; each window adds its own stat
   viewport, text renderers, blur textures, so two targets never share a write that lands at the next
   submit, D28), a `Painter` building a `Scene` and its hit list each frame, a `Translator`
   (`RawInput` in) and an `OutputState` (`FrameOutput` out);
-- per headless target: a `FrameRenderer` and an offscreen texture from `dump::target`; no window.
+- per headless target: a `FrameRenderer` and an offscreen texture from `dump::target`; no window;
+- the tray's surface (M10, D225): a second window on the same `Gpu` and `TextCache`, with its own `WindowSurface`, `FrameRenderer`, `UiStore`, `Translator`, `OutputState` and (macOS) the `PopoverWindow` guard. The app creates it once and reuses it: a click on the tray item goes through `TrayToggle` and `place_surface`, the surface draws `Ui::flyout_window` or `Ui::menu_window` with the window as the rect, and the app hides the window once the response says dismissed and the frame is idle. The guard drops before the window handle, and the host drops before the event loop returns (`gallery`'s `popover.rs` is the worked example).
 
 Call `Gpu::end_frame` once per app frame, after every window drew; calling it per window only ages
 text entries faster. `acquire` returns `Acquired::Redraw` instead of asking a window to redraw, and
@@ -407,7 +417,9 @@ window.
 | Overlay | `Ui::overlay` with `OverlayOptions` (layer, modal, dismissal, anchor, initial focus, open and close `Motion`) and an exit painter; `Ui::menu` and `Ui::dialog` are the worked examples |
 | Gallery page | A file under `apps/gallery/src/pages/` implementing `PageState`, its `UiScene`s (timed scripted input, then a capture frame, with the `Repaint` it must report) and one line in `apps/gallery/src/pages/mod.rs` |
 | Test locale | A `StringTable` returned by `PageState::strings` (the gallery's `locale` page wraps every default in brackets) |
-| Look | A `Theme` value handed to the `Painter`; `theme::DARK` and `lunegit_dark` are one |
+| Look | A `Theme` value handed to the `Painter`; `theme::DARK` and `lunegit_dark` are one; a theme file loads over a base with `Theme::from_json` (the app swaps by passing the new theme: the swap frame snaps every colour, D209) |
+| Locale file | `Catalog::from_json`, then `StringTable::overlay` onto the table the app returns from `PageState::strings`; `audit_template` checks a template |
+| Tray surface | `Ui::flyout_window` or `Ui::menu_window` in a window of its own, placed by `tray::place_surface`, opened and closed by `TrayToggle`; the macOS window is wrapped in `PopoverWindow` |
 | App-specific drawing | `CustomDraw`, one implementation per slot passed to `FrameRenderer::draw_with`; the gallery's `apps/gallery/src/custom.rs` is the worked example. The terminal-grid renderer built on it stays in Luneterm (D8) |
 | Fonts | The app passes font bytes and family names to `TextCache::new` (or `with_locale`); the library bundles none and loads no system font (D5, D12, D78) |
 
@@ -427,13 +439,13 @@ functions; mid-transition and interaction scenes are live scripted `Ui` frames. 
 `nav_item`, `radio_group`, `star_rating`, `slider`, `filter_bar`, `search_picker`, `tab_strip`, `toolbar` and `banner`, and from M7
 `flyout`, `toast-notifications`, `command-palette`, `page`, `panel`, `sidebar`, `side-panel`, `icon-rail`, `split-panes`,
 `tree-view` and `settings-page`, from M8 `table`, `bar-chart`, `pie-chart`, `kanban-board` and `lane-graph`, and from M9 `code-block`,
-`code-editor-view`, `markdown-preview` and `diff-view`
-(70 pages in all, 389 scene names; every page of the same pattern: a live state, scripted scenes, a bench timeline); `apps/gallery/src/pages/controls_ui.rs` is the shared composition of every M4 widget that the
+`code-editor-view`, `markdown-preview` and `diff-view`, and from M10 `theme`, `tray` and `file-drop`
+(73 pages in all, 413 scene names; every page of the same pattern: a live state, scripted scenes, a bench timeline); `apps/gallery/src/pages/controls_ui.rs` is the shared composition of every M4 widget that the
 core pages draw. Window mode builds a `Ui` per frame over the page's live state; dump and bench
 drive the same state through a `Player` (a scripted input, the retained store and the page state). A scene's `Expect` is `Settled` (`Idle`),
 `Moving` (`Now`) or, for a pending tooltip, `Waiting` (`At`). `Ev` scripts pointer, scroll, typed text, keys
-with modifiers, IME preedit and commit, and the clipboard's answer; the window answers a clipboard
-request from an in-process string until M10 (D107). The bundled fonts have no CJK glyph, so the IME scenes'
+with modifiers, IME preedit and commit, the clipboard's answer, file hover and drop, and a cue (a script's way to ask for what a pointer would, as the theme swap does); the window answers a clipboard
+request from the OS clipboard (D215; `--dump` never builds one). A page may also name a theme and a tray state (`PageState::theme`, `tray_state`), read by the `Player` and by window mode. `gallery --smoke-platform` (a logged-in GUI session; exit 2 without one) puts a real item in the tray for about 2 seconds and prints each fact it measured (D225). The bundled fonts have no CJK glyph, so the IME scenes'
 "かな" draws as boxes (D90). A shown overlay fades from the first frame that draws it, so a scene that wants
 it visible needs a frame at the due time. Window mode and the bench draw the list page with 1,000,000 rows, the code editor page with a 1,000,000-line document, the table, lane graph and diff pages with 100,000 rows or lines, and the markdown page with a document of 2,800 blocks (400 sections).
 
@@ -501,6 +513,16 @@ facade keeps those paths):
 - `theme::DARK`, a neutral alias of `lunegit_dark::THEME`;
 - new: `RawInput`, `FrameOutput`, `Translator`, `OutputState`, `Backdrop::apply`, `WindowBackdrop`,
   the `testing` module.
+
+Since M10 (D204 to D227; nothing public was removed; `Theme` gained a field, so a `Theme { .. }` literal outside the toolkit needs `glass`):
+
+- new core modules `json` (`parse`, `Value`, the `MAX_*` limits) and `tray` (the raster, placement and click rules), and the file `theme/file.rs`; `strings` gains `Catalog`, `StringTable::overlay` and `iter`, `audit_template`;
+- `Theme` gains `glass: ThemeGlass { window, panel, card }` (the preset's are the existing consts, which stay), `Theme::from_json`, `Theme::with_acrylic(AcrylicLevel)` and `COLOR_KEYS`; derived tokens follow their source colour when a file sets it (D208); a frame whose `FrameConfig.theme` differs from the last frame's snaps every `animate_color` to its target (D209, `UiStore` keeps the last theme);
+- `Event` gains `FileHover`, `FileHoverCancelled` and `FileDrop` (`PathBuf`; D211) and `ScriptedInput` the builders for them; `lune_ui_winit::input::keymap()` replaces the app's own `cfg!(target_os)` (D212); `OutputState::plan_output` is the pure change detection (`OutputPlan`);
+- `lune_ui::clipboard` (`Clipboard::service`, `MAX_PASTE_BYTES`), `lune_ui::access` (merged: the core model plus, with the facade's `accesskit` feature, `AccessBridge`, `tree_update`, `action_from`), `lune_ui::tray` (merged: the core half plus `Tray`, `TrayImage`, `TrayRect`, `TrayEvent`) and `lune_ui::popover` (`PopoverWindow`, `frontmost_app`); `lune_ui_winit::popover_attributes`, `lune_ui_platform::material::apply_rounded`;
+- `Ui::flyout_window`, `Ui::menu_window`, `menu_size` (public); `WidgetId::from_value` (D216);
+- the tray icon: at scale 1 the dot's centre is 14, on the pixel grid (D226, refining D218's "flush at the corner"); the icon is the CPU raster, not the painter (D218);
+- the gallery's clipboard stub (D107) is gone (D215).
 
 Since M9 (D177 to D199; nothing public was removed or changed in signature):
 
@@ -626,8 +648,6 @@ Since M4:
 - new modules `ui`, `access`, `motion`, `strings` (see above), re-exported by the facade;
 - `Token::Zero` (outside `Token::ALL`) is a zero-duration row; the dropdown's snap
   open and close use it so an overlay with no motion reports `Idle` at once (D80);
-- M10: `WidgetId::from_value` is the inverse of `value`, for an adapter mapping an id back from an
-  outside system; `lune_ui::access` is a module of its own, so the feature can add the bridge (D216).
 
 ## Provenance of reworded comments
 
@@ -663,7 +683,7 @@ only under `target/`, except that `scripts/pixel-gate.sh` extracts its base sour
 | `scripts/check-targets.sh [--skip-linux]` | The workspace lints and builds beyond the host: Windows `clippy` (needs the `x86_64-pc-windows-msvc` target) and Linux fmt, clippy and tests in a `rust:1.92` container. Not a pixel gate; it covers the code the host `cfg` hides | `windows: passed`, `linux: passed` or `skipped (<reason>)` | 0 every half that ran passed; 1 a check failed; 2 usage |
 
 Dump file names: the gallery writes `<id>@<scale>x.png` (logical 1040x660; `gallery --list` prints
-the 15 legacy names first, then the Ui pages' scenes: 62 names after M4, 152 after M5, 231 after M6, 305 after M7, 332 after M8, 389 after M9); Luneterm's spike writes `NN-<name>@<scale>x.png` (18 scenes). `tools/dump-compare`
+the 15 legacy names first, then the Ui pages' scenes: 62 names after M4, 152 after M5, 231 after M6, 305 after M7, 332 after M8, 389 after M9, 413 after M10); Luneterm's spike writes `NN-<name>@<scale>x.png` (18 scenes). `tools/dump-compare`
 (`cargo run -p dump-compare -- <baseline> <candidate> [--max-delta N] [--allow-new]`) compares per
 pixel, max channel delta including alpha; a file missing from the candidate, a file only in the
 candidate (unless `--allow-new`), a size or colour-type mismatch or a delta above `N` (default 0)

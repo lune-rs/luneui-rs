@@ -121,6 +121,7 @@ Never animated: the rows themselves, the pressed fill, and the panel's size (the
 - `menu-pressed`: held on the third row, #FFFFFF23.
 - `menu-anchored`: under its button, `Side::Bottom`, `PlaceAlign::Start`, gap 4.
 - `menu-anchored-flipped`: the same near the window's bottom, flipped above.
+- `tray-menu-window` (M10, `platform.tray-icon`): `Ui::menu_window`, the menu filling a window of its own from its corner, over a flat stand-in for the desktop, settled.
 
 ### Painter primitives
 

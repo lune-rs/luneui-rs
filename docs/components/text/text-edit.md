@@ -139,7 +139,7 @@ None: the engine has no text of its own. A cut, copy and paste context menu, if 
 
 ### Build
 
-- Milestone: M5. Built in M5 (steps 11 to 13 and 15; the page is `text-edit`, 10 new scenes). Not verified here: the clipboard adapter (the gallery answers from an in-process string until M10, D107). Open for `done` (D47): M11 re-checks the whole bar on every entry; real typing with an input method (R1) and bidi caret placement are unverified here, and so is the Windows and Linux run time.
+- Milestone: M5. Built in M5 (steps 11 to 13 and 15; the page is `text-edit`, 10 new scenes). The clipboard is the OS's since M10 (`platform.clipboard`, D213 to D215; D107's in-process string is gone). Open for `done` (D47): M11 re-checks the whole bar on every entry; real typing with an input method (R1) and bidi caret placement are unverified here, and so is the Windows and Linux run time.
 - Depends on: core.ui, core.focus, core.input, text.shaping, platform.clipboard, text.ime, infra.accessibility, motion.transitions
 
 ## Open questions
