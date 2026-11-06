@@ -6,7 +6,11 @@
 //! `catch_unwind`; the cases that must be errors say which.
 
 use lune_ui::json::{JsonErrorKind as K, MAX_KEY, MAX_STRING, Value, parse};
+use lune_ui::strings::{
+    ArgFormat, Catalog, DisplayFormat, StringTable, TemplateAudit, audit_template, format_template,
+};
 use lune_ui::theme::{DARK, Skip, Theme, ThemeFile};
+use std::fmt::Display;
 use std::path::PathBuf;
 
 const THEMES: [(&str, usize); 5] = [
@@ -235,6 +239,121 @@ fn dark_modern_material_opacity_reaches_the_window_layer() {
     let g = load_theme("dark-modern").theme.glass;
     assert_eq!(g.window.material_opacity, 0.98);
     assert_eq!(g.window.tint_opacity, 1.0);
+}
+
+// --- Locale catalogs ------------------------------------------------------------------------
+
+fn load_locale(name: &str) -> Catalog {
+    match Catalog::from_json(&locale(name)) {
+        Ok(c) => c,
+        Err(e) => panic!("{name}: {e:?}"),
+    }
+}
+
+#[test]
+fn en_json_gives_1019_strings() {
+    let c = load_locale("en");
+    assert_eq!(
+        (c.code.as_str(), c.display_name.as_str()),
+        ("en", "English (US)")
+    );
+    assert_eq!(c.table().iter().count(), 1019);
+    assert_eq!(c.table().get("common.cancel"), Some("Cancel"));
+}
+
+#[test]
+fn the_nine_languages_load_with_1019_strings_each() {
+    let en = load_locale("en");
+    for (name, _) in LOCALES.iter().filter(|(n, _)| *n != "en") {
+        let c = load_locale(name);
+        assert_eq!(c.code, *name, "{name}");
+        assert_eq!(c.table().iter().count(), 1019, "{name}");
+        // The same keys as English.
+        let same = c
+            .table()
+            .iter()
+            .map(|(k, _)| k)
+            .eq(en.table().iter().map(|(k, _)| k));
+        assert!(same, "{name}: keys differ from en.json");
+    }
+}
+
+/// `(keys with a placeholder, keys with only plain ones, keys with a spec, malformed)` over a table.
+fn audit_table(t: &StringTable) -> (usize, usize, usize, usize) {
+    let (mut any, mut plain, mut spec, mut malformed) = (0, 0, 0, 0);
+    for (_, text) in t.iter() {
+        let TemplateAudit {
+            plain: p,
+            spec: s,
+            malformed: m,
+        } = audit_template(text);
+        any += usize::from(p + s > 0);
+        plain += usize::from(p > 0 && s == 0);
+        spec += usize::from(s > 0);
+        malformed += m;
+    }
+    (any, plain, spec, malformed)
+}
+
+#[test]
+fn the_placeholder_audit_over_en_json() {
+    let c = load_locale("en");
+    let (any, plain, spec, malformed) = audit_table(c.table());
+    assert_eq!((any, plain, spec), (119, 111, 8));
+    assert_eq!(malformed, 0, "a form format_template does not parse");
+}
+
+#[test]
+fn no_language_file_has_a_malformed_template() {
+    for (name, _) in LOCALES {
+        let (_, _, _, malformed) = audit_table(load_locale(name).table());
+        assert_eq!(malformed, 0, "{name}");
+    }
+}
+
+#[test]
+fn the_entrys_tr_fmt_known_answers_through_the_real_strings() {
+    let table = load_locale("en").into_table();
+    let args: [&dyn Display; 2] = [&"3", &"wip"];
+    assert_eq!(
+        table.tr_fmt("dialog.confirm.dropStash.message", &args, &DisplayFormat),
+        "Drop stash@{3} 'wip'? This cannot be undone via the UI."
+    );
+    // `{0:N0}`: the default hook ignores the spec; an app hook gets it unchanged.
+    let key = "toast.git.fsmonitorPromptDetail";
+    let plain = table.tr_fmt(key, &[&"1234"], &DisplayFormat);
+    assert!(
+        plain.starts_with("This repo has 1234 tracked files."),
+        "{plain}"
+    );
+    struct Group;
+    impl ArgFormat for Group {
+        fn format(&self, _i: usize, arg: &dyn Display, spec: &str, out: &mut String) {
+            assert_eq!(spec, "N0", "the spec text reaches the hook unchanged");
+            let digits = arg.to_string();
+            for (n, c) in digits.chars().enumerate() {
+                if n > 0 && (digits.len() - n) % 3 == 0 {
+                    out.push(',');
+                }
+                out.push(c);
+            }
+        }
+    }
+    let grouped = format_template(table.tr(key), &[&"1234"], &Group);
+    assert!(
+        grouped.starts_with("This repo has 1,234 tracked files."),
+        "{grouped}"
+    );
+}
+
+#[test]
+fn a_language_overlaid_on_english_falls_back_for_a_key_it_lacks() {
+    let mut base = load_locale("en").into_table();
+    let mut de = StringTable::default();
+    assert!(de.insert("common.cancel", "Abbrechen").is_ok());
+    base.overlay(&de);
+    assert_eq!(base.tr("common.cancel"), "Abbrechen");
+    assert_eq!(base.tr("common.reload"), "Reload");
 }
 
 // --- Negative fixtures made from the real files ---------------------------------------------
