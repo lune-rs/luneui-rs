@@ -16,7 +16,7 @@ use winit::keyboard::{Key, ModifiersState, NamedKey};
 use winit::window::{Window, WindowId};
 
 use lune_ui::gpu::{self, Gpu};
-use lune_ui::input::{ClipboardRequest, Keymap, OutputState, Repaint, Translator, control_flow};
+use lune_ui::input::{ClipboardRequest, OutputState, Repaint, Translator, control_flow, keymap};
 use lune_ui::lunegit_dark::THEME;
 use lune_ui::material::{self, Material};
 use lune_ui::motion::MotionTier;
@@ -235,11 +235,7 @@ impl App {
                     tier: MotionTier::Full,
                     strings: &self.strings,
                     arg_format: &DisplayFormat,
-                    keymap: if cfg!(target_os = "macos") {
-                        Keymap::MAC
-                    } else {
-                        Keymap::PC
-                    },
+                    keymap: keymap(),
                     shortcuts: &self.shortcuts,
                 };
                 let mut ui = Ui::begin(&mut self.store, &input, config, &mut r.text);

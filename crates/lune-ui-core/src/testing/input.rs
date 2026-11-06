@@ -1,5 +1,6 @@
 //! The input seam's fake: a scripted window.
 
+use std::path::PathBuf;
 use std::time::Duration;
 
 use crate::access::AccessAction;
@@ -177,6 +178,30 @@ impl ScriptedInput {
     /// Pushes the clipboard-unavailable answer to a read.
     pub fn clipboard_unavailable(&mut self) -> &mut Self {
         self.events.push(Event::ClipboardUnavailable);
+        self
+    }
+
+    /// A file is dragged over the window; the event carries the current pointer position.
+    pub fn file_hover(&mut self, path: impl Into<PathBuf>) -> &mut Self {
+        self.events.push(Event::FileHover {
+            pos: self.pointer,
+            path: path.into(),
+        });
+        self
+    }
+
+    /// The dragged file left the window.
+    pub fn file_hover_cancelled(&mut self) -> &mut Self {
+        self.events.push(Event::FileHoverCancelled);
+        self
+    }
+
+    /// A file is dropped on the window; the event carries the current pointer position.
+    pub fn file_drop(&mut self, path: impl Into<PathBuf>) -> &mut Self {
+        self.events.push(Event::FileDrop {
+            pos: self.pointer,
+            path: path.into(),
+        });
         self
     }
 

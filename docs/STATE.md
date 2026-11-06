@@ -1,14 +1,14 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-06 (M10 in progress: steps 1 to 3 of 11 done; M9 is merged at 8f499d0)
+Last updated: 2026-11-06 (M10 in progress: steps 1 to 4 of 11 done; M9 is merged at 8f499d0)
 
 ## Now
 
 M10 (infra and platform: JSON reader, theme and locale files, shortcut platform mapping, file drop, clipboard, AccessKit, tray) is in
 progress on `orch/toolkit-v1`. Step 1 is in: `lune_ui::json` (D204), Lunegit's theme and locale files as gallery fixtures (D205, D206,
 no open licence: license or remove before any public release). Step 2: theme files (`Theme::from_json`, glass inside `Theme`, derived
-tokens, `AcrylicLevel`, a theme swap is a hard cut for colour transitions; D207 to D209). Step 3: `Catalog::from_json`, `StringTable::overlay` and `iter`, `audit_template` (D210).
+tokens, `AcrylicLevel`, a theme swap is a hard cut for colour transitions; D207 to D209). Step 3: `Catalog::from_json`, `StringTable::overlay` and `iter`, `audit_template` (D210). Step 4: file-drop events, `keymap()`, `Translator::access`, pure `plan_output` (D211, D212).
 
 M9 (text views: code block, code editor view, markdown preview, diff view) is merged to main at 8f499d0
 (steps 1 to 9; DECISIONS D177 to D203), review rounds 1 to 4 fixed (D200 to D203), round 5 passed. `docs/architecture.md` has the module map,
@@ -160,7 +160,7 @@ frame 19.01 ms (`radio-group`).
 
 ## Next
 
-1. M10 steps 4 to 11 (input bridges, clipboard, AccessKit, tray) per the plan.
+1. M10 steps 5 to 11 (clipboard, AccessKit, tray) per the plan.
 2. CI (fmt, clippy `-D warnings`, tests on macOS, Windows and Linux) now that there is code to run.
 3. An export script for Luneterm's vendored snapshot, before Luneterm M9. The migration
    map for M11 is "API changes since M1" in `docs/architecture.md`.

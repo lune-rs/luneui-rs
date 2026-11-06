@@ -1,3 +1,4 @@
+use lune_ui_core::input::Keymap;
 use winit::platform::windows::{CornerPreference, WindowAttributesExtWindows};
 use winit::window::WindowAttributes;
 
@@ -10,4 +11,20 @@ pub(crate) fn glass(attrs: WindowAttributes) -> WindowAttributes {
         .with_undecorated_shadow(true)
         .with_corner_preference(CornerPreference::Round)
         .with_theme(Some(winit::window::Theme::Dark))
+}
+
+/// The keyboard conventions of this platform.
+pub(crate) fn keymap() -> Keymap {
+    Keymap::PC
+}
+
+#[cfg(test)]
+mod tests {
+    use super::keymap;
+    use lune_ui_core::input::Keymap;
+
+    #[test]
+    fn the_keymap_is_the_pc_one() {
+        assert_eq!(keymap(), Keymap::PC);
+    }
 }

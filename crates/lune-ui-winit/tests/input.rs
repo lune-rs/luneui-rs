@@ -279,3 +279,164 @@ fn control_flow_maps_each_repaint_without_reading_the_clock() {
         (ControlFlow::Wait, false)
     );
 }
+
+// --- File drop ------------------------------------------------------------------------------
+
+mod files {
+    use super::*;
+    use lune_ui_core::access::{AccessAction, Action};
+    use lune_ui_core::input::{CursorIcon, Event, FrameOutput, RawInput, WindowCommand};
+    use lune_ui_core::paint::Rect;
+    use lune_ui_core::ui::WidgetId;
+    use lune_ui_winit::input::{ImePlan, OutputState};
+    use std::path::PathBuf;
+
+    fn at_scale_2() -> Translator {
+        let mut t = Translator::new(PhysicalSize::new(800, 600), 2.0);
+        t.window_event(&WindowEvent::CursorMoved {
+            device_id: DeviceId::dummy(),
+            position: PhysicalPosition::new(200.0, 100.0),
+        });
+        t
+    }
+
+    fn events(mut t: Translator) -> Vec<Event> {
+        t.take(FRAME).events
+    }
+
+    #[test]
+    fn hover_cancel_and_drop_give_the_three_events_at_the_last_pointer_position() {
+        let mut t = at_scale_2();
+        let _ = t.take(FRAME); // the pointer move
+        t.window_event(&WindowEvent::HoveredFile(PathBuf::from("/tmp/a.txt")));
+        t.window_event(&WindowEvent::HoveredFileCancelled);
+        t.window_event(&WindowEvent::DroppedFile(PathBuf::from("/tmp/b.txt")));
+        assert_eq!(
+            events(t),
+            [
+                Event::FileHover {
+                    pos: (100.0, 50.0),
+                    path: PathBuf::from("/tmp/a.txt")
+                },
+                Event::FileHoverCancelled,
+                Event::FileDrop {
+                    pos: (100.0, 50.0),
+                    path: PathBuf::from("/tmp/b.txt")
+                },
+            ],
+            "physical (200, 100) at scale 2 is logical (100, 50)"
+        );
+    }
+
+    #[test]
+    fn before_any_pointer_move_the_position_is_the_origin() {
+        let mut t = Translator::new(PhysicalSize::new(800, 600), 2.0);
+        t.window_event(&WindowEvent::HoveredFile(PathBuf::from("a")));
+        t.window_event(&WindowEvent::DroppedFile(PathBuf::from("a")));
+        assert_eq!(
+            events(t),
+            [
+                Event::FileHover {
+                    pos: (0.0, 0.0),
+                    path: PathBuf::from("a")
+                },
+                Event::FileDrop {
+                    pos: (0.0, 0.0),
+                    path: PathBuf::from("a")
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn two_files_give_two_events_in_order() {
+        let mut t = at_scale_2();
+        let _ = t.take(FRAME);
+        for name in ["one", "two"] {
+            t.window_event(&WindowEvent::DroppedFile(PathBuf::from(name)));
+        }
+        let paths: Vec<PathBuf> = events(t)
+            .into_iter()
+            .filter_map(|e| match e {
+                Event::FileDrop { path, .. } => Some(path),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(paths, [PathBuf::from("one"), PathBuf::from("two")]);
+    }
+
+    #[test]
+    fn the_translator_and_the_script_agree_on_file_events() {
+        let mut s = ScriptedInput::new((400.0, 300.0), 2.0);
+        s.set_time(FRAME)
+            .pointer_to(100.0, 50.0)
+            .file_hover("/tmp/a.txt")
+            .file_hover("/tmp/b.txt")
+            .file_hover_cancelled()
+            .file_drop("/tmp/a.txt")
+            .file_drop("/tmp/b.txt");
+        let scripted = s.end_frame();
+
+        let mut t = at_scale_2();
+        t.window_event(&WindowEvent::HoveredFile(PathBuf::from("/tmp/a.txt")));
+        t.window_event(&WindowEvent::HoveredFile(PathBuf::from("/tmp/b.txt")));
+        t.window_event(&WindowEvent::HoveredFileCancelled);
+        t.window_event(&WindowEvent::DroppedFile(PathBuf::from("/tmp/a.txt")));
+        t.window_event(&WindowEvent::DroppedFile(PathBuf::from("/tmp/b.txt")));
+        let translated: RawInput = t.take(FRAME);
+        // The script's events start at the file events; the translator also has the pointer move.
+        assert_eq!(
+            translated.events[0],
+            Event::PointerMoved { pos: (100.0, 50.0) }
+        );
+        assert_eq!(&translated.events[1..], &scripted.events[1..]);
+        assert_eq!(translated.events[1..], scripted.events[1..]);
+    }
+
+    #[test]
+    fn an_access_action_queued_on_the_translator_appears_in_the_next_take() {
+        let action = AccessAction {
+            target: WidgetId::ROOT.with("button"),
+            action: Action::Default,
+            value: None,
+        };
+        let mut t = Translator::new(PhysicalSize::new(100, 100), 1.0);
+        t.access(action.clone());
+        assert_eq!(t.take(FRAME).events, [Event::Access(action)]);
+        assert!(t.take(FRAME).events.is_empty(), "drained");
+        // And the script builds the same event.
+        let mut s = ScriptedInput::new((100.0, 100.0), 1.0);
+        s.access(AccessAction {
+            target: WidgetId::ROOT.with("button"),
+            action: Action::Default,
+            value: None,
+        });
+        assert_eq!(s.end_frame().events.len(), 1);
+    }
+
+    // --- Output plan ------------------------------------------------------------------------
+
+    fn out(cursor: CursorIcon, ime: Option<Rect>) -> FrameOutput {
+        FrameOutput {
+            cursor,
+            ime_area: ime,
+            commands: vec![WindowCommand::Redraw],
+            ..FrameOutput::default()
+        }
+    }
+
+    #[test]
+    fn plan_output_is_public_pure_and_starts_from_nothing_set() {
+        let state = OutputState::new();
+        let area = Rect::new(1.0, 2.0, 3.0, 4.0);
+        let first = state.plan_output(&out(CursorIcon::Default, None));
+        assert_eq!(first.cursor, Some(CursorIcon::Default));
+        assert_eq!(first.ime, ImePlan::Keep);
+        let p = state.plan_output(&out(CursorIcon::Text, Some(area)));
+        assert_eq!(p.cursor, Some(CursorIcon::Text));
+        assert_eq!(p.ime, ImePlan::Area { enable: true, area });
+        // Planning changed nothing: the same plan again. The sequences of changes are the unit
+        // tests in `src/input.rs` (they can record a plan without a window).
+        assert_eq!(state.plan_output(&out(CursorIcon::Text, Some(area))), p);
+    }
+}

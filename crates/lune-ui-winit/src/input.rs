@@ -1,6 +1,7 @@
 //! The input seam on winit: [`Translator`] turns `WindowEvent`s into [`RawInput`], and
 //! [`OutputState`] applies a [`FrameOutput`] to the window. One of each per window.
 
+use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use winit::dpi::{LogicalPosition, LogicalSize, PhysicalSize};
@@ -9,20 +10,23 @@ use winit::event_loop::ControlFlow;
 use winit::keyboard::{Key as WKey, ModifiersState, NamedKey as WNamed};
 use winit::window::{CursorIcon as WCursor, Window};
 
+use lune_ui_core::access::AccessAction;
 use lune_ui_core::input::{
-    CursorIcon, Event, FrameOutput, ImeEvent, Key, Modifiers, NamedKey, PointerButton, RawInput,
-    Repaint, ScrollDelta, WindowCommand, printable,
+    CursorIcon, Event, FrameOutput, ImeEvent, Key, Keymap, Modifiers, NamedKey, PointerButton,
+    RawInput, Repaint, ScrollDelta, WindowCommand, printable,
 };
 use lune_ui_core::paint::Rect;
 
+use crate::platform;
 use crate::window::resize_direction;
 
 /// Collects one window's winit events into [`RawInput`] frames.
 ///
 /// Positions and sizes are divided by the latest scale factor. Events that arrive before the
 /// first pointer move carry the position (0, 0). The window starts unfocused until winit says
-/// otherwise. Touch, gestures, file drops, theme, moved, occluded, axis motion and touchpad
-/// pressure events are ignored.
+/// otherwise. A hovered, cancelled or dropped file becomes a file event (one per file) at the last
+/// pointer position, in logical pixels: winit gives none. Touch, gestures, theme, moved, occluded,
+/// axis motion and touchpad pressure events are ignored.
 #[derive(Debug)]
 pub struct Translator {
     size: PhysicalSize<u32>,
@@ -70,6 +74,9 @@ impl Translator {
             WindowEvent::ModifiersChanged(m) => self.modifiers(m.state()),
             WindowEvent::Ime(ime) => self.ime(ime),
             WindowEvent::Focused(f) => self.focused(*f),
+            WindowEvent::HoveredFile(path) => self.file_hovered(path.clone()),
+            WindowEvent::HoveredFileCancelled => self.file_hover_cancelled(),
+            WindowEvent::DroppedFile(path) => self.file_dropped(path.clone()),
             _ => {}
         }
     }
@@ -161,6 +168,32 @@ impl Translator {
         self.events.push(Event::Ime(e));
     }
 
+    /// A file is dragged over the window. The path passes unchanged (it may not be UTF-8).
+    pub fn file_hovered(&mut self, path: PathBuf) {
+        self.events.push(Event::FileHover {
+            pos: self.pointer,
+            path,
+        });
+    }
+
+    /// The dragged file left the window.
+    pub fn file_hover_cancelled(&mut self) {
+        self.events.push(Event::FileHoverCancelled);
+    }
+
+    /// A file was dropped on the window. The path passes unchanged.
+    pub fn file_dropped(&mut self, path: PathBuf) {
+        self.events.push(Event::FileDrop {
+            pos: self.pointer,
+            path,
+        });
+    }
+
+    /// An assistive technology asked for an action on a node.
+    pub fn access(&mut self, action: AccessAction) {
+        self.events.push(Event::Access(action));
+    }
+
     /// The clipboard's text, answering a `ClipboardRequest::Read`.
     pub fn clipboard_text(&mut self, text: &str) {
         self.events.push(Event::ClipboardText(text.to_owned()));
@@ -189,6 +222,12 @@ impl Translator {
             events: std::mem::take(&mut self.events),
         }
     }
+}
+
+/// The keyboard conventions of the platform this adapter was built for: `Keymap::MAC` on macOS,
+/// `Keymap::PC` elsewhere. The app passes it in `FrameConfig` (the core never reads the OS, D7).
+pub fn keymap() -> Keymap {
+    platform::keymap()
 }
 
 fn pointer_button(b: MouseButton) -> PointerButton {
@@ -304,6 +343,25 @@ pub fn control_flow(repaint: Repaint, origin: Instant) -> (ControlFlow, bool) {
     }
 }
 
+/// What [`OutputState::apply`] does with the IME for a frame.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ImePlan {
+    /// The area is as the last frame left it: touch nothing.
+    Keep,
+    /// An area is wanted; `enable` is true when the IME was off and must be allowed first.
+    Area { enable: bool, area: Rect },
+    /// The IME was on and is not wanted any more.
+    Disable,
+}
+
+/// What [`OutputState::apply`] changes on the window for a frame, apart from its commands.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct OutputPlan {
+    /// The cursor to set, when it differs from the one set last (always on the first frame).
+    pub cursor: Option<CursorIcon>,
+    pub ime: ImePlan,
+}
+
 /// Applies a window's [`FrameOutput`], touching the cursor and the IME only when they changed.
 #[derive(Debug, Default)]
 pub struct OutputState {
@@ -316,28 +374,53 @@ impl OutputState {
         Self::default()
     }
 
+    /// What `out` changes against the state the last [`Self::apply`] left. Pure: it reads no
+    /// window and changes nothing, so it is tested without one.
+    pub fn plan_output(&self, out: &FrameOutput) -> OutputPlan {
+        let cursor = (self.cursor != Some(out.cursor)).then_some(out.cursor);
+        let ime = if self.ime_area == out.ime_area {
+            ImePlan::Keep
+        } else {
+            match out.ime_area {
+                Some(area) => ImePlan::Area {
+                    enable: self.ime_area.is_none(),
+                    area,
+                },
+                None => ImePlan::Disable,
+            }
+        };
+        OutputPlan { cursor, ime }
+    }
+
+    /// Records what the plan for `out` set, so the next plan compares against it.
+    fn commit(&mut self, plan: &OutputPlan, out: &FrameOutput) {
+        if let Some(icon) = plan.cursor {
+            self.cursor = Some(icon);
+        }
+        self.ime_area = out.ime_area;
+    }
+
     /// Applies `out` to `window`. Returns true when the frame asked to close the window (the app
     /// closes it).
     pub fn apply(&mut self, window: &Window, out: &FrameOutput) -> bool {
-        if self.cursor != Some(out.cursor) {
-            window.set_cursor(cursor_icon(out.cursor));
-            self.cursor = Some(out.cursor);
+        let plan = self.plan_output(out);
+        if let Some(icon) = plan.cursor {
+            window.set_cursor(cursor_icon(icon));
         }
-        if self.ime_area != out.ime_area {
-            match out.ime_area {
-                Some(r) => {
-                    if self.ime_area.is_none() {
-                        window.set_ime_allowed(true);
-                    }
-                    window.set_ime_cursor_area(
-                        LogicalPosition::new(r.x, r.y),
-                        LogicalSize::new(r.w, r.h),
-                    );
+        match plan.ime {
+            ImePlan::Keep => {}
+            ImePlan::Area { enable, area: r } => {
+                if enable {
+                    window.set_ime_allowed(true);
                 }
-                None => window.set_ime_allowed(false),
+                window.set_ime_cursor_area(
+                    LogicalPosition::new(r.x, r.y),
+                    LogicalSize::new(r.w, r.h),
+                );
             }
-            self.ime_area = out.ime_area;
+            ImePlan::Disable => window.set_ime_allowed(false),
         }
+        self.commit(&plan, out);
         let mut close = false;
         for c in &out.commands {
             match c {
@@ -358,5 +441,75 @@ impl OutputState {
             }
         }
         close
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn out(cursor: CursorIcon, ime: Option<Rect>) -> FrameOutput {
+        FrameOutput {
+            cursor,
+            ime_area: ime,
+            ..FrameOutput::default()
+        }
+    }
+
+    /// Plans `o`, then records it as `apply` does.
+    fn step(state: &mut OutputState, o: &FrameOutput) -> OutputPlan {
+        let plan = state.plan_output(o);
+        state.commit(&plan, o);
+        plan
+    }
+
+    #[test]
+    fn the_cursor_is_set_on_the_first_frame_and_on_a_change_only() {
+        let mut s = OutputState::new();
+        let first = step(&mut s, &out(CursorIcon::Default, None));
+        assert_eq!(first.cursor, Some(CursorIcon::Default));
+        assert_eq!(step(&mut s, &out(CursorIcon::Default, None)).cursor, None);
+        assert_eq!(
+            step(&mut s, &out(CursorIcon::Text, None)).cursor,
+            Some(CursorIcon::Text)
+        );
+        assert_eq!(step(&mut s, &out(CursorIcon::Text, None)).cursor, None);
+        assert_eq!(
+            step(&mut s, &out(CursorIcon::Default, None)).cursor,
+            Some(CursorIcon::Default)
+        );
+    }
+
+    #[test]
+    fn the_ime_is_touched_when_its_area_appears_moves_or_goes() {
+        let mut s = OutputState::new();
+        let (a, b) = (Rect::new(1.0, 2.0, 3.0, 4.0), Rect::new(5.0, 6.0, 3.0, 4.0));
+        let d = CursorIcon::Default;
+        assert_eq!(step(&mut s, &out(d, None)).ime, ImePlan::Keep);
+        assert_eq!(
+            step(&mut s, &out(d, Some(a))).ime,
+            ImePlan::Area {
+                enable: true,
+                area: a
+            }
+        );
+        assert_eq!(step(&mut s, &out(d, Some(a))).ime, ImePlan::Keep);
+        assert_eq!(
+            step(&mut s, &out(d, Some(b))).ime,
+            ImePlan::Area {
+                enable: false,
+                area: b
+            },
+            "a move does not enable it again"
+        );
+        assert_eq!(step(&mut s, &out(d, None)).ime, ImePlan::Disable);
+        assert_eq!(step(&mut s, &out(d, None)).ime, ImePlan::Keep);
+    }
+
+    #[test]
+    fn planning_changes_nothing() {
+        let s = OutputState::new();
+        let o = out(CursorIcon::Text, Some(Rect::new(0.0, 0.0, 1.0, 1.0)));
+        assert_eq!(s.plan_output(&o), s.plan_output(&o));
     }
 }

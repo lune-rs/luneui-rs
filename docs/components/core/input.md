@@ -93,8 +93,8 @@ n/a — no drawing.
 ### Acceptance
 
 - Existing tests: `crates/lune-ui-winit/tests/input.rs` (`translator_and_scripted_input_agree`, `state_persists_and_events_drain`, `unmapped_keys_are_unidentified`, `other_mouse_button_keeps_its_number`, `every_cursor_icon_maps_to_the_same_named_winit_icon`); core has no inline test for `input.rs` and `printable` is covered through them.
-- The done standard still needs: a unit test of `printable` (control characters dropped, empty gives `None`); an `Access` event round trip through `ScriptedInput`; file-drop events through `ScriptedInput` and the translator (M10); a match over each `#[non_exhaustive]` enum in a downstream test compiles with a wildcard arm.
-- `ScriptedInput` gains `access(...)` and `file_drop(...)` builders (M4, M10); `Translator` and `ScriptedInput` agree on the new events in the same test style [R crates/lune-ui-core/src/testing/input.rs:16-30,161].
+- The done standard still needs: a unit test of `printable` (control characters dropped, empty gives `None`); an `Access` event round trip through `ScriptedInput`; file-drop events through `ScriptedInput` and the translator (M10, done: `crates/lune-ui-winit/tests/input.rs` `files::the_translator_and_the_script_agree_on_file_events`, `files::hover_cancel_and_drop_give_the_three_events_at_the_last_pointer_position`; the core side, `crates/lune-ui-core/tests/input.rs` `file_events_reach_the_app_and_change_no_widget_state` and `a_file_event_alone_asks_for_no_repaint`: the events reach `ui.input().events` and change no widget state and ask for no frame); a match over each `#[non_exhaustive]` enum in a downstream test compiles with a wildcard arm.
+- `ScriptedInput` gains `access(...)` and `file_hover(...)`, `file_hover_cancelled()`, `file_drop(...)` builders (M4, M10, D211); `Translator` and `ScriptedInput` agree on the new events in the same test style [R crates/lune-ui-core/src/testing/input.rs:16-30,161].
 - No clock read: the boundary script stays green; `RawInput.time` is the only time [R crates/lune-ui-core/src/input.rs:5-6].
 
 ### Build

@@ -116,7 +116,7 @@ None: chords are formatted with fixed ASCII names (Cmd, Ctrl, Alt, Shift, then t
 
 ### Build
 
-- Milestone: M5 (the registry is core, no platform code; `overlay.command-palette` of M7 binds through it; `core.ui`'s key phase and `core.focus` of M4 have an empty registry until then). M5 built the registry (steps 3 and 6; the page is `shortcuts`, the `shortcut-hints` scene). `overlay.command-palette` of M7 binds through it. Open for `done` (D47): M11 re-checks the whole bar on every entry; the Windows and Linux run time is unverified (the Linux and Windows lint is `scripts/check-targets.sh`).
+- Milestone: M5 (the registry is core, no platform code; `overlay.command-palette` of M7 binds through it; `core.ui`'s key phase and `core.focus` of M4 have an empty registry until then). M5 built the registry (steps 3 and 6; the page is `shortcuts`, the `shortcut-hints` scene). `overlay.command-palette` of M7 binds through it. Platform mapping done in M10 step 4: `lune_ui::input::keymap()` picks `Keymap::MAC` or `Keymap::PC` per platform (D212), so an app no longer branches on the OS itself. Open for `done` (D47): M11 re-checks the whole bar on every entry; the Windows and Linux run time is unverified (the Linux and Windows lint is `scripts/check-targets.sh`).
 - Depends on: core.input, core.focus, core.ui.
 
 ## Open questions
