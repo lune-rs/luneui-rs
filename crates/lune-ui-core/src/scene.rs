@@ -149,7 +149,9 @@ pub struct ImageItem {
     pub round_clip: RoundClip,
 }
 
-/// One layer's items, grouped by kind: the geometry, then the customs, the images and the text.
+/// One layer's items, grouped by kind, each kind in record order. They draw as: acrylic, under
+/// shapes, path fills, customs, images, text, then the over shapes and strokes (the geometry that
+/// draws above the text).
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Layer {
     pub geometry: LayerGeometry,

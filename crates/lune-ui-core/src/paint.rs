@@ -427,8 +427,10 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         self.hit_tag = tag;
     }
 
-    /// Draws on `layer` from now on, with no clip. A layer's items keep the order they were drawn
-    /// in, and the layers draw back to front ([`LayerId`]).
+    /// Draws on `layer` from now on, with no clip. Items of one kind keep the order they were drawn
+    /// in; the kinds draw in the renderer's order (acrylic, under shapes, path fills, customs,
+    /// images, text, then over shapes and strokes, see [`crate::scene::Layer`]), so a fill drawn
+    /// after a text still draws under it. The layers draw back to front ([`LayerId`]).
     pub fn on(&mut self, layer: LayerId) {
         self.rec(|| Op::On(layer));
         self.layer = layer as usize;
@@ -437,8 +439,9 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         self.clips.clear();
     }
 
-    /// Sets the clip to `clip` (logical px), or removes it with `None`. [`Self::push_clip`] nests;
-    /// this replaces.
+    /// Sets the clip to `clip` (logical px), or removes the rect clip with `None`. [`Self::push_clip`]
+    /// nests; this replaces the rect. It leaves a rounded clip from [`Self::push_clip_rounded`]
+    /// alone: that one stays until its [`Self::pop_clip`].
     pub fn set_clip(&mut self, clip: Option<Rect>) {
         self.rec(|| Op::SetClip(clip));
         self.clip = clip;
