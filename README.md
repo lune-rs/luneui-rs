@@ -19,7 +19,8 @@ scripts/check-boundaries.sh
 scripts/gen-component-index.sh          # regenerate docs/components/INDEX.md
 ```
 
-See `CLAUDE.md` for the rules and `docs/` for state and decisions.
+See `CLAUDE.md` for the rules and `docs/` for state and decisions. An app that takes the toolkit in
+before a remote exists vendors a snapshot (`scripts/export-snapshot.sh`); `docs/consuming.md` says how.
 
 ## Licence
 
