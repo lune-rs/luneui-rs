@@ -28,10 +28,9 @@ on real machines (`owner: Luneterm M9 to M11 runs`); the second needs a pixel ga
   the 8 new scenes (`ui-controls@1.5x` and seven `window-*`), nothing allowed.
 - Release size: `cargo build --release -p gallery` at a9d1292, `wc -c target/release/gallery` (macOS, strip, fat LTO): 9,869,520 bytes, against 9,869,408 at
   the M10 tip (+112) and 9,448,688 at the M9 merge. Also in `docs/consuming.md`.
-- Bench (`cargo run --release -p gallery -- --bench`, per D85): not run in M11. The user waived it on 2026-11-07 (D235) and the orchestrator ruled it is not re-run.
-  The last full reading is the M10 one, at 295aadc, 2080 x 1320, 5 runs, M1 Pro: 15 pages OVER at load 10 to 36 with a self-test spread of +17.01/+45.46, on
-  the drawing code that read 0 over at the step before. Load is the likely cause, not proved; `flyout` (5 of 5 runs, p99 49.35) and `code-editor-view`
-  (4 of 5, p99 36.15) were the worst and stay unexplained. M11 added the `window` page and no drawing code beyond it.
+- Bench (`cargo run --release -p gallery -- --bench`, per D85) at d14069f, one reading, 2080 x 1320, 5 runs, M1 Pro, no GUI session: 0 of 74 pages over budget at load
+  2.0, self-test in range with a spread of +1.13/+2.81. Highest p99 5.99 ms and worst frame 13.03 ms, both `code-editor-view`; `flyout` p99 4.85. The M10 reading (295aadc,
+  15 pages over at load 10 to 36, spread +17.01/+45.46) was on a loaded machine; the same pages read clean here, which fits load as its cause. Nothing waits on this reading (D235).
 - Platform smoke (`cargo run -p gallery -- --smoke-platform`) at a9d1292: not run, "no monitor: there is no GUI session". The last runs, on a logged-in session: M10 at
   b8faaf1 (exit 0, a real tray item, its rect, a synthetic click, the surface in its window, the frontmost app unchanged, the panel key, teardown) and M11 step 2
   at 15c471e (exit 0, plus the surface resized (2080, 1320) to (2144, 1352) and back, acquire answered skip because the window is hidden).
