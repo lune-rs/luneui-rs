@@ -1,12 +1,12 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-06 (M9 built and closed on the program branch, steps 1 to 9 done, review rounds 1 to 4 fixed; M8 merged to main at 2474248)
+Last updated: 2026-11-06 (M9 merged to main at 8f499d0, final gate at 9efda0b; M10 next)
 
 ## Now
 
-M9 (text views: code block, code editor view, markdown preview, diff view) is built, visually accepted and closed on the program
-branch (steps 1 to 9; DECISIONS D177 to D203), review rounds 1 to 3 fixed (D200 to D203), waiting on re-review and the merge to main. `docs/architecture.md` has the module map,
+M9 (text views: code block, code editor view, markdown preview, diff view) is merged to main at 8f499d0
+(steps 1 to 9; DECISIONS D177 to D203), review rounds 1 to 4 fixed (D200 to D203), round 5 passed. `docs/architecture.md` has the module map,
 the pages, "Disabled keys" and "API changes since M1" (the M9 block).
 
 What M9 added:
@@ -34,13 +34,11 @@ What M9 added:
 
 Counts at the tip: gallery 70 pages, 389 scene names in `--list`; `cargo test --workspace -- --list` names 2,279 tests.
 
-Final gate at the M9 tip: fmt, clippy `-D warnings`, `cargo test --workspace`, boundaries, component index; `LUNEUI_REQUIRE_GPU=1 cargo
-test -p lune-ui-wgpu` 63 passed; pixel gate against 2474248 (the M8 merge) 332 identical, 57 new, nothing allowed; Windows and Linux (Docker) pass. Bench
-(`cargo run --release -p gallery -- --bench`, verdict per D85, 2080 x 1320, 5 runs, 70 pages, M1 Pro; load 2.71 at the start and 2.98 at
-the end; self-test in range, cpu p50 4.09, spread p99 +1.13, max +3.41; a short `cargo test` overlapped the first minutes): 0 over, every
-page 0 of 5 runs over; highest page p99 8.36 ms (`dialog`), then `flyout` 6.30 and `code-editor-view` 6.28 (the new page with the
-highest p99; plan assumption D41, per-line shaping, holds: the editor's p99 is 38 percent of the budget); worst frame of any page
-19.59 ms (`diff-view`, one frame, under the 33 ms limit), `code-block` p99 1.08, `markdown-preview` 1.38, `diff-view` 2.61.
+Final gate at 9efda0b: fmt, clippy `-D warnings`, `cargo test --workspace` 2,279 passed and 0 failed, boundaries, component index;
+`LUNEUI_REQUIRE_GPU=1 cargo test -p lune-ui-wgpu` passed; `--list` 389; pixel gate against 2474248 (the M8 merge) 332 identical, nothing allowed;
+Windows and Linux (Docker) pass. Bench at 9efda0b (`cargo run --release -p gallery -- --bench`, verdict per D85, 2080 x 1320, 5 runs, 70 pages, M1 Pro;
+load 4.8 to 6.3; self-test in range, cpu p50 4.18, spread p99 +3.62, max +4.97): 0 over budget, every page 0 of 5 runs over; highest page p99 9.05 ms and
+worst frame 30.64 ms, both `code-editor-view` (under the 33 ms limit, the closest page to it); `diff-view` p99 2.34, `markdown-preview` 1.92, `code-block` 1.71.
 
 M8 (data views: table, bar chart, pie chart, kanban board, lane graph) is merged to main at 2474248 (7 steps, DECISIONS
 D160 to D176) and closed: the cross-widget suite, the disabled-keys rows, the catalogue audit, the architecture notes and the
