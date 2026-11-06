@@ -2,10 +2,10 @@
 id: widget.verdict-row
 title: Verdict check row
 area: widget
-status: in-progress
+status: done
 consumers: wane
-source: —
-owner: toolkit-v1 M6
+source: crates/lune-ui-core/src/widgets/verdict_row.rs
+owner: —
 summary: Verdict row: mark OK, WARN or NO in its tone, then name and text; three-column or stacked; static
 ---
 
@@ -81,11 +81,13 @@ The mark words are the toolkit strings `luneui.verdict-row.ok` (OK), `luneui.ver
 - Pixel probes at scale 2: row min 48 px; grid columns 80 px and 184 px; stacked column 428 px.
 - Conformance: n/a — no transition.
 - Semantic node: role row; name equals the name passed.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_verdict_row.rs`: `at_scale_2_the_row_is_48_px_with_columns_of_80_and_184_px`, `the_wide_row_is_a_40_92_rest_grid_at_least_24_high`, `the_stacked_row_has_mark_and_name_above_the_small_text_and_a_hairline`, `the_stacked_text_wraps_in_a_narrow_column`, `only_the_mark_carries_the_tone`, `the_mark_words_come_through_the_string_table`, `a_long_text_wraps_and_grows_the_row`, node `the_node_is_a_row_over_three_cells_and_the_row_is_static`, `it_settles_and_takes_no_tab_stop`.
 
 ### Build
 
 - Milestone: M6
 - Depends on: core.painter, text.shaping
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_verdict_row.rs::at_scale_2_the_row_is_48_px_with_columns_of_80_and_184_px, crates/lune-ui-core/tests/widget_verdict_row.rs::the_stacked_row_has_mark_and_name_above_the_small_text_and_a_hairline, crates/lune-ui-core/tests/widget_verdict_row.rs::the_mark_words_come_through_the_string_table, crates/lune-ui-core/tests/widget_verdict_row.rs::the_node_is_a_row_over_three_cells_and_the_row_is_static`; page `verdict-row`; unverified here: none (limit with a row: the last stacked row also draws a hairline, D130).
 
 ## Open questions
 

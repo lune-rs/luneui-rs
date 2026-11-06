@@ -2,10 +2,10 @@
 id: widget.toggle
 title: Toggle switch
 area: widget
-status: in-progress
+status: done
 consumers: luneterm, wane
 source: crates/lune-ui-core/src/widgets/toggle.rs
-owner: orch/toolkit-v1
+owner: —
 summary: On/off switch: 40x20 track, accent fill when on, knob slides between ends
 ---
 
@@ -108,11 +108,13 @@ None: the label is app text.
 - Pixel probes at scale 2: track 80 x 40 px, knob 24 px (28 hovered), knob centre 20 px from the track end (unhovered), on fill = `accent`.
 - Conformance: knob x over 60 Hz samples is monotonic, ends exact, settles within 180 ms + 1 frame; Reduced snaps the knob, Off snaps everything.
 - Semantic node: role switch, checked follows `on`, injected `AccessAction` default toggles.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_toggle.rs`: `click_and_space_flip_once_each_and_mark_changed`, `a_disabled_toggle_reports_no_click`, `pixel_probes_at_scale_two`, conformance `the_knob_slides_monotonically_and_settles_within_180_ms_and_a_frame`, `reduced_snaps_the_knob_and_off_snaps_everything`, `every_motion_row_conforms_under_every_tier`, node `the_node_is_a_switch_whose_checked_state_follows_the_value`, and `at_rest_the_ui_toggle_draws_exactly_what_the_painter_toggle_does`.
 
 ### Build
 
 - Milestone: M4 (retrofit: transitions, focus, semantic node); done by M11.
 - Depends on: core.ui, core.focus, infra.accessibility, motion.transitions.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_toggle.rs::click_and_space_flip_once_each_and_mark_changed, crates/lune-ui-core/tests/widget_toggle.rs::a_disabled_toggle_reports_no_click, crates/lune-ui-core/tests/widget_toggle.rs::pixel_probes_at_scale_two, crates/lune-ui-core/tests/widget_toggle.rs::the_knob_slides_monotonically_and_settles_within_180_ms_and_a_frame, crates/lune-ui-core/tests/widget_toggle.rs::reduced_snaps_the_knob_and_off_snaps_everything, crates/lune-ui-core/tests/widget_toggle.rs::the_node_is_a_switch_whose_checked_state_follows_the_value`; page `toggle`; unverified here: none.
 
 ## Open questions
 

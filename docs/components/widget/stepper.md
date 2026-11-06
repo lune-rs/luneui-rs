@@ -2,10 +2,10 @@
 id: widget.stepper
 title: Numeric stepper
 area: widget
-status: in-progress
+status: done
 consumers: luneterm, wane
 source: crates/lune-ui-core/src/widgets/stepper.rs
-owner: orch/toolkit-v1
+owner: —
 summary: Numeric stepper: value with minus and plus buttons; clamping and step size belong to the app
 ---
 
@@ -101,15 +101,17 @@ None: "−" and "+" are symbols drawn from literals [R crates/lune-ui-core/src/w
 - Pixel probes at scale 2: input box radius 12 px; minus box 48 x 48 px; value text starts 20 px from the box edge; `controls` at zero delta.
 - Conformance: button hover fill over 60 Hz samples is monotonic, ends exact, settles within 120 ms + 1 frame; Reduced keeps the fill tween.
 - Semantic node: role spin-button; value follows `value`; injected `AccessAction` increment and decrement change it by one step.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_stepper.rs`: `clicks_and_arrow_keys_report_one_step_each`, `a_disabled_stepper_reports_nothing`, `settle_clamps_snaps_and_never_panics`; pixel probes `pixel_probes_at_scale_two`, `at_rest_the_ui_stepper_draws_exactly_what_the_painter_stepper_does` (the `controls` look); conformance `the_minus_fill_rises_monotonically_and_settles_within_120_ms_and_a_frame`, `every_motion_row_conforms_under_every_tier`; node `the_node_is_a_spin_button_whose_value_follows_the_app`, `the_access_increment_and_decrement_step_and_set_value_is_settled`.
 
 ### Build
 
 - Milestone: M4 (retrofit: transitions, focus, semantic node); done by M11.
 - Depends on: core.ui, core.focus, infra.accessibility, motion.transitions.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_stepper.rs::clicks_and_arrow_keys_report_one_step_each, crates/lune-ui-core/tests/widget_stepper.rs::a_disabled_stepper_reports_nothing, crates/lune-ui-core/tests/widget_stepper.rs::pixel_probes_at_scale_two, crates/lune-ui-core/tests/widget_stepper.rs::at_rest_the_ui_stepper_draws_exactly_what_the_painter_stepper_does, crates/lune-ui-core/tests/widget_stepper.rs::the_minus_fill_rises_monotonically_and_settles_within_120_ms_and_a_frame, crates/lune-ui-core/tests/widget_stepper.rs::the_node_is_a_spin_button_whose_value_follows_the_app`; page `stepper`; unverified here: none.
 
 ## Open questions
 
-- `token-gap`: the whole-control hover look is in Wane's state list without a value [W docs/ui/components.md:365], and the moved code never hovers the input box (`mod.rs:102` passes `hovered` false); M4 chooses a value and cites it.
+- Answered (M4): the stepper hovers each button box only, with `surface_hover` (States, Anatomy); the input box takes no hover look, as the moved code. Wane's whole-control hover has no value, so none is drawn.
 
 ## Notes for the planner
 

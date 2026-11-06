@@ -2,10 +2,10 @@
 id: widget.row
 title: Row (setting row, list item row)
 area: widget
-status: in-progress
+status: done
 consumers: wane
-source: —
-owner: toolkit-v1 M6
+source: crates/lune-ui-core/src/widgets/row.rs
+owner: —
 summary: Row: setting row (title, description, control at right, min 56 high) or compact item row (32 high, four columns); hover tints the row; rows are not clickable
 ---
 
@@ -96,11 +96,13 @@ None: title, description and meta text are app data.
 - Pixel probes at scale 2: setting row min 112 px high; radius 12 px; title starts 24 px from the left edge.
 - Conformance: hover background over 60 Hz samples is monotonic, ends exact, settles within 120 ms + 1 frame.
 - Semantic node: role group; name equals the title; disabled follows the flag.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_row.rs`: pixel probes `at_scale_2_the_row_is_112_px_with_radius_12_and_the_title_24_px_in`, `a_setting_row_is_at_least_56_high_and_grows_with_its_description`, `an_item_row_is_32_high_over_a_40_1fr_88_176_grid_with_8_px_gaps`, `the_title_is_primary_and_the_description_fg_muted`; hover and conformance `the_hover_fill_is_monotonic_ends_exact_and_settles_within_120_ms_and_a_frame`, `every_motion_row_conforms_under_every_tier`, `off_fades_the_title_to_secondary_at_fast_and_ends_exact`, `an_item_row_lights_on_hover_and_the_cells_keep_their_input`; `the_pointer_on_the_control_keeps_the_row_lit_and_the_control_takes_the_click`; node and disabled `the_node_is_a_group_named_by_the_title_over_the_controls_node`, `a_disabled_row_is_inert_dimmed_and_marked`.
 
 ### Build
 
 - Milestone: M6
 - Depends on: widget.toggle, widget.checkbox, core.painter, text.shaping
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_row.rs::at_scale_2_the_row_is_112_px_with_radius_12_and_the_title_24_px_in, crates/lune-ui-core/tests/widget_row.rs::the_hover_fill_is_monotonic_ends_exact_and_settles_within_120_ms_and_a_frame, crates/lune-ui-core/tests/widget_row.rs::every_motion_row_conforms_under_every_tier, crates/lune-ui-core/tests/widget_row.rs::the_node_is_a_group_named_by_the_title_over_the_controls_node, crates/lune-ui-core/tests/widget_row.rs::a_disabled_row_is_inert_dimmed_and_marked`; page `row`; unverified here: none.
 
 ## Open questions
 

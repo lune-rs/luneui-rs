@@ -2,10 +2,10 @@
 id: widget.star-rating
 title: Star rating
 area: widget
-status: in-progress
+status: done
 consumers: lunegit
-source: Lunegit: src/Lunegit.Desktop/Controls/StarRatingControl.axaml
-owner: toolkit-v1 M6
+source: crates/lune-ui-core/src/widgets/star_rating.rs
+owner: —
 summary: Star rating: row of star buttons (default five) in the warning tone; click N sets N, click again clears
 ---
 
@@ -95,11 +95,13 @@ None: the star names are numbers, and the control has no text keys [L src/Lunegi
 - Pixel probes at scale 2: star 48 x 48 px button area (20 px glyph plus padding 2 each side; the hover fill measures 48, `StarRatingControl.axaml:9-15`); hover fill radius 8 px; spacing 4 px.
 - Conformance: hover fill over 60 Hz samples settles within 120 ms + 1 frame.
 - Semantic node: role radio-group; checked follows `Value`; injected `AccessAction` default sets the value.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_star_rating.rs`: `click_n_sets_n_and_a_second_click_on_n_sets_zero`, `max_changes_the_count_and_the_names`, `a_value_above_max_draws_as_max_and_is_left_alone`, `tab_enters_once_on_the_value_star_and_arrows_move_focus_only`, `enter_and_space_set_the_focused_star_and_again_clear_it`, `the_default_action_sets_the_value_and_clears_it_on_the_current_one`; pixel probes `pixel_probes_at_scale_two`, `filled_stars_are_the_warning_tone_and_empty_ones_the_tertiary_tone`; conformance `the_hover_fill_rises_monotonically_and_settles_within_120_ms_and_a_frame`, `every_motion_row_conforms_under_every_tier`, `a_value_change_snaps`; node `the_nodes_are_a_radio_group_of_radios_and_checked_follows_the_value`.
 
 ### Build
 
 - Milestone: M6
 - Depends on: widget.button, core.focus, infra.accessibility, core.ui, motion.transitions
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_star_rating.rs::click_n_sets_n_and_a_second_click_on_n_sets_zero, crates/lune-ui-core/tests/widget_star_rating.rs::max_changes_the_count_and_the_names, crates/lune-ui-core/tests/widget_star_rating.rs::tab_enters_once_on_the_value_star_and_arrows_move_focus_only, crates/lune-ui-core/tests/widget_star_rating.rs::pixel_probes_at_scale_two, crates/lune-ui-core/tests/widget_star_rating.rs::the_hover_fill_rises_monotonically_and_settles_within_120_ms_and_a_frame, crates/lune-ui-core/tests/widget_star_rating.rs::the_nodes_are_a_radio_group_of_radios_and_checked_follows_the_value`; page `star-rating`; unverified here: none.
 
 ## Open questions
 

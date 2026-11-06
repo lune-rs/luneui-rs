@@ -2,10 +2,10 @@
 id: widget.slider
 title: Slider
 area: widget
-status: in-progress
+status: done
 consumers: any
-source: —
-owner: toolkit-v1 M6
+source: crates/lune-ui-core/src/widgets/slider.rs
+owner: —
 summary: Slider: 4 px track with accent fill and a 12 px knob (14 hovered); look derived from the toggle knob and the progress track; arrow keys step
 ---
 
@@ -101,17 +101,19 @@ None: the slider has no text; the label is the owner's.
 - Pixel probes at scale 2: track 8 px high, radius 4 px (a semicircular end); knob `on_accent`; knob 24 px (28 hovered); knob centre at the value position.
 - Conformance: knob x over 60 Hz samples is monotonic, ends exact, settles within 180 ms + 1 frame; Reduced snaps.
 - Semantic node: role slider; value follows `value`; injected `AccessAction` increment and decrement change it by one step.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_slider.rs`: keys `right_and_left_change_the_value_by_one_step_and_stop_at_the_ends`, `every_arrow_of_a_frame_counts_in_arrival_order`, `disabled_changes_nothing`; pointer `a_press_at_three_quarters_sets_the_value_at_once_with_no_drag_threshold`, `a_drag_follows_on_every_frame_with_the_knob_on_the_value_and_nothing_in_flight`; clamp and steps `max_stays_reachable_when_the_step_does_not_divide_the_range`, `every_pointer_result_is_in_range_and_on_a_step_from_min`, `degenerate_input_changes_nothing_and_draws_the_knob_at_the_start`; pixel probes `pixel_probes_at_scale_2`, `hover_grows_the_knob_and_a_held_knob_keeps_the_size_off_the_track`, `no_fill_at_the_start_and_a_full_fill_at_the_end`; conformance `a_key_step_tweens_to_exactly_the_value_monotonically_within_fast_and_a_frame`, `reduced_and_off_snap_a_key_step`, `every_motion_row_conforms_under_every_tier`; node `the_node_is_a_slider_whose_value_follows_and_whose_steps_arrive_as_actions`, `increment_and_decrement_step_and_tween_like_the_keys_with_no_focus`.
 
 ### Build
 
 - Milestone: M6
 - Depends on: widget.toggle, data.progress, widget.scrollbar, core.focus, core.ui, infra.accessibility, motion.transitions
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_slider.rs::right_and_left_change_the_value_by_one_step_and_stop_at_the_ends, crates/lune-ui-core/tests/widget_slider.rs::disabled_changes_nothing, crates/lune-ui-core/tests/widget_slider.rs::a_press_at_three_quarters_sets_the_value_at_once_with_no_drag_threshold, crates/lune-ui-core/tests/widget_slider.rs::pixel_probes_at_scale_2, crates/lune-ui-core/tests/widget_slider.rs::a_key_step_tweens_to_exactly_the_value_monotonically_within_fast_and_a_frame, crates/lune-ui-core/tests/widget_slider.rs::every_motion_row_conforms_under_every_tier, crates/lune-ui-core/tests/widget_slider.rs::the_node_is_a_slider_whose_value_follows_and_whose_steps_arrive_as_actions`; page `slider`; unverified here: none.
 
 ## Open questions
 
 - Resolved [D119] `pointer-gap`: a press anywhere in the hit area sets the value.
 - Resolved [D119] `clamp-gap`: the widget clamps and snaps.
-- `no-consumer`: neither Lunegit nor Wane uses a slider today; the entry is kept for the M6 control set (R-widget-5).
+- Still open, a note: `no-consumer`: neither Lunegit nor Wane uses a slider today; the entry is kept for the M6 control set (R-widget-5). It changes no behaviour.
 
 ## Notes for the planner
 
