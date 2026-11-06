@@ -15,6 +15,7 @@ use lune_ui::widgets::button::{ButtonKind, ButtonOptions};
 use lune_ui::widgets::side_panel::SidePanelOptions;
 
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -67,8 +68,8 @@ impl Live {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        card(ui, "Side panel");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        card(ui, stage, "Side panel");
         heading(ui, "SIDE PANEL", X, Y);
         if self.switch_at.is_some_and(|t| ui.time() >= t) {
             self.panel = 2;

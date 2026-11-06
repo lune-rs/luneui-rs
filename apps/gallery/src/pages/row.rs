@@ -10,6 +10,7 @@ use lune_ui::widgets::row::{ItemRow, SettingRow};
 use lune_ui::widgets::tone::Tone;
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -71,8 +72,8 @@ fn states() -> Box<dyn PageState> {
 }
 
 impl PageState for Rows {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Row");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Row");
         match self.mode {
             Mode::Setting => {
                 heading(ui, "SETTING ROW", card.x + 24.0, card.y + 24.0);

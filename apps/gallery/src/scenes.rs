@@ -30,7 +30,7 @@ pub(crate) const BLUR_SATURATION: f32 = 1.8;
 const OPAQUE_BASE: Rgba = [0x1F, 0x1F, 0x1F, 0xFF];
 
 pub(crate) const TITLE_BAND: f32 = 34.0;
-const CARD_MARGIN: f32 = 10.0;
+pub(crate) const CARD_MARGIN: f32 = 10.0;
 
 /// Hit regions of the gallery's controls (the painter is generic over the app's hit type).
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -214,6 +214,39 @@ pub(crate) fn background<H: Copy + PartialEq>(
     background_in(p, &THEME, glass, focused, title)
 }
 
+/// The panel fill, the card fill and the noise flag of the window layers: `glass` off puts them
+/// over an opaque base, unfocused swaps them for the solid inactive fill.
+fn glass_fills(theme: &Theme, glass: bool, focused: bool) -> ([f32; 4], [f32; 4], bool) {
+    if glass && !focused {
+        let solid = premul(lunegit_dark::INACTIVE_FALLBACK);
+        (solid, solid, false)
+    } else {
+        let mut panel = theme.glass.panel.premultiplied();
+        let mut fill = theme.glass.card.premultiplied();
+        if !glass {
+            let base = premul(OPAQUE_BASE);
+            panel = over(panel, base);
+            fill = over(fill, base);
+        }
+        (panel, fill, true)
+    }
+}
+
+/// Only the card of [`background_in`], at `card`: for a page that sits in a rect of a window
+/// something else already painted.
+pub(crate) fn card_in<H: Copy + PartialEq>(
+    p: &mut Painter<'_, H>,
+    theme: &Theme,
+    glass: bool,
+    focused: bool,
+    card: Rect,
+) -> Rect {
+    p.on(LayerId::Base);
+    let (panel, card_fill, noise) = glass_fills(theme, glass, focused);
+    p.acrylic(card, chrome::CARD_RADIUS, card_fill, panel, noise);
+    card
+}
+
 /// [`background`] with the layers and the title colour of `theme`: a page under a loaded theme
 /// file draws its window from the theme's glass.
 pub(crate) fn background_in<H: Copy + PartialEq>(
@@ -231,19 +264,7 @@ pub(crate) fn background_in<H: Copy + PartialEq>(
         win.w - 2.0 * CARD_MARGIN,
         win.h - TITLE_BAND - CARD_MARGIN,
     );
-    let (panel, card_fill, noise) = if glass && !focused {
-        let solid = premul(lunegit_dark::INACTIVE_FALLBACK);
-        (solid, solid, false)
-    } else {
-        let mut panel = theme.glass.panel.premultiplied();
-        let mut fill = theme.glass.card.premultiplied();
-        if !glass {
-            let base = premul(OPAQUE_BASE);
-            panel = over(panel, base);
-            fill = over(fill, base);
-        }
-        (panel, fill, true)
-    };
+    let (panel, card_fill, noise) = glass_fills(theme, glass, focused);
     p.acrylic(win, 0.0, panel, [0.0; 4], noise);
     p.acrylic(card, chrome::CARD_RADIUS, card_fill, panel, noise);
     let spec = Spec::plain(title, Style::ui(12.0, theme.fg_secondary).medium());

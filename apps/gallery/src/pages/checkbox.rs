@@ -8,6 +8,7 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::checkbox::{CheckboxLook, CheckboxState, paint};
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -34,8 +35,8 @@ struct Live {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Checkbox");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Checkbox");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "CHECKBOXES", x, y);
         let ty = y + 20.0;
@@ -59,8 +60,8 @@ impl PageState for Live {
 struct Specimens;
 
 impl PageState for Specimens {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Checkbox states");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Checkbox states");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "CHECKBOX STATES", x, y);
         let theme = *ui.theme();

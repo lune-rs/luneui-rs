@@ -14,6 +14,7 @@ use lune_ui::widgets::virtual_list::{
 };
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -117,8 +118,8 @@ fn specimens() -> Box<dyn PageState> {
 struct Live;
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "List row");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "List row");
         heading(ui, "LIST ROWS", card.x + 24.0, card.y + 24.0);
         let opts = ListOptions {
             count: 200,
@@ -137,8 +138,8 @@ impl PageState for Live {
 struct Specimens;
 
 impl PageState for Specimens {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "List row states");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "List row states");
         heading(
             ui,
             "REST, HOVER, SELECTED, SELECTED + HOVER, FOCUS-VISIBLE, DISABLED",

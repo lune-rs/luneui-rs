@@ -14,6 +14,7 @@ use lune_ui::widgets::sidebar::{Sidebar, SidebarBody, SidebarFooter, WIDTH};
 use lune_ui::widgets::tone::Tone;
 
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -102,8 +103,8 @@ impl Live {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        card(ui, "Sidebar");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        card(ui, stage, "Sidebar");
         heading(ui, "SIDEBAR", X, Y);
         let all = self.show == Show::All;
         let mut col = 0.0;

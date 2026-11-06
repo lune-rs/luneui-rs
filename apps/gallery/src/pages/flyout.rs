@@ -19,6 +19,7 @@ use lune_ui::widgets::stat::StatOptions;
 use lune_ui::widgets::tone::Tone;
 
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -158,8 +159,8 @@ struct Live {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Tray flyout");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Tray flyout");
         heading(ui, "TRAY FLYOUT", card.x + 24.0, card.y + 24.0);
         caption(
             ui,

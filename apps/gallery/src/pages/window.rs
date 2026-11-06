@@ -14,6 +14,7 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::caption::{CaptionButton, CaptionOptions};
 use lune_ui::window::{EDGE_BORDER, ResizeEdge, edge_at};
 
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 use crate::scenes::{H, TITLE_BAND, W};
 
@@ -61,8 +62,8 @@ struct Caption {
 }
 
 impl PageState for Caption {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "luneui gallery");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "luneui gallery");
         caption(ui, "Caption buttons", card.x + 24.0, card.y + 24.0);
         let win = ui.painter().window;
         let opts = CaptionOptions {
@@ -81,8 +82,8 @@ impl PageState for Caption {
 struct Edges;
 
 impl PageState for Edges {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "luneui gallery");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "luneui gallery");
         let t = *ui.theme();
         let (w, h, b) = (W as f32, H as f32, EDGE_BORDER);
         let regions = [
@@ -129,7 +130,7 @@ fn edge_name(e: ResizeEdge) -> &'static str {
 struct Inactive;
 
 impl PageState for Inactive {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
+    fn draw(&mut self, ui: &mut Ui<'_>, _stage: &Stage) {
         let theme = *ui.theme();
         let win = ui.painter().window;
         let band = TITLE_BAND;

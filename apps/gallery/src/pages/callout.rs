@@ -8,6 +8,7 @@ use lune_ui::widgets::callout::CalloutOptions;
 use lune_ui::widgets::tone::Tone;
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Expect, Page, PageKind, PageState, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -53,8 +54,8 @@ const CASES: [(Tone, &str, &str, &str); 4] = [
 struct Tones;
 
 impl PageState for Tones {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Callout");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Callout");
         let (x, mut y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "NEUTRAL, DATA, WARN, ERR", x, y);
         y += 24.0;

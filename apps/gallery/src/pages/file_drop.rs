@@ -13,6 +13,7 @@ use lune_ui::text::{Spec, Style};
 use lune_ui::ui::Ui;
 
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -56,10 +57,10 @@ impl Drops {
 }
 
 impl PageState for Drops {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
         self.read(&ui.input().events);
         let t = *ui.theme();
-        let area = card(ui, "File drop");
+        let area = card(ui, stage, "File drop");
         let (x, y) = (area.x + 24.0, area.y + 24.0);
         heading(ui, "DROP ZONE", x, y);
         caption(

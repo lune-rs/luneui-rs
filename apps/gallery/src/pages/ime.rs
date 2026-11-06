@@ -13,6 +13,7 @@ use lune_ui::widgets::field::FieldOptions;
 use lune_ui::widgets::text_area::AreaOptions;
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -61,8 +62,8 @@ fn outlined() -> Box<dyn PageState> {
 }
 
 impl PageState for Ime {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Input method");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Input method");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "INPUT METHOD", x, y);
         let field = FieldOptions {

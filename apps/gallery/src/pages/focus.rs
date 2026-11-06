@@ -19,6 +19,7 @@ use lune_ui::widgets::{button, checkbox, combo, field, stepper, toggle};
 
 use super::controls_ui::{Controls, glass};
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -52,8 +53,8 @@ fn dialog_after() -> Box<dyn PageState> {
 }
 
 impl PageState for Focus {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let area = card(ui, "luneui gallery");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let area = card(ui, stage, "luneui gallery");
         self.controls.draw(ui, area);
         if self.open_at.is_some_and(|t| ui.time() >= t) {
             let d = Dialog {
@@ -73,8 +74,8 @@ impl PageState for Focus {
 struct Kinds;
 
 impl PageState for Kinds {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let area = card(ui, "Focus rings");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let area = card(ui, stage, "Focus rings");
         let (x, y) = (area.x + 24.0, area.y + 24.0);
         heading(ui, "FOCUS-VISIBLE RINGS", x, y);
         let theme = *ui.theme();

@@ -12,7 +12,8 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::button::ButtonKind;
 use lune_ui::widgets::popover::{PopoverOptions, Surface};
 
-use super::{caption, card, heading};
+use super::{caption, card, heading, on_card};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -97,10 +98,11 @@ struct Live {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Popover");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Popover");
         heading(ui, "POPOVER", card.x + 24.0, card.y + 24.0);
-        let button = ui.button("anchor", self.anchor, "Open popover", ButtonKind::Secondary);
+        let anchor = on_card(card, self.anchor);
+        let button = ui.button("anchor", anchor, "Open popover", ButtonKind::Secondary);
         if button.clicked {
             self.open = true;
         }
@@ -108,7 +110,7 @@ impl PageState for Live {
             let options = PopoverOptions {
                 anchor_id: Some(button.id),
                 surface: self.surface,
-                ..PopoverOptions::new(self.anchor, self.size)
+                ..PopoverOptions::new(anchor, self.size)
             };
             let (frame, _placement, ()) = ui.popover("popover", &options, |ui, at| {
                 caption(ui, "A popover", at.x + 12.0, at.y + 12.0);

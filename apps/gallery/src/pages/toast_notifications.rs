@@ -13,6 +13,7 @@ use lune_ui::widgets::button::ButtonKind;
 use lune_ui::widgets::toast::{ToastAction, ToastId, ToastKind, ToastSpec, Toasts};
 
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -263,7 +264,7 @@ impl State {
 }
 
 impl PageState for State {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
         let now = ui.time();
         if !self.started {
             self.started = true;
@@ -272,7 +273,7 @@ impl PageState for State {
         self.act(now);
         self.advance(now);
 
-        let card = card(ui, "Toasts and notification history");
+        let card = card(ui, stage, "Toasts and notification history");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "TOASTS", x, y);
         caption(

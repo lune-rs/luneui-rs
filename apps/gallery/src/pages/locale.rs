@@ -11,6 +11,7 @@ use lune_ui::widgets::menu::MenuRow;
 
 use super::card;
 use super::controls_ui::{Controls, glass};
+use crate::page::Stage;
 use crate::page::{Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -72,8 +73,8 @@ fn pseudo() -> Box<dyn PageState> {
 }
 
 impl PageState for Locale {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let area = card(ui, "luneui gallery");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let area = card(ui, stage, "luneui gallery");
         self.controls.draw(ui, area);
         let rows = [
             ("app.menu.new", Some(icon::ADD)),

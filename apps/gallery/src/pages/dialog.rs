@@ -20,6 +20,7 @@ use lune_ui::widgets::menu::MenuRow;
 use lune_ui::widgets::popover::PopoverOptions;
 
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -163,8 +164,8 @@ fn glass() -> DialogGlass {
 }
 
 impl PageState for Dialogs {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Dialog");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Dialog");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "A DIALOG OVER THE PAGE", x, y);
         let by = y + 20.0;

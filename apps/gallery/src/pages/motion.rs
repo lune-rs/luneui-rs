@@ -15,6 +15,7 @@ use lune_ui::text::{Spec, Style};
 use lune_ui::ui::{Ui, WidgetId};
 
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -175,8 +176,8 @@ fn easings_row(ui: &mut Ui<'_>, x: f32, y: f32) {
 struct Easings;
 
 impl PageState for Easings {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Motion: easings");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Motion: easings");
         easings_row(ui, card.x + 24.0, card.y + 24.0);
     }
 }
@@ -185,8 +186,8 @@ impl PageState for Easings {
 struct Curve(Easing);
 
 impl PageState for Curve {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Motion: curve");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Motion: curve");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "CURVE", x, y);
         plot(ui.painter(), Rect::new(x, y + 30.0, 240.0, 240.0), self.0);
@@ -478,9 +479,9 @@ fn kinds_grid(
 struct Kinds(Grid);
 
 impl PageState for Kinds {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
         self.0.frames += 1;
-        let card = card(ui, "Motion: kinds");
+        let card = card(ui, stage, "Motion: kinds");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "KINDS", x, y);
         let tier = ui.tier();
@@ -512,9 +513,9 @@ struct Retarget {
 const REVERSE_MS: u64 = 60;
 
 impl PageState for Retarget {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
         self.frames += 1;
-        let card = card(ui, "Motion: retarget");
+        let card = card(ui, stage, "Motion: retarget");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "MOVE, RETARGETED AT 60 MS OF ITS 180 MS RUN", x, y);
         let now = ui.time();
@@ -676,9 +677,9 @@ fn tier_name(t: MotionTier) -> &'static str {
 }
 
 impl PageState for Tiers {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
         self.0.frames += 1;
-        let card = card(ui, "Motion: tiers");
+        let card = card(ui, stage, "Motion: tiers");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "FULL, REDUCED, OFF", x, y);
         for (i, tier) in [MotionTier::Full, MotionTier::Reduced, MotionTier::Off]
@@ -714,9 +715,9 @@ fn live() -> Box<dyn PageState> {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
         self.0.frames += 1;
-        let card = card(ui, "Motion");
+        let card = card(ui, stage, "Motion");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         easings_row(ui, x, y);
         let ky = y + 168.0;
@@ -877,7 +878,7 @@ mod tests {
     struct Alone(Grid, MotionTier);
 
     impl PageState for Alone {
-        fn draw(&mut self, ui: &mut Ui<'_>) {
+        fn draw(&mut self, ui: &mut Ui<'_>, _stage: &Stage) {
             self.0.frames += 1;
             panel(ui, &self.0, self.1, (40.0, 40.0));
         }

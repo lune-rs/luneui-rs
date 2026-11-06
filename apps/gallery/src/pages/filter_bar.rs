@@ -7,6 +7,7 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::filter_bar::FilterOptions;
 
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -54,8 +55,8 @@ struct Live {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        card(ui, "Filter bar");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        card(ui, stage, "Filter bar");
         heading(ui, "FILTER BAR", X, Y);
         for (i, name) in ["Empty", "With text", "Focused", "Disabled"]
             .into_iter()

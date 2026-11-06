@@ -9,6 +9,7 @@ use lune_ui::widgets::button::{ButtonKind, button_width};
 use lune_ui::widgets::pie_chart::{PieOptions, PieSlice};
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -65,8 +66,8 @@ fn change() -> Box<dyn PageState> {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Pie chart");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Pie chart");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "STORAGE BY KIND", x, y);
         let label = "Retarget the data";

@@ -14,7 +14,8 @@ use lune_ui::widgets::table::{
 use lune_ui::widgets::tone::Tone;
 use lune_ui::widgets::virtual_list::{RowKey, SelectionMode};
 
-use super::{card, heading};
+use super::{card, heading, on_card};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -306,8 +307,8 @@ impl Live {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Table");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Table");
         heading(ui, "TABLE", card.x + 24.0, card.y + 24.0);
         if !self.seeded {
             self.seeded = true;
@@ -334,7 +335,7 @@ impl PageState for Live {
         let resp = ui.with_enabled(self.enabled, |ui| {
             ui.table(
                 "table",
-                TABLE,
+                on_card(card, TABLE),
                 &opts,
                 |i| RowKey(u64::from(order[i])),
                 |ui, c| cell(ui, mode, toggles, c),

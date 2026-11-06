@@ -15,6 +15,7 @@ use lune_ui::widgets::button::{ButtonKind, ButtonOptions};
 use lune_ui::widgets::split_panes::{Pane, SplitOptions, SplitSide};
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -96,8 +97,8 @@ fn pane(ui: &mut Ui<'_>, rect: Rect, tint: [u8; 4], title: &str, detail: &str) {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        card(ui, "Split panes");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        card(ui, stage, "Split panes");
         heading(ui, "SPLIT PANES", X, Y);
         let ghost = ButtonOptions {
             kind: ButtonKind::Secondary,

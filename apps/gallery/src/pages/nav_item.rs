@@ -11,6 +11,7 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::nav_item::{NavEntry, NavLook, NavState, paint};
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -60,8 +61,8 @@ struct Live {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        card(ui, "Navigation item");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        card(ui, stage, "Navigation item");
         heading(ui, "NAVIGATION", X, Y);
         if self.select_at.is_some_and(|t| ui.time() >= t) {
             self.selected = 3;
@@ -87,8 +88,8 @@ impl PageState for Live {
 struct Specimens;
 
 impl PageState for Specimens {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        card(ui, "Navigation item states");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        card(ui, stage, "Navigation item states");
         heading(ui, "NAV ITEM STATES", X, Y);
         let theme = *ui.theme();
         let rest = NavState::default();

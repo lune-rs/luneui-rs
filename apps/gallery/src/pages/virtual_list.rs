@@ -12,6 +12,7 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::virtual_list::{Heights, ListOptions, RowKey, SelectionMode};
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -94,8 +95,8 @@ struct Live {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Virtualized list");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Virtualized list");
         heading(ui, "VIRTUALIZED LIST", card.x + 24.0, card.y + 24.0);
         if !self.seeded {
             self.seeded = true;

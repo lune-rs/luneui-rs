@@ -17,6 +17,7 @@ use lune_ui::widgets::diff_view::{
 use lune_ui::widgets::menu::{MenuOptions, MenuPlace, MenuRow};
 
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -261,8 +262,8 @@ const ACTIONS: [HunkAction<'static>; 2] = [
 ];
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Diff view");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Diff view");
         heading(ui, "DIFF VIEW", card.x + 24.0, card.y + 24.0);
         self.header(ui);
 

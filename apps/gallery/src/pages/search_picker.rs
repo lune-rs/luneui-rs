@@ -9,6 +9,7 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::search_picker::{PickerOptions, Trigger};
 
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -71,8 +72,8 @@ struct Live {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        card(ui, "Search picker");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        card(ui, stage, "Search picker");
         heading(ui, "SEARCH PICKER", X, Y);
         if let Some(selected) = &mut self.field {
             caption(ui, "Field", X, FIELD.y + 11.0);

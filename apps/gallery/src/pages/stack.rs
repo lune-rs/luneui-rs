@@ -8,6 +8,7 @@ use lune_ui::paint::Rect;
 use lune_ui::ui::Ui;
 
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -39,8 +40,8 @@ const SAMPLES: [Sample; 5] = [
 ];
 
 /// The card's heading, then the content area under it.
-fn content(ui: &mut Ui<'_>) -> Rect {
-    let card = card(ui, "Stack");
+fn content(ui: &mut Ui<'_>, stage: &Stage) -> Rect {
+    let card = card(ui, stage, "Stack");
     let (x, y) = (card.x + 24.0, card.y + 24.0);
     heading(ui, "STACK", x, y);
     Rect::new(x, y + 24.0, card.w - 48.0, card.h - 48.0 - 24.0)
@@ -50,8 +51,8 @@ fn content(ui: &mut Ui<'_>) -> Rect {
 struct Sheet;
 
 impl PageState for Sheet {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let area = content(ui);
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let area = content(ui, stage);
         let band = area.h / SAMPLES.len() as f32;
         for (i, which) in SAMPLES.iter().enumerate() {
             let at = Rect::new(area.x, area.y + i as f32 * band, area.w, band);
@@ -64,8 +65,8 @@ impl PageState for Sheet {
 struct Show(Sample);
 
 impl PageState for Show {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let area = content(ui);
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let area = content(ui, stage);
         sample(ui, self.0, area);
     }
 }

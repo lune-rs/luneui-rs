@@ -7,6 +7,7 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::star_rating::{MAX, StarLook, StarState, button_rect, paint};
 
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -47,8 +48,8 @@ struct Live {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        card(ui, "Star rating");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        card(ui, stage, "Star rating");
         heading(ui, "STAR RATING", X, Y);
         ui.star_rating("stars", AT, &mut self.value, MAX, "Rating");
         let text = if self.value == 0 {
@@ -64,8 +65,8 @@ impl PageState for Live {
 struct Specimens;
 
 impl PageState for Specimens {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        card(ui, "Star rating states");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        card(ui, stage, "Star rating states");
         heading(ui, "STAR RATING STATES", X, Y);
         let theme = *ui.theme();
         let rows = [

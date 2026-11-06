@@ -11,6 +11,7 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::icon_rail::{PITCH, RailItem};
 
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -94,8 +95,8 @@ impl Live {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        card(ui, "Icon rail");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        card(ui, stage, "Icon rail");
         heading(ui, "ICON RAIL", X, Y);
         let item = |(key, glyph, name): (u64, &'static str, &'static str)| RailItem {
             key,

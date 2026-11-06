@@ -13,6 +13,7 @@ use lune_ui::widgets::panel::{PanelKind, PanelOptions, PanelSlot, TEXT_INSET};
 use lune_ui::widgets::stat::StatOptions;
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Expect, Page, PageKind, PageState, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -58,8 +59,8 @@ fn unavailable() -> Box<dyn PageState> {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let area = card(ui, "Panel");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let area = card(ui, stage, "Panel");
         let (x, y) = (area.x + 24.0, area.y + 18.0);
         if self.0 != Show::All {
             let at = Rect::new(x, y + 24.0, 640.0, 360.0);

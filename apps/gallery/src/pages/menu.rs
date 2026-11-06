@@ -13,6 +13,7 @@ use lune_ui::widgets::popover::{PlaceAlign, Side};
 use lune_ui::widgets::tone::Tone;
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -144,8 +145,8 @@ struct Live {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Menu");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Menu");
         let (mut x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "MENU", x, y);
         let at = (x, y + 60.0);
@@ -202,8 +203,8 @@ struct Pinned {
 }
 
 impl PageState for Pinned {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Menu");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Menu");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "MENU", x, y);
         ui.menu("menu", self.rows, (x, y + 60.0));
@@ -217,8 +218,8 @@ struct Anchored {
 }
 
 impl PageState for Anchored {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Menu");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Menu");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "MENU", x, y);
         let top = if self.low {
@@ -238,8 +239,8 @@ impl PageState for Anchored {
 struct Closing;
 
 impl PageState for Closing {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Menu");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Menu");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "MENU", x, y);
         if ui.time().as_millis() < 300 {

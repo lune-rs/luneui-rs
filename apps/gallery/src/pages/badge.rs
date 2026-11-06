@@ -5,6 +5,7 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::tone::Tone;
 
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Expect, Page, PageKind, PageState, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -34,8 +35,8 @@ const CASES: [(&str, Tone); 5] = [
 struct Tones;
 
 impl PageState for Tones {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Badge");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Badge");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         for (row, (title, dot)) in [("BADGES", false), ("BADGES WITH A DOT", true)]
             .into_iter()

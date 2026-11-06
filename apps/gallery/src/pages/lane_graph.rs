@@ -13,6 +13,7 @@ use lune_ui::widgets::lane_graph::{LaneEdge, LaneLine, LaneRow, ROW_H, width};
 use lune_ui::widgets::virtual_list::{Heights, ListOptions, RowKey, SelectionMode};
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -94,8 +95,8 @@ fn key(i: usize) -> RowKey {
 }
 
 impl PageState for Listed {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Lane graph");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Lane graph");
         heading(
             ui,
             "100,000 ROWS IN A VIRTUALIZED LIST",
@@ -155,8 +156,8 @@ struct Strip {
 }
 
 impl PageState for Strip {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Lane graph");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Lane graph");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, self.title, x, y);
         for (i, (dot, lanes, edges)) in (self.rows)().iter().enumerate() {

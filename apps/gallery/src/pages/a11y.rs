@@ -10,6 +10,7 @@ use lune_ui::ui::Ui;
 
 use super::card;
 use super::controls_ui::Controls;
+use crate::page::Stage;
 use crate::page::{Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -33,8 +34,8 @@ fn nodes() -> Box<dyn PageState> {
 }
 
 impl PageState for Nodes {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let area = card(ui, "luneui gallery");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let area = card(ui, stage, "luneui gallery");
         self.controls.draw(ui, area);
         let theme = *ui.theme();
         // The previous frame's nodes: empty on the very first frame.

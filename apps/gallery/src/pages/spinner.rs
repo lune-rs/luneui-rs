@@ -10,6 +10,7 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::spinner::SpinnerOptions;
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -38,8 +39,8 @@ struct Live {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Spinner");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Spinner");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "SPINNERS", x, y);
         let ty = y + 24.0;

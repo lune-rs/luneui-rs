@@ -8,6 +8,7 @@ use lune_ui::widgets::field::FieldState;
 use lune_ui::widgets::form_field::FormField;
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Expect, Page, PageKind, PageState, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -41,8 +42,8 @@ fn states() -> Box<dyn PageState> {
 }
 
 impl PageState for States {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Form field");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Form field");
         heading(ui, "NORMAL, ERROR, INLINE", card.x + 24.0, card.y + 24.0);
         let mut y = TOP;
 

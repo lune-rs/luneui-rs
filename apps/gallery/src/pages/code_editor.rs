@@ -17,6 +17,7 @@ use lune_ui::widgets::code_editor::{ANCHOR_INSET, CodeOptions, LineBand};
 use lune_ui::widgets::text_lines::{HighlightSpan, Highlighter, PlainHighlighter};
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -302,8 +303,8 @@ fn bad_spans() -> Box<dyn PageState> {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Code editor view");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Code editor view");
         heading(ui, "CODE EDITOR VIEW", card.x + 24.0, card.y + 24.0);
         if self.toggle {
             let mut edit = !self.read_only;

@@ -18,6 +18,7 @@ use lune_ui::widgets::tab_strip::{
 use lune_ui::widgets::tone::Tone;
 
 use super::card;
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -152,8 +153,8 @@ impl Demo {
 }
 
 impl PageState for Demo {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let page = card(ui, "Tab strip");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let page = card(ui, stage, "Tab strip");
         let inner = Rect::new(page.x + INSET, page.y + INSET, CARD_W, CARD_H);
         let strip = Rect::new(inner.x, inner.y, inner.w, HEIGHT);
         let tabs: Vec<Tab<'_>> = self

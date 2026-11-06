@@ -13,6 +13,7 @@ use lune_ui::widgets::code_block::{CodeBlockOptions, height};
 use lune_ui::widgets::text_lines::HighlightSpan;
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -193,8 +194,8 @@ fn bad(_text: &str) -> Vec<(usize, HighlightSpan)> {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Code block");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Code block");
         heading(ui, "CODE BLOCK", card.x + 24.0, card.y + 24.0);
         let spans = match self.colors {
             Colors::Plain => Vec::new(),

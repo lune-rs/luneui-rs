@@ -5,6 +5,7 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::label::LabelRole;
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Expect, Page, PageKind, PageState, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -21,8 +22,8 @@ pub(crate) static PAGE: Page = Page {
 struct Roles;
 
 impl PageState for Roles {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Labels");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Labels");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "LABEL ROLES", x, y);
         let roles = [

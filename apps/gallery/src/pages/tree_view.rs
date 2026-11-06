@@ -13,7 +13,8 @@ use lune_ui::text::{Spec, Style};
 use lune_ui::ui::Ui;
 use lune_ui::widgets::tree_view::{ROW, TreeOptions, TreeRow, TreeRowCtx};
 
-use super::{caption, card, heading};
+use super::{caption, card, heading, on_card};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -139,8 +140,8 @@ fn size_cell(ui: &mut Ui<'_>, ctx: &TreeRowCtx) {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let c = card(ui, "Tree view");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let c = card(ui, stage, "Tree view");
         let (x, y) = (c.x + 24.0, c.y + 24.0);
         heading(ui, "A FILE TREE", x, y);
         if let Some((open, selected)) = self.seed.take() {
@@ -154,8 +155,9 @@ impl PageState for Live {
             guides: true,
             toggle_on_row: false,
         };
+        let tree = on_card(c, TREE);
         let out = ui.with_enabled(!self.disabled, |ui| {
-            ui.tree_view("tree", TREE, &opts, size_cell)
+            ui.tree_view("tree", tree, &opts, size_cell)
         });
         if let Some(key) = out.activated {
             self.activated = ROWS.iter().find(|r| r.key == key).map(|r| r.text);
@@ -164,11 +166,11 @@ impl PageState for Live {
             Some(text) => format!("Opened: {text}"),
             None => "Enter or a double click opens a row.".to_owned(),
         };
-        caption(ui, &said, TREE.right() + 24.0, y + 20.0);
+        caption(ui, &said, tree.right() + 24.0, y + 20.0);
         caption(
             ui,
             "Arrows move and fold, Space selects.",
-            TREE.right() + 24.0,
+            tree.right() + 24.0,
             y + 40.0,
         );
     }

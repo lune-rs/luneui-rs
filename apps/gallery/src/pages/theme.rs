@@ -16,6 +16,7 @@ use lune_ui::widgets::menu::{MenuItem, MenuRow};
 
 use super::controls_ui::Controls;
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -105,8 +106,8 @@ impl Themed {
 }
 
 impl PageState for Themed {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let area = card(ui, "luneui gallery");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let area = card(ui, stage, "luneui gallery");
         self.controls.draw(ui, area);
         let x = area.x + 24.0;
         if self.pickers {
@@ -250,7 +251,7 @@ const MENU: [MenuRow<'static>; 3] = [
 ];
 
 impl PageState for Acrylic {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
+    fn draw(&mut self, ui: &mut Ui<'_>, _stage: &Stage) {
         let theme = *ui.theme();
         let win = ui.painter().window;
         let band = win.w / STRIPES.len() as f32;

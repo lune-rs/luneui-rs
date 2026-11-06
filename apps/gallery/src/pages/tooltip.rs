@@ -12,7 +12,8 @@ use lune_ui::paint::Rect;
 use lune_ui::text::{Spec, Style};
 use lune_ui::ui::{Sense, Ui};
 
-use super::{card, heading};
+use super::{card, heading, on_card};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -91,11 +92,11 @@ struct Live {
 const RICH: (f32, f32) = (190.0, 76.0);
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Tooltip");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Tooltip");
         heading(ui, "TOOLTIP", card.x + 24.0, card.y + 24.0);
         let id = ui.id("icon");
-        let anchor = self.anchor;
+        let anchor = on_card(card, self.anchor);
         let r = ui.with_enabled(self.enabled, |ui| {
             let r = ui.interact(id, anchor, Sense::CLICK_FOCUS);
             let mut node = Node::new(id, Role::Button, "", anchor);

@@ -9,6 +9,7 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::dropdown::DropdownOptions;
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -87,8 +88,8 @@ impl Live {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Dropdown");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Dropdown");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "DROPDOWN", x, y);
         let anchor = Rect::new(x, y + 20.0, 210.0, 32.0);

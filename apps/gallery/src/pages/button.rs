@@ -12,6 +12,7 @@ use lune_ui::widgets::button::{
 };
 
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -36,8 +37,8 @@ fn specimens() -> Box<dyn PageState> {
 struct Live;
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Button");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Button");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "BUTTONS", x, y);
         let by = y + 20.0;
@@ -71,8 +72,8 @@ impl PageState for Live {
 struct Specimens;
 
 impl PageState for Specimens {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Button states");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Button states");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "BUTTON STATES", x, y);
         let theme = *ui.theme();
@@ -141,8 +142,8 @@ fn variants() -> Box<dyn PageState> {
 struct Variants;
 
 impl PageState for Variants {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Button variants");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Button variants");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "BUTTON VARIANTS", x, y);
         let theme = *ui.theme();

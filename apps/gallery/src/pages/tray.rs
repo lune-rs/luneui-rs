@@ -24,6 +24,7 @@ use lune_ui::widgets::popover::{PlaceAlign, Side};
 
 use super::flyout::{ROUTES, rows, state_text, state_tone, stats};
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -116,8 +117,8 @@ struct Icon {
 }
 
 impl PageState for Icon {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let area = card(ui, "Tray icon");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let area = card(ui, stage, "Tray icon");
         let (x, y) = (area.x + 24.0, area.y + 24.0);
         heading(ui, "TRAY ICON", x, y);
         let side = 18 * self.scale;
@@ -228,8 +229,8 @@ impl Mock {
 struct PlacementMac;
 
 impl PageState for PlacementMac {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let area = card(ui, "Tray placement");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let area = card(ui, stage, "Tray placement");
         let (x, y) = (area.x + 24.0, area.y + 24.0);
         heading(ui, "MACOS", x, y);
         caption(
@@ -253,8 +254,8 @@ impl PageState for PlacementMac {
 struct PlacementWindows;
 
 impl PageState for PlacementWindows {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let area = card(ui, "Tray placement");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let area = card(ui, stage, "Tray placement");
         let (x, y) = (area.x + 24.0, area.y + 24.0);
         heading(ui, "WINDOWS", x, y);
         caption(
@@ -421,7 +422,7 @@ struct Surface {
 }
 
 impl PageState for Surface {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
+    fn draw(&mut self, ui: &mut Ui<'_>, _stage: &Stage) {
         let t = *ui.theme();
         let win = ui.painter().window;
         {
@@ -467,8 +468,8 @@ fn live() -> Box<dyn PageState> {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let area = card(ui, "Tray");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let area = card(ui, stage, "Tray");
         let (x, y) = (area.x + 24.0, area.y + 24.0);
         heading(ui, "TRAY ITEM", x, y);
         let note = if cfg!(any(target_os = "macos", target_os = "windows")) {

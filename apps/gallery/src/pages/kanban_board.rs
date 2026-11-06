@@ -10,6 +10,7 @@ use lune_ui::widgets::kanban_board::{
 };
 
 use super::card;
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -167,8 +168,8 @@ impl Board {
 }
 
 impl PageState for Board {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let rect = card(ui, "Kanban board").inset(12.0, 12.0);
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let rect = card(ui, stage, "Kanban board").inset(12.0, 12.0);
         let cards: Vec<Vec<KanbanCard<'_>>> = self
             .columns
             .iter()

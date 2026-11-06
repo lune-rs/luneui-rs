@@ -9,6 +9,7 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::combo::{ComboLook, ComboState, paint};
 
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -36,8 +37,8 @@ struct Live {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Combo");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Combo");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "COMBO", x, y);
         let r = ui.combo(
@@ -67,8 +68,8 @@ impl PageState for Live {
 struct Specimens;
 
 impl PageState for Specimens {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Combo states");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Combo states");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "COMBO STATES", x, y);
         let theme = *ui.theme();

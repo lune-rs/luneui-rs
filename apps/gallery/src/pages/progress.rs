@@ -8,6 +8,7 @@ use lune_ui::widgets::progress::ProgressOptions;
 use lune_ui::widgets::tone::Tone;
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Expect, Page, PageKind, PageState, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -26,8 +27,8 @@ const BAR_W: f32 = 360.0;
 struct Sections(&'static [fn(&mut Ui<'_>, f32, f32) -> f32]);
 
 impl PageState for Sections {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Progress");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Progress");
         let (x, mut y) = (card.x + 24.0, card.y + 24.0);
         for section in self.0 {
             y += section(ui, x, y) + 28.0;

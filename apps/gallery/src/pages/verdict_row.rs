@@ -7,6 +7,7 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::verdict_row::Verdict;
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Expect, Page, PageKind, PageState, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -46,8 +47,8 @@ const CASES: [(Verdict, &str, &str); 3] = [
 struct States;
 
 impl PageState for States {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Verdict row");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Verdict row");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "THREE COLUMNS", x, y);
         let mut at = y + 24.0;

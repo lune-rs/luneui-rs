@@ -9,6 +9,7 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::toggle::{ToggleLook, ToggleState, paint};
 
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 use lune_ui::input::NamedKey;
 
@@ -45,8 +46,8 @@ struct Live {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Toggle");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Toggle");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "TOGGLES", x, y);
         let ty = y + 20.0;
@@ -76,8 +77,8 @@ impl PageState for Live {
 struct Specimens;
 
 impl PageState for Specimens {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Toggle states");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Toggle states");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "TOGGLE STATES", x, y);
         let theme = *ui.theme();

@@ -10,6 +10,7 @@ use lune_ui::widgets::field::{FieldOptions, Variant};
 use lune_ui::widgets::text_area::AreaOptions;
 
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -94,8 +95,8 @@ fn password() -> Box<dyn PageState> {
 }
 
 impl PageState for Edit {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Text edit");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Text edit");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "TEXT EDIT", x, y);
         let rect = Rect::new(x, y + 20.0, 260.0, 32.0);

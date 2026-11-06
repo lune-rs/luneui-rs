@@ -8,6 +8,7 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::field::{FieldLook, FieldOptions, FieldState, Variant, paint};
 
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -45,8 +46,8 @@ struct Search {
 }
 
 impl PageState for Search {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Search field");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Search field");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "SEARCH WITH CLEAR", x, y);
         let opts = FieldOptions {
@@ -73,8 +74,8 @@ struct Live {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Text field");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Text field");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "TEXT FIELD", x, y);
         ui.text_field(
@@ -91,8 +92,8 @@ impl PageState for Live {
 struct Specimens;
 
 impl PageState for Specimens {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Text field states");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Text field states");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "TEXT FIELD STATES", x, y);
         let theme = *ui.theme();
@@ -138,8 +139,8 @@ struct Variants {
 }
 
 impl PageState for Variants {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Text field variants");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Text field variants");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "TEXT FIELD VARIANTS", x, y);
         let plain = FieldOptions::default();

@@ -16,6 +16,7 @@ use lune_ui::input::{
 };
 use lune_ui::lunegit_dark::THEME;
 use lune_ui::motion::MotionTier;
+use lune_ui::paint::Rect;
 use lune_ui::scene::Scene;
 use lune_ui::shortcuts::Shortcuts;
 use lune_ui::strings::{DisplayFormat, StringTable};
@@ -55,9 +56,37 @@ pub(crate) struct UiPage {
     pub(crate) bench: &'static [Step],
 }
 
+/// Where a page draws: the whole window (a scene, the bench, the page alone in a window) or a
+/// rect of it (the showcase shell's content pane). A page gets its origin from the [`card`]
+/// `card` returns and lays everything out relative to it, so one page serves both.
+///
+/// [`card`]: crate::pages::card
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct Stage {
+    rect: Option<Rect>,
+}
+
+impl Stage {
+    /// The whole window: `card` paints the window glass, the title and the card, as always.
+    pub(crate) const fn window() -> Self {
+        Self { rect: None }
+    }
+
+    /// A rect of the window: `card` paints the card there and no window glass or title.
+    #[allow(dead_code)] // the showcase shell's stage (step 2); the tests use it now
+    pub(crate) const fn at(rect: Rect) -> Self {
+        Self { rect: Some(rect) }
+    }
+
+    /// The rect, when the page is not alone in the window.
+    pub(crate) const fn rect(&self) -> Option<Rect> {
+        self.rect
+    }
+}
+
 /// What a Ui page draws each frame. The runner calls `draw` under `ui.scope(page.id)`.
 pub(crate) trait PageState {
-    fn draw(&mut self, ui: &mut Ui<'_>);
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage);
 
     /// The string table the page's window runs with (a test locale); the default is empty, so
     /// every lookup falls back to the toolkit's English.
@@ -240,6 +269,7 @@ pub(crate) struct Player {
     /// The modifiers `Ev::Mods` holds.
     held: Modifiers,
     shortcuts: Shortcuts,
+    stage: Stage,
 }
 
 impl std::fmt::Debug for Player {
@@ -272,7 +302,14 @@ impl Player {
             tier,
             held: Modifiers::default(),
             shortcuts: Shortcuts::default(),
+            stage: Stage::window(),
         }
+    }
+
+    #[allow(dead_code)] // the showcase shell (step 2); the tests use it now
+    /// Draws the page on `stage` from now on (the default is the whole window).
+    pub(crate) fn set_stage(&mut self, stage: Stage) {
+        self.stage = stage;
     }
 
     /// A player for the gallery's window size.
@@ -427,7 +464,8 @@ impl Player {
         let mut ui = Ui::begin(&mut self.store, &raw, config, text);
         let page = self.page;
         let state = &mut self.state;
-        ui.scope(page, |ui| state.draw(ui));
+        let stage = self.stage;
+        ui.scope(page, |ui| state.draw(ui, &stage));
         Ok(ui.finish())
     }
 }
@@ -462,7 +500,7 @@ mod tests {
     use crate::pages::PAGES;
     use lune_ui::access::{Actions, Node, Role, States};
     use lune_ui::motion::{Kind, Motion};
-    use lune_ui::paint::Rect;
+    use lune_ui::scene::LayerId;
     use lune_ui::testing::FakeText;
     use lune_ui::ui::Sense;
     use std::cell::Cell;
@@ -566,7 +604,7 @@ mod tests {
     const B: Rect = Rect::new(200.0, 10.0, 100.0, 40.0);
 
     impl PageState for Probe {
-        fn draw(&mut self, ui: &mut Ui<'_>) {
+        fn draw(&mut self, ui: &mut Ui<'_>, _stage: &Stage) {
             let a = ui.id("a");
             let b = ui.id("b");
             let ra = ui.interact(a, A, Sense::CLICK_FOCUS);
@@ -661,6 +699,108 @@ mod tests {
         assert_eq!(clicks.get(), 2);
         assert_eq!(path_id("p", &["a"]), WidgetId::ROOT.with("p").with("a"));
     }
+    /// Pages not yet laid out relative to their card (step 1 ports them; the list empties as it
+    /// does): the stage test skips them and fails if one on the list has become clean.
+    const NOT_ON_STAGE: &[&str] = &[
+        "locale",
+        "scroll-area",
+        "scrollbar",
+        "virtual-list",
+        "drag-and-drop",
+        "row",
+        "list-row",
+        "form-field",
+        "nav-item",
+        "radio-group",
+        "star-rating",
+        "slider",
+        "filter-bar",
+        "search-picker",
+        "sidebar",
+        "side-panel",
+        "icon-rail",
+        "split-panes",
+        "settings-page",
+        "lane-graph",
+        "code-block",
+        "code-editor-view",
+        "markdown-preview",
+        "diff-view",
+        "window",
+    ];
+
+    /// Where the page's content lies on a stage: its semantic nodes' bounds and the shapes and
+    /// text it draws on the page layer (overlay layers are left out) when `drawn_on`. Names what lies
+    /// left of `stage`'s x or above its y.
+    fn off_stage(page: &Page, drawn_on: Stage, stage: Rect) -> Vec<String> {
+        let PageKind::Ui(ui_page) = page.kind else {
+            return Vec::new();
+        };
+        let mut player = Player::new(
+            page.id,
+            (ui_page.state)(),
+            (W as f32, H as f32),
+            1.0,
+            MotionTier::Full,
+        );
+        player.set_stage(drawn_on);
+        let mut out = BTreeSet::new();
+        for ms in [0, 16, 300] {
+            let (scene, frame) = player.frame(&mut FakeText, ms, &[]).expect("frame");
+            let outside = |x: f32, y: f32| x < stage.x - 0.5 || y < stage.y - 0.5;
+            for n in &frame.tree.nodes {
+                if outside(n.bounds.x, n.bounds.y) {
+                    out.insert(format!("{} node {:?}", n.name, n.bounds));
+                }
+            }
+            let layer = &scene.layers[LayerId::Page as usize];
+            for t in &layer.texts {
+                if outside(t.x, t.y) {
+                    out.insert(format!("text at ({}, {})", t.x, t.y));
+                }
+            }
+            for s in layer.geometry.under.iter().chain(&layer.geometry.over) {
+                if s.rect[2] > 0.0 && s.rect[3] > 0.0 && outside(s.rect[0], s.rect[1]) {
+                    out.insert(format!("shape {:?}", s.rect));
+                }
+            }
+        }
+        out.into_iter().collect()
+    }
+
+    /// Every Ui page's live state draws inside a content rect: nothing it makes lies left of or
+    /// above it. Names each offender.
+    #[test]
+    fn every_ui_page_draws_inside_its_stage() {
+        let stage = Rect::new(300.0, 80.0, 1020.0, 592.0);
+        let mut bad = Vec::new();
+        for page in PAGES {
+            let off = off_stage(page, Stage::at(stage), stage);
+            let pending = NOT_ON_STAGE.contains(&page.id);
+            match (off.is_empty(), pending) {
+                (false, false) => bad.push(format!(
+                    "{}: {} off the stage, e.g. {}",
+                    page.id,
+                    off.len(),
+                    off.iter().take(2).cloned().collect::<Vec<_>>().join("; ")
+                )),
+                (true, true) => bad.push(format!("{}: clean, drop it from NOT_ON_STAGE", page.id)),
+                _ => {}
+            }
+        }
+        assert!(bad.is_empty(), "{}", bad.join("\n"));
+    }
+
+    /// The instrument finds what it should: the button page drawn on the whole window lies left
+    /// of and above the stage rect, drawn on the stage it does not.
+    #[test]
+    fn the_stage_check_sees_an_offender() {
+        let stage = Rect::new(300.0, 80.0, 1020.0, 592.0);
+        let button = PAGES.iter().find(|p| p.id == "button").expect("a page");
+        assert!(!off_stage(button, Stage::window(), stage).is_empty());
+        assert!(off_stage(button, Stage::at(stage), stage).is_empty());
+    }
+
     /// The `*-disabled` scenes of the D47 pass (M11 review round 1): each draws a scope in
     /// `with_enabled(false, ..)`, so a node is `Disabled`, and its pointer, click, Tab or key
     /// script leaves no widget focused.

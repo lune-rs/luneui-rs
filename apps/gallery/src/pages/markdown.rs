@@ -16,6 +16,7 @@ use lune_ui::widgets::markdown::{
 use lune_ui::widgets::text_lines::HighlightSpan;
 
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -388,8 +389,8 @@ fn readonly_tasks() -> Box<dyn PageState> {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Markdown preview");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Markdown preview");
         heading(ui, "MARKDOWN PREVIEW", card.x + 24.0, card.y + 24.0);
         if let Some(url) = &self.opened {
             let t = *ui.theme();

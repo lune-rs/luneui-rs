@@ -31,7 +31,7 @@ use lune_ui::tray::TrayState;
 use lune_ui::ui::{FrameConfig, Ui, UiStore};
 use lune_ui::window::glass_attributes;
 
-use crate::page::{Page, PageKind, PageState, register_images, release_images};
+use crate::page::{Page, PageKind, PageState, Stage, register_images, release_images};
 use crate::pages::PAGES;
 use crate::popover::{AppEvent, TrayHost, event_loop, route_tray_events};
 use crate::scenes::{H, W};
@@ -316,7 +316,7 @@ impl App {
                     shortcuts: &self.shortcuts,
                 };
                 let mut ui = Ui::begin(&mut self.store, &input, config, &mut r.text);
-                ui.scope(page.id, |ui| state.draw(ui));
+                ui.scope(page.id, |ui| state.draw(ui, &Stage::window()));
                 let (display, out) = ui.finish();
                 if output.apply(window, &out) {
                     event_loop.exit();

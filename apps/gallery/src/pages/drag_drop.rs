@@ -19,6 +19,7 @@ use lune_ui::text::{Spec, Style};
 use lune_ui::ui::{Sense, Ui};
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -77,8 +78,8 @@ fn overflow() -> Box<dyn PageState> {
 }
 
 impl PageState for Tabs {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Drag and drop");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Drag and drop");
         heading(ui, "TABS", card.x + 24.0, card.y + 24.0);
         let theme = *ui.theme();
         let widths: Vec<f64> = self.keys.iter().map(|k| self.widths[*k as usize]).collect();
@@ -224,8 +225,8 @@ fn card_rect(column: usize, index: usize) -> Rect {
 }
 
 impl PageState for Board {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Drag and drop");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Drag and drop");
         heading(ui, "BOARD", card.x + 24.0, card.y + 24.0);
         let theme = *ui.theme();
 

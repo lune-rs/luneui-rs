@@ -16,6 +16,7 @@ use lune_ui::widgets::stepper::StepRange;
 
 use super::controls_ui::OPTIONS;
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -96,8 +97,8 @@ impl Live {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Settings page");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Settings page");
         heading(ui, "SETTINGS PAGE", card.x + 24.0, card.y + 24.0);
         if self.restart_at.is_some_and(|t| ui.time() >= t) {
             self.restart = true;
