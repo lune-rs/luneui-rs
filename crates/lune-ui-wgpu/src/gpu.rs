@@ -1,6 +1,9 @@
 //! The shared GPU: device, queue, the noise texture and, per colour target format, the shape and
 //! stroke pipelines, the blur pipelines and one glyph atlas.
 
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use bytemuck::{Pod, Zeroable};
 use glyphon::{Cache, SwashCache, TextAtlas};
 use wgpu::util::DeviceExt;
@@ -120,6 +123,8 @@ pub struct Gpu {
     pub(crate) swash: SwashCache,
     /// Created on first use, looked up linearly (a handful of formats at most).
     pub(crate) formats: Vec<FormatState>,
+    /// Set by the device's lost callback; read by [`Gpu::is_lost`].
+    lost: Arc<AtomicBool>,
 }
 
 impl std::fmt::Debug for Gpu {
@@ -231,6 +236,11 @@ impl Gpu {
             })
             .await
             .map_err(|e| e.to_string())?;
+        let lost = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&lost);
+        device.set_device_lost_callback(move |_reason, _message| {
+            flag.store(true, Ordering::Release);
+        });
 
         let (noise_view, noise_sampler) = noise_texture(&device, &queue)?;
         let globals_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -304,7 +314,25 @@ impl Gpu {
             glyph_cache,
             swash: SwashCache::new(),
             formats: Vec::new(),
+            lost,
         })
+    }
+
+    /// Whether the device is lost: the driver reset or dropped it, the adapter went away, or
+    /// `device.destroy()` was called. wgpu reports a loss from the device's poll (every frame's
+    /// submission makes one, and a destroy is reported once the queue has drained), so a check
+    /// right after the event may still read `false`; ask once a frame, before drawing. A lost
+    /// device draws nothing, and wgpu panics inside a draw that creates a buffer on one (seen with
+    /// [`FrameRenderer::draw`](crate::frame::FrameRenderer::draw)): check this first and skip the
+    /// draw.
+    ///
+    /// The toolkit does not recover. The app owns everything built on the device, so on `true` it
+    /// drops and rebuilds all of it: this `Gpu`, the [`TextCache`], every
+    /// [`FrameRenderer`](crate::frame::FrameRenderer), every
+    /// [`WindowSurface`](crate::surface::WindowSurface) and every registered image (register them
+    /// again with the new `Gpu`).
+    pub fn is_lost(&self) -> bool {
+        self.lost.load(Ordering::Acquire)
     }
 
     /// The index of `format`'s shared state in `formats`, created on first use.

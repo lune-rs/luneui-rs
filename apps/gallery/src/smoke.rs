@@ -2,10 +2,12 @@
 //! session. About two seconds long, it puts an item in the tray, reads its rect, opens the menu
 //! surface through the same path a click takes (a synthetic [`TrayEvent`] in place of a real click),
 //! draws at least ten frames of it, closes it, opens and closes it again, and tears everything down.
-//! The accessibility bridge is built on a hidden window. It uses no clipboard.
+//! The accessibility bridge is built on a hidden window. Before the surface opens, the hidden
+//! window's own surface is resized and acquired from (the `render.surface` stage: no test reaches a
+//! real `WindowSurface`). It uses no clipboard.
 //!
-//! It prints each fact it measured. Exit 0 only if the frames drew, the frontmost app stayed the
-//! same and teardown finished; exit 1 if any of those failed; exit 2 (with a line saying why) if
+//! It prints each fact it measured. Exit 0 only if the surface stage ran, the frames drew, the
+//! frontmost app stayed the same and teardown finished; exit 1 if any of those failed; exit 2 (with a line saying why) if
 //! there is no GUI session to run in.
 //!
 //! App code: it reads the clock and runs the event loop.
@@ -19,6 +21,7 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoopProxy};
 use winit::window::WindowId;
 
 use lune_ui::popover::frontmost_app;
+use lune_ui::surface::Acquired;
 use lune_ui::tray::{TrayButton, TrayError, TrayEvent, TrayState};
 
 use crate::popover::{AppEvent, TrayHost, event_loop, route_tray_events};
@@ -39,6 +42,8 @@ const HIDE_WITHIN: Duration = Duration::from_secs(2);
 enum Step {
     /// Wait for the OS to place the item.
     Place,
+    /// Resize the hidden window's surface and acquire from it.
+    Resize,
     /// Open the surface and let it draw.
     Open1,
     /// Close it and wait for the window to hide.
@@ -58,6 +63,8 @@ struct Facts {
     front_after: Vec<Option<String>>,
     is_key: Option<bool>,
     placed: bool,
+    /// What the surface stage found: the size it set and what `acquire` answered.
+    resized: Option<String>,
     teardown: bool,
     failure: Option<String>,
 }
@@ -133,8 +140,13 @@ impl Smoke {
             f.front_before, f.front_after
         );
         println!("smoke: popover was key while open: {:?}", f.is_key);
+        println!("smoke: surface stage: {:?}", f.resized);
         println!("smoke: teardown finished: {}", f.teardown);
-        let ok = f.failure.is_none() && f.frames_first_open >= FRAMES && front_ok && f.teardown;
+        let ok = f.failure.is_none()
+            && f.resized.is_some()
+            && f.frames_first_open >= FRAMES
+            && front_ok
+            && f.teardown;
         if let Some(why) = &f.failure {
             println!("smoke: FAILED: {why}");
         }
@@ -166,6 +178,42 @@ impl Smoke {
         if let Err(e) = host.click(event_loop, &mut shown.r, click, TrayState::Serving, now) {
             self.fail(format!("click: {e}"));
         }
+    }
+
+    /// The surface stage: resize the hidden window's surface to a size that is not its own, check
+    /// the size it reports, acquire from it (a frame, a skip or a redraw are all answers; an error
+    /// or a panic is not), then put the size back and check that too. Prints which answer came.
+    fn resize_stage(&mut self) {
+        let Some(shown) = &mut self.shown else {
+            self.fail("the surface stage has no window".into());
+            return;
+        };
+        let (gpu, surface) = (&shown.r.gpu, &mut shown.surface);
+        let old = surface.size();
+        let new = (old.0 + 64, old.1 + 32);
+        surface.resize(gpu, new.0, new.1);
+        if surface.size() != new {
+            let got = surface.size();
+            self.fail(format!("resize to {new:?} left the size at {got:?}"));
+            return;
+        }
+        let answer = match surface.acquire(gpu) {
+            Ok(Acquired::Frame(_)) => "frame",
+            Ok(Acquired::Skip) => "skip",
+            Ok(Acquired::Redraw) => "redraw",
+            Err(e) => {
+                self.fail(format!("acquire after a resize: {e}"));
+                return;
+            }
+        };
+        surface.resize(gpu, old.0, old.1);
+        if surface.size() != old {
+            let got = surface.size();
+            self.fail(format!("resize back to {old:?} left the size at {got:?}"));
+            return;
+        }
+        println!("smoke: surface resized {old:?} -> {new:?} and back, acquire answered {answer}");
+        self.facts.resized = Some(format!("{old:?} -> {new:?}: {answer}"));
     }
 
     fn popover_frames(&self) -> u64 {
@@ -203,13 +251,17 @@ impl Smoke {
                         h.sync(event_loop, TrayState::Serving);
                     }
                     self.facts.placed = true;
-                    self.click(event_loop);
-                    self.frames_at = self.popover_frames();
-                    self.go(Step::Open1);
+                    self.go(Step::Resize);
                 } else if waited > PLACE_WITHIN {
                     self.fail("the tray item was not placed by the OS".into());
                     self.go(Step::Teardown);
                 }
+            }
+            Step::Resize => {
+                self.resize_stage();
+                self.click(event_loop);
+                self.frames_at = self.popover_frames();
+                self.go(Step::Open1);
             }
             Step::Open1 => {
                 let drawn = self.popover_frames() - self.frames_at;
