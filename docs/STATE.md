@@ -1,14 +1,14 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-07 (M11 built on `orch/toolkit-v1`; the final gate, review and merge are the orchestrator's)
+Last updated: 2026-11-07 (program toolkit-v1 closed: M11 merged at 10f503e)
 
 ## Now
 
-Program toolkit-v1 is built end to end: M11 is the last milestone. The toolkit is five crates (`lune-ui-core`, the adapters
+Program toolkit-v1 is closed: M11, the last milestone, merged at 10f503e. The toolkit is five crates (`lune-ui-core`, the adapters
 `lune-ui-wgpu`, `lune-ui-winit`, `lune-ui-platform`, and the facade `lune-ui`), workspace version 0.2.0 (D238). `apps/gallery` has 74 pages and
 431 scene names in `--list`. The catalogue holds 97 entries: 91 `done`, 2 `in-progress`, 4 `external`. Milestone merges to main: M4 d9fe71f,
-M5 1aeaf1b, M6 a75a708, M7 662d310, M8 2474248, M9 8f499d0, M10 55cfaaf (M1 to M3: the extraction, the seams and the catalogue).
+M5 1aeaf1b, M6 a75a708, M7 662d310, M8 2474248, M9 8f499d0, M10 55cfaaf, M11 10f503e (M1 to M3: the extraction, the seams and the catalogue).
 `docs/architecture.md` has the module map, the pages and "API changes since M1"; `docs/consuming.md` how an app vendors the toolkit.
 
 M11 (DECISIONS D234 to D245) did, in order: the catalogue's still-needs tests; `Gpu::is_lost` and a surface stage in the platform smoke; the caption
@@ -23,11 +23,10 @@ on real machines (`owner: Luneterm M9 to M11 runs`); the second needs a pixel ga
 
 ## Readings (M11; each run once; nothing acts on them)
 
-- Final gate: recorded by the orchestrator at the merge (sha, test count). Not stated here.
-- Pixel gate: `scripts/pixel-gate.sh --base 55cfaaf` at 1ad60fd (before the audit, which changed no drawing): 413 files identical, 0 differ, max delta 0;
-  the 8 new scenes (`ui-controls@1.5x` and seven `window-*`), nothing allowed. Review round 1 then added 10 scenes
-  (a disabled or focus state each for `toolbar`, `search-picker`, `banner`, `tree-view`, `settings-page`, `kanban-board`, `command-palette`,
-  `code-editor-view`; 431 names), drawing nothing else: the gate has not been re-run since.
+- Final gate at ace3648, the merged tip: fmt, clippy, boundaries, index, `cargo doc -D warnings`: clean. `cargo test --workspace`: 2,620 passed, 0 failed, 111 binaries.
+  `LUNEUI_REQUIRE_GPU=1 cargo test -p lune-ui-wgpu`: 73 passed. `scripts/check-targets.sh`: Windows passed, Linux skipped (Docker not running). Export and an offline consumer: passed.
+- Pixel gate: `scripts/pixel-gate.sh --base 55cfaaf` at ace3648: 413 files identical, 0 differ, max delta 0; 18 new scenes (`ui-controls@1.5x`, seven `window-*`, and ten
+  disabled or focus states from review), nothing allowed. Viewed by eye once, no director: the ten review scenes, and `ui-controls@1.5x` (1560 x 990), `window-caption-hover-close`, `window-edges`, `window-inactive-wane`. The other four `window-*` scenes were not viewed.
 - Release size: `cargo build --release -p gallery` at a9d1292, `wc -c target/release/gallery` (macOS, strip, fat LTO): 9,869,520 bytes, against 9,869,408 at
   the M10 tip (+112) and 9,448,688 at the M9 merge. Also in `docs/consuming.md`.
 - Bench (`cargo run --release -p gallery -- --bench`, per D85) at d14069f, one reading, 2080 x 1320, 5 runs, M1 Pro, no GUI session: 0 of 74 pages over budget at load
@@ -42,6 +41,7 @@ on real machines (`owner: Luneterm M9 to M11 runs`); the second needs a pixel ga
 Each is a recorded deviation or a choice with a DECISIONS row or an entry, and an API change no consumer has asked for (D237, D245). Paid in M11 and gone from this list:
 the disabled-key readers and the chord takers, F11, the audit's 33 unreached colour fields.
 
+- A `with_enabled(false, ..)` scope does not dim an overlay opened inside it (`command-palette-disabled` shows it).
 - Layers and clips: overlays above a modal go one level deep, those stacked further share `Raised` and a third level that overlaps its parent interleaves (D137; two edges of it:
   a child held on `Raised` after its parent closed sits above a dialog opened in that window, and a child in a nested dialog's body registers before that dialog's footer buttons).
   One blur per frame (D138). Text cannot be cut by a rounded clip (the bounding rect; the page and panel inset their text by the radius, `panel::TEXT_INSET` is the caller's, D148).
