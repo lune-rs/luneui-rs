@@ -2,10 +2,10 @@
 id: platform.clipboard
 title: Clipboard
 area: platform
-status: in-progress
+status: done
 consumers: any
-source: crates/lune-ui-core/src/input.rs
-owner: orch/toolkit-v1
+source: crates/lune-ui-core/src/input.rs, crates/lune-ui-winit/src/clipboard.rs
+owner: —
 summary: Text clipboard through FrameOutput requests and input events; types in M4, fake in M5, platform adapter in M10
 ---
 
@@ -90,12 +90,14 @@ None: no text of its own.
 - Adapter (M10, done, `crates/lune-ui-winit/tests/clipboard.rs`, on a fake backend; the gate never touches the OS clipboard): `write_then_read_returns_the_text_with_multi_byte_characters_intact`, `two_writes_in_a_frame_keep_the_last`, `a_read_reply_lands_in_the_next_take_exactly_once`, `a_failed_read_gives_the_event`, `a_read_over_the_cap_is_refused_whole`, `a_write_over_the_cap_never_reaches_the_backend`, `ten_million_bytes_pass_whole`, `the_empty_string_round_trips`; and one `#[ignore]`d `real_round_trip` on macOS, run by hand (it skips unless the clipboard holds plain text only, writes, reads, compares and restores). Originally: a write then a read returns the same text; reading with no text on the clipboard returns the failure event; a 10,000,000-byte write is either forwarded whole or refused, never truncated silently [derived: the cap is open]. Windows and Linux are compile-checked only [D15].
 - A widget that shapes its whole text (the text field and the text area) refuses a paste, an input method's commit or an assistive set-value over 1 MiB whole, whatever the adapter's cap (D232, D233): `an_editor_that_shapes_its_text_refuses_an_insert_over_the_cap_whole` (the engine, paste, typed and input-method forms, one line and many), and per widget `an_insert_over_the_cap_is_refused_whole_by_set_value_and_by_paste` in `widget_text_field.rs` and `widget_text_area.rs` (the cap goes in, one byte more is refused). The code editor sets no limit and takes more (`the_code_editor_sets_no_insert_limit_so_it_takes_more_than_the_shaped_limit`): it draws only the lines in view, and the adapter's 32 MiB is its bound.
 - No panics on any text, including embedded NUL and lone surrogate-like sequences (the type is `String`, so only valid UTF-8 reaches it).
+- Tests, bullet by bullet (`crates/lune-ui-core/tests/` unless named). Copy, cut and paste through the frame output: `widget_text_field.rs::copy_cut_and_paste_go_through_the_frame_output` (a copy puts one `Write` with the selected text; a cut also edits; a paste asks with a `Read` in one frame and the `ClipboardText` answer in the next inserts), `a_clipboard_answer_applies_only_while_a_paste_is_pending` (an unasked answer, a second answer and a late one insert nothing; `ClipboardUnavailable` ends the wait), `a_password_copies_nothing_and_its_selection_fills_the_mask`; two writes in one frame keep the last: `ui_core.rs::clipboard_keeps_the_last_write_and_one_read`; the code views write the selection or the whole text (`widget_code_block.rs`, `widget_code_editor.rs`). Multi-byte text through the adapter: `crates/lune-ui-winit/tests/clipboard.rs::write_then_read_returns_the_text_with_multi_byte_characters_intact`. The cap on a widget that shapes its text: `text_edit.rs::an_editor_that_shapes_its_text_refuses_an_insert_over_the_cap_whole`, `widget_text_field.rs` and `widget_text_area.rs` `an_insert_over_the_cap_is_refused_whole_by_set_value_and_by_paste`, `widget_code_editor.rs::the_code_editor_sets_no_insert_limit_so_it_takes_more_than_the_shaped_limit`.
 - Pixel probes, conformance and semantic node: n/a.
 
 ### Build
 
 - Milestone: M4 (`ClipboardRequest` and the reply `Event` variants, with `core.ui`'s `FrameOutput.clipboard` and `core.input`'s reserved variant); M5 (the fake adapter and `ScriptedInput` clipboard event, with `text.text-edit`, whose acceptance tests need them); M10 (the platform adapter, per the roadmap's M10 row). Until M10 the code views of M9 (copy buttons) run on the fake.
 - Depends on: core.ui, core.input, platform.input
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_text_field.rs::copy_cut_and_paste_go_through_the_frame_output, crates/lune-ui-core/tests/widget_text_field.rs::a_clipboard_answer_applies_only_while_a_paste_is_pending, crates/lune-ui-core/tests/widget_text_field.rs::a_password_copies_nothing_and_its_selection_fills_the_mask, crates/lune-ui-core/tests/ui_core.rs::clipboard_keeps_the_last_write_and_one_read, crates/lune-ui-winit/tests/clipboard.rs::write_then_read_returns_the_text_with_multi_byte_characters_intact, crates/lune-ui-winit/tests/clipboard.rs::a_read_over_the_cap_is_refused_whole, crates/lune-ui-winit/tests/clipboard.rs::a_write_over_the_cap_never_reaches_the_backend, crates/lune-ui-core/tests/text_edit.rs::an_editor_that_shapes_its_text_refuses_an_insert_over_the_cap_whole`; page n/a (no pixels; the write path shows on the scenes `code-block-copied` and `text-edit-selection`); unverified here: the real OS clipboard on macOS (`real_round_trip`, run by hand at M10, not re-run), Windows and Linux run time (D15).
 
 ## Open questions
 
@@ -104,7 +106,7 @@ None open. Answered in M10 step 5 (D213):
 - The adapter uses `arboard` 3.7 (`default-features = false`) in `lune-ui-winit`, one `Clipboard` per app, behind a backend trait so tests use a fake. Direct OS calls were rejected (X11 selections need a thread and a protocol).
 - The cap is `MAX_PASTE_BYTES` = 33,554,432 bytes (32 MiB, three times the 11 MB document the code view measured). A longer read is `ClipboardUnavailable`, a longer write is dropped, nothing is truncated; text at the cap passes whole.
 - A failed write is silent, as Lunegit's is; the app may add a toast.
-- Linux and Windows runtime behaviour is unverified here (D15); both are compile-checked.
+- Linux and Windows runtime behaviour is unverified here (D15); both are compile-checked. The one real macOS round trip, `real_round_trip` (`#[ignore]`), was run by hand at M10 and was not re-run in the M11 audit, because it writes the user's clipboard.
 
 ## Notes for the planner
 

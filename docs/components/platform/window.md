@@ -2,10 +2,10 @@
 id: platform.window
 title: Glass window helpers
 area: platform
-status: in-progress
+status: done
 consumers: luneterm, wane
-source: crates/lune-ui-core/src/window.rs, crates/lune-ui-winit/src/window.rs
-owner: orch/toolkit-v1
+source: crates/lune-ui-core/src/window.rs, crates/lune-ui-core/src/widgets/caption.rs, crates/lune-ui-winit/src/window.rs
+owner: —
 summary: Glass window attributes, edge resize, double-click detection and caption buttons
 ---
 
@@ -113,22 +113,23 @@ The Wane mock eases with `--ease-out`; the animation rules give Linear for hover
 - Existing tests stay green: `corners`, `edges`, `border_is_six_pixels`, `interior_is_none`, `double_click_gap_is_strictly_under_400ms` (`crates/lune-ui-core/tests/window.rs`); the direction mapping test in `crates/lune-ui-winit/tests/input.rs`.
 - Edge known answers (window 400 x 300): (5.9, 100) is west and (6.0, 100) none; (0, 0) north-west; (399, 299) south-east [R crates/lune-ui-core/tests/window.rs:11-37].
 - Caption: a scripted pointer over the close button hovers it and fills `caption_close_hover`; a click returns the close hit; `maximized` draws the restore glyph; at scale 2 each button is 92 device px wide.
-- Behaviour: a press on an edge reports the resize edge; a double click within 399 ms toggles maximize and 400 ms does not.
+- Behaviour: a press on an edge reports the resize edge; a double click within 399 ms toggles maximize and 400 ms does not (`crates/lune-ui-core/tests/window.rs::edges`, `double_click_gap_is_strictly_under_400ms`, and for the `Ui` form `ui_core.rs::double_click_is_strictly_under_400_ms`; `crates/lune-ui-winit/tests/input.rs::resize_edges_map_to_the_same_named_direction`). The toolkit reports the edge and the double click; the app turns them into a `WindowCommand`.
 - Conformance: the hover fill passes `motion::conformance`; Reduced keeps it, Off snaps [motion].
 - Semantic node: the three buttons exist with the names above and `default` runs the command.
-- Real OS behaviour (transparent windows, round corners, snap layouts, traffic lights) is unverified here: no VM or GUI run (D15); Luneterm's M9 and M10 runs cover it. The scenes and the semantic node are built (M11 step 3); the "done standard" (D18) now waits on the audit.
+- Real OS behaviour (transparent windows, round corners, snap layouts, traffic lights) is unverified here: no VM or GUI run (D15); Luneterm's M9 and M10 runs cover it. The scenes and the semantic node are built (M11 step 3) and the M11 audit passed them (the `Done` line below).
 
 ### Build
 
 - Milestone: M11 (done standard; code exists)
 - Depends on: core.painter, core.input, core.theme, platform.input, infra.accessibility, motion.transitions
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_caption.rs::at_rest_and_active_the_scene_is_the_painter_forms, crates/lune-ui-core/tests/widget_caption.rs::a_pointer_over_close_fills_caption_close_hover, crates/lune-ui-core/tests/widget_caption.rs::a_click_returns_the_button_once, crates/lune-ui-core/tests/widget_caption.rs::maximized_draws_the_restore_glyph, crates/lune-ui-core/tests/widget_caption.rs::each_button_is_92_device_px_wide_at_scale_2, crates/lune-ui-core/tests/widget_caption.rs::the_hover_fill_passes_motion_conformance_in_every_tier, crates/lune-ui-core/tests/widget_caption.rs::the_nodes_are_buttons_with_their_names_and_the_default_action_clicks, crates/lune-ui-core/tests/widget_caption.rs::a_disabled_scope_leaves_no_violation_and_no_click, crates/lune-ui-core/tests/window.rs::edges, crates/lune-ui-core/tests/window.rs::double_click_gap_is_strictly_under_400ms, crates/lune-ui-winit/tests/input.rs::resize_edges_map_to_the_same_named_direction`; page `window` (seven scenes); unverified here: real OS windows (transparent windows, round corners, snap layouts, traffic lights); Luneterm's M9 and M10 runs cover them (D15).
 
 ## Open questions
 
 - None on the seam: the core half has no winit type; the winit mapping is in `lune-ui-winit` (M2 step 8). `edge_at` returns `ResizeEdge` (was winit's `ResizeDirection`).
-- `DoubleClick::click` takes a `std::time::Instant`, while frames carry an app-supplied `Duration` (`RawInput`'s time): a `Duration` form would make scripted tests need no real clock; M4 decides.
-- Windows 11 snap layouts on the maximize button need non-client hit-testing from the OS window procedure [W docs/ui/components.md:714]; no helper exists; unverified here.
-- Space for the macOS traffic lights in the app's title strip: no source gives the inset.
+- Answered (M4, `core.ui`): the `Ui` detects double clicks from the frame's own time (`Response::double_clicked`, `ui_core.rs::double_click_is_strictly_under_400_ms`), so scripted tests need no real clock. `DoubleClick` with an `Instant` stays for an app that has no `Ui`.
+- Still open, a limit: Windows 11 snap layouts on the maximize button need non-client hit-testing from the OS window procedure [W docs/ui/components.md:714]; no helper exists; unverified here (an OS window-procedure hook, an API no consumer has asked for, D4).
+- Still open: space for the macOS traffic lights in the app's title strip: no source gives the inset, and the toolkit draws none.
 - A loaded theme's `WindowFallbackBackground` sets only `Theme::window_fallback` (M10, D207); Lunegit recomputes the inactive window's fill from the glass tint, and that recomputation is the app's, since the toolkit has no inactive-window policy of its own.
 
 ## Notes for the planner

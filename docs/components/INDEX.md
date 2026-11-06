@@ -12,8 +12,8 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | in-luneterm | 0 |
 | planned | 0 |
 | stub | 0 |
-| in-progress | 72 |
-| done | 21 |
+| in-progress | 68 |
+| done | 25 |
 | external | 4 |
 | **total** | **97** |
 
@@ -49,11 +49,11 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
-| [platform.clipboard](platform/clipboard.md) | Clipboard | in-progress | any | Text clipboard through FrameOutput requests and input events; types in M4, fake in M5, platform adapter in M10 |
-| [platform.input](platform/input.md) | winit input translation and output | in-progress | any | Translator turns winit events into RawInput; OutputState applies FrameOutput to a window |
+| [platform.clipboard](platform/clipboard.md) | Clipboard | done | any | Text clipboard through FrameOutput requests and input events; types in M4, fake in M5, platform adapter in M10 |
+| [platform.input](platform/input.md) | winit input translation and output | done | any | Translator turns winit events into RawInput; OutputState applies FrameOutput to a window |
 | [platform.material](platform/material.md) | OS glass materials | in-progress | luneterm | Backdrop seam in core (Material, Backdrop, NullMaterial); OS glass behind it: macOS NSVisualEffect and Liquid Glass, Windows acrylic and mica, opaque elsewhere |
-| [platform.tray-icon](platform/tray-icon.md) | Tray icon with status dot | in-progress | wane | 16 px monochrome glyph with a status dot (green serving, amber degraded, grey paused), rendered to OS bitmaps at 1x and 2x; opens toolkit glass menus |
-| [platform.window](platform/window.md) | Glass window helpers | in-progress | luneterm, wane | Glass window attributes, edge resize, double-click detection and caption buttons |
+| [platform.tray-icon](platform/tray-icon.md) | Tray icon with status dot | done | wane | 16 px monochrome glyph with a status dot (green serving, amber degraded, grey paused), rendered to OS bitmaps at 1x and 2x; opens toolkit glass menus |
+| [platform.window](platform/window.md) | Glass window helpers | done | luneterm, wane | Glass window attributes, edge resize, double-click detection and caption buttons |
 
 ## widget
 

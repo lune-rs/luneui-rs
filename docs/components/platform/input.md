@@ -2,10 +2,10 @@
 id: platform.input
 title: winit input translation and output
 area: platform
-status: in-progress
+status: done
 consumers: any
-source: crates/lune-ui-winit/src/input.rs
-owner: orch/toolkit-v1
+source: crates/lune-ui-winit/src/input.rs, crates/lune-ui-winit/src/platform.rs
+owner: —
 summary: Translator turns winit events into RawInput; OutputState applies FrameOutput to a window
 ---
 
@@ -21,7 +21,7 @@ summary: Translator turns winit events into RawInput; OutputState applies FrameO
 
 ## Existing code
 
-`crates/lune-ui-winit/src/input.rs:26` (`Translator`), `:171` (`take`), `:235` (`cursor_icon`), `:281` (`OutputState`), `:293` (`apply`); 334 lines. Tests: `crates/lune-ui-winit/tests/input.rs` (translator and `ScriptedInput` agree; every cursor icon maps to the same named winit icon).
+`crates/lune-ui-winit/src/input.rs:31` (`Translator`), `:215` (`take`), `:285` (`cursor_icon`), `:367` (`OutputState`), `:380` (`plan_output`), `:406` (`apply`); 516 lines; the OS-specific parts in `src/platform/{macos,windows,other}.rs`. Tests: `crates/lune-ui-winit/tests/input.rs` (translator and `ScriptedInput` agree; every cursor icon maps to the same named winit icon).
 
 ## Spec
 
@@ -93,19 +93,21 @@ n/a — no drawing.
 ### Acceptance
 
 - Existing tests (`crates/lune-ui-winit/tests/input.rs`): `translator_and_scripted_input_agree`, `state_persists_and_events_drain`, `unmapped_keys_are_unidentified`, `other_mouse_button_keeps_its_number`, `resize_edges_map_to_the_same_named_direction`, `every_cursor_icon_maps_to_the_same_named_winit_icon`.
-- Done in M10 step 4 (`crates/lune-ui-winit/tests/input.rs`, module `files`): file-drop translation (`hover_cancel_and_drop_give_the_three_events_at_the_last_pointer_position`, scale 2; `before_any_pointer_move_the_position_is_the_origin`; `two_files_give_two_events_in_order`; `the_translator_and_the_script_agree_on_file_events`); `Translator::access` queues an `Access` event that appears in the next `take` (`an_access_action_queued_on_the_translator_appears_in_the_next_take`; the AccessKit bridge itself is step 6); the change detection of `OutputState::apply` factored into the pure `OutputState::plan_output` (`plan_output_is_public_pure_and_starts_from_nothing_set`, and the sequences in the unit tests of `src/input.rs`); `keymap()` is `Keymap::MAC` on macOS and `Keymap::PC` elsewhere (`platform/{macos,windows,other}.rs` own tests, D212); a non-UTF-8 path passes through unchanged (`platform/macos.rs` test). Still needed: the AccessKit bridge's tests and the feature matrix (step 6). Originally: file-drop translation tests (a hover, a cancel and a drop give the three core events at the last pointer position) in M10; an `Access` event queued by the bridge appears in the next `take`; the change-detection of `OutputState::apply` (cursor and IME area set only when changed) factored into a pure function so a test runs without a live window [derived: `apply` against a live window is not run by the gates].
+- Done in M10 step 4 (`crates/lune-ui-winit/tests/input.rs`, module `files`): file-drop translation (`hover_cancel_and_drop_give_the_three_events_at_the_last_pointer_position`, scale 2; `before_any_pointer_move_the_position_is_the_origin`; `two_files_give_two_events_in_order`; `the_translator_and_the_script_agree_on_file_events`); `Translator::access` queues an `Access` event that appears in the next `take` (`an_access_action_queued_on_the_translator_appears_in_the_next_take`; the AccessKit bridge itself is step 6); the change detection of `OutputState::apply` factored into the pure `OutputState::plan_output` (`plan_output_is_public_pure_and_starts_from_nothing_set`, and the sequences in the unit tests of `src/input.rs`); `keymap()` is `Keymap::MAC` on macOS and `Keymap::PC` elsewhere (`platform/{macos,windows,other}.rs` own tests, D212); a non-UTF-8 path passes through unchanged (`platform/macos.rs` test). The AccessKit bridge's tests are `crates/lune-ui-winit/tests/access.rs` (step 6, `infra.accessibility`). Originally: file-drop translation tests (a hover, a cancel and a drop give the three core events at the last pointer position) in M10; an `Access` event queued by the bridge appears in the next `take`; the change-detection of `OutputState::apply` (cursor and IME area set only when changed) factored into a pure function so a test runs without a live window [derived: `apply` against a live window is not run by the gates].
 - A feature matrix: the crate builds and its tests pass with and without the accessibility feature (M10). Done in M10 step 6: the gate's `-p lune-ui-winit` line runs it without, `--workspace` with (the gallery turns it on).
-- No clock read in the adapter: the app passes `time` to `take` [R crates/lune-ui-winit/src/input.rs:171].
+- No clock read in the adapter: the app passes `time` to `take` [R crates/lune-ui-winit/src/input.rs:215] (`scripts/check-boundaries.sh`).
+- The planned output, without a window: `crates/lune-ui-winit/src/input.rs`, module `tests`: `the_cursor_is_set_on_the_first_frame_and_on_a_change_only`, `the_ime_is_touched_when_its_area_appears_moves_or_goes`, `planning_changes_nothing`.
 
 ### Build
 
 - Milestone: M10 (file drop, AccessKit bridge, clipboard execution); `take` and `apply` extensions for M4's `FrameOutput` fields land with M4.
 - Depends on: core.input, infra.accessibility, platform.clipboard.
+- Done (D47, M11): tests `crates/lune-ui-winit/tests/input.rs::translator_and_scripted_input_agree, crates/lune-ui-winit/tests/input.rs::state_persists_and_events_drain, crates/lune-ui-winit/tests/input.rs::unmapped_keys_are_unidentified, crates/lune-ui-winit/tests/input.rs::every_cursor_icon_maps_to_the_same_named_winit_icon, crates/lune-ui-winit/tests/input.rs::hover_cancel_and_drop_give_the_three_events_at_the_last_pointer_position, crates/lune-ui-winit/tests/input.rs::an_access_action_queued_on_the_translator_appears_in_the_next_take, crates/lune-ui-winit/tests/input.rs::plan_output_is_public_pure_and_starts_from_nothing_set, crates/lune-ui-winit/src/input.rs::the_ime_is_touched_when_its_area_appears_moves_or_goes`; page n/a (an adapter; the gallery's event loop is its consumer, and the `file-drop` page shows the events); unverified here: real OS events and windows (the platform smoke exercises one on macOS), Windows and Linux run time (D15).
 
 ## Open questions
 
-- Unmapped named keys become `Unidentified`. None of the catalogue specs written so far needs another named key; `text.text-edit` (M5) is the one that could, and it extends `NamedKey` and `map_key` together if it does.
-- `OutputState::apply` against a live window is not run by the gates (a window cannot be built headless); the pure change-detection split above is the proposed way to test it.
+- Still open, a limit: unmapped named keys become `Unidentified`. None of the catalogue specs written so far needs another named key; `text.text-edit` (M5) is the one that could, and it extends `NamedKey` and `map_key` together if it does.
+- Answered: `OutputState::apply` against a live window is not run by the gates (a window cannot be built headless); the pure change-detection split `plan_output` is what the tests above run. The tray popover window runs `apply` for real in the platform smoke.
 - Answered in M10 ([D216]): AccessKit's adapter and `Translator` both get every `WindowEvent`; the app calls `AccessBridge::window_event` first.
 
 ## Notes for the planner
