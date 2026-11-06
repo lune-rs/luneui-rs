@@ -14,7 +14,8 @@ use crate::input::Translator;
 
 /// The longest text the adapter reads from or writes to the OS clipboard, in bytes: 32 MiB, three
 /// times the 11 MB document the code view measured (D213). It bounds the adapter, not the widget: a
-/// one-line editor refuses any insert over 1 MiB itself (`text_edit::MAX_ONE_LINE_INSERT`, D232).
+/// text field and the text area refuse any insert over 1 MiB themselves (`text_edit::MAX_SHAPED_INSERT`, D232, D233);
+/// only the code view, which draws just the lines in view, takes what the adapter lets through.
 pub const MAX_PASTE_BYTES: usize = 33_554_432;
 
 /// What the adapter needs of an OS clipboard. The real one is `arboard`; tests give a fake. Not

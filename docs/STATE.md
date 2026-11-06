@@ -20,7 +20,7 @@ next. What it added:
 - Gallery: pages `theme`, `tray` and `file-drop` (24 new scenes), the live tray (`popover.rs`) and `gallery --smoke-platform` (D225).
 - Step 10: the director accepted the tray icon and the two window surfaces in round 1 (D226, D227).
 - Step 11: `c4::m10`, the theme reach audit (below), the catalogue and architecture notes, and the checks.
-- Review round 2 fixed (D228 to D232): the tray's reopen guard is per surface and the focus watch follows the window (F1, F4); tray placement is in logical pixels (F2); a theme swap drops closing overlays (F3); a password field is `Role::PasswordInput` (S1); a one-line editor refuses an insert over 1 MiB (S2).
+- Review round 2 fixed (D228 to D232): the tray's reopen guard is per surface and the focus watch follows the window (F1, F4); tray placement is in logical pixels (F2); a theme swap drops closing overlays (F3); a password field is `Role::PasswordInput` (S1); a text field and text area refuse an insert over 1 MiB (S2, S3, D232, D233).
 
 Counts at the tip: gallery 73 pages, 413 scene names in `--list`; `cargo test --workspace -- --list` names 2,520 tests.
 Release size (macOS, `cargo build --release -p gallery`, strip, fat LTO): 9,448,688 bytes at the M9 merge (8f499d0), 9,869,408 at this tip, +420,720 (+4.45%);
@@ -174,7 +174,7 @@ frame 19.01 ms (`radio-group`).
   neither); a one-line code block scrolled fully right has its thumb under the copy button by about 4 px (the button is hit first);
   the markdown's inline underline, strike and pill are fills from row boxes, not a seam feature (D188); no italic face ships, so italic is the shaper's skew (D189);
   a page key or Home in the frame right after a far jump in a wrapped view lands off by what that frame measured (80 px in the probe: the shift the content queued lands after the jump); a pane pulled in the frame of its own wheel publishes nothing, so a pixel wheel on the other pane in the very frame one pane opens a document alone rests apart until the next scroll (D184's rule; a split diff opens both panes, so only linked code views can do it).
-- M10 limits (entries and DECISIONS): a one-line editor refuses a paste or set-value over 1 MiB whole (D232; the text area, which shapes its whole text too, is multi-line and not bound, and was not measured); assistive clients get the lines in view of an editor, not the document (D217); `Dismiss` is exposed only on a tooltip and `Dragging` and a mixed toggle
+- M10 limits (entries and DECISIONS): the text field and the text area refuse a paste or set-value over 1 MiB whole (`EditFlags::max_insert`, D232, D233); the code editor sets no limit; assistive clients get the lines in view of an editor, not the document (D217); `Dismiss` is exposed only on a tooltip and `Dragging` and a mixed toggle
   are not sent (D217); a locale file written for a newer toolkit fails on an older one and the app falls back to English (D210); the Windows popover activates, so it takes focus when
   shown, where the entry said non-activating (D224, Q17); a surface is placed from the tray item's rect, so on Windows, where the rect may sit a few px inside the taskbar, "12 px above" may
   read a little more (D219); the macOS rect settles only after 300 ms, so the host waits for it (D225); the tray icon has no automatic inversion while the item is highlighted (D218); there is no

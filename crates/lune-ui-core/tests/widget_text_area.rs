@@ -475,3 +475,52 @@ fn the_ime_area_in_a_scrolled_area_is_on_screen() {
     );
     assert!(area.h > 0.0);
 }
+
+#[test]
+fn an_insert_over_the_cap_is_refused_whole_by_paste_and_by_set_value() {
+    use lune_ui_core::text_edit::MAX_SHAPED_INSERT;
+    // The area builds one spec of all its text, as the field does (the round 3 measures are in
+    // D233), so it takes the same 1 MiB: the cap itself goes in, one byte more is refused whole.
+    for (len, taken) in [(MAX_SHAPED_INSERT, true), (MAX_SHAPED_INSERT + 1, false)] {
+        let value = "a".repeat(len);
+
+        let mut text = String::from("old");
+        let mut h = UiHarness::new(WIN);
+        plain(&mut h, &mut text);
+        h.input.access(AccessAction {
+            target: id(),
+            action: Action::SetValue,
+            value: Some(AccessValue::Text(value.clone())),
+        });
+        let (_, r, _) = plain(&mut h, &mut text);
+        assert_eq!(r.response.changed, taken, "set-value of {len}");
+        assert_eq!(
+            text,
+            if taken {
+                value.clone()
+            } else {
+                "old".to_owned()
+            }
+        );
+
+        let opts = AreaOptions::default();
+        let mut text = String::from("old");
+        let mut h = focused(&mut text, &opts);
+        let logo = Modifiers {
+            logo: true,
+            ..Modifiers::default()
+        };
+        h.input.set_modifiers(logo);
+        h.input.key_down(Key::Character("v".to_owned()), None);
+        h.input.set_modifiers(Modifiers::default());
+        run(&mut h, &mut text, &opts);
+        h.input.clipboard_text(&value);
+        let (_, r, _) = run(&mut h, &mut text, &opts);
+        assert_eq!(r.response.changed, taken, "paste of {len}");
+        assert_eq!(
+            text.len(),
+            if taken { 3 + len } else { 3 },
+            "paste of {len}"
+        );
+    }
+}

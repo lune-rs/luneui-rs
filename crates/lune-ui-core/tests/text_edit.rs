@@ -8,7 +8,7 @@ use lune_ui_core::input::{FocusEvent, ImeEvent, Key, Keymap, Modifiers, NamedKey
 use lune_ui_core::testing::FakeText;
 use lune_ui_core::text::{CaretPos, LineSpan, Spec, Style, TextSystem, Unit};
 use lune_ui_core::text_edit::{
-    COALESCE_PAUSE, EditCommand, EditFlags, EditLayout, EditOutcome, MAX_ONE_LINE_INSERT, Motion,
+    COALESCE_PAUSE, EditCommand, EditFlags, EditLayout, EditOutcome, MAX_SHAPED_INSERT, Motion,
     SpecLayout, TextEdit, UNDO_DEPTH,
 };
 
@@ -796,39 +796,51 @@ fn text_that_cleans_to_nothing_keeps_the_selection() {
     assert_eq!(ed.sel(), (0, 3));
 }
 
+/// The flags of a widget that shapes its whole text.
+fn shaped(multiline: bool) -> EditFlags {
+    EditFlags {
+        multiline,
+        max_insert: Some(MAX_SHAPED_INSERT),
+        ..EditFlags::default()
+    }
+}
+
 #[test]
-fn a_one_line_editor_refuses_an_insert_over_the_cap_whole() {
+fn an_editor_that_shapes_its_text_refuses_an_insert_over_the_cap_whole() {
     // A paste and an assistive set-value both come in as `PasteText`; typing and an input method's
-    // commit as `Insert`. Past 1 MiB a one-line field would shape the lot every frame.
-    let at_cap = "a".repeat(MAX_ONE_LINE_INSERT);
-    let over = "a".repeat(MAX_ONE_LINE_INSERT + 1);
-    for make in [EditCommand::PasteText, EditCommand::Insert] {
-        let mut ed = Ed::new("ab");
-        ed.edit.set_selection(1, 1);
-        ed.sync();
-        let out = ed.cmd(make(over.clone()));
-        assert!(!out.changed, "refused");
-        assert_eq!(
-            (ed.text.as_str(), ed.sel()),
-            ("ab", (1, 1)),
-            "nothing cut, nothing moved"
-        );
+    // commit as `Insert`. Past 1 MiB a widget that shapes all its text would shape the lot every
+    // frame, one line or many.
+    let at_cap = "a".repeat(MAX_SHAPED_INSERT);
+    let over = "a".repeat(MAX_SHAPED_INSERT + 1);
+    for multiline in [false, true] {
+        for make in [EditCommand::PasteText, EditCommand::Insert] {
+            let mut ed = Ed::with_flags("ab", shaped(multiline));
+            ed.edit.set_selection(1, 1);
+            ed.sync();
+            let out = ed.cmd(make(over.clone()));
+            assert!(!out.changed, "refused");
+            assert_eq!(
+                (ed.text.as_str(), ed.sel()),
+                ("ab", (1, 1)),
+                "nothing cut, nothing moved"
+            );
 
-        // The same on a selection: it is not replaced.
-        ed.edit.set_selection(0, 2);
-        ed.sync();
-        assert!(!ed.cmd(make(over.clone())).changed);
-        assert_eq!((ed.text.as_str(), ed.sel()), ("ab", (0, 2)));
+            // The same on a selection: it is not replaced.
+            ed.edit.set_selection(0, 2);
+            ed.sync();
+            assert!(!ed.cmd(make(over.clone())).changed);
+            assert_eq!((ed.text.as_str(), ed.sel()), ("ab", (0, 2)));
 
-        // One byte less is a normal insert.
-        let mut ed = Ed::new("");
-        assert!(ed.cmd(make(at_cap.clone())).changed);
-        assert_eq!(ed.text.len(), MAX_ONE_LINE_INSERT);
+            // The cap itself is a normal insert.
+            let mut ed = Ed::with_flags("", shaped(multiline));
+            assert!(ed.cmd(make(at_cap.clone())).changed);
+            assert_eq!(ed.text.len(), MAX_SHAPED_INSERT);
+        }
     }
     // Bytes, not chars: a 3-byte char 349,526 times is over the cap in bytes.
-    let wide = "\u{20AC}".repeat(MAX_ONE_LINE_INSERT / 3 + 1);
-    assert!(wide.len() > MAX_ONE_LINE_INSERT);
-    let mut ed = Ed::new("");
+    let wide = "\u{20AC}".repeat(MAX_SHAPED_INSERT / 3 + 1);
+    assert!(wide.len() > MAX_SHAPED_INSERT);
+    let mut ed = Ed::with_flags("", shaped(false));
     assert!(!ed.cmd(EditCommand::PasteText(wide)).changed);
     assert_eq!(ed.text, "");
     // A password field is one line too.
@@ -836,7 +848,7 @@ fn a_one_line_editor_refuses_an_insert_over_the_cap_whole() {
         "",
         EditFlags {
             password: true,
-            ..EditFlags::default()
+            ..shaped(false)
         },
     );
     assert!(!ed.cmd(EditCommand::PasteText(over.clone())).changed);
@@ -844,9 +856,10 @@ fn a_one_line_editor_refuses_an_insert_over_the_cap_whole() {
 }
 
 #[test]
-fn a_multi_line_editor_is_not_bound_by_the_one_line_cap() {
-    let big = "line\n".repeat(MAX_ONE_LINE_INSERT / 5 * 2);
-    assert!(big.len() > MAX_ONE_LINE_INSERT);
+fn an_editor_with_no_insert_limit_takes_more_than_the_cap() {
+    // The code view draws only the lines in view and sets no limit; multi-line alone is not one.
+    let big = "line\n".repeat(MAX_SHAPED_INSERT / 5 * 2);
+    assert!(big.len() > MAX_SHAPED_INSERT);
     let mut ed = Ed::with_flags(
         "",
         EditFlags {
@@ -859,12 +872,12 @@ fn a_multi_line_editor_is_not_bound_by_the_one_line_cap() {
 }
 
 #[test]
-fn max_chars_still_applies_to_a_one_line_insert_under_the_cap() {
+fn max_chars_still_applies_to_an_insert_under_the_cap() {
     let mut ed = Ed::with_flags(
         "",
         EditFlags {
             max_chars: Some(5),
-            ..EditFlags::default()
+            ..shaped(false)
         },
     );
     ed.cmd(EditCommand::PasteText("abcdefgh".to_owned()));

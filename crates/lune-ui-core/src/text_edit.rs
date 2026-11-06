@@ -30,13 +30,15 @@ use crate::text::{CaretPos, LineSpan, Spec, TextSystem, Unit, clamp_to_boundary,
 /// How many undo steps a [`TextEdit`] keeps.
 pub const UNDO_DEPTH: usize = 200;
 
-/// The most bytes a one-line editor takes in one insert (a paste, an assistive `SetValue`, an input
-/// method's commit); a longer one is refused whole, never cut. A one-line field shapes its whole
-/// text as one buffer, so what it takes costs in proportion: about 25 ms a frame and 290 MB at 1
-/// MiB, 10 s and 9.6 GB at the clipboard adapter's 32 MiB cap (measured and extrapolated in
-/// D232), and that cap is sized for the code view, which draws only the lines in view. A
-/// multi-line editor is not bound here; an app's own `max_chars` still applies.
-pub const MAX_ONE_LINE_INSERT: usize = 1_048_576;
+/// The most bytes a widget that shapes its whole text takes in one insert (a paste, an assistive
+/// `SetValue`, an input method's commit); a longer one is refused whole, never cut. The text field
+/// and the text area build one spec of all their text, so what they take costs in proportion: a
+/// field about 25 ms a frame and 290 MB at 1 MiB, an area about 0.4 s to first draw and 430 MB (and
+/// at the clipboard adapter's 32 MiB cap 10 to 16 s and 10 to 14 GB, extrapolated; measured and
+/// recorded in D232 and D233). They set it through [`EditFlags::max_insert`]; the code editor draws
+/// only the lines in view and leaves it off, so it takes what the adapter lets through. An app's own
+/// `max_chars` still applies below it.
+pub const MAX_SHAPED_INSERT: usize = 1_048_576;
 
 /// The pause that ends a run of typed characters as one undo step.
 pub const COALESCE_PAUSE: Duration = Duration::from_millis(500);
@@ -320,6 +322,9 @@ pub struct EditFlags {
     pub multiline: bool,
     /// The most chars an edit may leave in the text.
     pub max_chars: Option<usize>,
+    /// The most bytes one insert may bring, else it is refused whole: set by a widget that shapes
+    /// its whole text ([`MAX_SHAPED_INSERT`]), left `None` by one that draws only the lines in view.
+    pub max_insert: Option<usize>,
     /// A preedit exists, so keys belong to the input method. Set by [`TextEdit::flags`];
     /// [`TextEdit::set_flags`] ignores it.
     pub composing: bool,
@@ -1041,8 +1046,8 @@ impl TextEdit {
     }
 
     /// Replaces the selection with `insert`, cleaned and cut to fit; `typing` lets it join the
-    /// typed run before it. Empty text after cleaning changes nothing, selection included. A
-    /// one-line editor refuses an insert over [`MAX_ONE_LINE_INSERT`] bytes whole.
+    /// typed run before it. Empty text after cleaning changes nothing, selection included. An
+    /// insert over [`EditFlags::max_insert`] bytes is refused whole.
     fn insert<T: EditBuffer + ?Sized>(
         &mut self,
         insert: &str,
@@ -1051,7 +1056,7 @@ impl TextEdit {
         typing: bool,
         now: Time,
     ) -> bool {
-        if !self.flags.multiline && insert.len() > MAX_ONE_LINE_INSERT {
+        if self.flags.max_insert.is_some_and(|max| insert.len() > max) {
             return false;
         }
         let sel = self.selection();

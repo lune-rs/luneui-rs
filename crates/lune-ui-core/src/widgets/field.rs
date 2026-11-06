@@ -27,7 +27,7 @@ use crate::motion::{Kind, Lerp, Motion};
 use crate::paint::{Painter, Rect};
 use crate::text::{CaretPos, Font, LineSpan, Spec, Style, TextSystem, Unit};
 use crate::text_edit::{
-    EditCommand, EditFlags, EditLayout, EditOutcome, MAX_ONE_LINE_INSERT, SpecLayout, TextEdit,
+    EditCommand, EditFlags, EditLayout, EditOutcome, MAX_SHAPED_INSERT, SpecLayout, TextEdit,
 };
 use crate::theme::Theme;
 use crate::ui::{Response, Sense, Ui, WidgetId};
@@ -276,6 +276,7 @@ impl EditConfig<'_> {
             password: self.password,
             multiline: self.multiline,
             max_chars: self.max_chars,
+            max_insert: Some(MAX_SHAPED_INSERT),
             composing: false,
         }
     }
@@ -646,9 +647,9 @@ pub(super) fn set_value(
     text: &mut String,
     value: String,
 ) -> bool {
-    // The paste rule would refuse an oversize value against an empty text and leave the field
+    // The paste rule would refuse an oversize value against an empty text and leave the widget
     // emptied: refuse it before anything is replaced, so the text and its history stay.
-    if !cfg.flags().multiline && value.len() > MAX_ONE_LINE_INSERT {
+    if cfg.flags().max_insert.is_some_and(|max| value.len() > max) {
         return false;
     }
     let mut next = String::new();

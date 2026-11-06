@@ -190,23 +190,62 @@ fn set_value_replaces_the_text_and_marks_changed() {
 }
 
 #[test]
-fn set_value_over_the_one_line_cap_is_refused_whole_and_clipboard_text_the_same() {
-    use lune_ui_core::text_edit::MAX_ONE_LINE_INSERT;
-    // The field shapes its whole text, so a value past 1 MiB (an assistive set-value or a paste of
-    // anything from outside the process) would cost seconds and gigabytes: the text stays.
-    let over = "a".repeat(MAX_ONE_LINE_INSERT + 1);
+fn an_insert_over_the_cap_is_refused_whole_by_set_value_and_by_paste() {
+    use lune_ui_core::input::Modifiers;
+    use lune_ui_core::text_edit::MAX_SHAPED_INSERT;
+    // The field shapes its whole text, so a value past 1 MiB (an assistive set-value, or a paste of
+    // anything from outside the process) would cost seconds and gigabytes: the text stays. The
+    // cap itself goes in.
+    for (len, taken) in [(MAX_SHAPED_INSERT, true), (MAX_SHAPED_INSERT + 1, false)] {
+        let value = "a".repeat(len);
+
+        let mut h = UiHarness::new(WIN);
+        let mut text = String::from("old");
+        frame(&mut h, &mut text);
+        h.input.access(AccessAction {
+            target: id(),
+            action: Action::SetValue,
+            value: Some(AccessValue::Text(value.clone())),
+        });
+        let (_, r, _) = frame(&mut h, &mut text);
+        assert_eq!(r.changed, taken, "set-value of {len}");
+        assert_eq!(
+            text,
+            if taken {
+                value.clone()
+            } else {
+                "old".to_owned()
+            }
+        );
+
+        // The paste: Command+V asks, the clipboard's text answers a frame later.
+        let mut text = String::from("old");
+        let mut h = UiHarness::new(WIN);
+        frame(&mut h, &mut text);
+        h.input.key_down(Key::Named(NamedKey::Tab), None);
+        frame(&mut h, &mut text);
+        let logo = Modifiers {
+            logo: true,
+            ..Modifiers::default()
+        };
+        h.input
+            .set_modifiers(logo)
+            .key_down(Key::Character("v".to_owned()), None)
+            .set_modifiers(Modifiers::default());
+        frame(&mut h, &mut text);
+        h.input.clipboard_text(&value);
+        let (_, r, _) = frame(&mut h, &mut text);
+        assert_eq!(r.changed, taken, "paste of {len}");
+        assert_eq!(
+            text.len(),
+            if taken { 3 + len } else { 3 },
+            "paste of {len}"
+        );
+    }
+    // Under the cap a value still replaces.
     let mut h = UiHarness::new(WIN);
     let mut text = String::from("old");
     frame(&mut h, &mut text);
-    h.input.access(AccessAction {
-        target: id(),
-        action: Action::SetValue,
-        value: Some(AccessValue::Text(over.clone())),
-    });
-    let (_, r, _) = frame(&mut h, &mut text);
-    assert_eq!(text, "old");
-    assert!(!r.changed);
-    // Under the cap it still replaces.
     h.input.access(AccessAction {
         target: id(),
         action: Action::SetValue,

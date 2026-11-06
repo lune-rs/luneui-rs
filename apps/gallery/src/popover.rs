@@ -80,7 +80,8 @@ const fn platform() -> TrayPlatform {
 }
 
 /// How many times a frame polls for the status item to be placed before the tone is left as
-/// guessed: about 5 seconds.
+/// guessed: 300 polls, which is 5 seconds at 60 frames a second and 15 on an idle page (it polls
+/// every 50 ms).
 const TONE_POLLS: u32 = 300;
 
 /// How long the item's rect must hold still before it is taken as where the item is: the status
@@ -380,7 +381,6 @@ pub(crate) struct TrayHost {
     scale: u32,
 }
 
-/// The tooltip for a state: its name in words, the second channel for colour.
 /// Where the window of `kind`, `logical` px across, goes, in physical desktop pixels: the one place
 /// the tray item's physical rect and the monitor's physical rect become logical ones. `place_surface`
 /// and `bar_from_tray` work in logical pixels in one coordinate space, so its 4, 12 and 8 px gaps and
@@ -428,6 +428,7 @@ fn is_focus_loss(event: &WindowEvent, open: bool, visible: bool, had_focus: bool
     matches!(event, WindowEvent::Focused(false)) && open && visible && had_focus
 }
 
+/// The tooltip for a state: its name in words, the second channel for colour.
 fn tooltip(state: TrayState) -> &'static str {
     match state {
         TrayState::Serving => "Wane - serving on :4646",
