@@ -2,10 +2,10 @@
 id: render.custom-draw
 title: App-owned drawing hook
 area: render
-status: in-progress
+status: done
 consumers: luneterm
 source: crates/lune-ui-wgpu/src/custom.rs
-owner: orch/toolkit-v1
+owner: —
 summary: CustomDraw trait: app-owned GPU drawing inside a layer
 ---
 
@@ -19,7 +19,7 @@ summary: CustomDraw trait: app-owned GPU drawing inside a layer
 
 ## Existing code
 
-`crates/lune-ui-wgpu/src/custom.rs:13` (`CustomFrame`), `:24` (`CustomDraw`), `:9` (`CustomItem`, re-exported from `crates/lune-ui-core/src/scene.rs:74`); 33 lines. Used by lune-termview (`src/render.rs:12`) and the glass-ui spike (`src/main.rs:29`).
+`crates/lune-ui-wgpu/src/custom.rs:13` (`CustomFrame`), `:24` (`CustomDraw`), `:9` (`CustomItem`, re-exported from `crates/lune-ui-core/src/scene.rs:109`); 33 lines. Used by lune-termview (`src/render.rs:12`) and the glass-ui spike (`src/main.rs:29`).
 
 ## Spec
 
@@ -70,13 +70,15 @@ n/a — no text in the hook.
 
 ### Acceptance
 
-- Existing tests (by path, `crates/lune-ui-core/src/paint.rs`): `custom_records_physical_clip_on_base`, `custom_is_cut_by_the_current_clip`, `custom_outside_the_window_records_nothing`, `custom_lands_on_the_current_layer`.
-- Done standard still needs: a pixel gate on `custom-draw` at zero delta, and the Luneterm terminal grid as the consumer's cite (`render/custom-draw.md` Notes).
+- Recording (`crates/lune-ui-core/src/paint.rs`, module `tests`): `custom_records_physical_clip_on_base`, `custom_is_cut_by_the_current_clip`, `custom_outside_the_window_records_nothing`, `custom_lands_on_the_current_layer`; the draw order (customs after the layer's fills, before its images and text) is `crates/lune-ui-core/src/testing/recording.rs::records_the_documented_draw_order`.
+- The hook through the real renderer: `crates/lune-ui-wgpu/tests/custom_draw.rs::every_slot_is_prepared_once_and_rendered_once_per_item` (every supplied implementation is prepared once, one with no item too; `render` runs once per item of its slot; both get the frame's size, scale and format). The scissor and the pixels the gallery's `Fill` draws are the pixel gate on `custom-draw` at zero delta (the orchestrator's gate; M11's pre-audit run held 413 of 413).
+- The consumer: Luneterm's `lune-termview` imports `lune_ui::custom::{CustomDraw, CustomFrame}` and checks against this repo with no source change (`docs/consuming.md`, "lune-termview"; `luneterm.terminal-grid`).
 
 ### Build
 
 - Milestone: M11 (done standard; code exists).
 - Depends on: render.frame, core.scene.
+- Done (D47, M11): tests `crates/lune-ui-wgpu/tests/custom_draw.rs::every_slot_is_prepared_once_and_rendered_once_per_item, crates/lune-ui-core/src/paint.rs::custom_records_physical_clip_on_base, crates/lune-ui-core/src/paint.rs::custom_is_cut_by_the_current_clip, crates/lune-ui-core/src/paint.rs::custom_lands_on_the_current_layer, crates/lune-ui-core/src/testing/recording.rs::records_the_documented_draw_order`; page n/a (an app hook; the scene `custom-draw` draws the gallery's `Fill` through it); unverified here: none (the terminal grid itself is Luneterm's).
 
 ## Open questions
 

@@ -12,8 +12,8 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | in-luneterm | 0 |
 | planned | 0 |
 | stub | 0 |
-| in-progress | 79 |
-| done | 14 |
+| in-progress | 75 |
+| done | 18 |
 | external | 4 |
 | **total** | **97** |
 
@@ -39,10 +39,10 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
 | [render.blur](render/blur.md) | Backdrop blur pass | done | luneterm | Backdrop blur pass with its WGSL shader |
-| [render.custom-draw](render/custom-draw.md) | App-owned drawing hook | in-progress | luneterm | CustomDraw trait: app-owned GPU drawing inside a layer |
-| [render.dump](render/dump.md) | Offscreen frame dump | in-progress | luneterm | Offscreen target, GPU readback and PNG writer for frame goldens |
-| [render.frame](render/frame.md) | Frame pass sequence | in-progress | luneterm | FrameRenderer: one target's scene, blur, target pass sequence over the core Scene |
-| [render.gpu](render/gpu.md) | Shared GPU | in-progress | luneterm | One shared Gpu (device, queue, noise texture, per-format pipelines and glyph atlas) for any number of targets |
+| [render.custom-draw](render/custom-draw.md) | App-owned drawing hook | done | luneterm | CustomDraw trait: app-owned GPU drawing inside a layer |
+| [render.dump](render/dump.md) | Offscreen frame dump | done | luneterm | Offscreen target, GPU readback and PNG writer for frame goldens |
+| [render.frame](render/frame.md) | Frame pass sequence | done | luneterm | FrameRenderer: one target's scene, blur, target pass sequence over the core Scene |
+| [render.gpu](render/gpu.md) | Shared GPU | done | luneterm | One shared Gpu (device, queue, noise texture, per-format pipelines and glyph atlas) for any number of targets |
 | [render.surface](render/surface.md) | Window surface | in-progress | any | One window's swapchain on the shared Gpu: acquire, present, resize; no winit dependency |
 
 ## platform
