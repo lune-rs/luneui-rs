@@ -1,14 +1,43 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-06 (M10 in progress: steps 1 to 9 of 11 done; M9 is merged at 8f499d0)
+Last updated: 2026-11-06 (M10 built, steps 1 to 11 done on `orch/toolkit-v1`, awaiting review, the final gate and the merge; M9 is merged at 8f499d0)
 
 ## Now
 
-M10 (infra and platform: JSON reader, theme and locale files, shortcut platform mapping, file drop, clipboard, AccessKit, tray) is in
-progress on `orch/toolkit-v1`. Step 1 is in: `lune_ui::json` (D204), Lunegit's theme and locale files as gallery fixtures (D205, D206,
-no open licence: license or remove before any public release). Step 2: theme files (`Theme::from_json`, glass inside `Theme`, derived
-tokens, `AcrylicLevel`, a theme swap is a hard cut for colour transitions; D207 to D209). Step 3: `Catalog::from_json`, `StringTable::overlay` and `iter`, `audit_template` (D210). Step 4: file-drop events, `keymap()`, `Translator::access`, pure `plan_output` (D211, D212). Step 5: the clipboard adapter over `arboard`, 32 MiB cap, the gallery's stub retired (D213 to D215); the `--parity-only` lock check fails by design from here. Step 7: the tray's pure half, `tray::{icon_bitmap, bar_from_tray, place_surface, TrayToggle, tray_surface}` and `Ui::flyout_window` / `Ui::menu_window` (D218 to D221). Step 8: `lune_ui_platform::{tray, popover}` over `tray-icon`, the macOS class swap behind the `PopoverWindow` guard, `popover_attributes`, `apply_rounded` (D222 to D224). Step 9: the gallery's `theme`, `tray` and `file-drop` pages (24 new scenes, 413 names, 73 pages), the live tray (`popover.rs`) and `gallery --smoke-platform` (D225; ran here: exit 0, 13 or more frames, frontmost app unchanged, popover key).
+M10 (infra and platform) is built on `orch/toolkit-v1` (steps 1 to 11; DECISIONS D204 to D227): the review, the final gate and the merge are
+next. What it added:
+- `lune_ui::json`: the bounded reader (D204; 1 MiB, depth 16, strings 4,096, keys 256, 8,192 members, 65,536 values), the loaders' policy on top.
+- Theme files (D207 to D209): `Theme::from_json` over a base, the glass inside `Theme` (`Theme.glass`), derived tokens that follow their source,
+  `AcrylicLevel`, and a theme swap is a hard cut (every colour transition snaps in the frame the theme differs).
+- Locale files (D210): `Catalog::from_json` (strict: an unknown `luneui.` key fails the file), `StringTable::overlay`, `audit_template`.
+- Input (D211, D212): `Event::FileHover`, `FileHoverCancelled`, `FileDrop` (a `PathBuf`; nothing opens it), `keymap()`, the pure `OutputState::plan_output`.
+- The OS clipboard (D213 to D215): `arboard` in `lune-ui-winit`, a 32 MiB cap, the gallery's stub (D107) retired.
+- AccessKit (D216, D217): `AccessBridge` behind the `accesskit` feature of `lune-ui-winit` and the facade; handlers touch only `Shared`.
+- The tray (D218 to D227): the icon is a CPU raster (`tray::icon_bitmap`, a transparent ring, the dot's centre at 14 at 1x), placement from the item's
+  rect (`bar_from_tray`, `place_surface`), `TrayToggle`, `Ui::flyout_window` and `Ui::menu_window`; `lune_ui_platform::{tray, popover}` over `tray-icon`
+  and the macOS `NSPanel` class swap behind the `PopoverWindow` guard; the Windows popover activates (D224).
+- Gallery: pages `theme`, `tray` and `file-drop` (24 new scenes), the live tray (`popover.rs`) and `gallery --smoke-platform` (D225).
+- Step 10: the director accepted the tray icon and the two window surfaces in round 1 (D226, D227).
+- Step 11: `c4::m10`, the theme reach audit (below), the catalogue and architecture notes, and the checks.
+
+Counts at the tip: gallery 73 pages, 413 scene names in `--list`; `cargo test --workspace -- --list` names 2,505 tests.
+Release size (macOS, `cargo build --release -p gallery`, strip, fat LTO): 9,448,688 bytes at the M9 merge (8f499d0), 9,869,408 at this tip, +420,720 (+4.45%);
+the AccessKit bridge is +237,728 of that (D216), the tray stack about +150,000 (a scratch estimate at step 8), `arboard` the rest.
+Checked here at the tip (not the final gate, which is the orchestrator's): `gallery --smoke-platform` exit 0 (a real tray item, its rect, a synthetic click, the surface in its window, 25 frames in the
+first open, the frontmost app unchanged, the panel key, two opens and closes, teardown); the guarded `real_round_trip` of the clipboard ran at step 5 and passed;
+bench (`cargo run --release -p gallery -- --bench`, verdict per D85, 2080 x 1320, 5 runs, 73 pages, M1 Pro; load 4.46 to 12.5 and the machine was also
+compiling for part of it; self-test in range, cpu p50 4.27, spread p99 +7.18, max +86.38): 0 over budget, no page over in 3 or more of 5 runs; highest page p99 13.57 ms
+(`code-editor-view`, in 2 of 5 runs over its own limit), worst frame 80.47 ms (`markdown-preview`, 1 of 5 runs over, a load spike: its p99 is 7.08); the new pages
+`theme` 7.34, `tray` 10.11, `file-drop` 7.04.
+
+The theme reach audit (`tests/c4.rs`, `c4::m10`): the controls and a spread of M6 and M7 widgets (ghost, primary and icon buttons, a radio group, stars, a slider, a tab strip,
+a filter bar, progress, badges and status dots in every tone, a spinner, a banner, the four toasts, the dropdown, the menu and the dialog; with hover, focus rings and a selection)
+are drawn under a theme whose 71 colour fields are all distinct and none is a preset colour: no fill, stroke or text holds a preset colour (the scan finds them under the preset, so
+it does not look at nothing, and a one-line mutant in `toggle.rs` is caught). It reaches 38 of the 71 fields; the other 33 belong to widgets the frame does not draw (scroll thumbs, the
+markdown, code and diff colours, the page and panel glass tints, the caption buttons, the dirty mark, the count badge, a few greys), so for those the audit proves nothing and the
+literal grep below is the only check. The grep over `widgets/` (`[0x..` and `[255, ..` forms, hex words, colour consts) finds two fixed colours, both on purpose: the pie chart's hover
+wash `[255, 255, 255, 38]` (Lunegit's `StoragePieChartControl`) and the kanban board's `CLEAR`, a transparent transition target.
 
 M9 (text views: code block, code editor view, markdown preview, diff view) is merged to main at 8f499d0
 (steps 1 to 9; DECISIONS D177 to D203), review rounds 1 to 4 fixed (D200 to D203), round 5 passed. `docs/architecture.md` has the module map,
@@ -144,6 +173,13 @@ frame 19.01 ms (`radio-group`).
   neither); a one-line code block scrolled fully right has its thumb under the copy button by about 4 px (the button is hit first);
   the markdown's inline underline, strike and pill are fills from row boxes, not a seam feature (D188); no italic face ships, so italic is the shaper's skew (D189);
   a page key or Home in the frame right after a far jump in a wrapped view lands off by what that frame measured (80 px in the probe: the shift the content queued lands after the jump); a pane pulled in the frame of its own wheel publishes nothing, so a pixel wheel on the other pane in the very frame one pane opens a document alone rests apart until the next scroll (D184's rule; a split diff opens both panes, so only linked code views can do it).
+- M10 limits (entries and DECISIONS): assistive clients get the lines in view of an editor, not the document (D217); `Dismiss` is exposed only on a tooltip and `Dragging` and a mixed toggle
+  are not sent (D217); a locale file written for a newer toolkit fails on an older one and the app falls back to English (D210); the Windows popover activates, so it takes focus when
+  shown, where the entry said non-activating (D224, Q17); a surface is placed from the tray item's rect, so on Windows, where the rect may sit a few px inside the taskbar, "12 px above" may
+  read a little more (D219); the macOS rect settles only after 300 ms, so the host waits for it (D225); the tray icon has no automatic inversion while the item is highlighted (D218); there is no
+  Windows row scene (`MenuOverBar` is live only and was never viewed); a loaded theme's `WindowFallbackBackground` sets only `window_fallback`, and the inactive window's fill that Lunegit recomputes
+  from the glass tint is the app's (`platform.window`); there is no drop-target widget; the toolkit holds Lunegit's theme and locale files as gallery fixtures with no open licence
+  (D206): license or remove them before any public release, and M11's export must leave them out; `--parity-only` of `scripts/pixel-gate-luneterm.sh` fails by design (the lock has grown).
 - `role-gap: tab to panel association` of the tab strip stays open (D122). The real pointer feel of the tab drag, the
   slider, the splitter and the tree in window mode is not testable with scripted input.
 - Review nits left open (M6 `review.md`): `toolbar_label` repeats `button_inner_colored` (F2); colour helpers exist twice
@@ -151,18 +187,21 @@ frame 19.01 ms (`radio-group`).
 
 ## Unverified here
 
-- Real typing with an input method (roadmap R1), screen readers (R1) and bidi caret placement.
-- Windows and Linux run time (the lint runs through `scripts/check-targets.sh`, Linux only with Docker).
-- The flyout in its own window, its placement from the tray rect, a real click on the tray item, and keys in the panel (M10; `platform.tray-icon` has the list).
-- The real pointer feel of the board's drag, its ghost and its auto-scroll in window mode (scripted input only), and screen
-  readers (R1).
+- Real typing with an input method (roadmap R1), screen readers and an assistive client of the AccessKit bridge (R1: its tree is replayed into `accesskit_consumer`, no client ran), and bidi caret placement.
+- Windows and Linux run time (the lint runs through `scripts/check-targets.sh`, Linux only with Docker): nothing of the tray, the popover, the clipboard or the bridge has run on Windows;
+  Linux has no tray (`Unsupported`).
+- The tray, past what `gallery --smoke-platform` measured on this Mac (an item, its rect, a synthetic click, the panel's key status, the frontmost app, two opens and closes, teardown): a real click on
+  the item, real hover and keys in the panel, the OS shadow and corners of the surface, a menu bar on a second display, the item highlighted. The panel rests on AppKit behaviour Apple does not
+  document and is proved only on this macOS version (D223). Run it again after a macOS update.
+- The OS clipboard beyond the one guarded `real_round_trip` (macOS, plain text); a real file dragged over a window (the scenes send the events through the script).
+- The real pointer feel of the board's drag, its ghost and its auto-scroll in window mode (scripted input only).
 
 ## Next
 
-1. M10 steps 9 to 11 per the plan.
+1. M10 review, the final gate (including the AccessKit-off line and `scripts/check-targets.sh`) and the merge.
 2. CI (fmt, clippy `-D warnings`, tests on macOS, Windows and Linux) now that there is code to run.
-3. An export script for Luneterm's vendored snapshot, before Luneterm M9. The migration
-   map for M11 is "API changes since M1" in `docs/architecture.md`.
+3. M11: the done-standard pass on every entry, the export script for Luneterm's vendored snapshot (it must leave out `apps/gallery/assets/lunegit/`, D206), and the migration
+   map, which is "API changes since M1" in `docs/architecture.md`. The release size for its report: the figures above.
 
 ## Blockers / open questions
 

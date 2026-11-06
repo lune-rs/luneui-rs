@@ -53,7 +53,7 @@ const RING_R: f32 = 4.5;
 /// The dot's centre, from the top left, at scale 1 and at scale 2 (`right: -2px; bottom: -2px` of
 /// the glyph box, `-4px` at 2x). At scale 1 it is on a pixel corner, so the 6 px dot covers whole
 /// pixels (11 to 16) and not a soft 7 px disc; its ring's outer circle then runs half a pixel past
-/// the bitmap's edge, which cuts nothing. At scale 2 it is the same 27 as the mock's `--2x`.
+/// the bitmap's edge, which cuts nothing. At scale 2 it is 27, the 2x variant of the same design.
 const DOT_AT: [f32; 2] = [14.0, 27.0];
 /// The crescent's view box.
 const VIEW: f32 = 24.0;

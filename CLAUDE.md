@@ -60,6 +60,7 @@ Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, r
 - A composite with one tab stop (radio group, star rating, nav list, tab strip, table header, board cards) uses roving focus: `Sense.skip_tab`,
   `Ui::rove_stop`, `rove_keys`, `rove_focus` (D113); text that must fit a width goes through `text::elide` / `Painter::elide`
   (D114). A drag ghost draws one layer group above its source, out of any `record` (`Ui::drag_ghost`, D168).
+- A loaded theme must reach every widget: a widget takes every colour from `ui.theme()` (or its options), never a literal or the preset (`c4::m10` draws the controls under a theme of distinct colours and fails on a preset colour; a fixed colour on purpose is listed in `docs/STATE.md`).
 - One text editing engine: `TextEdit` edits through `EditText` and `EditBuffer`, implemented for `str`, `String` and the line-indexed
   `CodeDoc` (D180); a new text kind implements them, it does not get a second engine. A text view draws only the lines in view and
   never shapes, hashes or clones the whole text per frame (D179, D195).
