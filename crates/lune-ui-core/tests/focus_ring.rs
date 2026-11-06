@@ -42,7 +42,7 @@ fn a_button_ring_sits_on_the_rects_own_edge_in_fg_secondary() {
 #[test]
 fn an_offset_ring_clears_the_control_by_2_px_and_draws_1_px_outside_that() {
     // 2 px gap and the 1 px line: the shape is the control grown by 3 on each side, so its inner
-    // edge is the control grown by 2 (a 40 x 20 track gives the mock's 44 x 24 box).
+    // edge is the control grown by 2 (a 40 x 20 track gives the spec's 44 x 24 box).
     let s = one(RingKind::Offset { radius: 10.0 });
     assert_eq!(s.rect, [14.0, 14.0, 212.0, 72.0]);
     assert_eq!(s.radii, [26.0; 4], "(10 + 3) * 2");

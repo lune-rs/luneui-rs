@@ -84,8 +84,12 @@ and the popover on a logged-in session.
 
 ## Release size
 
-An app measures its own. The toolkit's figure for the gallery's release build is recorded in
-`docs/STATE.md` when a milestone closes.
+An app measures its own. The toolkit's figure for the gallery's release build (`cargo build --release -p gallery`,
+the repo's `[profile.release]`: fat LTO, one codegen unit, abort on panic, stripped; the size of `target/release/gallery`
+on macOS, read with `wc -c`) is **9,869,520 bytes** at a9d1292, the M11 close. It was 9,448,688 at the M9 merge (8f499d0)
+and 9,869,408 at the M10 tip; the M10 growth is the AccessKit bridge, the tray stack and `arboard` (DECISIONS D216, D213).
+The figure covers the gallery with every feature on, including `accesskit`; an app that leaves the feature off is smaller.
+`docs/STATE.md` keeps the latest reading.
 
 ## Migration map: Luneterm 296cfdc `lune-ui` to the snapshot
 

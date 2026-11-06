@@ -1,6 +1,6 @@
 # Architecture
 
-State after M10 (infra and platform): the toolkit is five crates. A pure core (`lune-ui-core`, no
+State after M11 (the close): the toolkit is five crates. A pure core (`lune-ui-core`, no
 dependencies) holds the painter, the display list, the per-window `Ui` frame, the motion system,
 the string table, the semantic tree, widgets, the theme and the four seam types; three adapter
 crates implement the seams on wgpu/glyphon, winit and the OS glass; the facade `lune-ui` re-exports
@@ -17,7 +17,10 @@ code editor over a line-indexed document (`CodeDoc`, one editing engine generic 
 preview on virtual blocks and the diff view, unified and split on the list frame (D177 to D199). M10 finished the infra and platform layer: a
 bounded JSON reader, theme files (the glass moved into `Theme`, a swap is a hard cut) and locale catalogs, file-drop events and the
 platform keymap, the OS clipboard (`arboard`), an AccessKit bridge behind a cargo feature, and the tray icon (a CPU raster) with the
-flyout and the menu in windows of their own (D204 to D227).
+flyout and the menu in windows of their own (D204 to D227). M11 closed the program (D234 to D245): the window's caption buttons
+through the `Ui` (`widgets/caption.rs`, the page `window`), `Gpu::is_lost`, the key readers that leaked or took a chord, a 1.5x scene,
+the rustdoc bar, the done-standard audit of the whole catalogue with the check that keeps it true (`apps/gallery/src/catalogue.rs`),
+and the vendored snapshot (`scripts/export-snapshot.sh`, `docs/consuming.md`).
 
 ## Workspace layout
 
@@ -30,13 +33,14 @@ flyout and the menu in windows of their own (D204 to D227).
 | `crates/lune-ui` | Facade: `lib.rs` only, re-exports the four crates at the old paths |
 | `apps/gallery` | A page registry (legacy Painter-API pages and `Ui` pages), a glass window, `--dump <dir>` (offscreen PNG frames on a headless device, no window), `--list`, `--bench` (frame-time probes). App code, outside `crates/` (D12): it bundles fonts |
 | `tools/dump-compare` | Compares two dirs of PNG frame dumps pixel by pixel (the pixel gate's compare tool) |
-| `scripts/` | Gates and generators, see "Boundary rules" and "Pixel gates" |
+| `scripts/` | Gates and generators, see "Boundary rules" and "Pixel gates"; `export-snapshot.sh` writes the snapshot an app vendors (D239) |
+| `docs/consuming.md` | How an app takes the toolkit in before a remote exists: what the snapshot holds, the app's duties, the release size, the migration map from Luneterm 296cfdc |
 | `docs/components/` | Catalogue, one file per component; `docs/components/INDEX.md` is generated |
 | `licenses/`, `THIRD_PARTY_NOTICES.md` | Licence texts and the per-asset notice rows |
 
 Scripts: `scripts/check-boundaries.sh` (rules 1 to 12, see below; fixed-string exceptions in
 `scripts/boundaries.allow`), `scripts/gen-component-index.sh` (catalogue index; `--check` is in the
-gate), `scripts/pixel-gate.sh`, `scripts/pixel-gate-luneterm.sh`, `scripts/check-targets.sh`.
+gate), `scripts/pixel-gate.sh`, `scripts/pixel-gate-luneterm.sh`, `scripts/check-targets.sh`, `scripts/export-snapshot.sh`.
 
 ## Crates and modules
 
@@ -63,7 +67,8 @@ app passes time, sizes, fonts, theme, scale and hit values in), so frames are de
 | `code_doc` (`code_doc.rs`) | The code editor's document (D179): one `String` and a line index, verbatim, with `\n`, `\r\n` and a lone `\r` ending a line; an edit costs O(log lines) | `CodeDoc` (`new`, `text`, `set_text`, `line_count`, `line`, `line_of`), implements `EditText` and `EditBuffer` |
 | `drag` (`drag.rs`) | The in-window drag machines and their `Ui` glue (D89, D104) | `ReorderDrag`, `FreeDrag` (with `pressed`), `Metrics`, `Strip`, `Column`, `DropResult`, `FreeResult`, `paint_drop_line`, `edge_step` (the auto-scroll zone math, shared by the strip and the board; D168) |
 | `backdrop` (`backdrop.rs`) | The material seam | `Backdrop`, `Material`, `BackdropKind`, `GlassLayer` |
-| `window` (`window.rs`) | Edge resize, double click, caption buttons (no windowing type) | `ResizeEdge`, `edge_at`, `DoubleClick`, `caption_buttons` |
+| `window` (`window.rs`) | Edge resize, double click, the caption buttons' Painter form and their shared geometry (no windowing type) | `ResizeEdge`, `edge_at`, `DoubleClick`, `caption_buttons`, `CAPTION_BUTTON_WIDTH` |
+| `widgets::caption` (`widgets/caption.rs`) | The caption buttons through the `Ui` (D240): hover through the `hover` kind, `caption_close_hover`, nodes named from `luneui.window.*`, no Tab stop; the app turns the answer into a `WindowCommand` | `Ui::caption_buttons`, `CaptionButton`, `CaptionOptions` |
 | `icon` (`icon.rs`) | Codicon codepoints as Nerd Font glyphs; no font file bundled | `glyph`, `ADD`, `GEAR`, `CHECK`, ... |
 | `ui` (`ui.rs`, `ui/{access,animate,focus,id,keys,overlay,pointer,response,store}.rs`) | The per-window frame (see "The `Ui` frame" below) | `Ui`, `UiStore`, `FrameConfig`, `WidgetId`, `Response`, `Sense`, `OverlayOptions`, `OverlayFrame`, `OverlayPhase`, `Dismissal` |
 | `access` (`access.rs`) | The semantic tree and the actions that come back; plain data the `Ui` fills and routes | `Node`, `SemanticTree`, `Role` (37), `State` (15), `Action` (10), `Value`, `AccessAction`; `Node.level` (a tree row's depth + 1) |
@@ -72,7 +77,7 @@ app passes time, sizes, fonts, theme, scale and hit values in), so frames are de
 | `widgets` (`widgets/<name>.rs`, `widgets/mod.rs`) | One file per control, generic over `H` for the Painter API; each has a `Look`, a `paint` function, the old function as a wrapper and a `Ui` method (D60) | `button`, `toggle`, `checkbox`, `label`, `combo`, `stepper`, `field` (text field with its variants), `text_area`, `input_box` (shared look), `focus_ring`, `popup_panel`, `scroll_area`, `scrollbar`, `virtual_list`, `popover`, `tooltip`; M6 added `badge`, `status_dot`, `verdict_row`, `progress`, `spinner`, `callout`, `stat`, `kv_list` (with `selectable`, the read-only selectable text of D125), `row`, `list_row`, `form_field`, `steps`, `nav_item` (`Ui::nav_list`), `radio_group`, `star_rating`, `slider`, `filter_bar`, `search_picker`, `tab_strip`, `toolbar`, `banner` (with the empty state) and `tone` (the one tone recipe, D129); `button` gained `Ghost`, `ButtonOptions` (`Ui::button_with`) and `IconButton` (`Ui::icon_button`, D116); M7 added `flyout` (`Ui::flyout`), `toast` (the `Toasts` model, `Ui::toasts`, `Ui::toast_history`), `command_palette` (`Ui::command_palette`), `page` and `panel` (`Ui::page`, `Ui::panel`: one closure called per slot), `sidebar`, `side_panel` and `icon_rail` (`Ui::sidebar`, `Ui::side_panel`, `Ui::icon_rail`), `split_panes` (`Ui::split_panes`, `Ui::split_state`), `tree_view` (`Ui::tree_view`, `Ui::tree_state`) and `settings_page` (`Ui::settings_page`); M8 added `table` (`Ui::table`, `Ui::table_state`, `Ui::table_selection`: the list frame with a header, sort requests and tones; `virtual_list` gained a crate-private `ListStyle`, D161), `bar_chart` (`Ui::bar_chart`), `pie_chart` (`Ui::pie_chart`), `lane_graph` (`Ui::lane_graph_row`, a stateless `paint`) and `kanban_board` (`Ui::kanban_board`, `landed_index`); M9 added `text_lines` (`HighlightSpan`, `Highlighter`, `PlainHighlighter`, the rich-line spec and `range_boxes` across runs), `code_editor` (`Ui::code_editor`, `Ui::code_line_rect`: lines on `RowHeights` and the scroll area, read-only or editable, wrapped or not, synced panes), `code_block` (`Ui::code_block`, `code_block::height`: the same frame read-only with a copy button), `markdown` (`Ui::markdown` over the `MdBlock` model: top-level blocks as virtual rows) and `diff_view` (`Ui::diff_view`, `pair_rows`, `widest_chars`: the list frame, twice for split); M10 added `Ui::flyout_window` and `Ui::menu_window` (the flyout's and the menu's body filling a window of its own over `Ui::popover`, D220) and the public `menu_size` |
 | `widgets::menu`, `dropdown`, `dialog` | The overlays: the old Painter functions and `Ui::menu`, `Ui::dropdown`, `Ui::dialog` on the overlay stack; M7 added `menu_with` (`MenuOptions`, `MenuPlace`: anchored menus and the node name; rows `MenuRow::Entry` and `Header`; one highlight), `dropdown_with` (`DropdownOptions`: glass, `max_rows`), `dialog_with` (`DialogOptions`: `DialogWidth::{Confirm, Form}`, scrim blur, disabled confirm) and `dialog::modal_host`, which the palette shares | `menu`, `MenuRow`, `MenuItem`, `menu_open_anim`; `dropdown`; `dialog`, `Dialog`, `DialogGlass`, `Cancel` |
 | `chrome` (`chrome.rs`) | Tab chrome outline geometry | `outline`, `TabSpan` |
-| `testing` (`testing/`) | Fakes and contract suites of the seams, public so apps can use them | `RecordingRenderer`, `FakeText`, `text_system_contract`, `FakeImages`, `image_store_contract`, `ScriptedInput`, `NullMaterial`, `backdrop_contract`, `UiHarness` |
+| `testing` (`testing/`) | Fakes and contract suites of the seams, public so apps can use them | `RecordingRenderer`, `FakeText`, `text_system_contract`, `FakeImages`, `image_store_contract`, `ScriptedInput`, `scripted_input_contract`, `NullMaterial`, `backdrop_contract`, `UiHarness` |
 
 `lib.rs` re-exports `Backdrop`, `BackdropKind`, `GlassLayer` and `theme::lunegit_dark`. Tests: unit
 tests in the modules and the files under `tests/` (`window`, `painter`, `motion`, `strings`, `ui_*`,
@@ -296,7 +301,7 @@ monotone steps, the exact end and that it finishes within its duration plus one 
 
 | Module (file) | Purpose | Key items |
 |---|---|---|
-| `gpu` (`gpu.rs`, `shader.wgsl`) | The GPU every target shares: device, queue, noise texture, per colour format the pipelines and the glyph atlas; headless-capable | `Gpu`, `instance`, `Uploaded`, `Globals` |
+| `gpu` (`gpu.rs`, `shader.wgsl`) | The GPU every target shares: device, queue, noise texture, per colour format the pipelines and the glyph atlas; headless-capable; since M11 it reports a lost device and the app rebuilds (D241) | `Gpu` (`is_lost`), `instance`, `Uploaded`, `Globals` |
 | `frame` (`frame.rs`) | One target's renderer: the scene, blur, target pass sequence over a core `Scene` | `FrameRenderer`, `FrameParams` |
 | `images` (`images.rs`, `image.wgsl`) | The image pipeline and the picture store: premultiply on upload, nearest at an integer ratio without rotation, else linear; rotated text is a raster of the shaped text drawn through it (D105, D106) | `Gpu::register`, `Gpu::release` (the `ImageStore` impl) |
 | `blur` (`blur.rs`, `blur.wgsl`) | Backdrop blur | `Blur` |
@@ -308,7 +313,7 @@ monotone steps, the exact end and that it finishes within its duration plus one 
 
 Asset: `assets/acrylic-noise.png` (Avalonia's texture). Tests: `tests/text.rs` (text contract),
 `tests/targets.rs` (two targets on one `Gpu`), `tests/images.rs` (the image contract on the `Gpu`),
-`tests/primitives.rs` and `tests/text_field.rs` (pixel probes on real fonts).
+`tests/primitives.rs` and `tests/text_field.rs` (pixel probes on real fonts), `tests/device_lost.rs` (a destroyed device reports lost and a rebuild draws) and `tests/custom_draw.rs` (the hook through `draw_with`).
 
 ### `lune-ui-winit` (`crates/lune-ui-winit/src/`)
 
@@ -441,13 +446,13 @@ functions; mid-transition and interaction scenes are live scripted `Ui` frames. 
 `nav_item`, `radio_group`, `star_rating`, `slider`, `filter_bar`, `search_picker`, `tab_strip`, `toolbar` and `banner`, and from M7
 `flyout`, `toast-notifications`, `command-palette`, `page`, `panel`, `sidebar`, `side-panel`, `icon-rail`, `split-panes`,
 `tree-view` and `settings-page`, from M8 `table`, `bar-chart`, `pie-chart`, `kanban-board` and `lane-graph`, and from M9 `code-block`,
-`code-editor-view`, `markdown-preview` and `diff-view`, and from M10 `theme`, `tray` and `file-drop`
-(73 pages in all, 413 scene names; every page of the same pattern: a live state, scripted scenes, a bench timeline); `apps/gallery/src/pages/controls_ui.rs` is the shared composition of every M4 widget that the
+`code-editor-view`, `markdown-preview` and `diff-view`, from M10 `theme`, `tray` and `file-drop`, and from M11 `window`
+(74 pages in all, 421 scene names, one of them at scale 1.5, `ui-controls@1.5x`, D243; every page of the same pattern: a live state, scripted scenes, a bench timeline); `apps/gallery/src/pages/controls_ui.rs` is the shared composition of every M4 widget that the
 core pages draw. Window mode builds a `Ui` per frame over the page's live state; dump and bench
 drive the same state through a `Player` (a scripted input, the retained store and the page state). A scene's `Expect` is `Settled` (`Idle`),
 `Moving` (`Now`) or, for a pending tooltip, `Waiting` (`At`). `Ev` scripts pointer, scroll, typed text, keys
 with modifiers, IME preedit and commit, the clipboard's answer, file hover and drop, and a cue (a script's way to ask for what a pointer would, as the theme swap does); the window answers a clipboard
-request from the OS clipboard (D215; `--dump` never builds one). A page may also name a theme and a tray state (`PageState::theme`, `tray_state`), read by the `Player` and by window mode. `gallery --smoke-platform` (a logged-in GUI session; exit 2 without one) puts a real item in the tray for about 2 seconds and prints each fact it measured (D225). The bundled fonts have no CJK glyph, so the IME scenes'
+request from the OS clipboard (D215; `--dump` never builds one). `UiScene.scale` is an `f32`. A page may also name a theme and a tray state (`PageState::theme`, `tray_state`), read by the `Player` and by window mode. `gallery --smoke-platform` (a logged-in GUI session; exit 2 without one) puts a real item in the tray for about 2 seconds and prints each fact it measured (D225). The bundled fonts have no CJK glyph, so the IME scenes'
 "かな" draws as boxes (D90). A shown overlay fades from the first frame that draws it, so a scene that wants
 it visible needs a frame at the due time. Window mode and the bench draw the list page with 1,000,000 rows, the code editor page with a 1,000,000-line document, the table, lane graph and diff pages with 100,000 rows or lines, and the markdown page with a document of 2,800 blocks (400 sections).
 
@@ -459,6 +464,12 @@ page is `OVER` only when at least half its runs are, and a minority of over runs
 its `ok`. The self-test's spread (p99 and worst above its p50) and the load average are printed with
 every verdict; nothing refuses a busy machine (D85). It is the milestone acceptance run, not part of
 the per-commit gate.
+
+The catalogue is checked by `apps/gallery/src/catalogue.rs` (unit tests, in the gate; no dependency): every scene an
+entry claims is a scene or page of the gallery and every gallery scene is claimed; a non-external entry names a scene or says
+`n/a —`; a `done` entry has no owner, a `source:` that exists, no open "still needs" and a `- Done (D47, M11):` line whose cited
+tests exist (D236); every requirement id is cited or listed; every motion kind and easing is named where its scene is claimed;
+and the `in-progress` entries are exactly the two Class B ones (D234). Each check is shown to fire on a wrong inline entry.
 
 ## Boundary rules
 
@@ -490,16 +501,22 @@ seam, in `platform/` or `material/` files, so the Windows DX12 choice is in
 
 The two M1 deviations are resolved: the inline `cfg(target_os)` in `gpu.rs` and `window.rs` moved
 into `platform/` files (step 8), and `Gpu::new` takes an optional compatible surface, so a headless
-device needs no window (steps 3 and 4). Carried limits at the end of M5, none of them fixed here: an
-overlay above a modal is unsupported, so a popover or tooltip inside a dialog draws under it; the
-menu's node name; text cannot be cut by a rounded clip (it gets the bounding rect); text draws above
-fills, so overlapping labels show through during a drag; and nothing here verifies real typing with an
-input method, bidi caret placement or the Windows and Linux run time.
+device needs no window (steps 3 and 4). The limits that remain are choices with a row or an entry,
+not missing parts (D237, D245): an overlay above a modal goes one level (D137) and a frame has one
+blur (D138); text cannot be cut by a rounded clip (it gets the bounding rect) and draws above the
+fills of its layer, so overlapping labels show through during a drag; the bundled fonts have no bold,
+CJK or italic face; a ring's width follows the device scale only; the tab strip closes its menu when
+disabled; the API gaps marked in the entries. `docs/STATE.md`, "Carried limits", lists them with
+the milestone limits. What nothing here verifies is real typing with an input method, bidi caret
+placement, a screen reader, and the Windows and Linux run time (`docs/STATE.md`, "Unverified here").
 
 ## API changes since M1
 
-For M11's migration map (Luneterm's `lune-termview` uses `color`, `custom`, `paint`, `dump`; the
-facade keeps those paths):
+The migration map for Luneterm is built (`docs/consuming.md`, "Migration map"; Luneterm's `lune-termview`
+uses `color`, `custom`, `paint`, `dump`, and the facade keeps those paths, so it checks against the
+snapshot with no source change). This section stays the log; the map links it.
+
+From M1 to M3:
 
 - `Painter::new` takes `&mut dyn TextSystem` (was `&mut TextCache` plus a global scale); the painter
   has a `scene` field (the display list) instead of GPU geometry;
@@ -515,6 +532,22 @@ facade keeps those paths):
 - `theme::DARK`, a neutral alias of `lunegit_dark::THEME`;
 - new: `RawInput`, `FrameOutput`, `Translator`, `OutputState`, `Backdrop::apply`, `WindowBackdrop`,
   the `testing` module.
+
+Since M11 (D234 to D245; nothing public was removed; the workspace version is 0.2.0, D238):
+
+- `Ui::caption_buttons(key, win, CaptionOptions) -> Option<CaptionButton>` and the types `CaptionButton` and
+  `CaptionOptions` (`widgets::caption`, D240); `window::CAPTION_BUTTON_WIDTH` and `CAPTION_GLYPH_SIZE` (and the crate-private `caption_rect`) are
+  the geometry both forms share; `luneui.window.minimize`, `maximize`, `restore` and `close` join the default strings;
+- `Gpu::is_lost(&self) -> bool` (D241; the callback sets an `Arc<AtomicBool>`, no `unsafe`);
+- `testing::scripted_input_contract`, the fourth contract suite beside the text, image and backdrop ones;
+- the wheel's region rule takes a hit's call-order tag as well as its layer (F11, `h.tag >= tag` beside `h.layer >= layer`), so a wheel over a fit composite in a top popover does
+  not reach a list in a popover under it;
+- `stepper`, `slider`, the search picker's trigger, the tab strip and the star rating take their keys through `activation_keys`,
+  `consume_plain_key` or the slider's event filter: they take every key enabled or disabled and act only when enabled, and a chord on
+  them is a shortcut ("Disabled keys");
+- gallery: `UiScene.scale` is `f32` and the 74th page `window` adds seven scenes; `apps/gallery/src/catalogue.rs` is the catalogue check;
+- `scripts/export-snapshot.sh` (D239); every public function, method, type, trait and module has a doc comment and `cargo doc`
+  is clean under `-D warnings` (D242).
 
 Since M10 (D204 to D227; nothing public was removed; `Theme` gained a field, so a `Theme { .. }` literal outside the toolkit needs `glass`):
 
@@ -681,11 +714,11 @@ only under `target/`, except that `scripts/pixel-gate.sh` extracts its base sour
 | Gate | Proves | Compare | Exit codes |
 |---|---|---|---|
 | `scripts/pixel-gate-luneterm.sh` | M1 only: this repo's `lune-ui` drew the same pixels as Luneterm's. Phases: lock parity (every registry package in this repo's `Cargo.lock` is in Luneterm's lock at the rev; `--parity-only` stops here and still applies), run A (Luneterm's own crate), run B (the scratch clone's `lune-ui` repointed at this repo's crate), compare with Luneterm's `dump_compare`. Since M2 step 2 run B cannot build against the new API, so a full run exits 2 by design (roadmap D4) | `18 files, 18 identical, 0 differ, max delta 0` | 0 pass; 1 parity mismatch or pixel difference; 2 usage or setup error |
-| `scripts/pixel-gate.sh [--base <rev>] [--allow <id>...]` | A change since `<rev>` (default `HEAD`) leaves the gallery's reference scenes unchanged (the 15 legacy scenes stay on the Painter API, so the gate keeps proving the moved drawing code is untouched; scenes a later change adds are reported as new, D59). Dumps `git archive <rev>` and the working tree, compares with `dump-compare --allow-new`. `--allow <id>` names a scene whose frames may differ (reported only); an id not in `gallery --list` is an error | `15 files, 15 identical` | 0 pass; 1 delta or scene missing from the candidate; 2 usage or setup error (a base without `apps/gallery` included: nothing to compare is not a pass) |
+| `scripts/pixel-gate.sh [--base <rev>] [--allow <id>...]` | A change since `<rev>` (default `HEAD`) leaves every scene `gallery --list` prints unchanged (421 at M11's close; the 15 legacy scenes stay on the Painter API, so the gate keeps proving the moved drawing code is untouched; scenes a later change adds are reported as new, D59). Dumps `git archive <rev>` and the working tree, compares with `dump-compare --allow-new`. `--allow <id>` names a scene whose frames may differ (reported only); an id not in `gallery --list` is an error | `15 files, 15 identical` | 0 pass; 1 delta or scene missing from the candidate; 2 usage or setup error (a base without `apps/gallery` included: nothing to compare is not a pass) |
 | `scripts/check-targets.sh [--skip-linux]` | The workspace lints and builds beyond the host: Windows `clippy` (needs the `x86_64-pc-windows-msvc` target) and Linux fmt, clippy and tests in a `rust:1.92` container. Not a pixel gate; it covers the code the host `cfg` hides | `windows: passed`, `linux: passed` or `skipped (<reason>)` | 0 every half that ran passed; 1 a check failed; 2 usage |
 
 Dump file names: the gallery writes `<id>@<scale>x.png` (logical 1040x660; `gallery --list` prints
-the 15 legacy names first, then the Ui pages' scenes: 62 names after M4, 152 after M5, 231 after M6, 305 after M7, 332 after M8, 389 after M9, 413 after M10); Luneterm's spike writes `NN-<name>@<scale>x.png` (18 scenes). `tools/dump-compare`
+the 15 legacy names first, then the Ui pages' scenes: 62 names after M4, 152 after M5, 231 after M6, 305 after M7, 332 after M8, 389 after M9, 413 after M10, 421 after M11); Luneterm's spike writes `NN-<name>@<scale>x.png` (18 scenes). `tools/dump-compare`
 (`cargo run -p dump-compare -- <baseline> <candidate> [--max-delta N] [--allow-new]`) compares per
 pixel, max channel delta including alpha; a file missing from the candidate, a file only in the
 candidate (unless `--allow-new`), a size or colour-type mismatch or a delta above `N` (default 0)
