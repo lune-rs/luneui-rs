@@ -2006,12 +2006,16 @@ fn a_wheel_over_the_cards_of_a_column_that_overflows_scrolls_the_column_and_not_
         x0,
         "the board did not"
     );
-    // A sideways swipe over an overflowing column stays with it (the topmost area takes the
-    // delta), so the board does not move either: the entry says so.
+    // A sideways swipe over an overflowing column goes to the board: the column is live only on y,
+    // and a delta routes per axis (D178, which retires the M8 limit).
     h.input.scroll_pixels(-60.0, 0.0);
     run(&mut h, &m, 600);
     let r = settle(&mut h, &m, 610, 30);
-    assert_eq!(r.out.tree.get(col_id(2)).expect("a column").bounds.x, x0);
+    assert_eq!(
+        r.out.tree.get(col_id(2)).expect("a column").bounds.x,
+        x0 - 60.0
+    );
+    assert_eq!(bounds(&r.out, 101).y, y0 - 60.0, "the column stayed");
 }
 
 // Contract lines a mutant of the code left standing (fix round 1, F3): each test below names the

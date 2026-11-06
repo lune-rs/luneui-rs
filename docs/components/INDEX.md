@@ -10,9 +10,9 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | status | count |
 | --- | --- |
 | in-luneterm | 0 |
-| planned | 7 |
+| planned | 3 |
 | stub | 0 |
-| in-progress | 86 |
+| in-progress | 90 |
 | done | 0 |
 | external | 4 |
 | **total** | **97** |
@@ -133,11 +133,11 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
-| [text.code-block](text/code-block.md) | Code block | planned | lunegit, wane | Read-only mono block with optional app-supplied highlight spans, horizontal scroll, selectable text and a copy button with feedback |
-| [text.code-editor-view](text/code-editor-view.md) | Code viewer and editor with syntax highlighting | planned | lunegit, wane | Multi-line code view and editor over an app-supplied document: gutter, app-supplied highlight spans, line bands, synced scrolling, overlay anchors |
-| [text.diff-view](text/diff-view.md) | Diff view (unified, split, hunk actions) | planned | lunegit, wane | Unified and split diff over an app-supplied line model: line numbers, add and remove tints, hunk header rows with actions, row selection, intra-line marks |
+| [text.code-block](text/code-block.md) | Code block | in-progress | lunegit, wane | Read-only mono block with optional app-supplied highlight spans, horizontal scroll, selectable text and a copy button with feedback |
+| [text.code-editor-view](text/code-editor-view.md) | Code viewer and editor with syntax highlighting | in-progress | lunegit, wane | Multi-line code view and editor over an app-supplied document: gutter, app-supplied highlight spans, line bands, synced scrolling, overlay anchors |
+| [text.diff-view](text/diff-view.md) | Diff view (unified, split, hunk actions) | in-progress | lunegit, wane | Unified and split diff over an app-supplied line model: line numbers, add and remove tints, hunk header rows with actions, row selection, intra-line marks |
 | [text.ime](text/ime.md) | IME composition input | in-progress | luneterm, lunegit, wane | IME composition in text widgets: preedit drawn inline at the caret, commit, candidate-window area, byte offsets from the platform |
-| [text.markdown-preview](text/markdown-preview.md) | Markdown preview | planned | lunegit | Renders an app-supplied Markdown block model: headings, paragraphs with inline marks, lists with task boxes, quotes, tables, code, images; links raise an event |
+| [text.markdown-preview](text/markdown-preview.md) | Markdown preview | in-progress | lunegit | Renders an app-supplied Markdown block model: headings, paragraphs with inline marks, lists with task boxes, quotes, tables, code, images; links raise an event |
 | [text.shaping](text/shaping.md) | Shaped-text cache | in-progress | luneterm | TextSystem seam in core; glyphon TextCache behind it, keyed by content and scale; the app registers its fonts |
 | [text.text-edit](text/text-edit.md) | Text editing engine | in-progress | any | Caret, selection, word and line navigation, undo and redo, clipboard through FrameOutput and preedit for single- and multi-line text |
 

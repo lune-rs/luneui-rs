@@ -84,6 +84,8 @@ struct Registration {
     index: usize,
     sense: Sense,
     enabled: bool,
+    /// The axes a scroll region is live on, `(x, y)` (D178).
+    scroll_axes: (bool, bool),
 }
 
 /// An active overlay as the previous frame left it, for begin's input rules.
@@ -150,6 +152,8 @@ pub struct Ui<'a> {
     /// this frame and is the key focus or an accessibility scroll-into-view target, in call order:
     /// a scroll area reads it, because the clipped hit of an off-screen child is empty.
     watch: Vec<(WidgetId, Rect)>,
+    /// The regions registered now are no Tab stops ([`Self::off_tab_order`]).
+    off_tab_order: bool,
     tree: SemanticTree,
     /// Indices in `tree` of the open containers.
     containers: Vec<usize>,
@@ -247,6 +251,7 @@ impl<'a> Ui<'a> {
         // it still holds the capture at the key (D176); the flag is read once and cleared, so a host
         // that stops calling the gesture loses it.
         let gesture_live = std::mem::take(&mut store.gesture_live);
+        let tab_taker = std::mem::take(&mut store.tab_taker);
         let top_press = top_for(|o| o.dismiss_on_outside_press);
         let modal = modal_gate(store.overlays.iter());
         let eligible = move |h: &HitRecord| modal.is_none_or(|(t, l)| h.tag >= t || h.layer > l);
@@ -397,7 +402,13 @@ impl<'a> Ui<'a> {
                                     dismissed.entry(t.id).or_insert(D::Escape);
                                 }
                             }
-                            Key::Named(NamedKey::Tab) if !composing => {
+                            // A view that inserts tabs keeps a plain Tab: it falls through as a key.
+                            Key::Named(NamedKey::Tab)
+                                if !composing
+                                    && (tab_taker.is_none()
+                                        || tab_taker != store.focus.focused
+                                        || *modifiers != Modifiers::default()) =>
+                            {
                                 let scopes = active.iter().rev().map(|o| (o.tag, o.opts.modal));
                                 let mut to = None;
                                 for (tag, trap) in scopes.chain([(0, true)]) {
@@ -533,6 +544,7 @@ impl<'a> Ui<'a> {
             set_values: routed.set_values,
             scroll_into_view: routed.scroll_into_view,
             watch: Vec::new(),
+            off_tab_order: false,
             tree: SemanticTree::default(),
             containers: Vec::new(),
             node_meta: BTreeMap::new(),
@@ -619,9 +631,9 @@ impl<'a> Ui<'a> {
             input_acted |= fired.len() > before;
         }
 
-        let mut senses: Vec<Option<(Sense, bool)>> = vec![None; painter.hits.len()];
+        let mut senses: Vec<Option<Registration>> = vec![None; painter.hits.len()];
         for r in &registered {
-            senses[r.index] = Some((r.sense, r.enabled));
+            senses[r.index] = Some(*r);
         }
         let mut hits = Vec::with_capacity(painter.hits.len());
         let mut rects = BTreeMap::new();
@@ -631,11 +643,14 @@ impl<'a> Ui<'a> {
             if tag == SUPPRESSED {
                 continue;
             }
-            let (sense, enabled) = senses
-                .get(i)
-                .copied()
-                .flatten()
-                .unwrap_or_else(|| (Sense::CLICK, !disabled.iter().any(|d| d.contains(&i))));
+            let (sense, enabled, scroll_axes) = match senses.get(i).copied().flatten() {
+                Some(r) => (r.sense, r.enabled, r.scroll_axes),
+                None => (
+                    Sense::CLICK,
+                    !disabled.iter().any(|d| d.contains(&i)),
+                    (true, true),
+                ),
+            };
             hits.push(HitRecord {
                 id,
                 rect,
@@ -643,6 +658,7 @@ impl<'a> Ui<'a> {
                 sense,
                 tag,
                 enabled,
+                scroll_axes,
             });
             rects.insert(id, rect);
         }
@@ -874,6 +890,10 @@ impl<'a> Ui<'a> {
     /// Registers `rect` as a hit region of `id` on the painter's current layer and returns the
     /// frame's reading of it. The region is clipped and transformed like `Painter::hit`.
     pub fn interact(&mut self, id: WidgetId, rect: Rect, sense: Sense) -> Response {
+        let sense = Sense {
+            skip_tab: sense.skip_tab || self.off_tab_order,
+            ..sense
+        };
         let content_rect = rect;
         let index = self.painter.hits.len();
         self.painter.hit(rect, id);
@@ -882,6 +902,7 @@ impl<'a> Ui<'a> {
             index,
             sense,
             enabled: self.enabled,
+            scroll_axes: (true, true),
         });
         if !self.enabled {
             return Response::inert(id, rect, false);
@@ -923,6 +944,24 @@ impl<'a> Ui<'a> {
             self.watch.push((id, content_rect));
         }
         r
+    }
+
+    /// Runs `f`; with `off` true the regions it registers are no Tab stops: what a virtualized host
+    /// builds outside its viewport can take a press or keep the focus, and Tab does not land there.
+    pub(crate) fn off_tab_order<R>(&mut self, off: bool, f: impl FnOnce(&mut Self) -> R) -> R {
+        let outer = self.off_tab_order;
+        self.off_tab_order = outer || off;
+        let r = f(self);
+        self.off_tab_order = outer;
+        r
+    }
+
+    /// Tells the region the last `interact` registered which axes a wheel delta may reach it on
+    /// (D178): a scroll area calls this right after its own `interact`.
+    pub(crate) fn set_scroll_axes(&mut self, axes: (bool, bool)) {
+        if let Some(r) = self.registered.last_mut() {
+            r.scroll_axes = axes;
+        }
     }
 
     /// The length of the watch list now: a scroll area's mark before it runs its content.
@@ -977,6 +1016,13 @@ impl<'a> Ui<'a> {
     /// The running frame's number, which two frames never share.
     pub(crate) fn frame_number(&self) -> u64 {
         self.store.frame
+    }
+
+    /// The focused widget `id` takes a plain Tab next frame instead of it moving focus. Lasts one
+    /// frame, so a widget that stops being drawn frees the key (read in [`Ui::begin`], which runs
+    /// before any widget could say so).
+    pub(crate) fn take_tab_next_frame(&mut self, id: WidgetId) {
+        self.store.tab_taker = Some(id);
     }
 
     /// Asks for a frame after this one: the picture just drawn is one a state change this frame
@@ -1044,6 +1090,11 @@ impl<'a> Ui<'a> {
     /// Puts `text` on the clipboard; the last write of a frame is the one sent.
     pub fn clipboard_write(&mut self, text: String) {
         self.clipboard_write = Some(text);
+    }
+
+    /// The text a widget has put on the clipboard this frame, if any.
+    pub(crate) fn pending_clipboard(&self) -> Option<&str> {
+        self.clipboard_write.as_deref()
     }
 
     /// Asks for the clipboard's text; the answer arrives as an event on a later frame. Repeated

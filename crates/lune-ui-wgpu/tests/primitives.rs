@@ -542,3 +542,35 @@ fn a_lane_graph_dot_is_a_disc_of_diameter_10_over_a_line_of_another_colour() {
         .count();
     assert!((18..=22).contains(&col), "dot height {col} device px");
 }
+
+/// D13: an italic run draws different ink from the roman run of the same text. No italic face
+/// ships, so the shaper skews the roman face; the instrument is the white fill under the text
+/// (a blank image would be identical to itself, so each render must show ink first).
+#[test]
+fn an_italic_run_draws_different_ink_from_the_roman_run() {
+    let Some(mut gpu) = headless_gpu() else {
+        return;
+    };
+    let mut text = text_cache();
+    let square = [[2.0, 2.0], [118.0, 2.0], [118.0, 78.0], [2.0, 78.0]];
+    let roman = Style::ui(40.0, [0, 0, 0, 255]);
+    let on = |text: &mut TextCache, style: Style| {
+        paint(text, |p| {
+            p.fill_path(&square, WHITE);
+            p.text(&Spec::plain("Hill", style), 10.0, 10.0);
+        })
+    };
+    let a_scene = on(&mut text, roman);
+    let b_scene = on(&mut text, roman.italic());
+    let a = render(&mut gpu, &mut text, &a_scene);
+    let b = render(&mut gpu, &mut text, &b_scene);
+    let ink = |img: &[u8]| {
+        (0..SIZE.1 as usize)
+            .flat_map(|y| (0..SIZE.0 as usize).map(move |x| (x, y)))
+            .filter(|&(x, y)| px(img, x, y)[3] > 0 && px(img, x, y)[0] < 128)
+            .count()
+    };
+    assert!(ink(&a) > 100, "the roman run draws ink: {}", ink(&a));
+    assert!(ink(&b) > 100, "the italic run draws ink: {}", ink(&b));
+    assert_ne!(a, b, "italic changes the picture");
+}

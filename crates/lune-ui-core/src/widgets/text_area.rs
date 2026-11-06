@@ -68,6 +68,8 @@ impl Ui<'_> {
             max_chars: opts.max_chars,
             wrap: opts.wrap.then_some(inner_w),
             page_rows: (inner_h / style.line).floor().max(1.0) as usize,
+            page_keys_scroll: false,
+            rich: None,
         };
         let (mut st, frame) = begin_edit(self, id, &cfg, text);
         let enabled = self.is_enabled();

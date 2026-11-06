@@ -17,10 +17,13 @@ mod bar_chart;
 mod button;
 mod callout;
 mod checkbox;
+mod code_block;
+mod code_editor;
 mod combo;
 mod command_palette;
 mod controls_ui;
 mod dialog;
+mod diff_view;
 mod drag_drop;
 mod dropdown;
 pub(crate) mod effects;
@@ -38,6 +41,7 @@ mod lane_graph;
 mod layout_page;
 mod list_row;
 mod locale;
+mod markdown;
 mod menu;
 mod motion;
 mod nav_item;
@@ -146,6 +150,10 @@ pub(crate) static PAGES: &[&Page] = &[
     &pie_chart::PAGE,
     &kanban_board::PAGE,
     &lane_graph::PAGE,
+    &code_block::PAGE,
+    &code_editor::PAGE,
+    &markdown::PAGE,
+    &diff_view::PAGE,
 ];
 
 /// The window background of a Ui page (glass, focused) and its card. Returns the card.

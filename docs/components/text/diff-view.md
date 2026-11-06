@@ -2,10 +2,10 @@
 id: text.diff-view
 title: Diff view (unified, split, hunk actions)
 area: text
-status: planned
+status: in-progress
 consumers: lunegit, wane
-source: Lunegit: src/Lunegit.Desktop/Views/DiffView.axaml
-owner: —
+source: crates/lune-ui-core/src/widgets/diff_view.rs
+owner: toolkit-v1 M9
 summary: Unified and split diff over an app-supplied line model: line numbers, add and remove tints, hunk header rows with actions, row selection, intra-line marks
 ---
 
@@ -46,7 +46,7 @@ No conflicts among sources.
 - Unified row: minimum height 20; columns 48 (old number), 48 (new number), a 10 px prefix column with margin 4 on both sides, and the text; numbers mono 13, right-aligned with margin right 8, in `fg_faint` ([D58]); text mono 13 [L src/Lunegit.Desktop/Views/UnifiedDiffView.axaml:99-144].
 - Split view: two panes of equal width with a 1 px separator between them (`*, 1, *`); each pane's row has a 48 px line-number column, a 10 px prefix and the text; minimum row height 20; each pane scrolls on its own and the second follows the first in the vertical direction [L src/Lunegit.Desktop/Views/SplitDiffView.axaml:45,92-117,179], [L src/Lunegit.Desktop/Views/SplitDiffView.axaml.cs:107-113].
 - Line look: added rows `#1A73C991` fill and `#73C991` text with prefix "+"; removed rows `#1AE06C75` fill and `#E06C75` text with prefix "-"; context rows transparent, `fg_primary`, prefix a space; hunk rows no prefix, text `#61AFEF` [L src/Lunegit.Desktop/Converters/DiffLineBackgroundConverter.cs:21-26], [L src/Lunegit.Desktop/Converters/DiffLineForegroundConverter.cs:21-27], [L src/Lunegit.Desktop/Converters/DiffLinePrefixConverter.cs:18-24], [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:106-110].
-- Hunk header row: a 1 px `SurfaceSeparator` line, a centred pill (fill `surface_selected`, radius 10, padding 12 and 2, the hunk text in mono 9 px `fg_quaternary` ([D58]) [L src/Lunegit.Desktop/App.axaml:157]), the hunk actions, a second separator line; margin 2 above and below [L src/Lunegit.Desktop/Views/UnifiedDiffView.axaml:148-192], [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:10,30].
+- Hunk header row: a 1 px `SurfaceSeparator` line, a centred pill (fill `surface_selected`, radius 10, padding 12 and 2, the hunk text in mono 9 px `fg_quaternary` ([D58]) [L src/Lunegit.Desktop/App.axaml:157]), the hunk actions, a second separator line; margin 2 above and below [L src/Lunegit.Desktop/Views/UnifiedDiffView.axaml:148-192], [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:10,30]. Built: the row keeps its 20 px pitch with the 18 px buttons 1 px clear, 2 px under Lunegit's 22 (D198).
 - Hunk action button: 18 x 18, radius 5, fill `SurfaceOverlay`, 1 px `SurfaceBorder`, a 10 px icon (plus or minus), `fg_secondary`; a pointer over it: fill `surface_hover`, border `SurfaceDivider`, icon `fg_primary`; pressed: fill `SurfaceActive`, icon `ForegroundBright` [L src/Lunegit.Desktop/Views/UnifiedDiffView.axaml:11-41,165-188], [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:17,27,36]. They show only when the app says the diff is in a mode where actions apply, one action kind per file state (the app decides which kinds) [L src/Lunegit.Desktop/Views/UnifiedDiffView.axaml:163-188].
 - Row selection: a set of selected rows with an overlay `#33767D85` (the `accent` at alpha 0x33) over the row; click selects one row and sets the anchor, Meta-click toggles, Shift-click selects the range from the anchor, press and drag selects the range under the pointer; in the split form the selection lives in one pane and clears when the other pane is used [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:48], [L src/Lunegit.Desktop/Views/SplitDiffView.axaml.cs:133-215], [R crates/lune-ui-core/src/theme.rs:64].
 - Copy: the selected lines, in order, joined by line breaks, go to the clipboard; a context menu offers the line actions the app defines and "Copy selected lines" with the shortcut Cmd+C [L src/Lunegit.Desktop/Views/SplitDiffView.axaml.cs:253-275], [L src/Lunegit.Desktop/Views/UnifiedDiffView.axaml:57-77].
@@ -63,7 +63,7 @@ No conflicts among sources.
 | context row | transparent, `fg_primary` | [L src/Lunegit.Desktop/Converters/DiffLineBackgroundConverter.cs:25], [L src/Lunegit.Desktop/Converters/DiffLineForegroundConverter.cs:26] |
 | added row | fill `#1A73C991`, text `#73C991`, prefix "+" | [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:106,108] |
 | removed row | fill `#1AE06C75`, text `#E06C75`, prefix "-" | [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:107,109] |
-| hunk row | separators, pill, text `#61AFEF` | [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:110], [L src/Lunegit.Desktop/Views/UnifiedDiffView.axaml:148-192] |
+| hunk row | separators, pill, text `fg_quaternary` (the pill's, D198) | [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:110], [L src/Lunegit.Desktop/Views/UnifiedDiffView.axaml:148-192] |
 | row selected | overlay `#33767D85` | [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:48] |
 | row hover | none: the row style keeps the background transparent on hover and on selection | [L src/Lunegit.Desktop/Views/UnifiedDiffView.axaml:81-96] |
 | hunk action, rest | 18 x 18 button, `SurfaceOverlay` fill | [L src/Lunegit.Desktop/Views/UnifiedDiffView.axaml:11-21] |
@@ -82,18 +82,18 @@ No conflicts among sources.
 | hunk action hover | button fill and border | hover | instant | linear | keep | [L .claude/docs/animation-rules.md:102], [D40] |
 | hunk action press | button fill | press | fast | quad-out | keep | [L .claude/docs/animation-rules.md:103], [D40] |
 
-Rows never animate: the diff rows are virtualized, and recycled rows would tween spuriously [L .claude/docs/animation-rules.md:145]; selection, view-mode switches and word-wrap toggles replace the rows at once (Lunegit switches the two sub-views by visibility, no transition [L src/Lunegit.Desktop/Views/DiffView.axaml:203-206]). Lunegit's hunk buttons have no transition in either tier file; the hover and press rows are [D40] additions, and the press scale 0.98 does not apply to an 18 px icon button.
+Rows never animate: the diff rows are virtualized, and recycled rows would tween spuriously [L .claude/docs/animation-rules.md:145]; selection, view-mode switches and word-wrap toggles replace the rows at once (Lunegit switches the two sub-views by visibility, no transition [L src/Lunegit.Desktop/Views/DiffView.axaml:203-206]). Lunegit's hunk buttons have no transition in either tier file; the hover and press rows are [D40] additions, and the 0.98 press scale of the `icon_button` host moves an 18 px edge by under 0.2 px (unseen).
 
 ### Input and focus
 
 - Pointer: click, Meta-click, Shift-click and drag as in Anatomy; the hunk action buttons take their own presses, a press that starts on a button or a scroll bar is not a row press [L src/Lunegit.Desktop/Views/SplitDiffView.axaml.cs:133-136,180-189]; wheel and trackpad scroll; right press opens the context menu [L src/Lunegit.Desktop/Views/UnifiedDiffView.axaml:57-77].
 - Keys: the copy shortcut copies the selected lines [L src/Lunegit.Desktop/Views/UnifiedDiffView.axaml:70-71]; Up and Down move the selection and PageUp and PageDown scroll, as in `layout.virtualized-list` [layout.virtualized-list].
-- Tab stops: the diff body is one stop; each visible hunk action is a stop in call order [core.focus]. Layer: the host's. Context menu: `Popup` [core.ui]. No focus scope.
+- Tab stops: the diff body is one stop; each visible hunk action is a stop in call order, a row in the list's margin is none, and a focus move brings its button into view (D200) [core.focus]. Layer: the host's. Context menu: `Popup` [core.ui]. No focus scope.
 
 ### Retained state
 
 - Transient: hunk button hover and press, selection drag [core.ui].
-- Persistent: the selected row keys and anchor, the scroll offsets of the unified view and of the split panes; the offset is kept when the app replaces the lines with the same document key, and a different key starts at the top [L src/Lunegit.Desktop/Views/SplitDiffView.axaml.cs:102-104], [layout.scroll-area].
+- Persistent: the selected row keys and anchor, the scroll offsets of the unified view and of the split panes; the offset is kept when the app replaces the lines with the same document key, and a different key starts at the top [L src/Lunegit.Desktop/Views/SplitDiffView.axaml.cs:102-104], [layout.scroll-area]. A new key also ends what its rows held: a hunk button loses the focus (D72) even when the new document has one in its place; the focus on a pane stays (D202). Both split panes draw the new document's top in the frame of the switch, however close it lands after a scroll (D203).
 - App-owned: the lines, the document key, the view mode (unified or split), word wrap, whether hunk actions show and of which kind, the intra-line spans.
 - Exit retention: no.
 - Selection is by row key: a row scrolled out of view stays selected [layout.virtualized-list].
@@ -111,6 +111,7 @@ Rows never animate: the diff rows are virtualized, and recycled rows would tween
 - `luneui.diff-view.options`: "Diff options" [L src/Lunegit.Infrastructure/Localization/en.json:246].
 - `luneui.diff-view.word-wrap`: "Word wrap" [L src/Lunegit.Infrastructure/Localization/en.json:247].
 - `luneui.diff-view.copy-selected-lines`: "Copy selected lines" [L src/Lunegit.Infrastructure/Localization/en.json:252].
+- `luneui.diff-view.pane-old`, `luneui.diff-view.pane-new`: "old" and "new", the suffix of a split pane's table name (`Changes (old)`); the toolkit's own, no Lunegit source (D199).
 
 Hunk and line action labels (Lunegit: "Stage hunk", "Unstage hunk", "Stage line", "Unstage line", [L src/Lunegit.Infrastructure/Localization/en.json:248-251]) and the empty-state texts [L src/Lunegit.Infrastructure/Localization/en.json:253-254] are app strings.
 
@@ -128,6 +129,8 @@ Hunk and line action labels (Lunegit: "Stage hunk", "Unstage hunk", "Stage line"
 - `diff-view-scrolled`: offset 4000 px, settled.
 - `diff-view-hunk-hover-fade`: a hunk action entered, t = 60 ms (half of `instant`).
 - `diff-view-hunk-press-fade`: a hunk action pressed, t = 90 ms (half of `fast`).
+- `diff-view-hunk-focus`: Tab through the header's three stops and the body to the first hunk action: its ring, settled (D198).
+- `diff-view-hunk-disabled`: the hunk actions in a disabled scope, settled.
 
 ### Painter primitives
 
@@ -136,7 +139,7 @@ Hunk and line action labels (Lunegit: "Stage hunk", "Unstage hunk", "Stage line"
 
 ### Acceptance
 
-- Behaviour (scripted input): click selects one row; Meta-click toggles; Shift-click selects the range from the anchor; the copy shortcut puts the selected lines, in row order, in one clipboard request; in split form, a press in the other pane clears the first pane's selection [L src/Lunegit.Desktop/Views/SplitDiffView.axaml.cs:144-173].
+- Behaviour (scripted input): click selects one row; Meta-click toggles; Shift-click selects the range from the anchor; the copy shortcut puts the selected lines, in row order, in one clipboard request; in split form, a selection change in the other pane, by any input, clears the first pane's (D201) [L src/Lunegit.Desktop/Views/SplitDiffView.axaml.cs:144-173].
 - Hunk actions: a press on a hunk button reports `(hunk_index, action)` and does not select a row; with actions off the buttons are absent.
 - Preservation: replacing the lines with the same document key keeps the offset (clamped); a different key starts at the top [L src/Lunegit.Desktop/Views/SplitDiffView.axaml.cs:102-104].
 - Synced split scroll: scrolling the left pane to 120 px puts the right at 120 and does not echo [L src/Lunegit.Desktop/Views/SplitDiffView.axaml.cs:107-113].
@@ -148,14 +151,24 @@ Hunk and line action labels (Lunegit: "Stage hunk", "Unstage hunk", "Stage line"
 
 ### Build
 
-- Milestone: M9
+- Milestone: M9. Built in M9 step 6: `Ui::diff_view`, `Ui::diff_selected_text`, `DiffLine`, `LineKind`, `DiffMark`, `SplitRow`, `DiffMode`, `HunkAction`, `DiffOptions`, `DiffResponse`, `pair_rows`, `widest_chars`, 14 scenes on the page `diff-view`.
 - Depends on: text.code-editor-view, layout.virtualized-list, layout.scroll-area, widget.scrollbar, overlay.menu, widget.toolbar, platform.clipboard, core.ui, core.focus, infra.accessibility, motion.transitions
 
 ## Open questions
 
-- The intra-line marks: no Lunegit source; Wane's before and after diff may need word-level marks. The mark tint is a theme value M9 chooses.
-- Whether the unified and split forms share one row model in the toolkit (Lunegit has two views over two models, [L src/Lunegit.Desktop/Views/SplitDiffView.axaml.cs:257-267]); M9 decides.
-- Caps on very large diffs: none found in the files read.
+Answered in M9 (D15, D16):
+
+- The intra-line marks: `DiffMark { start, end }` in chars of the line, clamped like a highlight span; the tint is the theme's `diff_added_mark` / `diff_removed_mark` (the fill's hue at alpha 0x40, a look deviation, D14). Word-level computation stays the app's.
+- One row model for both forms: yes. `DiffLine` is the one model; split takes `&[SplitRow]` (index pairs into the lines) from the pure `pair_rows`, which the app calls when its lines change.
+- Caps on very large diffs: none; 100,000 rows build only the window, `pair_rows` and `widest_chars` are O(lines) and the app calls them on change.
+
+Built as the entry's contract, with these notes:
+
+- The hunk text is `fg_quaternary` inside the pill, as Lunegit's template draws it; `DiffHunkForeground` (`link`) reaches only the normal-line text, which a hunk row hides (D198).
+- A hunk row keeps the 20 px row; the 18 px buttons sit 1 px from its edges (Lunegit grows the row to 22).
+- The hunk action is an `icon_button` host: its 0.98 press scale reaches what the host draws, not the ring the diff paints, and on 18 px moves an edge by under 0.2 px, so it cannot be seen.
+- Number and prefix columns stay put while the text scrolls sideways (Lunegit's list moves them).
+- A split pane's table node is named `<label> (old)` and `<label> (new)` from two toolkit strings, so a screen reader tells the two tables apart (D199); the unified pane keeps `label`. The diff's `context` is the pane's line index, `None` over an empty half. `Ui::diff_selected_text` gives the text Command+C writes, for the app's "Copy selected lines" row.
 
 ## Notes for the planner
 

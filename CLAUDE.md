@@ -59,6 +59,11 @@ Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, r
 - A composite with one tab stop (radio group, star rating, nav list, tab strip, table header, board cards) uses roving focus: `Sense.skip_tab`,
   `Ui::rove_stop`, `rove_keys`, `rove_focus` (D113); text that must fit a width goes through `text::elide` / `Painter::elide`
   (D114). A drag ghost draws one layer group above its source, out of any `record` (`Ui::drag_ghost`, D168).
+- One text editing engine: `TextEdit` edits through `EditText` and `EditBuffer`, implemented for `str`, `String` and the line-indexed
+  `CodeDoc` (D180); a new text kind implements them, it does not get a second engine. A text view draws only the lines in view and
+  never shapes, hashes or clones the whole text per frame (D179, D195).
+- A wheel delta routes per axis: the topmost scroll region live on that axis takes it (D178). A composite with nothing to scroll on
+  an axis disables that axis (`Bars::unless_fits`), so the delta reaches the area around it (D176).
 - An overlay that opens above an active modal is put on `LayerId::Raised` by `Ui::overlay`, once at open (D137): a widget
   never names the layer. A widget in a `with_enabled(false, ..)` scope needs no rule of its own for its nodes (`Ui::node`
   marks them, D140), but it consumes its keys before it gates on `enabled` (not every reader does yet: `docs/architecture.md`, "Disabled keys", is the one list, D159); `testing::disabled_violations` checks a subtree.

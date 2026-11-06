@@ -60,6 +60,9 @@ pub struct UiStore {
     /// A pointer gesture that Escape cancels (a drag, a resize) was live at the end of the previous
     /// frame; cleared at each `begin` (D175).
     pub(crate) gesture_live: bool,
+    /// The focused widget that keeps a plain Tab for itself, as the previous frame said; cleared
+    /// at each `begin`.
+    pub(crate) tab_taker: Option<WidgetId>,
 }
 
 impl std::fmt::Debug for UiStore {

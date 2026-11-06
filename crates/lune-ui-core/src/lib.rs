@@ -41,6 +41,7 @@ pub mod access;
 pub mod acrylic;
 pub mod backdrop;
 pub mod chrome;
+pub mod code_doc;
 pub mod color;
 pub mod drag;
 pub mod icon;

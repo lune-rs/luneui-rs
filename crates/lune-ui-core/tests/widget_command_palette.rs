@@ -1307,3 +1307,92 @@ fn a_dialog_opened_from_an_activation_draws_above_and_takes_the_keys() {
         "the dialog's card is on Raised"
     );
 }
+
+/// Class 1 of D177: the search box holds the key focus when the scope turns disabled, so it takes
+/// the keys a filter bar takes and changes nothing. The palette runs on `Scope::Overlay`.
+#[test]
+fn a_search_box_focused_then_disabled_takes_its_keys_and_changes_nothing() {
+    let secs = sections();
+    type Probe = (&'static str, Key, Option<&'static str>, bool);
+    let named = |n: &'static str, k, t| (n, Key::Named(k), t, false);
+    let logo = |n: &'static str, c: &str| (n, Key::Character(c.to_owned()), None, true);
+    let probes: Vec<Probe> = vec![
+        named("Space", NamedKey::Space, Some(" ")),
+        named("Backspace", NamedKey::Backspace, None),
+        named("Delete", NamedKey::Delete, None),
+        named("Left", NamedKey::ArrowLeft, None),
+        named("Right", NamedKey::ArrowRight, None),
+        named("Home", NamedKey::Home, None),
+        named("End", NamedKey::End, None),
+        ("a typed j", Key::Character("j".into()), Some("j"), false),
+        logo("Command+A", "a"),
+        logo("Command+V", "v"),
+        logo("Command+Z", "z"),
+        logo("Command+C", "c"),
+        logo("Command+X", "x"),
+    ];
+    let chord_of = |p: &Probe| {
+        let c = Chord::key(p.1.clone());
+        if p.3 { c.primary() } else { c }
+    };
+    let press = |h: &mut UiHarness, p: &Probe| {
+        if p.3 {
+            h.input.set_modifiers(Modifiers {
+                logo: true,
+                ..Modifiers::default()
+            });
+        }
+        h.input.key_down(p.1.clone(), p.2);
+        h.input.set_modifiers(Modifiers::default());
+    };
+    let sel = |out: &FrameOutput| {
+        out.tree
+            .get(search_id())
+            .and_then(|n| n.text.as_ref())
+            .expect("the search box's text")
+            .selection
+    };
+    let go = |h: &mut UiHarness, q: &mut String, enabled: bool| {
+        let (_, out) = h.frame(|ui| {
+            page(ui.painter());
+            ui.with_enabled(enabled, |ui| {
+                ui.command_palette("p", q, &palette(&secs, None), &glass());
+            });
+        });
+        out
+    };
+    for probe in &probes {
+        let name = probe.0;
+        for enabled in [true, false] {
+            let mut h = UiHarness::new(WIN);
+            h.shortcuts
+                .add(Binding::new(Scope::Overlay(pid()), chord_of(probe), name))
+                .add(Binding::new(
+                    Scope::Overlay(pid()),
+                    Chord::key(Key::Named(NamedKey::F5)),
+                    "f5",
+                ));
+            let mut q = String::from("ab cd");
+            go(&mut h, &mut q, true);
+            h.at_ms(1000);
+            go(&mut h, &mut q, true);
+            press(&mut h, &("all", Key::Character("a".into()), None, true));
+            let before = sel(&go(&mut h, &mut q, true));
+            assert_eq!(before, (0, 5), "{name}: the box has the key focus");
+            if !enabled {
+                go(&mut h, &mut q, false);
+            }
+            press(&mut h, probe);
+            let out = go(&mut h, &mut q, enabled);
+            assert!(out.fired.is_empty(), "{name} enabled={enabled}: it fired");
+            if !enabled {
+                assert_eq!(q, "ab cd", "{name}: the query changed");
+                assert_eq!(sel(&out), before, "{name}: the selection moved");
+                assert!(out.clipboard.is_empty(), "{name}: the clipboard was used");
+                h.input.key_down(Key::Named(NamedKey::F5), None);
+                h.at_ms(1100);
+                assert_eq!(go(&mut h, &mut q, false).fired.len(), 1, "{name}: F5");
+            }
+        }
+    }
+}

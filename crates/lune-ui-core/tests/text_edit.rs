@@ -1589,3 +1589,123 @@ fn offsets_survive_a_text_system_that_only_shapes() {
     let layout = SpecLayout::new(dynamic, &sp, 2.0).with_page_rows(3);
     assert_eq!(layout.page_rows(), 3);
 }
+
+/// Every `EditCommand` variant at least once; the `match` stops compiling when a variant is added
+/// without a case here.
+fn every_command() -> Vec<EditCommand> {
+    let all = vec![
+        mv(Motion::GraphemeRight),
+        ext(Motion::LineUp),
+        EditCommand::SelectAll,
+        EditCommand::SelectWordAt(2),
+        EditCommand::SelectLineAt(2),
+        ins("x"),
+        BACK,
+        EditCommand::Backspace { word: true },
+        DEL,
+        EditCommand::Delete { word: true },
+        EditCommand::Undo,
+        EditCommand::Redo,
+        EditCommand::Cut,
+        EditCommand::Copy,
+        EditCommand::Paste,
+        EditCommand::PasteText("p".to_owned()),
+        EditCommand::PlaceCaret((7.0, 3.0)),
+        EditCommand::ExtendTo((12.0, 3.0)),
+        EditCommand::Enter,
+        EditCommand::ImePreedit {
+            text: "か".to_owned(),
+            cursor: None,
+        },
+        EditCommand::ImePreedit {
+            text: String::new(),
+            cursor: None,
+        },
+        EditCommand::ImeCommit("c".to_owned()),
+        EditCommand::ImeCancel,
+    ];
+    for c in &all {
+        match c {
+            EditCommand::Move { .. }
+            | EditCommand::SelectAll
+            | EditCommand::SelectWordAt(_)
+            | EditCommand::SelectLineAt(_)
+            | EditCommand::Insert(_)
+            | EditCommand::Backspace { .. }
+            | EditCommand::Delete { .. }
+            | EditCommand::Undo
+            | EditCommand::Redo
+            | EditCommand::Cut
+            | EditCommand::Copy
+            | EditCommand::Paste
+            | EditCommand::PasteText(_)
+            | EditCommand::PlaceCaret(_)
+            | EditCommand::ExtendTo(_)
+            | EditCommand::Enter
+            | EditCommand::ImePreedit { .. }
+            | EditCommand::ImeCommit(_)
+            | EditCommand::ImeCancel => {}
+        }
+    }
+    all
+}
+
+#[test]
+fn takes_is_what_apply_consumes_for_every_command_and_state() {
+    let mut checked = 0;
+    let mut taken = 0;
+    for cmd in every_command() {
+        for read_only in [false, true] {
+            for multiline in [false, true] {
+                for selected in [false, true] {
+                    for composing in [false, true] {
+                        let mut ed = Ed::at("one two\nthree", 4);
+                        ed.edit.set_flags(EditFlags {
+                            read_only,
+                            multiline,
+                            ..EditFlags::default()
+                        });
+                        if selected {
+                            ed.edit.set_selection(2, 6);
+                            ed.sync();
+                        }
+                        if composing && !read_only {
+                            // A preedit exists: only the IME commands and a clipboard answer run.
+                            ed.cmd(EditCommand::ImePreedit {
+                                text: "か".to_owned(),
+                                cursor: None,
+                            });
+                            assert!(ed.edit.preedit().is_some());
+                        }
+                        let takes = ed.edit.takes(&cmd);
+                        let consumed = ed.cmd(cmd.clone()).consumed;
+                        assert_eq!(
+                            takes, consumed,
+                            "{cmd:?} read_only={read_only} multiline={multiline} \
+                             selected={selected} composing={composing}"
+                        );
+                        checked += 1;
+                        taken += usize::from(takes);
+                    }
+                }
+            }
+        }
+    }
+    // The instrument saw both answers.
+    assert!(
+        checked > 0 && taken > 0 && taken < checked,
+        "{taken}/{checked}"
+    );
+}
+
+#[test]
+fn takes_changes_nothing() {
+    for cmd in every_command() {
+        let mut ed = Ed::at("one two", 3);
+        ed.edit.set_selection(1, 5);
+        ed.sync();
+        let before = (ed.sel(), ed.text.clone(), ed.edit.undo_steps());
+        ed.edit.takes(&cmd);
+        assert_eq!((ed.sel(), ed.text.clone(), ed.edit.undo_steps()), before);
+    }
+}

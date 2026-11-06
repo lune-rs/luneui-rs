@@ -2,10 +2,10 @@
 id: text.code-editor-view
 title: Code viewer and editor with syntax highlighting
 area: text
-status: planned
+status: in-progress
 consumers: lunegit, wane
-source: Lunegit: src/Lunegit.Desktop/Markdown/TextMateEditorSupport.cs
-owner: —
+source: crates/lune-ui-core/src/widgets/code_editor.rs
+owner: toolkit-v1 M9
 summary: Multi-line code view and editor over an app-supplied document: gutter, app-supplied highlight spans, line bands, synced scrolling, overlay anchors
 ---
 
@@ -52,7 +52,7 @@ Conflicts: none among sources; Wane needs an editable mono view for the Pricing 
 - Line bands: a full-row tint, as wide as the viewport, for each 1-based line number in a set; numbers below 1 or above the line count are skipped [L src/Lunegit.Desktop/Rendering/LineBackgroundHighlighter.cs:44-58]. Lunegit's tints: added `#1A73C991`, modified `#1AE2B93D`, renamed `#1A61AFEF`, conflicted `#1AF14C4C`; the diff add and remove backgrounds are `#1A73C991` and `#1AE06C75` [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:106-107,120-124].
 - Synced panes: panes that share a font scroll together by pixel offset, equal offsets meaning aligned lines; a re-entrancy flag stops the echo; a hidden pane is skipped; the editable result pane scrolls on its own [L src/Lunegit.Desktop/Views/ConflictResolverView.axaml.cs:19-23,38-42,69-86].
 - Overlay anchors: an overlay (the conflict strips) pins to a line of the editable pane using the text view's visual-line geometry, so it matches the line bands; it is hidden when its line is scrolled out; the gaps around it are not hit-test-visible; it keeps a 16 px inset from the right edge [L src/Lunegit.Desktop/Rendering/ConflictHunkStripOverlay.cs:15-25,37,300-310]. The strip's look and buttons are the app's (`external`, [D42]); the view exposes `line_rect(line)` and the viewport.
-- Read-only: no caret, not focusable by click, as Lunegit suppresses the caret and focus on the read-only panes [L src/Lunegit.Desktop/Views/ConflictResolverView.axaml.cs:30-36]; text can still be selected and copied in the viewer through the engine [text.text-edit].
+- Read-only: no caret, as Lunegit suppresses it on the read-only panes [L src/Lunegit.Desktop/Views/ConflictResolverView.axaml.cs:30-36]; a Tab stop, and a press focuses and selects, so the conflict panes stay selectable and text is copied through the engine (D181; Lunegit's panes take no focus) [text.text-edit].
 - Wrap: off in the viewer, on in the note editor [L src/Lunegit.Desktop/Views/Scratchpad/ScratchpadNoteView.axaml:111].
 - Notices above the text: a truncated-file banner (padding 12 and 6, `surface_input`, a 13 px warning icon and 11 px text) [L src/Lunegit.Desktop/Views/FileViewerView.axaml:319-330]; the app composes it with `widget.banner-empty-state`.
 
@@ -69,8 +69,9 @@ Conflicts: none among sources; Wane needs an editable mono view for the Pricing 
 | wrapped | long lines wrap at the viewport | [L src/Lunegit.Desktop/Views/Scratchpad/ScratchpadNoteView.axaml:111] |
 | empty | no lines; the app shows its empty state | [L src/Lunegit.Desktop/Views/FileViewerView.axaml:380-390] |
 | hover, pressed | not applicable to the view (the text cursor shows over text) | [derived: Lunegit styles none] |
-| focus-visible | the caret is the focus mark; no outline on the view | [derived: Lunegit draws no outline on a TextEditor] |
-| disabled | not applicable (read-only is the inert state) | [derived: no source] |
+| focus-visible, editable | the caret is the focus mark; no outline on the view | [derived: Lunegit draws no outline on a TextEditor] |
+| focus-visible, read-only | the ring, since there is no caret to show it | D181 |
+| disabled | no caret, no selection, the keys taken and none run (D177); read-only is the usual inert state | [derived: no source] |
 
 ### Transitions
 
@@ -79,9 +80,13 @@ n/a — typing, caret movement, selection, scrolling and line bands are high-fre
 ### Input and focus
 
 - Pointer: wheel and trackpad scroll (vertical, and horizontal when not wrapped) [layout.scroll-area]; click places the caret in the editable mode; drag selects; double-click selects a word [text.text-edit]. A press on an overlay anchor goes to the overlay first [core.ui].
-- Keys: the engine's navigation and edit keys in the editable mode; PageUp, PageDown, Home, End scroll; select-all and copy in the read-only mode [text.text-edit], [layout.scroll-area].
-- Tab stop: the view (to scroll and select by keyboard) in the viewer; the engine's Tab rule applies when editable (an app option: insert a tab or move focus) [core.focus].
+- Keys, editable: every key of `text.text-edit`, run on the view. Enter inserts a line; Up and Down cross wrapped rows at the preferred x; PageUp and PageDown move the caret by a page of rows; caret motion reveals at once, in x and y.
+- Keys, read-only: Select all and Copy reach the engine and nothing else; PageUp, PageDown, Home and End scroll, through the area; the arrows stay free, so a binding fires on them (D181) [layout.scroll-area].
+- Tab stop: the view, in both modes. `tab_inserts` (default false): plain Tab inserts `\t` and Shift+Tab still leaves; `Ui::begin` reads the frame before's word from the view, so a view not drawn frees the key. Read-only never keeps it [core.focus].
+- The caret starts at the document's top, not at its end as a field's does: a document opens there. A new `identity` is another document: caret, selection, undo, composition and pending paste go with the old one (D201). A pane of a `scroll_group` that opens one takes nothing from the group in that frame and takes the group to the top with it, whether the others open one too or not; a pane drawn for the first time joins the group where it stands (D203).
+- Composition: on one line in place (`text.ime`). A selection on the line is replaced in the drawing; across lines the first line is cut at the selection and later lines stay as they are until the commit, a stated simplification. The spans of the composing line are asked for the shown text.
 - Layer: the host's; overlay anchors above it on the same layer in call order [core.ui]. No focus scope.
+- Word motions: the document is a `CodeDoc` (D179), and a word motion reads the lines either side of the caret's, one line further where the line past that edge holds text. It crosses one blank line as a `String` does; across two or more blank lines it stops at the blank line, a stated difference from `text.text-edit` on a `String` (D180).
 
 ### Retained state
 
@@ -93,7 +98,7 @@ n/a — typing, caret movement, selection, scrolling and line bands are high-fre
 ### Accessibility
 
 - Role `multiline-text`; read-only state in the viewer; name = the label the app passes (the file name); value = the text and the selection as char offsets [infra.accessibility].
-- A document of up to 10,000,000 bytes cannot be re-exposed every frame: the node's value carries the visible lines and the selection, with the full text on demand (`role-gap: ranged text value for large documents`, Open questions).
+- A document of up to 10,000,000 bytes cannot be re-exposed every frame: the node's `value` and `text` carry the lines in view joined by `\n`, and the selection clipped to them, in chars of that text; a set-value replaces the document under a paste's rules when editable (D185).
 
 ### Strings
 
@@ -111,11 +116,13 @@ n/a — typing, caret movement, selection, scrolling and line bands are high-fre
 - `code-editor-view-bands`: lines 4 to 6 added, 9 modified, 12 conflicted, settled.
 - `code-editor-view-bands-clamped`: band sets with lines 0 and 9999, clamped, settled.
 - `code-editor-view-synced`: three read-only panes and an editable one, the first three at the same offset, settled.
-- `code-editor-view-anchor`: an overlay pinned to line 7 of the editable pane, then scrolled out of view, settled.
+- `code-editor-view-anchor`: two editable panes, an overlay pinned to line 7 of each: the left shows it, the right has scrolled it out of view, settled.
 - `code-editor-view-truncated`: the truncated banner above the text, settled.
 - `code-editor-view-highlight-off`: the large-file warning, plain text, settled.
 - `code-editor-view-empty`: no lines, settled.
 - `code-editor-view-bad-spans`: spans past the line end and inverted, clamped, settled.
+- `code-editor-view-ime`: a Latin preedit on line 4 (D90), settled.
+- `code-editor-view-focus`: read-only with keyboard focus: the ring, no caret, settled.
 
 ### Painter primitives
 
@@ -136,15 +143,26 @@ n/a — typing, caret movement, selection, scrolling and line bands are high-fre
 
 ### Build
 
-- Milestone: M9
+- Milestone: M9. Built in M9 step 4: `Ui::code_editor`, `Ui::code_line_rect`, `CodeOptions`, `LineBand`, 15 scenes on the page `code-editor-view`.
 - Depends on: text.text-edit, layout.scroll-area, widget.scrollbar, layout.virtualized-list, text.shaping, platform.clipboard, core.ui, core.focus, infra.accessibility
 
 ## Open questions
 
-- `role-gap: ranged text value for large documents` (see Accessibility): how the node exposes a 10 MB value.
-- Document representation (a rope, a line index over a `String`): not a source question; M9 decides within the D41 budget.
-- Folding and in-editor search: Lunegit has neither (Evidence), so out of v1 unless a consumer asks.
-- Gutter width and the selection fill: Lunegit's come from AvaloniaEdit and are not read; M9 takes them from the theme (selection: see `text.text-edit`).
+Answered in M9 (D179 to D185, D194):
+
+- Ranged text value: the node carries the lines in view (D185). The full-text query stays open for M10's bridge.
+- Document representation: `CodeDoc`, one `String` and a line index (D179); at 11 MB and 1,000,000 lines an edit measures 0.9 ms.
+- Folding and in-editor search: out of v1, as Lunegit has neither (D181).
+- Gutter width and the selection fill: the numbers take `GUTTER_PAD` 4 and `GUTTER_GAP` 8 around the widest number, the text 2 from the column's edge; the selection is `text_selection`, with a 4 px sliver past a selected line's end (D195).
+- A very long single line: shaping follows its length, so a multi-megabyte line is slow to first draw, then cached; no windowing inside a line in v1 (D194).
+
+Built as the entry's contract, with these notes:
+
+- `Ui::code_line_rect(key, line)` numbers lines from 1, as the gutter and `LineBand` do; `Highlighter::spans` and `CodeDoc::line` count from 0 (D195).
+- The frame shapes the lines in view and nothing else: a highlighter is asked for those only, and a wrapped view also measures the `MARGIN` lines either side, undrawn, so a line that comes into view from above has already shifted the area.
+- A reveal in a wrapped view measures the caret's line and what fills the view above it, then lands; a far line takes two frames at most.
+- A read-only view follows no caret: a selection dragged past the edge does not scroll it.
+- Word motions: see Input and focus.
 
 ## Notes for the planner
 

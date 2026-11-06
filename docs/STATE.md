@@ -1,13 +1,50 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-05 (M8 built on `orch/toolkit-v1`, step 7 closed, review rounds 1 and 2 fixed (F1 to F3, D175; F7 to F10, D176); awaiting re-review and merge; M7 is merged to main at 662d310)
+Last updated: 2026-11-06 (M9 built and closed on the program branch, steps 1 to 9 done, review rounds 1 to 4 fixed; M8 merged to main at 2474248)
 
 ## Now
 
-M8 (data views: table, bar chart, pie chart, kanban board, lane graph) is built on `orch/toolkit-v1` (7 steps, DECISIONS
-D160 to D174) and closed: the cross-widget suite, the disabled-keys rows, the catalogue audit, the architecture notes and the
-bench are in. It waits for review and the merge. `docs/architecture.md` has the module map, the pages and "API changes since M1".
+M9 (text views: code block, code editor view, markdown preview, diff view) is built, visually accepted and closed on the program
+branch (steps 1 to 9; DECISIONS D177 to D203), review rounds 1 to 3 fixed (D200 to D203), waiting on re-review and the merge to main. `docs/architecture.md` has the module map,
+the pages, "Disabled keys" and "API changes since M1" (the M9 block).
+
+What M9 added:
+- Carried limits paid first: text readers consume then gate (D177: `begin_edit` and `selectable_text`, so `text_field`, the filter
+  bar's and the palette's box, `text_area` and the selectable text; `TextEdit::takes`), and a wheel delta routes per axis (D178), which
+  closed the M8 limit of a sideways swipe over a board column.
+- One engine, generic over the text (D179, D180): `TextEdit` edits through `EditText` and `EditBuffer`, implemented for `str`,
+  `String` and `CodeDoc` (one `String` and a line index; at 11 MB and 1,000,000 lines an edit measures 0.9 ms).
+- `text.code-editor-view` (D181 to D185, D195): `Ui::code_editor`, `Ui::code_line_rect`, lines on `RowHeights`, read-only or
+  editable, wrapped or not, spans, bands, synced panes, plain Tab through `tab_taker`, IME; 15 scenes.
+- `text.code-block` (D186, D196): the same frame read-only with a copy button and the check-mark feedback; the text's clip ends 4 px
+  before the button and the bar lies in the bottom padding (step 8); 12 scenes.
+- `text.markdown-preview` (D188, D197, D198): `Ui::markdown` over the `MdBlock` model, blocks as virtual rows, inline code pills with
+  pads left out of Copy, links as Tab stops, task boxes, tables, images, fenced code through the block; 16 scenes.
+- `text.diff-view` (D191, D192, D199): `Ui::diff_view`, unified and split on the list frame (a pixel scroll link between panes),
+  `pair_rows`, hunk actions, intra-line marks, `Ui::diff_selected_text`; 14 scenes; each split pane names its table "(old)" or "(new)".
+- Scaffold: `Style.italic` (D189), six theme tokens (D190), `widgets::text_lines`, rich selectable text by position (D187), the list
+  frame's x axis, `fill`, `identity` and `link`.
+- Step 8 (visual): the director accepted both batches (Wane's code block against its mock, Lunegit's values for the other three);
+  the fixes are in D196 and D198 (hunk text `fg_quaternary`, the underline, strike and pill places, the link ring).
+- Step 9: `c4::m9` (roles, names and states of the four in one frame, injected actions on a link, a task box, a hunk action, the copy
+  button and a set-value, tab stops, the disabled walk, Global-binding silence for nine stops with a mutant each, idle at rest) and
+  one `nested_wheel` case per composite; the "Disabled keys" rows; the catalogue audit (every scene name of the four entries in
+  `--list`, both ways).
+
+Counts at the tip: gallery 70 pages, 389 scene names in `--list`; `cargo test --workspace -- --list` names 2,279 tests.
+
+Final gate at the M9 tip: fmt, clippy `-D warnings`, `cargo test --workspace`, boundaries, component index; `LUNEUI_REQUIRE_GPU=1 cargo
+test -p lune-ui-wgpu` 63 passed; pixel gate against 2474248 (the M8 merge) 332 identical, 57 new, nothing allowed; Windows and Linux (Docker) pass. Bench
+(`cargo run --release -p gallery -- --bench`, verdict per D85, 2080 x 1320, 5 runs, 70 pages, M1 Pro; load 2.71 at the start and 2.98 at
+the end; self-test in range, cpu p50 4.09, spread p99 +1.13, max +3.41; a short `cargo test` overlapped the first minutes): 0 over, every
+page 0 of 5 runs over; highest page p99 8.36 ms (`dialog`), then `flyout` 6.30 and `code-editor-view` 6.28 (the new page with the
+highest p99; plan assumption D41, per-line shaping, holds: the editor's p99 is 38 percent of the budget); worst frame of any page
+19.59 ms (`diff-view`, one frame, under the 33 ms limit), `code-block` p99 1.08, `markdown-preview` 1.38, `diff-view` 2.61.
+
+M8 (data views: table, bar chart, pie chart, kanban board, lane graph) is merged to main at 2474248 (7 steps, DECISIONS
+D160 to D176) and closed: the cross-widget suite, the disabled-keys rows, the catalogue audit, the architecture notes and the
+bench are in. `docs/architecture.md` has the module map, the pages and "API changes since M1".
 
 What M8 added:
 - Carried limits paid first (D160): a real arrow on a focused scroll area no longer scrolls (F18); the area's Page, Home and
@@ -48,16 +85,16 @@ reaches the area around it (the board and its columns, list, table, tree, tab st
 `nested_wheel`); an Escape in the frame a gesture ends, after the release or the capture's loss, is the overlay's; the armed-press
 rule has its test on `free_drag_gesture`; the Escape routing entries say D175. Gate: `cargo test --workspace` 1,954 passed, 0 failed.
 
-The bench below is from before the fixes (nothing they touch is on a
-frame path the bench measures beyond one store flag).
+Review round 3 passed at 208608b with two nits left open: a wheel over a fit composite in a top popover reaches a list in a popover under it
+(`pointer.rs:258`, two non-modal overlays on one layer; `&& h.tag >= tag` fixed both probes in a scratch copy, F11), and F5, F6 (a ghost's step on a
+press mid-slide or a second Shift move during a landing).
 
-Final gate at 7147e31: fmt, clippy `-D warnings`, `cargo test --workspace` 1,918 passed and 0 failed, boundaries clean, component
-index up to date; `LUNEUI_REQUIRE_GPU=1 cargo test -p lune-ui-wgpu` 62 passed (the lane dot probe included); `--list` 332;
-pixel gate against 662d310 (the M7 merge) 305 identical, 27 new, nothing allowed; Windows and Linux (Docker) pass. Bench
-(`cargo run --release -p gallery -- --bench`, verdict per D85, 66 pages, 2080 x 1320, 5 runs, M1 Pro; load 7.53 at the start,
-4.4 to 6.4 across the pages, 5.00 at the end; self-test in range, cpu p50 4.22, spread p99 +3.95): 0 pages over, every page 0 of
-5 runs over; highest page p99 11.87 ms (`dialog`) and worst frame 15.68 ms (`flyout`); the five M8 pages `table`, `bar-chart`,
-`pie-chart`, `kanban-board`, `lane-graph` read p99 7.97, 7.31, 6.07, 6.68, 6.11 ms and worst 13.10, 15.59, 10.83, 11.83, 8.57 ms.
+Final gate at 208608b: fmt, clippy `-D warnings`, `cargo test --workspace` 1,954 passed and 0 failed, boundaries clean, component
+index up to date; `LUNEUI_REQUIRE_GPU=1 cargo test -p lune-ui-wgpu` 62 passed; `--list` 332; pixel gate against 662d310 (the M7
+merge) 305 identical, nothing allowed; Windows and Linux (Docker) pass. Bench (`cargo run --release -p gallery -- --bench`, verdict
+per D85, 2080 x 1320, 5 runs, M1 Pro; load 6.46 at the start, 4.14 at the end; self-test in range, cpu p50 4.2, spread p99 about +7.6;
+a second bench overlapped its first two minutes): 0 over, every page 0 of 5 runs over; highest page p99 12.08 ms (`dialog`), worst
+frame 19.01 ms (`radio-group`).
 
 ## Carried limits
 
@@ -91,12 +128,19 @@ pixel gate against 662d310 (the M7 merge) 305 identical, 27 new, nothing allowed
   `CHEVRON_GAP` and `GLYPH_GAP` have no source (the director accepted them). Split panes: the panes draw with the size the
   frame began with, so a size a frame's input changed shows in the panes on the catch-up frame.
 - M8 limits (entries and D173, D174): the table has no horizontal scroll (`Fill` columns shrink, then the last columns clip),
-  a sideways swipe over a board column that overflows moves nothing (the topmost scroll area takes the delta; a vertical wheel over
-  the cards of a column that fits scrolls the board, D175), `page` and `settings_page` nested in another area keep a delta even when they fit (measured extent; the other composites pass it, D176), an Escape before the release in one frame is lost and the drop commits (the next Escape dismisses, D176), a `Measured` row height after a sort takes effect on the next frame, a control in a row scrolled out of view loses the
+  `page` and `settings_page` nested in another area keep a delta even when they fit (measured extent; the other composites pass it, D176), an Escape before the release in one frame is lost and the drop commits (the next Escape dismisses, D176), a `Measured` row height after a sort takes effect on the next frame, a control in a row scrolled out of view loses the
   focus (rows out of view are not built; by construction, not probed), a wrapping cell ignores `num`, and the sorted header's
   focus ring snaps. Bars are keyed by column index, so a rolling window morphs in place with no slide. The board moves one
   card a frame by Shift and arrow, takes no landing in a disabled scope, and an app that applies a move later than the next
   frame sees the landing retarget with a step; an empty card footer leaves 6 px under the last row.
+- M9 limits (entries, D194, D183, Q16): a very long single line costs in proportion to its length, slow to first draw then cached (no
+  windowing inside a line); a line inserted into a wrapped editor leaves stale heights below it until they are built, so the bar may
+  shift; a word motion in the editor stops at its window's edge (a line, so on single-blank-line text one window past); the markdown's
+  nested block (a table, a list, a quote) is built whole, and only the blocks in view are Tab stops; the editor's node carries the
+  lines in view, so the `role-gap` full-text query stays open for M10's bridge; no folding and no in-editor search (D181, Lunegit has
+  neither); a one-line code block scrolled fully right has its thumb under the copy button by about 4 px (the button is hit first);
+  the markdown's inline underline, strike and pill are fills from row boxes, not a seam feature (D188); no italic face ships, so italic is the shaper's skew (D189);
+  a page key or Home in the frame right after a far jump in a wrapped view lands off by what that frame measured (80 px in the probe: the shift the content queued lands after the jump); a pane pulled in the frame of its own wheel publishes nothing, so a pixel wheel on the other pane in the very frame one pane opens a document alone rests apart until the next scroll (D184's rule; a split diff opens both panes, so only linked code views can do it).
 - `role-gap: tab to panel association` of the tab strip stays open (D122). The real pointer feel of the tab drag, the
   slider, the splitter and the tree in window mode is not testable with scripted input.
 - Review nits left open (M6 `review.md`): `toolbar_label` repeats `button_inner_colored` (F2); colour helpers exist twice
@@ -113,7 +157,7 @@ pixel gate against 662d310 (the M7 merge) 305 identical, 27 new, nothing allowed
 
 ## Next
 
-1. Review and merge M8 (`orch/toolkit-v1`), then M9 (text views).
+1. M9 review and merge to main; then M10 (platform bridges) per the roadmap.
 2. CI (fmt, clippy `-D warnings`, tests on macOS, Windows and Linux) now that there is code to run.
 3. An export script for Luneterm's vendored snapshot, before Luneterm M9. The migration
    map for M11 is "API changes since M1" in `docs/architecture.md`.

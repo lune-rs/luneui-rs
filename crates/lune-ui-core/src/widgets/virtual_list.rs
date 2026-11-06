@@ -19,7 +19,7 @@
 //! that row stays where it is on screen.
 
 use std::collections::BTreeSet;
-use std::hash::Hash;
+use std::hash::{Hash, Hasher};
 
 use crate::access::{Action, Node, Role, State};
 use crate::color::{Rgba, with_alpha};
@@ -56,6 +56,18 @@ pub(crate) struct ListStyle {
     /// Rows fill their slot edge to edge at radius 0, and hover reads the pointer over the slot
     /// (so a control in a cell keeps its row lit).
     pub(crate) flat: bool,
+    /// The width of the rows' content when it can exceed the viewport: the x axis is then live
+    /// (a bar that shows only when it overflows) and [`RowCtx::scroll_x`] says how far the rows'
+    /// content has scrolled. `None`: no horizontal scroll.
+    pub(crate) content_w: Option<f64>,
+    /// Whether the list paints the hover and selection fill. `false`: the row's closure draws it
+    /// (from [`RowCtx::fill`]); the focus ring stays the list's.
+    pub(crate) fill: bool,
+    /// The app's "same document" key, given to the area; a new key clears the list's offset,
+    /// measured heights and selection.
+    pub(crate) identity: Option<u64>,
+    /// A scroll link (D8): lists with the same group share their vertical offset.
+    pub(crate) link: Option<WidgetId>,
 }
 
 impl ListStyle {
@@ -64,6 +76,10 @@ impl ListStyle {
         role: Role::List,
         row_role: Role::ListItem,
         flat: false,
+        content_w: None,
+        fill: true,
+        identity: None,
+        link: None,
     };
 }
 
@@ -131,6 +147,9 @@ pub struct RowCtx {
     pub focus_visible: bool,
     /// The highlight colour this frame.
     pub fill: Rgba,
+    /// How far the rows' content has scrolled sideways, in px: 0 unless the frame has a content
+    /// width (the slot itself does not move).
+    pub scroll_x: f32,
 }
 
 /// What [`Ui::virtual_list`] returns.
@@ -482,6 +501,9 @@ struct ListMem {
     /// The offset and rect the last frame drew at.
     offset: f64,
     rect: Option<Rect>,
+    /// The offset the last frame's area ended at: past `offset` when a reveal landed after the
+    /// rows drew.
+    ended: f64,
     /// A height changed last frame, so this frame's rows move.
     relaid: bool,
     /// The content moved last frame: this frame's hover is still that movement's result.
@@ -490,6 +512,28 @@ struct ListMem {
     press: Option<RowKey>,
     /// The row a drag selection last reached.
     drag_end: Option<usize>,
+    /// The identity the rows belong to.
+    identity: Option<u64>,
+    /// How many identities followed the first this list drew: a row's id holds it, so what a row
+    /// and its children kept (a focused button) goes with the document.
+    epoch: u64,
+}
+
+/// What a row's id and its children's scope are keyed by: the key alone until a new identity, so a
+/// list's ids do not depend on it having one.
+#[derive(Clone, Copy)]
+struct RowScope {
+    epoch: u64,
+    key: RowKey,
+}
+
+impl Hash for RowScope {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        if self.epoch != 0 {
+            self.epoch.hash(state);
+        }
+        self.key.hash(state);
+    }
 }
 
 impl ListMem {
@@ -586,17 +630,52 @@ impl Ui<'_> {
             key: row_key,
         };
         let mut out = Outcome::default();
+        let mut opened = false;
+        if style.identity != mem.identity {
+            // Another document: nothing of the last one carries over. A first draw replaces none.
+            opened = mem.rect.is_some();
+            self.scroll_forget_shift(AREA);
+            mem = ListMem {
+                identity: style.identity,
+                epoch: mem.epoch + u64::from(opened),
+                ..ListMem::default()
+            };
+            mem.heights.sync(opts.count, opts.heights);
+            st = ListState::default();
+        }
 
         // Always: a list focused and then disabled takes its keys and acts on none.
         let enabled = self.is_enabled();
         self.list_keys(&mut st, &mem, &rows, enabled, &mut out);
 
+        // A linked pane takes the group's offset before its area runs, from where it stands: the
+        // last frame's end and this pane's own queued shift (a measured height above the first
+        // row). One that opened a document takes nothing, and the group starts over with it.
+        let drawn_at = mem.offset;
+        let pending = self.scroll_pending_shift(AREA);
+        let pulled = match style.link {
+            Some(group) if opened => {
+                self.scroll_link_open(group);
+                0.0
+            }
+            Some(group) => self.scroll_link_pull(group, mem.ended + pending, mem.rect.is_none()),
+            None => 0.0,
+        };
+        if pulled != 0.0 {
+            self.scroll_shift(AREA, pulled);
+        }
         let area = ScrollOptions {
             bars: (
-                Bars::Disabled,
+                style.content_w.map_or(Bars::Disabled, |w| {
+                    Bars::Auto.unless_fits(w, f64::from(rect.w))
+                }),
                 Bars::Auto.unless_fits(mem.heights.total(), f64::from(rect.h)),
             ),
-            extent: Some((f64::from(rect.w), mem.heights.total())),
+            extent: Some((
+                style.content_w.unwrap_or(f64::from(rect.w)),
+                mem.heights.total(),
+            )),
+            identity: style.identity,
             ..ScrollOptions::default()
         };
         let scroll = self.scroll_area_untranslated(AREA, rect, &area, |ui, view| {
@@ -608,11 +687,18 @@ impl Ui<'_> {
                 State::Disabled
             });
             let response = ui.node_container(node, |ui| {
-                ui.list_rows(view.offset.1, st, &mut mem, &rows, draw, &mut out)
+                ui.list_rows(view.offset, st, &mut mem, &rows, draw, &mut out)
             });
             (response, Extent::default())
         });
+        mem.ended = scroll.offset.1;
         *self.persistent::<ListMem>(id) = mem;
+        // Only a move of its own publishes; a pane that was just pulled follows, and says nothing.
+        if let Some(group) = style.link
+            && pulled == 0.0
+        {
+            self.scroll_link_push(group, drawn_at, scroll.offset.1);
+        }
 
         let mut response = scroll.value;
         if out.changed {
@@ -710,7 +796,7 @@ impl Ui<'_> {
     /// One frame of the rows inside the area: registers them, applies their input, then draws.
     fn list_rows(
         &mut self,
-        offset: f64,
+        view_offset: (f64, f64),
         mut st: ListState,
         mem: &mut ListMem,
         rows: &Rows<'_>,
@@ -718,6 +804,7 @@ impl Ui<'_> {
         out: &mut Outcome,
     ) -> Response {
         let (id, rect, style) = (rows.id, rows.rect, rows.style);
+        let (scroll_x, offset) = (view_offset.0 as f32, view_offset.1);
         let response = self.interact(id, rect, Sense::CLICK_FOCUS);
         let still = mem.still(offset, rect);
         let viewport = f64::from(rect.h);
@@ -730,7 +817,10 @@ impl Ui<'_> {
         let mut pressing = false;
         for index in window {
             let key = (rows.key)(index);
-            let row_id = self.id(key);
+            let row_id = self.id(RowScope {
+                epoch: mem.epoch,
+                key,
+            });
             let y = (mem.heights.top(index) - offset) as f32 + rect.y;
             let slot = Rect::new(rect.x, y, rect.w, mem.heights.height(index) as f32);
             let r = self.interact(row_id, slot, Sense::DRAG);
@@ -804,6 +894,7 @@ impl Ui<'_> {
                     cursor,
                     focus_visible: cursor && ring,
                     fill: row_fill(&theme, hovered, selected),
+                    scroll_x,
                 },
             });
         }
@@ -831,7 +922,7 @@ impl Ui<'_> {
                     theme.item_radius,
                 )
             };
-            if ctx.fill[3] != 0 {
+            if style.fill && ctx.fill[3] != 0 {
                 self.painter().fill(highlight, radius, ctx.fill);
             }
 
@@ -851,7 +942,15 @@ impl Ui<'_> {
             } else {
                 node.states.insert(State::Disabled);
             }
-            let height = self.node_container(node, |ui| ui.scope(ctx.key, |ui| draw(ui, &ctx)));
+            let scope = RowScope {
+                epoch: mem.epoch,
+                key: ctx.key,
+            };
+            // A margin row is built and clipped: nothing on it is a Tab stop.
+            let hidden = ctx.rect.bottom() <= rect.y || ctx.rect.y >= rect.bottom();
+            let height = self.off_tab_order(hidden, |ui| {
+                ui.node_container(node, |ui| ui.scope(scope, |ui| draw(ui, &ctx)))
+            });
             if ctx.focus_visible {
                 focus_ring::paint(self.painter(), highlight, RingKind::Button, 1.0);
             }
@@ -872,5 +971,621 @@ impl Ui<'_> {
             self.request_catch_up();
         }
         response
+    }
+}
+
+/// The frame's crate-private fields (`ListStyle`'s `content_w`, `fill`, `identity` and `link`,
+/// `RowCtx::scroll_x`) at non-default values. The suites in `tests/` hold
+/// the defaults; the diff view proves these again from outside.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::color::premul;
+    use crate::input::{Key, PointerButton, Repaint};
+    use crate::scene::Scene;
+    use crate::testing::UiHarness;
+    use crate::theme::DARK;
+
+    const WIN: (f32, f32) = (500.0, 300.0);
+    const RECT: Rect = Rect::new(20.0, 20.0, 200.0, 100.0);
+    const RIGHT: Rect = Rect::new(260.0, 20.0, 200.0, 100.0);
+    const ROW: f32 = 20.0;
+    const COUNT: usize = 60;
+
+    fn opts(count: usize) -> ListOptions<'static> {
+        ListOptions {
+            count,
+            heights: Heights::Fixed(ROW),
+            selection: SelectionMode::Single,
+            index_of: None,
+            label: "rows",
+        }
+    }
+
+    struct Seen {
+        rows: Vec<RowCtx>,
+        resp: ListResponse,
+    }
+
+    /// One pane of a frame.
+    fn pane(ui: &mut Ui<'_>, rect: Rect, count: usize, style: ListStyle) -> Seen {
+        let mut rows = Vec::new();
+        let resp = ui.list_styled(
+            ("l", rect.x as i32),
+            rect,
+            &opts(count),
+            style,
+            |i| RowKey(i as u64),
+            |_, c| {
+                rows.push(*c);
+                ROW
+            },
+        );
+        Seen { rows, resp }
+    }
+
+    /// One frame with the left pane.
+    fn frame(h: &mut UiHarness, style: ListStyle) -> (Seen, Scene) {
+        let mut seen = None;
+        let (scene, _) = h.frame(|ui| seen = Some(pane(ui, RECT, COUNT, style)));
+        (seen.expect("the frame ran"), scene)
+    }
+
+    /// One frame with both panes, left drawn first; the repaint request comes with it.
+    fn both(
+        h: &mut UiHarness,
+        styles: (ListStyle, ListStyle),
+        counts: (usize, usize),
+    ) -> (Seen, Seen, Repaint) {
+        let mut seen = (None, None);
+        let (_, out) = h.frame(|ui| {
+            seen.0 = Some(pane(ui, RECT, counts.0, styles.0));
+            seen.1 = Some(pane(ui, RIGHT, counts.1, styles.1));
+        });
+        (
+            seen.0.expect("left drew"),
+            seen.1.expect("right drew"),
+            out.repaint,
+        )
+    }
+
+    fn shapes(scene: &Scene) -> usize {
+        scene
+            .layers
+            .iter()
+            .map(|l| l.geometry.under.len() + l.geometry.over.len())
+            .sum()
+    }
+
+    fn fills_of(scene: &Scene, colors: &[Rgba]) -> usize {
+        let cs: Vec<_> = colors.iter().map(|c| premul(*c)).collect();
+        scene
+            .layers
+            .iter()
+            .flat_map(|l| l.geometry.under.iter())
+            .filter(|s| cs.contains(&s.color))
+            .count()
+    }
+
+    #[test]
+    fn a_content_width_makes_the_x_axis_live_with_its_bar() {
+        let wide = ListStyle {
+            content_w: Some(600.0),
+            ..ListStyle::LIST
+        };
+        let mut seen = Vec::new();
+        for style in [ListStyle::LIST, wide] {
+            let mut h = UiHarness::new(WIN);
+            frame(&mut h, style);
+            h.input.pointer_to(100.0, 60.0);
+            frame(&mut h, style);
+            h.input.scroll_pixels(-50.0, 0.0);
+            frame(&mut h, style);
+            // Past the bar's fade-in.
+            h.at_ms(300);
+            let (s, scene) = frame(&mut h, style);
+            seen.push((s.rows[0].scroll_x, shapes(&scene)));
+        }
+        assert_eq!(seen[0].0, 0.0, "no content width, no sideways scroll");
+        assert_eq!(seen[1].0, 50.0, "the wheel moved the rows' content");
+        assert!(seen[1].1 > seen[0].1, "the x bar draws: {seen:?}");
+    }
+
+    #[test]
+    fn a_content_that_fits_the_width_has_no_x_scroll() {
+        let fits = ListStyle {
+            content_w: Some(150.0),
+            ..ListStyle::LIST
+        };
+        let mut h = UiHarness::new(WIN);
+        frame(&mut h, fits);
+        h.input.pointer_to(100.0, 60.0);
+        frame(&mut h, fits);
+        h.input.scroll_pixels(-50.0, 0.0);
+        assert_eq!(frame(&mut h, fits).0.rows[0].scroll_x, 0.0);
+    }
+
+    #[test]
+    fn no_fill_paints_no_highlight_but_keeps_the_fill_value_and_the_ring() {
+        let quiet = ListStyle {
+            fill: false,
+            ..ListStyle::LIST
+        };
+        let tones = [DARK.surface_selected, DARK.surface_active];
+        let mut result = Vec::new();
+        for style in [ListStyle::LIST, quiet] {
+            let mut h = UiHarness::new(WIN);
+            frame(&mut h, style);
+            h.input
+                .pointer_to(100.0, 30.0)
+                .click(PointerButton::Primary);
+            frame(&mut h, style);
+            h.input.key_down(Key::Named(NamedKey::ArrowDown), None);
+            frame(&mut h, style);
+            h.at_ms(500);
+            let (s, scene) = frame(&mut h, style);
+            let selected = s.rows.iter().find(|r| r.selected).expect("a selected row");
+            assert_ne!(selected.fill[3], 0, "the row is still given its fill");
+            assert!(s.rows.iter().any(|r| r.focus_visible), "the ring shows");
+            let strokes: usize = scene.layers.iter().map(|l| l.geometry.over.len()).sum();
+            result.push((fills_of(&scene, &tones), strokes));
+        }
+        assert!(result[0].0 > 0, "the instrument sees the fill: {result:?}");
+        assert_eq!(result[1].0, 0, "no fill: {result:?}");
+        assert_eq!(result[0].1, result[1].1, "the ring stays: {result:?}");
+        assert!(result[1].1 > 0, "and there is a ring: {result:?}");
+    }
+
+    fn selected(h: &mut UiHarness) -> usize {
+        let mut n = 0;
+        h.frame(|ui| n = ui.list_state(("l", RECT.x as i32)).selection.len());
+        n
+    }
+
+    #[test]
+    fn a_new_identity_clears_the_offset_and_the_selection() {
+        let at = |id| ListStyle {
+            identity: Some(id),
+            ..ListStyle::LIST
+        };
+        let mut h = UiHarness::new(WIN);
+        frame(&mut h, at(1));
+        h.input
+            .pointer_to(100.0, 30.0)
+            .click(PointerButton::Primary);
+        frame(&mut h, at(1));
+        h.input.scroll_pixels(0.0, -200.0);
+        assert_eq!(frame(&mut h, at(1)).0.resp.offset, 200.0);
+        assert_eq!(
+            frame(&mut h, at(1)).0.resp.offset,
+            200.0,
+            "the same key keeps it"
+        );
+        assert_eq!(selected(&mut h), 1, "the selection is kept with the key");
+        assert_eq!(
+            frame(&mut h, at(2)).0.resp.offset,
+            0.0,
+            "a new key starts at the top"
+        );
+        assert_eq!(selected(&mut h), 0, "and unselected");
+    }
+
+    #[test]
+    fn tab_onto_a_child_past_the_right_edge_moves_the_list_sideways() {
+        let style = ListStyle {
+            content_w: Some(800.0),
+            ..ListStyle::LIST
+        };
+        let mut child = None;
+        let mut frame = |h: &mut UiHarness| {
+            let mut x = 0.0;
+            let (_, out) = h.frame(|ui| {
+                ui.list_styled(
+                    "l",
+                    RECT,
+                    &opts(COUNT),
+                    style,
+                    |i| RowKey(i as u64),
+                    |ui, row| {
+                        x = row.scroll_x;
+                        if row.index == 1 {
+                            let id = ui.id("child");
+                            child = Some(id);
+                            let left = row.rect.x + 600.0 - row.scroll_x;
+                            let at = Rect::new(left, row.rect.y, 40.0, ROW);
+                            ui.interact(id, at, Sense::CLICK_FOCUS);
+                            ui.node(Node::new(id, Role::Button, "child", at));
+                        }
+                        ROW
+                    },
+                );
+            });
+            (x, out)
+        };
+        let mut h = UiHarness::new(WIN);
+        frame(&mut h);
+        frame(&mut h);
+        for _ in 0..2 {
+            h.input.key_down(Key::Named(NamedKey::Tab), None);
+            frame(&mut h);
+        }
+        let (mut x, mut out) = frame(&mut h);
+        for ms in 1..30 {
+            if out.repaint == Repaint::Idle {
+                break;
+            }
+            h.at_ms(ms * 100);
+            (x, out) = frame(&mut h);
+        }
+        assert_eq!(out.focused, child, "the child took the focus");
+        assert_eq!(x, 640.0 - RECT.w, "its right edge at the view's");
+    }
+
+    fn linked() -> ListStyle {
+        ListStyle {
+            link: Some(WidgetId::ROOT.with("group")),
+            ..ListStyle::LIST
+        }
+    }
+
+    fn offsets(h: &mut UiHarness, styles: (ListStyle, ListStyle)) -> (f64, f64, Repaint) {
+        let (a, b, repaint) = both(h, styles, (COUNT, COUNT));
+        (a.resp.offset, b.resp.offset, repaint)
+    }
+
+    #[test]
+    fn a_wheel_on_the_first_pane_moves_the_second_in_the_same_frame() {
+        let mut h = UiHarness::new(WIN);
+        let styles = (linked(), linked());
+        offsets(&mut h, styles);
+        h.input.pointer_to(100.0, 60.0);
+        offsets(&mut h, styles);
+        h.input.scroll_pixels(0.0, -120.0);
+        let (a, b, _) = offsets(&mut h, styles);
+        assert_eq!((a, b), (120.0, 120.0));
+    }
+
+    #[test]
+    fn a_wheel_on_the_second_pane_moves_the_first_on_the_catch_up_frame() {
+        let mut h = UiHarness::new(WIN);
+        let styles = (linked(), linked());
+        offsets(&mut h, styles);
+        h.input.pointer_to(300.0, 60.0);
+        offsets(&mut h, styles);
+        h.input.scroll_pixels(0.0, -120.0);
+        let (a, b, repaint) = offsets(&mut h, styles);
+        assert_eq!(b, 120.0);
+        assert_eq!(a, 0.0, "the first drew before the move");
+        assert_eq!(repaint, Repaint::Now, "a catch-up frame was asked");
+        let (a, b, _) = offsets(&mut h, styles);
+        assert_eq!((a, b), (120.0, 120.0));
+        h.at_ms(500);
+        let (_, _, repaint) = offsets(&mut h, styles);
+        assert_eq!(repaint, Repaint::Idle, "equal values ask nothing");
+    }
+
+    #[test]
+    fn a_pane_not_drawn_for_three_frames_catches_up_when_drawn() {
+        let mut h = UiHarness::new(WIN);
+        let styles = (linked(), linked());
+        offsets(&mut h, styles);
+        h.input.pointer_to(100.0, 60.0);
+        offsets(&mut h, styles);
+        h.input.scroll_pixels(0.0, -120.0);
+        // The right pane drops out of the page for the moves that follow.
+        let alone = |h: &mut UiHarness| {
+            let mut seen = None;
+            h.frame(|ui| seen = Some(pane(ui, RECT, COUNT, linked())));
+            seen.expect("drew").resp.offset
+        };
+        assert_eq!(alone(&mut h), 120.0);
+        h.input.scroll_pixels(0.0, -40.0);
+        assert_eq!(alone(&mut h), 160.0);
+        assert_eq!(alone(&mut h), 160.0);
+        let (a, b, _) = offsets(&mut h, styles);
+        assert_eq!((a, b), (160.0, 160.0), "it caught up when drawn again");
+    }
+
+    #[test]
+    fn a_line_wheel_on_the_second_pane_rests_with_both_panes_equal() {
+        let mut h = UiHarness::new(WIN);
+        let styles = (linked(), linked());
+        offsets(&mut h, styles);
+        h.input.pointer_to(300.0, 60.0);
+        offsets(&mut h, styles);
+        h.input.scroll_lines(0.0, -3.0);
+        let mut ms = 0;
+        for _ in 0..200 {
+            ms += 16;
+            h.at_ms(ms);
+            let (a, b, repaint) = offsets(&mut h, styles);
+            if repaint == Repaint::Idle {
+                assert!(b > 0.0, "the wheel moved it");
+                assert_eq!(a, b, "the panes rest equal");
+                return;
+            }
+        }
+        panic!("the page did not settle");
+    }
+
+    /// One frame of a list whose rows `with_child` carry a focusable box; the rows' offset, the
+    /// focus and the child's box when it is focused.
+    fn child_frame(
+        h: &mut UiHarness,
+        with_child: &[usize],
+    ) -> (f64, Option<WidgetId>, Option<Rect>) {
+        let mut seen = (0.0, None);
+        let (_, out) = h.frame(|ui| {
+            let resp = ui.virtual_list(
+                "l",
+                RECT,
+                &opts(COUNT),
+                |i| RowKey(i as u64),
+                |ui, c| {
+                    if with_child.contains(&c.index) {
+                        let id = ui.id("child");
+                        let at = Rect::new(c.rect.x + 10.0, c.rect.y + 2.0, 40.0, 16.0);
+                        let r = ui.interact(id, at, Sense::CLICK_FOCUS);
+                        if r.focused {
+                            seen.1 = Some(at);
+                        }
+                    }
+                    ROW
+                },
+            );
+            seen.0 = resp.offset;
+        });
+        (seen.0, out.focused, seen.1)
+    }
+
+    fn resting(
+        h: &mut UiHarness,
+        ms: &mut u64,
+        rows: &[usize],
+    ) -> (f64, Option<WidgetId>, Option<Rect>) {
+        child_frame(h, rows);
+        *ms += 2_000;
+        h.at_ms(*ms);
+        child_frame(h, rows)
+    }
+
+    #[test]
+    fn tab_reveals_a_child_on_a_row_and_a_margin_rows_child_is_no_stop() {
+        let list = WidgetId::ROOT.with("l");
+        let rows = [5, 6];
+        let mut h = UiHarness::new(WIN);
+        let mut ms = 0;
+        resting(&mut h, &mut ms, &rows);
+        // At offset 10 of rows of 20 in a view of 100: row 5 shows in part, row 6 is in the margin.
+        h.input.pointer_to(100.0, 60.0).scroll_pixels(0.0, -10.0);
+        resting(&mut h, &mut ms, &rows);
+        h.input.key_down(Key::Named(NamedKey::Tab), None);
+        assert_eq!(resting(&mut h, &mut ms, &rows).1, Some(list));
+        h.input.key_down(Key::Named(NamedKey::Tab), None);
+        let (offset, _, child) = resting(&mut h, &mut ms, &rows);
+        let child = child.expect("the child on row 5 is a stop");
+        assert!(child.bottom() <= RECT.bottom(), "{child:?}");
+        assert_eq!(offset, 18.0, "the least movement");
+        h.input.key_down(Key::Named(NamedKey::Tab), None);
+        assert_eq!(resting(&mut h, &mut ms, &rows).1, Some(list), "not row 6's");
+    }
+
+    #[test]
+    fn tab_onto_the_list_in_a_wheels_flight_leaves_the_flight_alone() {
+        let mut h = UiHarness::new(WIN);
+        let s = ListStyle::LIST;
+        frame(&mut h, s);
+        h.input.pointer_to(100.0, 60.0);
+        frame(&mut h, s);
+        h.input.scroll_lines(0.0, -3.0);
+        frame(&mut h, s);
+        h.at_ms(30);
+        h.input.key_down(Key::Named(NamedKey::Tab), None);
+        frame(&mut h, s);
+        h.at_ms(5_000);
+        frame(&mut h, s);
+        assert_eq!(
+            frame(&mut h, s).0.resp.offset,
+            144.0,
+            "the wheel's whole step"
+        );
+    }
+
+    #[test]
+    fn panes_without_a_group_scroll_alone() {
+        let mut h = UiHarness::new(WIN);
+        let styles = (ListStyle::LIST, ListStyle::LIST);
+        offsets(&mut h, styles);
+        h.input.pointer_to(100.0, 60.0);
+        offsets(&mut h, styles);
+        h.input.scroll_pixels(0.0, -120.0);
+        let (a, b, _) = offsets(&mut h, styles);
+        assert_eq!((a, b), (120.0, 0.0));
+    }
+
+    fn document(identity: u64) -> ListStyle {
+        ListStyle {
+            identity: Some(identity),
+            ..linked()
+        }
+    }
+
+    /// Both panes at 200 by a wheel on the left, each on document 1.
+    fn apart() -> UiHarness {
+        let mut h = UiHarness::new(WIN);
+        let one = (document(1), document(1));
+        offsets(&mut h, one);
+        h.input.pointer_to(100.0, 60.0);
+        offsets(&mut h, one);
+        h.input.scroll_pixels(0.0, -200.0);
+        let (a, b, _) = offsets(&mut h, one);
+        assert_eq!((a, b), (200.0, 200.0));
+        h
+    }
+
+    #[test]
+    fn a_later_pane_alone_on_a_new_identity_asks_the_frame_that_tops_the_first() {
+        let mut h = apart();
+        let styles = (document(1), document(2));
+        // Long after the wheel: nothing else asks a frame.
+        h.at_ms(5_000);
+        assert_eq!(offsets(&mut h, (document(1), document(1))).2, Repaint::Idle);
+        let (a, b, repaint) = offsets(&mut h, styles);
+        assert_eq!((a, b), (200.0, 0.0), "the first drew before it");
+        assert_eq!(repaint, Repaint::Now);
+        let (a, b, _) = offsets(&mut h, styles);
+        assert_eq!((a, b), (0.0, 0.0));
+        h.at_ms(500);
+        assert_eq!(offsets(&mut h, styles).2, Repaint::Idle);
+    }
+
+    #[test]
+    fn an_earlier_pane_alone_on_a_new_identity_tops_the_later_one_in_the_frame() {
+        let mut h = apart();
+        let (a, b, _) = offsets(&mut h, (document(2), document(1)));
+        assert_eq!((a, b), (0.0, 0.0));
+    }
+
+    #[test]
+    fn both_panes_on_a_new_identity_ask_no_frame_of_each_other() {
+        let mut h = apart();
+        let styles = (document(2), document(2));
+        h.at_ms(500);
+        let (a, b, repaint) = offsets(&mut h, styles);
+        assert_eq!((a, b, repaint), (0.0, 0.0, Repaint::Idle));
+    }
+
+    #[test]
+    fn a_far_jump_then_the_other_pane_on_a_new_identity_tops_the_pane_that_jumped() {
+        // End lands after the content, so the right pane drew 0 and stands at the end: the group's
+        // top must be asked of where it stands.
+        let mut h = UiHarness::new(WIN);
+        let one = (document(1), document(1));
+        offsets(&mut h, one);
+        h.input
+            .pointer_to(300.0, 60.0)
+            .click(PointerButton::Primary);
+        offsets(&mut h, one);
+        h.input.key_down(Key::Named(NamedKey::End), None);
+        let (a, b, _) = offsets(&mut h, one);
+        assert_eq!((a, b), (0.0, 1100.0), "the left pane drew first");
+        let styles = (document(2), document(1));
+        let (a, b, _) = offsets(&mut h, styles);
+        assert_eq!((a, b), (0.0, 0.0));
+        let (a, b, _) = offsets(&mut h, styles);
+        assert_eq!(
+            (a, b),
+            (0.0, 0.0),
+            "and the right pane published nothing back"
+        );
+    }
+
+    #[test]
+    fn a_pane_drawn_first_with_an_identity_takes_the_groups_value() {
+        // A first draw opens no document: a pane joining a moved group joins it.
+        let mut h = UiHarness::new(WIN);
+        let alone = |h: &mut UiHarness| {
+            let mut seen = None;
+            h.frame(|ui| seen = Some(pane(ui, RECT, COUNT, document(1))));
+            seen.expect("drew").resp.offset
+        };
+        alone(&mut h);
+        h.input.pointer_to(100.0, 60.0);
+        alone(&mut h);
+        h.input.scroll_pixels(0.0, -120.0);
+        assert_eq!(alone(&mut h), 120.0);
+        let (a, b, _) = offsets(&mut h, (document(1), document(1)));
+        assert_eq!((a, b), (120.0, 120.0), "in its first frame");
+        let (a, b, _) = offsets(&mut h, (document(1), document(1)));
+        assert_eq!((a, b), (120.0, 120.0), "and the first pane stays");
+    }
+
+    #[test]
+    fn a_pane_hidden_while_its_group_stands_still_comes_back_with_the_group() {
+        // `taken` lives under the group and outlasts the pane's own state: a first draw joins
+        // where the group stands, whether it moved meanwhile or not.
+        let styles = (document(1), document(1));
+        let mut h = UiHarness::new(WIN);
+        offsets(&mut h, styles);
+        h.input.pointer_to(100.0, 60.0);
+        offsets(&mut h, styles);
+        h.input.scroll_pixels(0.0, -120.0);
+        assert_eq!(offsets(&mut h, styles).0, 120.0);
+        for _ in 0..3 {
+            let mut seen = None;
+            h.frame(|ui| seen = Some(pane(ui, RECT, COUNT, document(1))));
+            assert_eq!(seen.expect("drew").resp.offset, 120.0);
+        }
+        let (a, b, _) = offsets(&mut h, styles);
+        assert_eq!((a, b), (120.0, 120.0), "in the frame it returns");
+        h.at_ms(5_000);
+        assert_eq!(
+            offsets(&mut h, styles).2,
+            Repaint::Idle,
+            "and the page rests"
+        );
+    }
+
+    #[test]
+    fn a_short_pane_with_an_identity_comes_back_with_its_group() {
+        // An area keeps `wanted` for its document: asked past its end, it would stay there.
+        let styles = (document(1), document(1));
+        let mut h = UiHarness::new(WIN);
+        let two = |h: &mut UiHarness| {
+            let (a, b, _) = both(h, styles, (COUNT, 8));
+            (a.resp.offset, b.resp.offset)
+        };
+        two(&mut h);
+        h.input.pointer_to(100.0, 60.0);
+        two(&mut h);
+        h.input.scroll_pixels(0.0, -500.0);
+        assert_eq!(two(&mut h), (500.0, 60.0));
+        h.input.scroll_pixels(0.0, 460.0);
+        assert_eq!(two(&mut h), (40.0, 40.0));
+    }
+
+    #[test]
+    fn a_document_keeps_its_place_through_a_short_frame() {
+        let style = ListStyle {
+            identity: Some(1),
+            ..ListStyle::LIST
+        };
+        let mut h = UiHarness::new(WIN);
+        let at = |h: &mut UiHarness, count: usize| {
+            let mut seen = None;
+            h.frame(|ui| seen = Some(pane(ui, RECT, count, style)));
+            seen.expect("drew").resp.offset
+        };
+        at(&mut h, COUNT);
+        h.input.pointer_to(100.0, 60.0);
+        at(&mut h, COUNT);
+        h.input.scroll_pixels(0.0, -500.0);
+        assert_eq!(at(&mut h, COUNT), 500.0);
+        assert_eq!(at(&mut h, 3), 0.0, "the short frame shows its top");
+        assert_eq!(at(&mut h, COUNT), 500.0, "and the place comes back");
+    }
+
+    #[test]
+    fn a_pane_that_cannot_reach_the_value_does_not_ask_every_frame() {
+        // The right pane has fewer rows, so it stops below the group's value; it must settle.
+        let styles = (linked(), linked());
+        let mut h = UiHarness::new(WIN);
+        let two = |h: &mut UiHarness| {
+            let (a, b, repaint) = both(h, styles, (COUNT, 8));
+            (a.resp.offset, b.resp.offset, repaint)
+        };
+        two(&mut h);
+        h.input.pointer_to(100.0, 60.0);
+        two(&mut h);
+        h.input.scroll_pixels(0.0, -500.0);
+        let (a, _, _) = two(&mut h);
+        assert_eq!(a, 500.0);
+        let (_, b, _) = two(&mut h);
+        assert_eq!(b, 60.0, "the short pane stops at its end");
+        h.at_ms(500);
+        let (_, _, repaint) = two(&mut h);
+        assert_eq!(repaint, Repaint::Idle);
+        let (a, b, repaint) = two(&mut h);
+        assert_eq!((a, b, repaint), (500.0, 60.0, Repaint::Idle));
     }
 }

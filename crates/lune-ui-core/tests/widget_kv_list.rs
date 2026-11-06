@@ -603,3 +603,199 @@ fn at_scale_2_the_row_is_48_px_and_the_gap_32_px() {
     let key_col = text_w("Repository") * 2.0;
     assert_eq!((t[1].x - t[0].x) * 2.0, key_col + 32.0);
 }
+
+/// Class 1 of D177: a value that holds the key focus when its scope turns disabled takes the keys
+/// it takes enabled and changes nothing, in both the positioned and the whole-selection path.
+#[test]
+fn a_value_focused_then_disabled_takes_its_keys_and_changes_nothing() {
+    use lune_ui_core::shortcuts::{Binding, Chord, Scope};
+    type Probe = (&'static str, Key, bool);
+    let named = |n: &'static str, k| (n, Key::Named(k), false);
+    let logo = |n: &'static str, c: &str| (n, Key::Character(c.to_owned()), true);
+    // (the spec drawn, the keys that fire nothing with it enabled)
+    let cases: [(&str, &str, Vec<Probe>); 2] = [
+        (
+            "abcdef",
+            "positioned",
+            vec![
+                named("Enter", NamedKey::Enter),
+                named("Left", NamedKey::ArrowLeft),
+                named("Right", NamedKey::ArrowRight),
+                named("Home", NamedKey::Home),
+                named("End", NamedKey::End),
+                logo("Command+A", "a"),
+                logo("Command+C", "c"),
+            ],
+        ),
+        (
+            "ab\u{2026}",
+            "elided",
+            vec![logo("Command+A", "a"), logo("Command+C", "c")],
+        ),
+    ];
+    let rect = Rect::new(20.0, 30.0, 200.0, 20.0);
+    for (drawn, mode, probes) in cases {
+        let spec = Spec::plain(drawn, Style::ui(13.0, DARK.fg_primary));
+        for (name, key, with_logo) in probes {
+            let mut h = UiHarness::new(WIN);
+            let chord_of = Chord::key(key.clone());
+            h.shortcuts.add(Binding::new(
+                Scope::Global,
+                if with_logo {
+                    chord_of.primary()
+                } else {
+                    chord_of
+                },
+                name,
+            ));
+            h.shortcuts.add(Binding::new(
+                Scope::Global,
+                Chord::key(Key::Named(NamedKey::F5)),
+                "f5",
+            ));
+            let run = |h: &mut UiHarness, enabled: bool| {
+                h.frame(|ui| {
+                    ui.with_enabled(enabled, |ui| {
+                        ui.selectable_text("s", rect, &spec, "abcdef");
+                    });
+                })
+                .1
+            };
+            let sel = |out: &FrameOutput| {
+                out.tree
+                    .get(WidgetId::ROOT.with("s"))
+                    .and_then(|n| n.text.as_ref())
+                    .expect("text")
+                    .selection
+            };
+            let press = |h: &mut UiHarness| {
+                if with_logo {
+                    h.input.set_modifiers(Modifiers {
+                        logo: true,
+                        ..Modifiers::default()
+                    });
+                }
+                h.input.key_down(key.clone(), None);
+                h.input.set_modifiers(Modifiers::default());
+            };
+            run(&mut h, true);
+            h.input.pointer_to(24.0, 40.0);
+            run(&mut h, true);
+            h.input.click(PointerButton::Primary);
+            run(&mut h, true);
+            chord(&mut h, "a");
+            let before = sel(&run(&mut h, true));
+            assert_eq!(before.0.min(before.1), 0, "{mode} {name}");
+            assert_ne!(before.0, before.1, "{mode} {name}: selected");
+            // Enabled, the same key fires nothing (so the probe proves something).
+            press(&mut h);
+            let out = run(&mut h, true);
+            assert!(out.fired.is_empty(), "{mode} {name}: enabled it fired");
+            // A fresh start, disabled.
+            let mut h2 = UiHarness::new(WIN);
+            h2.shortcuts = h.shortcuts.clone();
+            run(&mut h2, true);
+            h2.input.pointer_to(24.0, 40.0);
+            run(&mut h2, true);
+            h2.input.click(PointerButton::Primary);
+            run(&mut h2, true);
+            chord(&mut h2, "a");
+            run(&mut h2, true);
+            run(&mut h2, false);
+            press(&mut h2);
+            let out = run(&mut h2, false);
+            assert!(out.fired.is_empty(), "{mode} {name}: disabled, it fired");
+            assert!(out.clipboard.is_empty(), "{mode} {name}: clipboard used");
+            h2.input.key_down(Key::Named(NamedKey::F5), None);
+            let out = run(&mut h2, false);
+            assert_eq!(out.fired.len(), 1, "{mode} {name}: F5");
+            // Enabled again: the selection is what it was, and Copy writes it.
+            let out = run(&mut h2, true);
+            assert_eq!(sel(&out), before, "{mode} {name}: the selection moved");
+        }
+    }
+}
+
+#[test]
+fn select_all_on_an_elided_value_focused_then_disabled_selects_nothing() {
+    use lune_ui_core::access::{AccessAction, Action};
+    use lune_ui_core::shortcuts::{Binding, Chord, Scope};
+    let spec = Spec::plain("ab\u{2026}", Style::ui(13.0, DARK.fg_primary));
+    let rect = Rect::new(20.0, 30.0, 200.0, 20.0);
+    let mut h = UiHarness::new(WIN);
+    h.shortcuts.add(Binding::new(
+        Scope::Global,
+        Chord::key(Key::Character("a".into())).primary(),
+        "all",
+    ));
+    let run = |h: &mut UiHarness, enabled: bool| {
+        h.frame(|ui| {
+            ui.with_enabled(enabled, |ui| {
+                ui.selectable_text("s", rect, &spec, "abcdef");
+            });
+        })
+        .1
+    };
+    run(&mut h, true);
+    // Focus by the assistive route, so nothing is selected.
+    h.input.access(AccessAction {
+        target: WidgetId::ROOT.with("s"),
+        action: Action::Focus,
+        value: None,
+    });
+    let out = run(&mut h, true);
+    assert_eq!(out.focused, Some(WidgetId::ROOT.with("s")));
+    run(&mut h, false);
+    chord(&mut h, "a");
+    let out = run(&mut h, false);
+    assert!(out.fired.is_empty(), "the key is the value's");
+    let out = run(&mut h, true);
+    let sel = out
+        .tree
+        .get(WidgetId::ROOT.with("s"))
+        .and_then(|n| n.text.as_ref())
+        .expect("text")
+        .selection;
+    assert_eq!(sel, (0, 0), "nothing was selected while disabled");
+}
+
+/// D11: a rich spec whose runs join to `full` selects by position, across its runs.
+#[test]
+fn a_two_run_spec_equal_to_full_selects_part_of_it_and_copies_that_part() {
+    let a = Style::ui(13.0, DARK.fg_primary);
+    let b = Style {
+        color: DARK.fg_secondary,
+        ..a
+    };
+    let spec = Spec {
+        runs: vec![("abc".to_owned(), a), ("defg".to_owned(), b)],
+        wrap: None,
+    };
+    let rect = Rect::new(20.0, 30.0, 200.0, 20.0);
+    let mut h = UiHarness::new(WIN);
+    let run = |h: &mut UiHarness| {
+        h.frame(|ui| {
+            ui.selectable_text("s", rect, &spec, "abcdefg");
+        })
+    };
+    run(&mut h);
+    // From between "b" and "c" (char 2) to between "e" and "f" (char 5), across both runs.
+    h.input.pointer_to(20.0 + 2.0 * GLYPH + 0.5, 40.0);
+    run(&mut h);
+    h.input.press(PointerButton::Primary);
+    run(&mut h);
+    h.input.pointer_to(20.0 + 5.0 * GLYPH + 0.5, 40.0);
+    run(&mut h);
+    let (scene, out) = run(&mut h);
+    let node = out.tree.get(WidgetId::ROOT.with("s")).expect("node");
+    assert_eq!(node.text.as_ref().expect("text").selection, (2, 5));
+    let f = fills(&scene);
+    assert_eq!(f.len(), 1, "one fill: {f:?}");
+    assert!((f[0].rect[0] - (20.0 + 2.0 * GLYPH)).abs() < 0.01, "{f:?}");
+    assert!((f[0].rect[2] - 3.0 * GLYPH).abs() < 0.01, "{f:?}");
+    h.input.release(PointerButton::Primary);
+    run(&mut h);
+    chord(&mut h, "c");
+    let (_, out) = run(&mut h);
+    assert_eq!(out.clipboard, [ClipboardRequest::Write("cde".to_owned())]);
+}
