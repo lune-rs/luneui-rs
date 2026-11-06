@@ -474,4 +474,329 @@ mod tests {
         assert_eq!(THEME.font_title, 18.0);
         assert_eq!(THEME.line_title, 24.0);
     }
+
+    // ── The preset against Lunegit's `DarkTheme.axaml` and `App.axaml` (read at M11) ─────────
+    //
+    // `src/Lunegit.Desktop/Themes/DarkTheme.axaml` and `src/Lunegit.Desktop/App.axaml` of the
+    // Lunegit repo. Each value below was read from the file at the line named beside it, never from
+    // `THEME`. (The entry's old range, lines 200-233, has moved: the colour brushes are at 7-159,
+    // 298-341 and the glass levels at 226-235.)
+
+    use super::{COLOR_KEYS, Theme};
+    use crate::GlassLayer;
+
+    /// (axaml key, its line in `DarkTheme.axaml`, the file's literal, the RGBA it means).
+    /// `GlassTintColor` (`Black`, :226) is the one key not here; see the glass test.
+    const AXAML: &[(&str, u32, &str, [u8; 4])] = &[
+        (
+            "ForegroundPrimary",
+            7,
+            "#CCFFFFFF",
+            [0xFF, 0xFF, 0xFF, 0xCC],
+        ),
+        (
+            "ForegroundSecondary",
+            8,
+            "#AAFFFFFF",
+            [0xFF, 0xFF, 0xFF, 0xAA],
+        ),
+        (
+            "ForegroundTertiary",
+            9,
+            "#88FFFFFF",
+            [0xFF, 0xFF, 0xFF, 0x88],
+        ),
+        (
+            "ForegroundQuaternary",
+            10,
+            "#66FFFFFF",
+            [0xFF, 0xFF, 0xFF, 0x66],
+        ),
+        ("ForegroundDim", 11, "#55FFFFFF", [0xFF, 0xFF, 0xFF, 0x55]),
+        ("ForegroundFaint", 12, "#44FFFFFF", [0xFF, 0xFF, 0xFF, 0x44]),
+        ("ForegroundMuted", 13, "#B0B0B0", [0xB0, 0xB0, 0xB0, 0xFF]),
+        ("ForegroundSubtle", 14, "#808080", [0x80, 0x80, 0x80, 0xFF]),
+        (
+            "ForegroundBright",
+            17,
+            "#DDFFFFFF",
+            [0xFF, 0xFF, 0xFF, 0xDD],
+        ),
+        ("SurfaceInput", 25, "#0AFFFFFF", [0xFF, 0xFF, 0xFF, 0x0A]),
+        ("SurfaceHover", 26, "#10FFFFFF", [0xFF, 0xFF, 0xFF, 0x10]),
+        ("SurfaceSelected", 28, "#18FFFFFF", [0xFF, 0xFF, 0xFF, 0x18]),
+        ("SurfaceOverlay", 27, "#15FFFFFF", [0xFF, 0xFF, 0xFF, 0x15]),
+        ("SurfaceActive", 29, "#20FFFFFF", [0xFF, 0xFF, 0xFF, 0x20]),
+        (
+            "SurfaceSeparator",
+            30,
+            "#22FFFFFF",
+            [0xFF, 0xFF, 0xFF, 0x22],
+        ),
+        ("SurfaceDivider", 36, "#40FFFFFF", [0xFF, 0xFF, 0xFF, 0x40]),
+        ("SurfaceBorder", 35, "#30FFFFFF", [0xFF, 0xFF, 0xFF, 0x30]),
+        (
+            "SurfaceBorderSubtle",
+            34,
+            "#1AFFFFFF",
+            [0xFF, 0xFF, 0xFF, 0x1A],
+        ),
+        (
+            "AccentPrimaryColor",
+            158,
+            "#FF767D85",
+            [0x76, 0x7D, 0x85, 0xFF],
+        ),
+        ("BackdropDark", 42, "#F0000000", [0x00, 0x00, 0x00, 0xF0]),
+        (
+            "DialogBackdropBrush",
+            317,
+            "#80000000",
+            [0x00, 0x00, 0x00, 0x80],
+        ),
+        (
+            "DialogDarkerBlockBackground",
+            318,
+            "#24000000",
+            [0x00, 0x00, 0x00, 0x24],
+        ),
+        (
+            "PopupMenuOuterBorder",
+            301,
+            "#3AFFFFFF",
+            [0xFF, 0xFF, 0xFF, 0x3A],
+        ),
+        (
+            "PopupMenuItemHover",
+            304,
+            "#16FFFFFF",
+            [0xFF, 0xFF, 0xFF, 0x16],
+        ),
+        (
+            "PopupMenuItemPressed",
+            305,
+            "#23FFFFFF",
+            [0xFF, 0xFF, 0xFF, 0x23],
+        ),
+        (
+            "PopupMenuDisabledForeground",
+            307,
+            "#58FFFFFF",
+            [0xFF, 0xFF, 0xFF, 0x58],
+        ),
+        (
+            "ToastBackground",
+            333,
+            "#E6181818",
+            [0x18, 0x18, 0x18, 0xE6],
+        ),
+        ("ToastBorder", 334, "#33FFFFFF", [0xFF, 0xFF, 0xFF, 0x33]),
+        ("ToastInfoAccent", 335, "#61AFEF", [0x61, 0xAF, 0xEF, 0xFF]),
+        (
+            "ToastSuccessAccent",
+            336,
+            "#4CAF50",
+            [0x4C, 0xAF, 0x50, 0xFF],
+        ),
+        (
+            "ToastWarningAccent",
+            337,
+            "#E2B93D",
+            [0xE2, 0xB9, 0x3D, 0xFF],
+        ),
+        ("ToastErrorAccent", 338, "#E06C75", [0xE0, 0x6C, 0x75, 0xFF]),
+        (
+            "ToastTerminalBackground",
+            340,
+            "#FF0D0D0D",
+            [0x0D, 0x0D, 0x0D, 0xFF],
+        ),
+        (
+            "ToastTerminalForeground",
+            341,
+            "#CCCCCC",
+            [0xCC, 0xCC, 0xCC, 0xFF],
+        ),
+        ("DirtyIndicator", 68, "#D98A3D", [0xD9, 0x8A, 0x3D, 0xFF]),
+        ("StatusDeleted", 57, "#E74856", [0xE7, 0x48, 0x56, 0xFF]),
+        ("FileStatusAdded", 116, "#73C991", [0x73, 0xC9, 0x91, 0xFF]),
+        (
+            "FileStatusModified",
+            115,
+            "#E2B93D",
+            [0xE2, 0xB9, 0x3D, 0xFF],
+        ),
+        (
+            "FileStatusDeleted",
+            117,
+            "#E06C75",
+            [0xE0, 0x6C, 0x75, 0xFF],
+        ),
+        ("StatusWarning", 60, "#FFC107", [0xFF, 0xC1, 0x07, 0xFF]),
+        (
+            "StatusWarningLight",
+            62,
+            "#FFD666",
+            [0xFF, 0xD6, 0x66, 0xFF],
+        ),
+        ("StatusWarningDark", 61, "#5D4300", [0x5D, 0x43, 0x00, 0xFF]),
+        ("StatusError", 63, "#F44336", [0xF4, 0x43, 0x36, 0xFF]),
+        ("StatusErrorLight", 64, "#EF9A9A", [0xEF, 0x9A, 0x9A, 0xFF]),
+        (
+            "WindowFallbackBackground",
+            245,
+            "#FF333333",
+            [0x33, 0x33, 0x33, 0xFF],
+        ),
+        (
+            "MarkdownLinkForeground",
+            140,
+            "#61AFEF",
+            [0x61, 0xAF, 0xEF, 0xFF],
+        ),
+        (
+            "MarkdownInlineCodeBackground",
+            134,
+            "#14FFFFFF",
+            [0xFF, 0xFF, 0xFF, 0x14],
+        ),
+        (
+            "DiffAddedBackground",
+            106,
+            "#1A73C991",
+            [0x73, 0xC9, 0x91, 0x1A],
+        ),
+        (
+            "DiffRemovedBackground",
+            107,
+            "#1AE06C75",
+            [0xE0, 0x6C, 0x75, 0x1A],
+        ),
+    ];
+
+    #[test]
+    fn every_color_key_holds_the_dark_theme_axaml_value() {
+        // 49 rows plus `GlassTintColor`: all 50 keys of the table are covered, none twice.
+        let mut keys: Vec<&str> = AXAML.iter().map(|r| r.0).collect();
+        keys.push("GlassTintColor");
+        keys.sort_unstable();
+        let mut table = COLOR_KEYS.to_vec();
+        table.sort_unstable();
+        assert_eq!(keys, table);
+        for (key, line, literal, rgba) in AXAML {
+            assert_eq!(
+                THEME.color_key(key),
+                Some(*rgba),
+                "{key}: DarkTheme.axaml:{line} says {literal}"
+            );
+        }
+        // `GlassTintColor` is `Black` (:226) and sets the tint of all three layers.
+        assert_eq!(THEME.color_key("GlassTintColor"), Some([0, 0, 0, 255]));
+        for layer in [THEME.glass.window, THEME.glass.panel, THEME.glass.card] {
+            assert_eq!(layer.tint, [0, 0, 0, 255]);
+        }
+    }
+
+    /// `GlassTintDarkOpacity` 1 (:227), `GlassMaterialDarkOpacity` 0.7 (:228),
+    /// `GlassMaterialDarkHeaderOpacity` 0.8 (:229), `GlassTintLightOpacity` 0.8 (:230),
+    /// `GlassMaterialLightOpacity` 0.7 (:231). `WINDOW` takes the Dark pair, `CARD` the tint 1 and
+    /// the header's 0.8, `PANEL` the Light pair (D53 names PANEL's values, tint 0.8 and material
+    /// 0.7). The 0.85 of `GlassMaterialDarkPanelOpacity` (:235) is Lunegit's terminal panel, a layer
+    /// the toolkit does not have; `Theme::with_acrylic` produces 0.85 from 0.7 (D208), and the
+    /// `Solid` levels (:232-233) are `AcrylicLevel::Opaque`.
+    #[test]
+    fn the_glass_layers_hold_the_dark_theme_axaml_opacities() {
+        let layer = |tint_opacity, material_opacity| GlassLayer {
+            tint: [0, 0, 0, 255],
+            tint_opacity,
+            material_opacity,
+        };
+        assert_eq!(THEME.glass.window, layer(1.0, 0.7));
+        assert_eq!(THEME.glass.card, layer(1.0, 0.8));
+        assert_eq!(THEME.glass.panel, layer(0.8, 0.7));
+        // `WindowFallbackBackground` #FF333333 (:245) is the inactive fill.
+        assert_eq!(
+            super::lunegit_dark::INACTIVE_FALLBACK,
+            [0x33, 0x33, 0x33, 0xFF]
+        );
+        assert_eq!(THEME.window_fallback, [0x33, 0x33, 0x33, 0xFF]);
+    }
+
+    /// Fields with no key of their own, each with the row that sets its value.
+    #[test]
+    fn the_tokens_without_an_axaml_key_follow_their_decision_rows() {
+        let accent = THEME.accent;
+        // `ScrollThumbFill` accent at Opacity 0.55 (:164) and `ScrollThumbFillHover` at 0.9 (:165):
+        // 0.55 * 255 = 140.25 -> 0x8C, 0.9 * 255 = 229.5 -> 0xE6 (D208).
+        assert_eq!(THEME.scroll_thumb, [accent[0], accent[1], accent[2], 0x8C]);
+        assert_eq!(
+            THEME.scroll_thumb_hover,
+            [accent[0], accent[1], accent[2], 0xE6]
+        );
+        // The selection fill is the accent at alpha 0x66 (D51, D208), not `SelectionOverlay`
+        // #33767D85 (:48), which the toolkit's text widgets do not read.
+        assert_eq!(
+            THEME.text_selection,
+            [accent[0], accent[1], accent[2], 0x66]
+        );
+        // `accent_hover`: each channel plus 0x10, saturating (D208).
+        assert_eq!(THEME.accent_hover, [0x86, 0x8D, 0x95, 0xFF]);
+        // The diff intra-line marks: the line fill's hue at alpha 0x40 (D14, D208).
+        assert_eq!(THEME.diff_added_mark, [0x73, 0xC9, 0x91, 0x40]);
+        assert_eq!(THEME.diff_removed_mark, [0xE0, 0x6C, 0x75, 0x40]);
+        // The menu's text tokens are the matching `fg_*` (D208), its separator the surface
+        // separator's value (D58 says they are equal; the key table sets both, D207). Lunegit's
+        // own `PopupMenuSeparator` is #18FFFFFF (:306): the menu entry builds on Luneium's
+        // ContextMenu.css, and the moved value stays.
+        assert_eq!(THEME.menu_text_primary, THEME.fg_primary);
+        assert_eq!(THEME.menu_text_tertiary, THEME.fg_tertiary);
+        assert_eq!(THEME.menu_text_quaternary, THEME.fg_quaternary);
+        assert_eq!(THEME.menu_separator, THEME.surface_separator);
+        assert_ne!(THEME.menu_separator, [0xFF, 0xFF, 0xFF, 0x18]);
+        // Wane only, no Lunegit colour for the meaning (D58): data, data_hi, gold, paused.
+        assert_eq!(THEME.data, [0x5C, 0x8F, 0xE6, 0xFF]);
+        assert_eq!(THEME.data_hi, [0x8F, 0xBB, 0xFF, 0xFF]);
+        assert_eq!(THEME.gold, [0xE9, 0xC4, 0x6A, 0xFF]);
+        assert_eq!(THEME.paused, [0x8A, 0x90, 0x99, 0xFF]);
+    }
+
+    /// `FontSizeS` 11, `FontSizeBase` 13, `FontSizeM` 14, `FontSizeL` 18 (`App.axaml:159-162`).
+    #[test]
+    fn the_font_sizes_hold_the_app_axaml_typography_scale() {
+        assert_eq!(THEME.font_s, 11.0);
+        assert_eq!(THEME.font_base, 13.0);
+        assert_eq!(THEME.font_m, 14.0);
+        assert_eq!(THEME.font_title, 18.0);
+    }
+
+    // One test per motion duration (`App.axaml:151-155`, seconds there, milliseconds here).
+
+    fn ms(theme: &Theme, f: impl Fn(&crate::motion::MotionTokens) -> std::time::Duration) -> u128 {
+        f(&theme.motion).as_millis()
+    }
+
+    #[test]
+    fn anim_duration_instant_is_120_ms() {
+        assert_eq!(ms(&THEME, |m| m.instant), 120); // 0:0:0.12, :151
+    }
+
+    #[test]
+    fn anim_duration_fast_is_180_ms() {
+        assert_eq!(ms(&THEME, |m| m.fast), 180); // 0:0:0.18, :152
+    }
+
+    #[test]
+    fn anim_duration_base_is_250_ms() {
+        assert_eq!(ms(&THEME, |m| m.base), 250); // 0:0:0.25, :153
+    }
+
+    #[test]
+    fn anim_duration_moderate_is_350_ms() {
+        assert_eq!(ms(&THEME, |m| m.moderate), 350); // 0:0:0.35, :154
+    }
+
+    #[test]
+    fn anim_duration_slow_is_500_ms() {
+        assert_eq!(ms(&THEME, |m| m.slow), 500); // 0:0:0.5, :155
+    }
 }

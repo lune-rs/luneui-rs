@@ -139,3 +139,60 @@ fn a_file_event_alone_asks_for_no_repaint() {
     assert_eq!(repaint, Repaint::Idle);
     assert_eq!(a.seen.len(), 1);
 }
+
+// A downstream crate must be able to match every `#[non_exhaustive]` enum of the seam with a
+// wildcard arm and keep compiling when a variant is added. This file is outside the crate, so
+// each match below compiles only because the wildcard arm is there (and, were a variant added, only
+// because the enum is `non_exhaustive`).
+
+fn event_kind(e: &Event) -> &'static str {
+    match e {
+        Event::PointerLeft => "pointer-left",
+        Event::PointerMoved { .. } => "pointer-moved",
+        _ => "other",
+    }
+}
+
+fn named_key_kind(k: lune_ui_core::input::NamedKey) -> &'static str {
+    use lune_ui_core::input::NamedKey;
+    match k {
+        NamedKey::Enter => "enter",
+        NamedKey::Escape => "escape",
+        _ => "other",
+    }
+}
+
+fn window_command_kind(c: lune_ui_core::input::WindowCommand) -> &'static str {
+    use lune_ui_core::input::WindowCommand;
+    match c {
+        WindowCommand::Close => "close",
+        WindowCommand::Minimize => "minimize",
+        _ => "other",
+    }
+}
+
+fn cursor_kind(c: lune_ui_core::input::CursorIcon) -> &'static str {
+    use lune_ui_core::input::CursorIcon;
+    match c {
+        CursorIcon::Default => "default",
+        CursorIcon::Text => "text",
+        _ => "other",
+    }
+}
+
+#[test]
+fn non_exhaustive_seam_enums_match_with_a_wildcard_downstream() {
+    use lune_ui_core::input::{CursorIcon, NamedKey, WindowCommand};
+    assert_eq!(event_kind(&Event::PointerLeft), "pointer-left");
+    assert_eq!(
+        event_kind(&Event::PointerMoved { pos: (1.0, 2.0) }),
+        "pointer-moved"
+    );
+    assert_eq!(event_kind(&Event::Focus(true)), "other");
+    assert_eq!(named_key_kind(NamedKey::Enter), "enter");
+    assert_eq!(named_key_kind(NamedKey::Tab), "other");
+    assert_eq!(window_command_kind(WindowCommand::Close), "close");
+    assert_eq!(window_command_kind(WindowCommand::Redraw), "other");
+    assert_eq!(cursor_kind(CursorIcon::Default), "default");
+    assert_eq!(cursor_kind(CursorIcon::Wait), "other");
+}

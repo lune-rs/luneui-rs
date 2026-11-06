@@ -331,7 +331,7 @@ only with the feature; the gate runs the crate both ways).
 | `popover` (`popover.rs`) | The guard of a tray surface's window (D223, D224) | `PopoverWindow`, `frontmost_app` |
 | `platform` (private; `platform.rs`, `platform/{item,macos,windows,other}.rs`) | The OS half of both: `item.rs` is the `tray-icon` wrapper macOS and Windows share, `macos.rs` the panel class swap. With `material/macos.rs`, the only `unsafe` | `Panel`, `TrayItem` |
 
-Tests: unit tests in `tray.rs` (the click rule, image sizes, an unplaced rect) and `platform/other.rs` (`Unsupported`, so they run in the Linux half of `scripts/check-targets.sh`). Nothing in the gate opens a window or a status item.
+Tests: unit tests in `tray.rs` (image sizes, an unplaced rect), `platform/item.rs` (the click rule) and `platform/other.rs` (`Unsupported`, so they run in the Linux half of `scripts/check-targets.sh`). Nothing in the gate opens a window or a status item.
 
 ### `lune-ui` (facade, `crates/lune-ui/src/lib.rs`)
 

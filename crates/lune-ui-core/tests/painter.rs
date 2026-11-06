@@ -459,3 +459,89 @@ fn acrylic_radii_keeps_each_corner_and_acrylic_is_the_even_case() {
     replayed.replay(&ops);
     assert_eq!(rec.scene, replayed.scene);
 }
+
+// ── `image` and `text_rotated`: the right item, on the right layer, under the clip and Xform ────
+
+/// The same state for both: layer `Popup` (index 2), a logical clip (10, 10, 50, 50) and an Xform
+/// of scale 2 moved by (3, 4) at alpha 0.5, all at device scale 2. The clip travels through the
+/// Xform: (10, 10, 50, 50) -> (23, 24, 100, 100) logical -> (46, 48, 200, 200) device.
+fn popup_under_clip_and_xform(p: &mut P<'_>) {
+    p.on(LayerId::Popup);
+    p.push_clip(Rect::new(10.0, 10.0, 50.0, 50.0));
+    p.push_xform(Xform {
+        origin: (0.0, 0.0),
+        scale: 2.0,
+        dx: 3.0,
+        dy: 4.0,
+        alpha: 0.5,
+    });
+}
+
+const POPUP: usize = 2;
+
+#[test]
+fn image_lands_on_the_current_layer_under_the_clip_and_xform() {
+    use lune_ui_core::image::{Fit, ImageAlign, ImageId};
+    use lune_ui_core::scene::ImageSource;
+    let scene = scene_of(|p| {
+        popup_under_clip_and_xform(p);
+        p.image(
+            Rect::new(10.0, 10.0, 10.0, 5.0),
+            ImageId(7),
+            Fit::Contain,
+            ImageAlign::CENTER,
+            0.5,
+        );
+    });
+    // Only the Popup layer holds it.
+    for (i, l) in scene.layers.iter().enumerate() {
+        assert_eq!(l.images.len(), usize::from(i == POPUP), "layer {i}");
+    }
+    let it = scene.layers[POPUP].images[0];
+    assert_eq!(it.source, ImageSource::Id(ImageId(7)));
+    // (10, 10, 10, 5) -> (23, 24, 20, 10) logical -> device.
+    assert_eq!(it.dst, Rect::new(46.0, 48.0, 40.0, 20.0));
+    assert_eq!(it.clip, [46.0, 48.0, 200.0, 200.0]);
+    assert_eq!(it.alpha, 0.25, "0.5 own times the Xform's 0.5");
+    // The renderer fake sees the same item as an Image call on layer 2.
+    let mut rec = RecordingRenderer::new();
+    rec.render(&scene, &FrameParams::default());
+    let calls = &rec.last().expect("one frame").calls;
+    let images: Vec<_> = calls
+        .iter()
+        .filter(|c| matches!(c, DrawCall::Image { .. }))
+        .collect();
+    assert_eq!(images.len(), 1);
+    assert!(matches!(images[0], DrawCall::Image { layer: POPUP, item } if *item == it));
+}
+
+#[test]
+fn text_rotated_lands_on_the_current_layer_under_the_clip_and_xform() {
+    use lune_ui_core::scene::ImageSource;
+    use lune_ui_core::text::TextSystem;
+    let spec = Spec::plain("turn", Style::ui(13.0, THEME.fg_primary));
+    let (key, (w, h)) = FakeText.prepare(&spec, 2.0);
+    let scene = scene_of(|p| {
+        popup_under_clip_and_xform(p);
+        p.text_rotated(&spec, (50.0, 40.0), 0.5);
+    });
+    for (i, l) in scene.layers.iter().enumerate() {
+        assert_eq!(l.images.len(), usize::from(i == POPUP), "layer {i}");
+        assert!(
+            l.texts.is_empty(),
+            "rotated text is an image, not a text item"
+        );
+    }
+    let it = scene.layers[POPUP].images[0];
+    // The text's raster is drawn at the Xform's scale (2): the key is the unscaled shaped text.
+    assert_eq!(it.source, ImageSource::Text(key, 2.0));
+    assert_eq!(it.rotation, 0.5);
+    // Centre (50, 40) -> (103, 84) logical -> (206, 168) device; size is the shaped size times
+    // the Xform's scale 2 times the device scale 2.
+    assert_eq!((it.dst.w, it.dst.h), (w * 4.0, h * 4.0));
+    let c = (it.dst.x + it.dst.w / 2.0, it.dst.y + it.dst.h / 2.0);
+    assert_eq!(c, (206.0, 168.0));
+    assert_eq!(it.clip, [46.0, 48.0, 200.0, 200.0]);
+    // The Xform's alpha is applied when the picture is drawn (a fade must not change the key).
+    assert_eq!(it.alpha, 0.5);
+}

@@ -262,6 +262,53 @@ fn a_radius_of_zero_takes_the_old_path() {
     assert_eq!(px(&img, 20, 20), WHITE);
 }
 
+#[test]
+fn an_arc_is_a_stroked_ring_piece_from_its_start_turning_clockwise_at_scale_2() {
+    let Some(mut gpu) = headless_gpu() else {
+        return;
+    };
+    let mut text = text_cache();
+    // Centre (30, 30) logical = (60, 60) device, radius 20 = 40 device, from the right (0 rad)
+    // a quarter turn clockwise on screen (to the bottom), 2 logical = 4 device px wide.
+    let scene = paint(&mut text, |p| {
+        p.arc(
+            [30.0, 30.0],
+            20.0,
+            0.0,
+            std::f32::consts::FRAC_PI_2,
+            StrokeStyle::solid(WHITE, 2.0),
+        );
+    });
+    let img = render(&mut gpu, &mut text, &scene);
+    // Instrument check: the ring's centre and a far corner are empty.
+    assert_eq!(px(&img, 60, 60), [0, 0, 0, 0]);
+    assert_eq!(px(&img, 230, 150), [0, 0, 0, 0]);
+    // On the ring (radius 40 from (60, 60)) at 5, 45 and 85 degrees clockwise: solid white.
+    for deg in [5.0f32, 45.0, 85.0] {
+        let a = deg.to_radians();
+        let (x, y) = (60.0 + 40.0 * a.cos(), 60.0 + 40.0 * a.sin());
+        assert_eq!(px(&img, x as usize, y as usize), WHITE, "{deg} degrees");
+    }
+    // Off the ring: 4 device px inside and outside it at 45 degrees (its half width is 2).
+    for r in [34.0f32, 46.0] {
+        let a = 45.0f32.to_radians();
+        let (x, y) = (60.0 + r * a.cos(), 60.0 + r * a.sin());
+        assert_eq!(px(&img, x as usize, y as usize)[3], 0, "radius {r}");
+    }
+    // Outside the sweep: on the ring's circle at 45 degrees anticlockwise of the start, at 180 and
+    // at 270 degrees (the top), nothing.
+    for deg in [-45.0f32, 180.0, 270.0] {
+        let a = deg.to_radians();
+        let (x, y) = (60.0 + 40.0 * a.cos(), 60.0 + 40.0 * a.sin());
+        assert_eq!(px(&img, x as usize, y as usize)[3], 0, "{deg} degrees");
+    }
+    // The ends are butt: 3 device px past either end along the ring is empty, 3 px inside is lit.
+    assert_eq!(px(&img, 100, 57)[3], 0, "before the start");
+    assert_eq!(px(&img, 100, 63), WHITE, "after the start");
+    assert_eq!(px(&img, 57, 100)[3], 0, "past the end");
+    assert_eq!(px(&img, 63, 100), WHITE, "before the end");
+}
+
 /// How far `a` in a list of `(x, y)` samples is lit, as a share of them.
 fn lit_share(img: &[u8], samples: &[(usize, usize)]) -> f32 {
     let lit = samples
@@ -347,6 +394,66 @@ fn a_sweep_is_brightest_at_its_phase_around_a_translated_centre() {
     assert!(right[1] > 200 && right[3] < 10, "{right:?}");
     let down = at(&mut gpu, &mut text, 0.5);
     assert!(down[2] > 200 && down[0] < 10, "{down:?}");
+}
+
+/// The conic sweep's alpha table (`shader.wgsl:135-141`, `sweep_alpha`) written out from its stops:
+/// alpha 1 at 0, the faint level 64/255 at 0.1528, 0 from 0.3056 to 0.6944, faint again at 0.8472,
+/// 1 at 1, straight lines between. Not read from a run.
+fn sweep_table(t: f32) -> f32 {
+    let faint = 64.0 / 255.0;
+    let lerp = |a: f32, b: f32, k: f32| a + (b - a) * k;
+    if t < 0.1528 {
+        lerp(1.0, faint, t / 0.1528)
+    } else if t < 0.3056 {
+        lerp(faint, 0.0, (t - 0.1528) / 0.1528)
+    } else if t < 0.6944 {
+        0.0
+    } else if t < 0.8472 {
+        lerp(0.0, faint, (t - 0.6944) / 0.1528)
+    } else {
+        lerp(faint, 1.0, (t - 0.8472) / 0.1528)
+    }
+}
+
+#[test]
+fn the_sweep_table_holds_at_its_four_breakpoints_at_scale_2() {
+    let Some(mut gpu) = headless_gpu() else {
+        return;
+    };
+    let mut text = text_cache();
+    // A circle of 360 points, radius 30 logical (60 device) round (60, 40) logical, drawn 4 device
+    // px thick; phase 0, so a pixel's alpha is the table at its clockwise turn from 12 o'clock.
+    let (cx, cy, r) = (60.0f32, 40.0f32, 30.0f32);
+    let ring: Vec<[f32; 2]> = (0..360)
+        .map(|i| {
+            let a = (i as f32).to_radians();
+            [cx + r * a.sin(), cy - r * a.cos()]
+        })
+        .collect();
+    let scene = paint(&mut text, |p| {
+        p.stroke_sweep(&ring, WHITE, 2.0, 0.0, [cx, cy]);
+    });
+    let img = render(&mut gpu, &mut text, &scene);
+    // Instrument check: the centre of the ring is empty.
+    assert_eq!(px(&img, 120, 80), [0, 0, 0, 0]);
+    // The four breakpoints, the start, the middle of the dark span and each segment's midpoint.
+    let turns = [
+        0.0, 0.0764, 0.1528, 0.2292, 0.3056, 0.5, 0.6944, 0.7708, 0.8472, 0.9236,
+    ];
+    for t in turns {
+        let a = t * std::f32::consts::TAU;
+        // The device pixel holding that point of the ring, then the turn of its own centre.
+        let (fx, fy) = (SCALE * (cx + r * a.sin()), SCALE * (cy - r * a.cos()));
+        let (x, y) = (fx.floor() as usize, fy.floor() as usize);
+        let (dx, dy) = (x as f32 + 0.5 - SCALE * cx, y as f32 + 0.5 - SCALE * cy);
+        let turn = (dx.atan2(-dy) / std::f32::consts::TAU).rem_euclid(1.0);
+        let want = sweep_table(turn) * 255.0;
+        let got = f32::from(px(&img, x, y)[0]);
+        assert!(
+            (got - want).abs() <= 8.0,
+            "turn {t} (pixel {x},{y} at {turn:.4}): alpha {got}, table {want:.1}"
+        );
+    }
 }
 
 /// Logical px. Black on the left of `EDGE_X`, white on the right.
