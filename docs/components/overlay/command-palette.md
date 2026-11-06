@@ -2,10 +2,10 @@
 id: overlay.command-palette
 title: Command palette
 area: overlay
-status: in-progress
+status: done
 consumers: lunegit
-source: Lunegit: src/Lunegit.Desktop/Views/Dialogs/GlobalSearchDialogView.axaml
-owner: toolkit-v1 M7
+source: crates/lune-ui-core/src/widgets/command_palette.rs
+owner: —
 summary: 640 px search dialog over commits, branches, tags, stash, reflog, repos, settings and commands, with prefix filters
 ---
 
@@ -120,11 +120,13 @@ The gallery's data is neutral (files and commands), not git words.
 - Pixel probes at scale 2: card 1280 px wide, at most 1440 high, results at most 1120 high, the footer block's bottom corners 16, search bar 40 px (80 in the probe's logical px), scrim #00000080.
 - Conformance: opening and closing sampled at 60 Hz under every tier equal the dialog's.
 - Semantic node: `dialog` modal; `text-input` with the placeholder name; sections as groups; `list-item` rows with `selected`; the disabled walk.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_command_palette.rs` holds the behaviour bullet's every clause: `down_and_up_walk_both_sections_and_the_show_more_row_and_wrap`, `enter_activates_the_selected_row_once`, `hover_fills_without_moving_the_selection_and_a_click_activates`, `the_first_row_is_selected_at_open`, `the_first_row_is_selected_when_the_rows_change_and_a_present_key_stays`, `enter_with_no_rows_does_nothing_and_is_consumed`, `typing_edits_the_query_and_up_down_enter_do_not_move_the_caret`, `show_more_reports_its_section_by_enter_and_by_click`, `the_selected_row_is_in_view_the_frame_it_is_chosen`, `escape_and_a_scrim_click_dismiss_once_and_a_card_click_does_not`, `tab_stays_in_the_card_and_never_lands_on_a_row`, `the_destructive_row_describes_itself_shows_a_tooltip_above_the_card_and_still_activates`, `the_page_under_the_palette_stays_inert`; pixel probes `the_card_is_640_wide_and_the_results_stop_at_560_at_scale_two` (1280 and 1120 device px), `the_results_span_the_card_with_rows_ten_in_and_no_gap_under`; conformance `opening_and_closing_follow_the_dialogs_curves_under_every_tier`, `a_closing_palette_keeps_drawing_its_rows_then_vanishes`; node `the_sections_are_groups_and_the_rows_list_items`, `a_card_name_overrides_the_placeholder`, `a_disabled_palette_takes_its_keys_activates_nothing_and_passes_the_walk`.
 
 ### Build
 
 - Milestone: M7.
 - Depends on: overlay.dialog, widget.filter-bar, layout.scroll-area, overlay.tooltip, core.focus, infra.accessibility, infra.shortcut-routing.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_command_palette.rs::down_and_up_walk_both_sections_and_the_show_more_row_and_wrap, crates/lune-ui-core/tests/widget_command_palette.rs::enter_activates_the_selected_row_once, crates/lune-ui-core/tests/widget_command_palette.rs::escape_and_a_scrim_click_dismiss_once_and_a_card_click_does_not, crates/lune-ui-core/tests/widget_command_palette.rs::the_destructive_row_describes_itself_shows_a_tooltip_above_the_card_and_still_activates, crates/lune-ui-core/tests/widget_command_palette.rs::the_card_is_640_wide_and_the_results_stop_at_560_at_scale_two, crates/lune-ui-core/tests/widget_command_palette.rs::opening_and_closing_follow_the_dialogs_curves_under_every_tier, crates/lune-ui-core/tests/widget_command_palette.rs::the_sections_are_groups_and_the_rows_list_items, crates/lune-ui-core/tests/widget_command_palette.rs::a_disabled_palette_takes_its_keys_activates_nothing_and_passes_the_walk`; page `command-palette`; unverified here: real typing with an input method (Luneterm's M9 run, D15).
 
 ## Open questions
 

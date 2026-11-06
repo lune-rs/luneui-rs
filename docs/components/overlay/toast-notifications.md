@@ -2,10 +2,10 @@
 id: overlay.toast-notifications
 title: Toasts and notification history
 area: overlay
-status: in-progress
+status: done
 consumers: lunegit
-source: Lunegit: src/Lunegit.Desktop/MainWindow.axaml
-owner: toolkit-v1 M7
+source: crates/lune-ui-core/src/widgets/toast.rs
+owner: —
 summary: Bottom-right toast stack (max 3, timed dismissal, loading and prompt toasts) and a 50-item notification history
 ---
 
@@ -130,15 +130,17 @@ Off snaps all four. A toast's y is one transition retargeted from where it is: w
 
 ### Acceptance
 
-- Behaviour (scripted input, injected time): info dismisses at 4 s, success at 3 s, warning at 6 s; error, loading and prompt never auto-dismiss; an expanded toast is not dismissed until collapsed; a fourth visible toast evicts the oldest non-loading, non-prompt toast; history is capped at 50. Source: [L src/Lunegit.Desktop/Services/NotificationService.cs:16-17,119-125,140-146,154-157,166-167]. None exists in the moved code.
+- Behaviour (scripted input, injected time): info dismisses at 4 s, success at 3 s, warning at 6 s; error, loading and prompt never auto-dismiss; an expanded toast is not dismissed until collapsed; a fourth visible toast evicts the oldest non-loading, non-prompt toast; history is capped at 50. Source: [L src/Lunegit.Desktop/Services/NotificationService.cs:16-17,119-125,140-146,154-157,166-167].
 - Pixel probes at scale 2: toast width 640 px (above the 600 px minimum), radius 16 px, padding 24 px inside the 2 px border, stack gap 16 px, bottom-right margin 32 px.
 - Conformance: the four motions above in the three tiers (`tests/widget_toast.rs`).
 - Semantic node: each toast `status` with polite live region (`alert` for an error); history `list`; actions named. Over a dialog and over a raised popover a toast's buttons work, and neither Tab nor Escape behaves differently for the dialog with a prompt toast up. In a disabled scope every node is disabled and no key reaches a binding.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_toast.rs`: behaviour `timed_toasts_leave_at_their_deadline_and_are_archived_once` (4 s, 3 s, 6 s), `error_loading_and_prompt_toasts_never_time_out`, `an_expanded_toast_waits_for_the_collapse`, `a_fourth_toast_evicts_the_oldest_that_may_go_without_archiving_it`, `the_history_keeps_fifty_newest_first_and_counts_unread`; pixel probes `scale_two_probes_width_radius_padding_gap_and_margin`, `width_is_320_collapsed_and_720_expanded_and_the_height_follows_the_text`; conformance `appearing_conforms_in_three_tiers`, `leaving_conforms_in_three_tiers`, `a_neighbour_moves_in_one_retargeted_transition`, `expanding_animates_the_height_and_collapsing_retargets_it`; node `the_nodes_are_a_status_an_alert_buttons_and_a_progress`, `access_default_toggles_and_dismiss_dismisses`, `the_toast_is_called_in_a_disabled_scope_and_every_node_says_so`; over a dialog `a_toast_button_works_over_a_dialog_and_over_a_raised_popover`, `tab_does_not_reach_a_toast_under_a_dialog`, `escape_closes_the_dialog_with_or_without_a_prompt_toast_up`; history `the_history_lists_newest_first_and_clear_all_empties_it`, `a_long_log_shapes_only_the_lines_in_view`.
 
 ### Build
 
 - Milestone: M7 (step 5 built the model, `Ui::toasts` and `Ui::toast_history`).
 - Depends on: core.ui, core.focus, infra.accessibility, widget.button, data.progress.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_toast.rs::timed_toasts_leave_at_their_deadline_and_are_archived_once, crates/lune-ui-core/tests/widget_toast.rs::error_loading_and_prompt_toasts_never_time_out, crates/lune-ui-core/tests/widget_toast.rs::the_history_keeps_fifty_newest_first_and_counts_unread, crates/lune-ui-core/tests/widget_toast.rs::scale_two_probes_width_radius_padding_gap_and_margin, crates/lune-ui-core/tests/widget_toast.rs::appearing_conforms_in_three_tiers, crates/lune-ui-core/tests/widget_toast.rs::the_nodes_are_a_status_an_alert_buttons_and_a_progress, crates/lune-ui-core/tests/widget_toast.rs::a_toast_button_works_over_a_dialog_and_over_a_raised_popover`; page `toast-notifications`; unverified here: none.
 
 ## Open questions
 

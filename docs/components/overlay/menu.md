@@ -2,10 +2,10 @@
 id: overlay.menu
 title: Glass context menu
 area: overlay
-status: in-progress
+status: done
 consumers: luneterm, wane
 source: crates/lune-ui-core/src/widgets/menu.rs
-owner: toolkit-v1 M7
+owner: —
 summary: Glass context menu with open and close motion
 ---
 
@@ -134,16 +134,18 @@ Never animated: the rows themselves, the pressed fill, and the panel's size (the
 - Pixel probes at scale 2: panel min width 380 px, row 56 px high, panel radius 18 px, separator 22 px high, row fill #FFFFFF16, pressed fill #FFFFFF23. Source values in Anatomy.
 - Conformance: open runs 180 ms, cubic-out, from alpha 0 / offset 4 / scale 0.97 to rest; close runs 120 ms, ease-in, to alpha 0; Reduced fades opacity only; Off snaps.
 - Semantic node: role `menu`, always named; item names and shortcut descriptions match the rows; the default action fires an enabled item and does nothing on a disabled one; `disabled_violations` is empty in a disabled scope.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_menu.rs`: behaviour `a_click_picks_the_item_once_and_a_separator_cannot_be_picked`, `enter_picks_the_hovered_item_else_the_focused_one`, `space_picks_as_enter_does`, `escape_and_an_outside_press_dismiss_and_the_press_reaches_nothing`, `a_closing_menu_hits_nothing`, the highlight rows `a_keyboard_open_lights_the_first_enabled_row_and_a_pointer_open_none`, `down_and_up_wrap_and_skip_disabled_rows_header_and_separators`, `a_press_takes_the_highlight_from_the_keys_and_shows_the_pressed_fill_while_held`; pixel probes at scale 2 `at_scale_2_the_panel_is_380_wide_with_radius_18_rows_56_high_and_separators_22`, `the_variants_draw_their_colours`, `a_row_draws_its_hint_and_its_chevron`; conformance `the_curves_conform_under_every_tier_and_opacity_is_monotone_through_the_ui`, `exit_retention_is_120_ms_full_120_reduced_and_none_off`, `reduced_fades_opacity_only`, `the_row_hover_conforms_under_every_tier_and_fades_through_the_ui`; node `the_semantic_tree_has_a_menu_of_menu_items`, `the_menu_node_is_always_named`; disabled `a_disabled_scope_takes_the_keys_picks_nothing_and_marks_every_node`, `a_disabled_row_takes_no_pointer_no_action_and_no_fill_but_blocks`.
 
 ### Build
 
 - Milestone: M4 (retrofit), M7 (variants, keyboard, anchored menus).
 - Depends on: core.ui, core.focus, infra.accessibility, motion.transitions, render.blur.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_menu.rs::a_click_picks_the_item_once_and_a_separator_cannot_be_picked, crates/lune-ui-core/tests/widget_menu.rs::escape_and_an_outside_press_dismiss_and_the_press_reaches_nothing, crates/lune-ui-core/tests/widget_menu.rs::a_closing_menu_hits_nothing, crates/lune-ui-core/tests/widget_menu.rs::down_and_up_wrap_and_skip_disabled_rows_header_and_separators, crates/lune-ui-core/tests/widget_menu.rs::at_scale_2_the_panel_is_380_wide_with_radius_18_rows_56_high_and_separators_22, crates/lune-ui-core/tests/widget_menu.rs::the_curves_conform_under_every_tier_and_opacity_is_monotone_through_the_ui, crates/lune-ui-core/tests/widget_menu.rs::exit_retention_is_120_ms_full_120_reduced_and_none_off, crates/lune-ui-core/tests/widget_menu.rs::the_semantic_tree_has_a_menu_of_menu_items, crates/lune-ui-core/tests/widget_menu.rs::a_disabled_scope_takes_the_keys_picks_nothing_and_marks_every_node`; page `menu`; unverified here: the OS tray menu surface (`platform.tray-icon`).
 
 ## Open questions
 
-- Shortcut routing of a menu's hints: the hint is text; the app binds its own `Binding`.
-- On macOS the tray menu may be the native NSMenu instead (W docs/ui/components.md:543-556; D8 chose the glass surface); open for the tray work.
+- Answered: shortcut routing of a menu's hints: the hint is text drawn from the chord (`Chord::hint`); the app binds its own `Binding` (`infra.shortcut-routing`).
+- Answered (D8, D48; M10): the tray menu is the toolkit's glass menu in its own window (`Ui::menu_window`), not a native NSMenu.
 
 ## Notes for the planner
 

@@ -2,10 +2,10 @@
 id: overlay.popover
 title: Anchored popover
 area: overlay
-status: in-progress
+status: done
 consumers: any
 source: crates/lune-ui-core/src/widgets/popover.rs
-owner: orch/toolkit-v1
+owner: —
 summary: Anchored overlay placement and lifecycle: flip and shift inside the window, dismiss on outside click, Escape and focus loss, Popup layer, focus scope
 ---
 
@@ -126,11 +126,13 @@ None: the popover has no text of its own.
 - Pixel probes at scale 2: gap 8 device px; margin 16 device px; shell radius 16.
 - Conformance lines: open and dismiss pass `motion::conformance` at 60 Hz (monotonic, exact end, settled within 180 ms and 120 ms plus one frame); Reduced fades, Off snaps [motion].
 - Semantic-node test: the content's node appears while open and is `hidden` once closed; an injected `AccessAction` dismiss closes it.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_popover.rs`: placement `placement_known_answers`, `the_popover_sits_where_place_says_and_reports_it`, `the_dropdown_panel_is_the_place_answer`; behaviour `an_outside_press_dismisses_once_and_reaches_nothing`, `a_press_inside_the_popover_does_not_dismiss`, `escape_closes_only_the_topmost_of_two`, `focus_loss_dismisses`, `closing_restores_focus_to_the_anchor_and_tab_stays_inside`; exit `a_popover_the_app_stops_calling_finishes_its_dismiss_then_idles`, `the_exit_replays_the_content_and_hits_nothing`; pixel probes `pixel_probes_at_scale_2`, `full_tier_opens_from_4_px_lower_at_97_percent`; conformance `the_curves_conform_under_every_tier_and_opacity_is_monotone_through_the_ui`, `reduced_fades_opacity_only_and_off_snaps`; node `the_content_node_appears_while_open_and_an_access_dismiss_closes_it`; glass `a_glass_popover_blurs_what_is_under_it_and_replays_the_blur_while_it_closes`.
 
 ### Build
 
-- Milestone: M5, M7 step 4 (`Surface::Glass`). Built in M5 (steps 9 and 10; the page is `popover`). The carried limit is settled [D137]: a popover opened above a dialog draws and takes input on the `Raised` layer, chosen once at open; a third level that overlaps its parent shares `Raised` and interleaves (fills under text). Open for `done` (D47): M11 re-checks the whole bar on every entry; the Windows and Linux run time is unverified (the Linux and Windows lint is `scripts/check-targets.sh`).
+- Milestone: M5, M7 step 4 (`Surface::Glass`). Built in M5 (steps 9 and 10; the page is `popover`). The carried limit is settled [D137]: a popover opened above a dialog draws and takes input on the `Raised` layer, chosen once at open; a third level that overlaps its parent shares `Raised` and interleaves (fills under text). M11 audited it against D47 (the `Done` line). Unverified here: the Windows and Linux run time (the lint for both is `scripts/check-targets.sh`).
 - Depends on: core.ui, core.focus, infra.accessibility, motion.transitions, core.input
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_popover.rs::placement_known_answers, crates/lune-ui-core/tests/widget_popover.rs::an_outside_press_dismisses_once_and_reaches_nothing, crates/lune-ui-core/tests/widget_popover.rs::escape_closes_only_the_topmost_of_two, crates/lune-ui-core/tests/widget_popover.rs::closing_restores_focus_to_the_anchor_and_tab_stays_inside, crates/lune-ui-core/tests/widget_popover.rs::a_popover_the_app_stops_calling_finishes_its_dismiss_then_idles, crates/lune-ui-core/tests/widget_popover.rs::pixel_probes_at_scale_2, crates/lune-ui-core/tests/widget_popover.rs::the_curves_conform_under_every_tier_and_opacity_is_monotone_through_the_ui, crates/lune-ui-core/tests/widget_popover.rs::the_content_node_appears_while_open_and_an_access_dismiss_closes_it`; page `popover`; unverified here: Windows and Linux run time (limits with rows: one level above a modal, D137).
 
 ## Open questions
 

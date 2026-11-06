@@ -2,10 +2,10 @@
 id: overlay.popup-panel
 title: Popup panel surface
 area: overlay
-status: in-progress
+status: done
 consumers: luneterm
 source: crates/lune-ui-core/src/widgets/popup_panel.rs
-owner: orch/toolkit-v1
+owner: —
 summary: Shared popup surface: radius-8 fill and 1 px ring, colours passed by the caller (used by the drop-down list)
 ---
 
@@ -83,17 +83,19 @@ None: the surface draws no text.
 - Pixel probes at scale 2: radius 16 px; ring 2 px; fill = the caller's `bg`.
 - Behaviour: n/a — no input.
 - Semantic node: n/a (see Accessibility).
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_dropdown.rs::the_popup_panel_is_16_px_radius_with_a_2_px_ring_in_the_callers_fill` (the panel the dropdown draws through `popup_panel`: radius 16, ring 2, the caller's fill); the search picker's popup at scale 2: `widget_search_picker.rs::at_scale_2_the_popup_radius_is_16_the_search_bar_8_and_the_dash_is_1_px_in_a_2_4_pattern`; the popover's `popover.rs::pixel_probes_at_scale_2`. It takes no input and emits no node (its host does): `widget_popover.rs::surface_none_draws_nothing_of_its_own`.
 
 ### Build
 
 - Milestone: M4.
 - Depends on: core.painter.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_dropdown.rs::the_popup_panel_is_16_px_radius_with_a_2_px_ring_in_the_callers_fill, crates/lune-ui-core/tests/widget_search_picker.rs::at_scale_2_the_popup_radius_is_16_the_search_bar_8_and_the_dash_is_1_px_in_a_2_4_pattern, crates/lune-ui-core/tests/widget_popover.rs::pixel_probes_at_scale_2`; page `dropdown` (the panel on its scenes); unverified here: none.
 
 ## Open questions
 
 - Resolved [D143, D145]: blur under the surface for the flyout (Wane `--menu-glass` blur 30, saturate 1.8, W docs/ui/components.md:571-584). `popup_panel` stays opaque and caller-coloured; the glass surface is `popover::glass_panel` (`Surface::Glass`, the glass dropdown, the flyout), and saturate 1.8 is the frame's `FrameParams.saturation`.
-- Reuse by the tooltip: decided with overlay.tooltip (step 5); open here until that entry lands.
-- Whether the flyout's own window uses this surface as-is (Wane section 5 needs a separate borderless window): open, platform work.
+- Answered: the tooltip reuses it (`crates/lune-ui-core/src/widgets/tooltip.rs:10`), as do the dropdown, the popover and the search picker's popup.
+- Answered (M10): the flyout's own window does not use this surface; `Ui::flyout_window` draws the flyout's own glass card (`overlay.flyout`).
 
 ## Notes for the planner
 

@@ -2,10 +2,10 @@
 id: overlay.tooltip
 title: Tooltips
 area: overlay
-status: in-progress
+status: done
 consumers: lunegit, wane
 source: crates/lune-ui-core/src/widgets/tooltip.rs
-owner: orch/toolkit-v1
+owner: —
 summary: Hover tooltip: glass shell radius 8, padding 10 by 8, one 800 ms show delay, text or small rich content, also on disabled controls
 ---
 
@@ -114,11 +114,13 @@ None: the text is supplied by the app (Lunegit's are app strings such as `termin
 - Pixel probes at scale 2: radius 16 device px, padding 20 px horizontal and 16 px vertical around the text, 2 px border.
 - Conformance: appear and dismiss pass `motion::conformance`; Reduced keeps the fade, Off snaps [motion].
 - Semantic node: role `tooltip` with the text while shown and no node while hidden; the anchor's description equals the text.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_tooltip.rs`: behaviour `the_delay_is_800_ms_of_hover`, `leaving_starts_the_dismiss_at_once_and_it_is_hidden_after_120_ms`, `moving_to_another_anchor_restarts_the_timer`, `an_anchor_the_app_stops_calling_never_shows_and_calling_again_restarts`, `a_disabled_anchor_shows_it`, `a_list_scrolling_under_a_parked_pointer_shows_none`, `a_focus_visible_anchor_shows_it_after_the_same_delay`; placement `it_stays_inside_the_window_flipped_and_shifted`; pixel probes `pixel_probes_at_scale_2`, `long_text_wraps_at_320`; conformance `the_fade_is_opacity_only_reduced_keeps_it_and_off_snaps`, `leaving_off_tier_hides_at_once`; node `the_semantic_nodes_follow_the_tooltip`.
 
 ### Build
 
-- Milestone: M5. Built in M5 (steps 9 and 10; the page is `tooltip`, 8 scenes). A tooltip over a dialog draws on the `Raised` layer, chosen once at open [D137]; a third level that overlaps its parent shares `Raised` and interleaves (fills under text). Open for `done` (D47): M11 re-checks the whole bar on every entry; the Windows and Linux run time is unverified (the Linux and Windows lint is `scripts/check-targets.sh`).
+- Milestone: M5. Built in M5 (steps 9 and 10; the page is `tooltip`, 8 scenes). A tooltip over a dialog draws on the `Raised` layer, chosen once at open [D137]; a third level that overlaps its parent shares `Raised` and interleaves (fills under text). M11 audited it against D47 (the `Done` line). Unverified here: the Windows and Linux run time (the lint for both is `scripts/check-targets.sh`).
 - Depends on: overlay.popover, core.ui, core.focus, infra.accessibility, motion.transitions
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_tooltip.rs::the_delay_is_800_ms_of_hover, crates/lune-ui-core/tests/widget_tooltip.rs::leaving_starts_the_dismiss_at_once_and_it_is_hidden_after_120_ms, crates/lune-ui-core/tests/widget_tooltip.rs::a_disabled_anchor_shows_it, crates/lune-ui-core/tests/widget_tooltip.rs::a_list_scrolling_under_a_parked_pointer_shows_none, crates/lune-ui-core/tests/widget_tooltip.rs::it_stays_inside_the_window_flipped_and_shifted, crates/lune-ui-core/tests/widget_tooltip.rs::pixel_probes_at_scale_2, crates/lune-ui-core/tests/widget_tooltip.rs::the_fade_is_opacity_only_reduced_keeps_it_and_off_snaps, crates/lune-ui-core/tests/widget_tooltip.rs::the_semantic_nodes_follow_the_tooltip`; page `tooltip`; unverified here: Windows and Linux run time (limit with a row: one level above a modal, D137).
 
 ## Open questions
 

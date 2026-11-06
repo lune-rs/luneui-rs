@@ -12,8 +12,8 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | in-luneterm | 0 |
 | planned | 0 |
 | stub | 0 |
-| in-progress | 56 |
-| done | 37 |
+| in-progress | 19 |
+| done | 74 |
 | external | 4 |
 | **total** | **97** |
 
@@ -59,46 +59,46 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
-| [widget.badge](widget/badge.md) | Badge | in-progress | wane | Badge: static 18 px tag with tone fill and border; neutral, ok, warn, err, data; Lunegit status-badge shape |
-| [widget.banner-empty-state](widget/banner-empty-state.md) | Banners, empty states and loading gates | in-progress | lunegit | Indexing banner (warning tone, spinning sync icon) and the empty-repository view: centred icon, title, subtitle, action buttons |
-| [widget.button](widget/button.md) | Button | in-progress | luneterm, wane | Button: primary and secondary fills, measured width, hover and press motion |
-| [widget.callout](widget/callout.md) | Callout | in-progress | wane | Callout: static notice with 1 px tone border, 14 px icon, optional figure and action button; not dismissible |
-| [widget.checkbox](widget/checkbox.md) | Checkbox | in-progress | luneterm, wane | Checkbox: 16 px box, accent fill and check when checked, label beside it |
-| [widget.combo](widget/combo.md) | Combo box | in-progress | luneterm, wane | Combo box: value and chevron in an input box; opens overlay.dropdown on click or key |
-| [widget.filter-bar](widget/filter-bar.md) | Filter bar | in-progress | lunegit | Filter bar: search field in an inset surface with a 14 px search icon, a clear button when text is present, and no focus ring |
-| [widget.form-field](widget/form-field.md) | Form field (label, control, hint) | in-progress | wane | Form field: label above a control, hint below; error state rings the control and colours the hint in err |
-| [widget.label](widget/label.md) | Label | in-progress | luneterm, wane | Label: UI-font text at the theme base size; colour from the caller; section and title roles from the font scale |
-| [widget.list-row-badge](widget/list-row-badge.md) | List rows with status badges | in-progress | lunegit, wane | Master list row: name, value and sub-line with a badge in the head; rest transparent, hover surface-hover, selected surface-selected |
-| [widget.nav-item](widget/nav-item.md) | Navigation item | in-progress | wane | Navigation item: 32 px row, secondary text at rest, surface-selected fill and bright text when active, no accent bar |
-| [widget.radio-group](widget/radio-group.md) | Radio group | in-progress | wane | Radio group: vertical 16 px rings, accent ring and 6 px dot when selected; arrow keys move the selection inside the group |
-| [widget.row](widget/row.md) | Row (setting row, list item row) | in-progress | wane | Row: setting row (title, description, control at right, min 56 high) or compact item row (32 high, four columns); hover tints the row; rows are not clickable |
-| [widget.scrollbar](widget/scrollbar.md) | Scrollbars | in-progress | lunegit, wane | Overlay scrollbar: 9 px transparent track, 6 px accent thumb, auto-hide while the pointer is away, thumb drag |
-| [widget.search-picker](widget/search-picker.md) | Search picker | in-progress | lunegit | Search picker: a field-style or link-style trigger that opens a searchable list; Escape closes, Enter picks the first match |
-| [widget.slider](widget/slider.md) | Slider | in-progress | any | Slider: 4 px track with accent fill and a 12 px knob (14 hovered); look derived from the toggle knob and the progress track; arrow keys step |
-| [widget.spinner](widget/spinner.md) | Spinner | in-progress | any | Spinner: a 14 px glyph that turns a full revolution every 1.2 s while busy; static under Reduced and Off |
-| [widget.star-rating](widget/star-rating.md) | Star rating | in-progress | lunegit | Star rating: row of star buttons (default five) in the warning tone; click N sets N, click again clears |
-| [widget.status-dot](widget/status-dot.md) | Status dot | in-progress | wane | Status dot: static 8 px circle in ok, warn, err, data or paused tone; never alone, a word beside it carries the meaning |
-| [widget.stepper](widget/stepper.md) | Numeric stepper | in-progress | luneterm, wane | Numeric stepper: value with minus and plus buttons; clamping and step size belong to the app |
-| [widget.steps](widget/steps.md) | Wizard steps | in-progress | wane | Wizard steps: four 32 px rows in the sidebar slot with upcoming, current and done states; not clickable |
-| [widget.tab-strip](widget/tab-strip.md) | Tab strip | in-progress | luneterm, lunegit | Tab strip: tabs with close, new-tab button, overflow scrolling, drag reorder, and the connected tab outline with a running cue |
-| [widget.text-field](widget/text-field.md) | Text field | in-progress | luneterm, wane | Single-line text box: 32 px, radius 6, placeholder, caret when focused; variants fill, small, mono, password, search and date; editing engine from text.text-edit |
-| [widget.toggle](widget/toggle.md) | Toggle switch | in-progress | luneterm, wane | On/off switch: 40x20 track, accent fill when on, knob slides between ends |
-| [widget.toolbar](widget/toolbar.md) | Main toolbar | in-progress | lunegit | Toolbar: three-column command bar of 40 px toolbar-action buttons with 20 px icons on a glass material |
-| [widget.verdict-row](widget/verdict-row.md) | Verdict check row | in-progress | wane | Verdict row: mark OK, WARN or NO in its tone, then name and text; three-column or stacked; static |
+| [widget.badge](widget/badge.md) | Badge | done | wane | Badge: static 18 px tag with tone fill and border; neutral, ok, warn, err, data; Lunegit status-badge shape |
+| [widget.banner-empty-state](widget/banner-empty-state.md) | Banners, empty states and loading gates | done | lunegit | Indexing banner (warning tone, spinning sync icon) and the empty-repository view: centred icon, title, subtitle, action buttons |
+| [widget.button](widget/button.md) | Button | done | luneterm, wane | Button: primary and secondary fills, measured width, hover and press motion |
+| [widget.callout](widget/callout.md) | Callout | done | wane | Callout: static notice with 1 px tone border, 14 px icon, optional figure and action button; not dismissible |
+| [widget.checkbox](widget/checkbox.md) | Checkbox | done | luneterm, wane | Checkbox: 16 px box, accent fill and check when checked, label beside it |
+| [widget.combo](widget/combo.md) | Combo box | done | luneterm, wane | Combo box: value and chevron in an input box; opens overlay.dropdown on click or key |
+| [widget.filter-bar](widget/filter-bar.md) | Filter bar | done | lunegit | Filter bar: search field in an inset surface with a 14 px search icon, a clear button when text is present, and no focus ring |
+| [widget.form-field](widget/form-field.md) | Form field (label, control, hint) | done | wane | Form field: label above a control, hint below; error state rings the control and colours the hint in err |
+| [widget.label](widget/label.md) | Label | done | luneterm, wane | Label: UI-font text at the theme base size; colour from the caller; section and title roles from the font scale |
+| [widget.list-row-badge](widget/list-row-badge.md) | List rows with status badges | done | lunegit, wane | Master list row: name, value and sub-line with a badge in the head; rest transparent, hover surface-hover, selected surface-selected |
+| [widget.nav-item](widget/nav-item.md) | Navigation item | done | wane | Navigation item: 32 px row, secondary text at rest, surface-selected fill and bright text when active, no accent bar |
+| [widget.radio-group](widget/radio-group.md) | Radio group | done | wane | Radio group: vertical 16 px rings, accent ring and 6 px dot when selected; arrow keys move the selection inside the group |
+| [widget.row](widget/row.md) | Row (setting row, list item row) | done | wane | Row: setting row (title, description, control at right, min 56 high) or compact item row (32 high, four columns); hover tints the row; rows are not clickable |
+| [widget.scrollbar](widget/scrollbar.md) | Scrollbars | done | lunegit, wane | Overlay scrollbar: 9 px transparent track, 6 px accent thumb, auto-hide while the pointer is away, thumb drag |
+| [widget.search-picker](widget/search-picker.md) | Search picker | done | lunegit | Search picker: a field-style or link-style trigger that opens a searchable list; Escape closes, Enter picks the first match |
+| [widget.slider](widget/slider.md) | Slider | done | any | Slider: 4 px track with accent fill and a 12 px knob (14 hovered); look derived from the toggle knob and the progress track; arrow keys step |
+| [widget.spinner](widget/spinner.md) | Spinner | done | any | Spinner: a 14 px glyph that turns a full revolution every 1.2 s while busy; static under Reduced and Off |
+| [widget.star-rating](widget/star-rating.md) | Star rating | done | lunegit | Star rating: row of star buttons (default five) in the warning tone; click N sets N, click again clears |
+| [widget.status-dot](widget/status-dot.md) | Status dot | done | wane | Status dot: static 8 px circle in ok, warn, err, data or paused tone; never alone, a word beside it carries the meaning |
+| [widget.stepper](widget/stepper.md) | Numeric stepper | done | luneterm, wane | Numeric stepper: value with minus and plus buttons; clamping and step size belong to the app |
+| [widget.steps](widget/steps.md) | Wizard steps | done | wane | Wizard steps: four 32 px rows in the sidebar slot with upcoming, current and done states; not clickable |
+| [widget.tab-strip](widget/tab-strip.md) | Tab strip | done | luneterm, lunegit | Tab strip: tabs with close, new-tab button, overflow scrolling, drag reorder, and the connected tab outline with a running cue |
+| [widget.text-field](widget/text-field.md) | Text field | done | luneterm, wane | Single-line text box: 32 px, radius 6, placeholder, caret when focused; variants fill, small, mono, password, search and date; editing engine from text.text-edit |
+| [widget.toggle](widget/toggle.md) | Toggle switch | done | luneterm, wane | On/off switch: 40x20 track, accent fill when on, knob slides between ends |
+| [widget.toolbar](widget/toolbar.md) | Main toolbar | done | lunegit | Toolbar: three-column command bar of 40 px toolbar-action buttons with 20 px icons on a glass material |
+| [widget.verdict-row](widget/verdict-row.md) | Verdict check row | done | wane | Verdict row: mark OK, WARN or NO in its tone, then name and text; three-column or stacked; static |
 
 ## overlay
 
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
-| [overlay.command-palette](overlay/command-palette.md) | Command palette | in-progress | lunegit | 640 px search dialog over commits, branches, tags, stash, reflog, repos, settings and commands, with prefix filters |
-| [overlay.dialog](overlay/dialog.md) | Modal dialog | in-progress | luneterm, wane | Modal dialog card: dim backdrop, 448 px acrylic card, darker footer, app-supplied body |
-| [overlay.dropdown](overlay/dropdown.md) | Drop-down list | in-progress | luneterm, wane | Combo drop-down option list that flips above its anchor near the window bottom |
-| [overlay.flyout](overlay/flyout.md) | Tray flyout | in-progress | wane | Windows tray left-click surface: header, stats, route list, action rows |
-| [overlay.menu](overlay/menu.md) | Glass context menu | in-progress | luneterm, wane | Glass context menu with open and close motion |
-| [overlay.popover](overlay/popover.md) | Anchored popover | in-progress | any | Anchored overlay placement and lifecycle: flip and shift inside the window, dismiss on outside click, Escape and focus loss, Popup layer, focus scope |
-| [overlay.popup-panel](overlay/popup-panel.md) | Popup panel surface | in-progress | luneterm | Shared popup surface: radius-8 fill and 1 px ring, colours passed by the caller (used by the drop-down list) |
-| [overlay.toast-notifications](overlay/toast-notifications.md) | Toasts and notification history | in-progress | lunegit | Bottom-right toast stack (max 3, timed dismissal, loading and prompt toasts) and a 50-item notification history |
-| [overlay.tooltip](overlay/tooltip.md) | Tooltips | in-progress | lunegit, wane | Hover tooltip: glass shell radius 8, padding 10 by 8, one 800 ms show delay, text or small rich content, also on disabled controls |
+| [overlay.command-palette](overlay/command-palette.md) | Command palette | done | lunegit | 640 px search dialog over commits, branches, tags, stash, reflog, repos, settings and commands, with prefix filters |
+| [overlay.dialog](overlay/dialog.md) | Modal dialog | done | luneterm, wane | Modal dialog card: dim backdrop, 448 px acrylic card, darker footer, app-supplied body |
+| [overlay.dropdown](overlay/dropdown.md) | Drop-down list | done | luneterm, wane | Combo drop-down option list that flips above its anchor near the window bottom |
+| [overlay.flyout](overlay/flyout.md) | Tray flyout | done | wane | Windows tray left-click surface: header, stats, route list, action rows |
+| [overlay.menu](overlay/menu.md) | Glass context menu | done | luneterm, wane | Glass context menu with open and close motion |
+| [overlay.popover](overlay/popover.md) | Anchored popover | done | any | Anchored overlay placement and lifecycle: flip and shift inside the window, dismiss on outside click, Escape and focus loss, Popup layer, focus scope |
+| [overlay.popup-panel](overlay/popup-panel.md) | Popup panel surface | done | luneterm | Shared popup surface: radius-8 fill and 1 px ring, colours passed by the caller (used by the drop-down list) |
+| [overlay.toast-notifications](overlay/toast-notifications.md) | Toasts and notification history | done | lunegit | Bottom-right toast stack (max 3, timed dismissal, loading and prompt toasts) and a 50-item notification history |
+| [overlay.tooltip](overlay/tooltip.md) | Tooltips | done | lunegit, wane | Hover tooltip: glass shell radius 8, padding 10 by 8, one 800 ms show delay, text or small rich content, also on disabled controls |
 
 ## layout
 
@@ -112,9 +112,9 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | [layout.side-panel](layout/side-panel.md) | Side panel host and panels | in-progress | lunegit | Side panel host that shows one of nine panels by key, with a fade and 6 px slide on show |
 | [layout.sidebar](layout/sidebar.md) | Sidebar | in-progress | wane | 208 px column on the window glass: nav list (or wizard steps) and a status footer |
 | [layout.split-panes](layout/split-panes.md) | Resizable split panes | in-progress | lunegit | Resizable columns and rows between panels and content, with a 4 px splitter that snaps columns shown or hidden |
-| [layout.stack](layout/stack.md) | Stack, row, column and grid layout | in-progress | any | Pure layout helpers: stack, row, column and grid with gaps, alignment, insets and fixed, fill and hug sizing |
+| [layout.stack](layout/stack.md) | Stack, row, column and grid layout | done | any | Pure layout helpers: stack, row, column and grid with gaps, alignment, insets and fixed, fill and hug sizing |
 | [layout.tree-view](layout/tree-view.md) | Tree view and tree guides | in-progress | lunegit, wane | Tree rows with guide lines (trunk and rounded elbow) per depth; expansion is a set of node keys, animated on the container |
-| [layout.virtualized-list](layout/virtualized-list.md) | Virtualized list | in-progress | lunegit, wane | Builds only the visible rows; selection as a set of row keys (single, multi, range); keyboard navigation; no row animation while scrolling |
+| [layout.virtualized-list](layout/virtualized-list.md) | Virtualized list | done | lunegit, wane | Builds only the visible rows; selection as a set of row keys (single, multi, range); keyboard navigation; no row animation while scrolling |
 
 ## data
 
