@@ -545,3 +545,132 @@ fn text_rotated_lands_on_the_current_layer_under_the_clip_and_xform() {
     // The Xform's alpha is applied when the picture is drawn (a fade must not change the key).
     assert_eq!(it.alpha, 0.5);
 }
+
+// ── the existing set under an Xform: the right layer, the clip, the scale and the alpha ────────
+
+/// `r` through the Xform of `popup_under_clip_and_xform` (scale 2, moved (3, 4)) at device scale 2.
+const MOVED: Rect = Rect::new(20.0, 30.0, 10.0, 8.0); // -> (43, 64, 20, 16) -> device (86, 128, 40, 32)
+const CLIP_DEVICE: [f32; 4] = [46.0, 48.0, 200.0, 200.0];
+
+#[test]
+fn fills_rings_and_backdrops_take_the_layer_clip_scale_and_alpha_of_the_xform() {
+    let scene = scene_of(|p| {
+        popup_under_clip_and_xform(p);
+        p.fill_radii(MOVED, [1.0, 2.0, 3.0, 4.0], WHITE);
+        p.fill_over(MOVED, 1.0, [1.0; 4]);
+        p.ring(MOVED, 1.0, 1.0, WHITE, false);
+        p.ring(MOVED, 1.0, 1.0, WHITE, true);
+        p.backdrop(MOVED, 1.0);
+    });
+    for (i, l) in scene.layers.iter().enumerate() {
+        let n = usize::from(i == POPUP) * 2;
+        assert_eq!(
+            (l.geometry.under.len(), l.geometry.over.len()),
+            (n, n),
+            "layer {i}"
+        );
+    }
+    let g = &scene.layers[POPUP].geometry;
+    for sh in g.under.iter().chain(&g.over) {
+        assert_eq!(sh.rect, [86.0, 128.0, 40.0, 32.0]);
+        assert_eq!(sh.clip, CLIP_DEVICE);
+        assert_eq!(sh.color, [0.5; 4], "premultiplied white at the Xform's 0.5");
+    }
+    // A radius is logical: times the device scale 2 times the Xform's scale 2.
+    assert_eq!(g.under[0].radii, [4.0, 8.0, 12.0, 16.0]);
+    assert_eq!(g.over[0].radii, [4.0; 4]);
+    assert_eq!((g.under[1].radii, g.over[1].radii), ([4.0; 4], [4.0; 4]));
+    let b = scene.backdrop.expect("asked");
+    assert_eq!(
+        (b.rect, b.radius, b.alpha, b.layer),
+        ([86.0, 128.0, 40.0, 32.0], 4.0, 0.5, POPUP)
+    );
+}
+
+#[test]
+fn strokes_fans_and_polygons_take_the_layer_clip_scale_and_alpha_of_the_xform() {
+    let scene = scene_of(|p| {
+        popup_under_clip_and_xform(p);
+        p.stroke(
+            &[[20.0, 30.0], [40.0, 30.0]],
+            false,
+            StrokeStyle::solid(WHITE, 1.0),
+        );
+        p.fill_path(&[[20.0, 30.0], [30.0, 30.0], [30.0, 38.0]], WHITE);
+        p.sector([20.0, 30.0], 5.0, 0.0, std::f32::consts::FRAC_PI_2, WHITE);
+    });
+    for (i, l) in scene.layers.iter().enumerate() {
+        let on = i == POPUP;
+        assert_eq!(!l.geometry.strokes.is_empty(), on, "strokes, layer {i}");
+        assert_eq!(!l.geometry.fills.is_empty(), on, "fills, layer {i}");
+    }
+    let g = &scene.layers[POPUP].geometry;
+    for v in &g.strokes {
+        assert_eq!((v.clip, v.color), (CLIP_DEVICE, [0.5; 4]));
+        // Half the width: 1 logical times the Xform's 2 times the device 2, halved.
+        assert_eq!(v.style[1], 2.0);
+    }
+    // The line (20, 30)-(40, 30) is (86, 128)-(166, 128) on the device.
+    let xs: Vec<f32> = g.strokes.iter().map(|v| v.pos[0]).collect();
+    assert_eq!(
+        (
+            xs.iter().cloned().fold(f32::MAX, f32::min),
+            xs.iter().cloned().fold(f32::MIN, f32::max)
+        ),
+        (86.0, 166.0)
+    );
+    for v in &g.fills {
+        assert_eq!((v.clip, v.color), (CLIP_DEVICE, [0.5; 4]));
+    }
+    // The polygon's first corner and the fan's centre are (20, 30) moved; the fan's first arc point
+    // is 5 logical px to the right: 5 * 2 * 2 = 20 device px.
+    assert!(g.fills.iter().any(|v| v.pos == [86.0, 128.0]));
+    assert!(g.fills.iter().any(|v| v.pos == [106.0, 128.0]));
+}
+
+#[test]
+fn text_takes_the_layer_clip_scale_and_alpha_of_the_xform() {
+    use lune_ui_core::text::TextSystem;
+    let spec = Spec::plain("fade", Style::ui(13.0, THEME.fg_primary));
+    let mut faded = spec.clone();
+    for (_, style) in &mut faded.runs {
+        style.color[3] = (f32::from(style.color[3]) * 0.5).round() as u8;
+    }
+    let scene = scene_of(|p| {
+        popup_under_clip_and_xform(p);
+        p.text(&spec, 20.0, 30.0);
+    });
+    for (i, l) in scene.layers.iter().enumerate() {
+        assert_eq!(l.texts.len(), usize::from(i == POPUP), "layer {i}");
+    }
+    let it = scene.layers[POPUP].texts[0];
+    assert_eq!((it.x, it.y, it.scale), (43.0, 64.0, 2.0));
+    assert_eq!(
+        it.clip,
+        Rect::new(23.0, 24.0, 100.0, 100.0),
+        "logical, through the Xform"
+    );
+    // The alpha is part of the text's colour: the key is the faded spec's.
+    assert_eq!(it.key, FakeText.prepare(&faded, 2.0).0);
+    assert_ne!(
+        it.key,
+        FakeText.prepare(&spec, 2.0).0,
+        "a fade must change the key"
+    );
+}
+
+#[test]
+fn an_arc_radius_takes_the_xform_scale() {
+    let scene = scene_of(|p| {
+        popup_under_clip_and_xform(p);
+        p.arc([20.0, 30.0], 5.0, 0.0, 1.0, StrokeStyle::solid(WHITE, 1.0));
+    });
+    let v = &scene.layers[POPUP].geometry.strokes;
+    assert!(!v.is_empty());
+    // The centre (20, 30) is (86, 128) on the device; the radius 5 is 5 * 2 * 2 = 20 device px.
+    // A vertex sits the stroke's half width plus one px of fringe (2 + 1) to either side.
+    for q in v {
+        let d = ((q.pos[0] - 86.0).powi(2) + (q.pos[1] - 128.0).powi(2)).sqrt();
+        assert!((17.0 - 0.3..=23.0 + 0.3).contains(&d), "{d}");
+    }
+}

@@ -12,8 +12,8 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | in-luneterm | 0 |
 | planned | 0 |
 | stub | 0 |
-| in-progress | 93 |
-| done | 0 |
+| in-progress | 92 |
+| done | 1 |
 | external | 4 |
 | **total** | **97** |
 
@@ -27,7 +27,7 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | [core.icon](core/icon.md) | Codicon glyph constants | in-progress | luneterm, wane | Codicon glyph constants and a glyph helper; the app supplies the icon font |
 | [core.image](core/image.md) | Image drawing | in-progress | lunegit, wane | Image primitive: app-decoded RGBA drawn into a rect with a fit mode, alpha and optional corner radius; explicit resource lifetime |
 | [core.input](core/input.md) | Input model | in-progress | any | Plain-data RawInput in, FrameOutput out; the windowing adapter translates both |
-| [core.painter](core/painter.md) | Immediate-mode painter | in-progress | luneterm | Painter: ordered layers, fills, rings, strokes, acrylic, text, clip, transform and hit regions, building a plain-data Scene; holds the aggregate table of new primitives |
+| [core.painter](core/painter.md) | Immediate-mode painter | done | luneterm | Painter: ordered layers, fills, rings, strokes, acrylic, text, clip, transform and hit regions, building a plain-data Scene; holds the aggregate table of new primitives |
 | [core.scene](core/scene.md) | Display list | in-progress | any | Plain-data Scene the painter builds and a renderer consumes; the draw-order contract |
 | [core.tab-outline](core/tab-outline.md) | Tab outline geometry | in-progress | luneterm | Tab-chrome outline loop geometry |
 | [core.testing](core/testing.md) | Seam fakes and contract suites | in-progress | any | Public testing module: RecordingRenderer, FakeText, ScriptedInput, NullMaterial and the contract suites |
