@@ -121,7 +121,9 @@ impl Ui<'_> {
                 rest_fg
             };
             let fill = self.animate_color(id.with("fill"), target_fill, &HOVER);
-            let fg = self.animate_color(id.with("fg"), target_fg, &HOVER);
+            // Keyed by the active flag: the active and inactive swap is a cut, and a flip starts a
+            // settled entry at the new colour instead of fading to it.
+            let fg = self.animate_color(id.with(("fg", opts.active)), target_fg, &HOVER);
 
             let p = self.painter();
             if fill[3] > 0 {

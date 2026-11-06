@@ -278,6 +278,33 @@ fn an_inactive_window_draws_its_glyphs_in_fg_quaternary() {
 }
 
 #[test]
+fn flipping_active_cuts_the_glyphs_to_the_new_colour_on_that_frame() {
+    // The window fill hard-cuts on a focus change (`platform/window.md`: "stays a snap"), so the
+    // glyphs do too: the flip frame is the new scene and asks for no repaint.
+    let inactive = {
+        let mut h = UiHarness::new(WIN);
+        frame(&mut h, opts(false, false));
+        h.at_ms(1000);
+        frame(&mut h, opts(false, false)).0
+    };
+    let mut h = UiHarness::new(WIN);
+    frame(&mut h, opts(false, true));
+    h.at_ms(1000);
+    let (rest, _, repaint, _) = frame(&mut h, opts(false, true));
+    assert_eq!(repaint, Repaint::Idle);
+    assert_eq!(rest, painter_scene(false, None));
+    h.at_ms(2000);
+    let (flipped, _, repaint, _) = frame(&mut h, opts(false, false));
+    assert_eq!(flipped, inactive, "the flip frame holds fq glyphs");
+    assert_eq!(repaint, Repaint::Idle);
+    // And back.
+    h.at_ms(3000);
+    let (back, _, repaint, _) = frame(&mut h, opts(false, true));
+    assert_eq!(back, rest);
+    assert_eq!(repaint, Repaint::Idle);
+}
+
+#[test]
 fn the_nodes_are_buttons_with_their_names_and_the_default_action_clicks() {
     for maximized in [false, true] {
         let mut h = UiHarness::new(WIN);
