@@ -2,10 +2,10 @@
 id: layout.tree-view
 title: Tree view and tree guides
 area: layout
-status: in-progress
+status: done
 consumers: lunegit, wane
-source: Lunegit: src/Lunegit.Desktop/Controls/TreeGuideControl.cs
-owner: toolkit-v1 M7
+source: crates/lune-ui-core/src/widgets/tree_view.rs
+owner: —
 summary: Tree rows with guide lines (trunk and rounded elbow) per depth; expansion is a set of node keys, animated on the container
 ---
 
@@ -132,11 +132,13 @@ None: row names and costs are app text.
 - Pixel probes at scale 2: row 56 px high; depth step 32 px; guide 2 px wide; elbow radius 7 px.
 - Conformance: expand reaches full height at 250 ms (base) on the container; rows do not animate.
 - Semantic node: role `tree`; each row `tree-item` with `expanded` and its level.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_tree_view.rs`: behaviour `up_down_home_and_end_move_the_cursor_over_visible_rows`, `right_expands_then_moves_to_the_first_child`, `left_collapses_then_moves_to_the_parent`, `enter_activates_and_space_selects`, `expansion_and_selection_survive_a_rebuilt_row_list`, `state_lasts_600_undrawn_frames_under_keep_alive`, `a_press_on_a_row_selects_it_once_and_a_press_on_the_chevron_only_toggles`; pixel probes `the_probes_at_scale_two`, the guides `the_guide_of_a_last_child_is_one_line_turning_into_the_stub`, `ancestor_lines_are_full_height_at_their_columns`; conformance `expand_reaches_full_height_at_base_on_a_sine_in_out_curve`, `collapse_runs_the_same_curve_backwards_and_the_extent_follows`, `reduced_and_off_snap_and_report_idle_the_frame_of_the_toggle`, `row_fills_tween_while_still_and_snap_while_the_content_scrolls`; node `the_tree_and_its_rows_are_nodes_with_level_state_and_actions`, `expand_and_collapse_actions_toggle_and_default_selects`; scale `a_10000_row_tree_builds_only_the_rows_in_view`; disabled `a_disabled_tree_toggles_and_selects_nothing_takes_its_keys_and_passes_the_walk`.
 
 ### Build
 
 - Milestone: M7.
 - Depends on: core.painter, core.ui, core.focus, infra.accessibility, motion.transitions.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_tree_view.rs::up_down_home_and_end_move_the_cursor_over_visible_rows, crates/lune-ui-core/tests/widget_tree_view.rs::right_expands_then_moves_to_the_first_child, crates/lune-ui-core/tests/widget_tree_view.rs::expansion_and_selection_survive_a_rebuilt_row_list, crates/lune-ui-core/tests/widget_tree_view.rs::the_probes_at_scale_two, crates/lune-ui-core/tests/widget_tree_view.rs::expand_reaches_full_height_at_base_on_a_sine_in_out_curve, crates/lune-ui-core/tests/widget_tree_view.rs::the_tree_and_its_rows_are_nodes_with_level_state_and_actions, crates/lune-ui-core/tests/widget_tree_view.rs::a_10000_row_tree_builds_only_the_rows_in_view`; page `tree-view`; unverified here: none.
 
 ## Open questions
 

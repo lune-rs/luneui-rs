@@ -2,10 +2,10 @@
 id: layout.scroll-area
 title: Scroll area
 area: layout
-status: in-progress
+status: done
 consumers: any
 source: crates/lune-ui-core/src/widgets/scroll_area.rs
-owner: orch/toolkit-v1
+owner: —
 summary: Scrolling region: per-id offset, wheel and trackpad scrolling, scroll-into-view, follow-tail, offset kept across content replacement
 ---
 
@@ -124,11 +124,13 @@ None: the area has no text of its own.
 - Pixel probes at scale 2: the clip edge is exact at the viewport rect; content at offset 40 is shifted by 80 device px.
 - Conformance: the wheel step and scroll-into-view run through `motion::conformance`: monotonic, exact end, settled within 180 ms plus one frame; Reduced and Off snap [motion].
 - Semantic node: role `scroll-area`, value follows the offset; an injected `AccessAction` scroll-into-view moves the target into the viewport [infra.accessibility].
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_scroll_area.rs`: behaviour `a_wheel_line_steps_48_px_and_settles_exactly`, `the_wheel_clamps_at_both_ends`, `a_trackpad_delta_moves_the_offset_one_to_one_at_once`, `page_keys_home_and_end_scroll_when_the_focused_child_declines_them`; preservation `should_restore_same_document_restores`, `should_restore_different_document_does_not`, `should_restore_first_bind_does_not`, `should_restore_null_identity_does_not`, `clamp_restore_offset_known_answers`, `clamp_restore_offset_non_finite_input_is_zero`; keep-alive `a_hidden_area_under_keep_alive_keeps_its_offset_for_600_undrawn_frames`, `outside_a_scope_the_offset_is_gone_after_one_undrawn_frame`; scroll-into-view `centring_row_100_of_45_in_a_400_viewport_is_4322_5_before_the_clamp`, `a_target_outside_the_content_changes_nothing`; pixel probes `the_clip_edge_is_exact_and_content_at_offset_40_is_shifted_by_80_device_px`; conformance `the_wheel_and_into_view_rows_conform_in_every_tier`, `reduced_and_off_snap_the_wheel_step`; node `the_node_is_a_scroll_area_with_the_offset_as_its_value_and_children_nested`, `increment_and_decrement_are_a_wheel_step`; wheel routing per axis (D178) `an_inner_area_live_only_on_x_takes_the_horizontal_wheel_and_leaves_the_vertical_to_the_outer` and the others in the list.
 
 ### Build
 
-- Milestone: M5. Built in M5 (steps 7 and 10; the page is `scroll-area`, 8 scenes). Open for `done` (D47): M11 re-checks the whole bar on every entry; the Windows and Linux run time is unverified (the Linux and Windows lint is `scripts/check-targets.sh`).
+- Milestone: M5. Built in M5 (steps 7 and 10; the page is `scroll-area`, 8 scenes). M11 audited it against D47 (the `Done` line). Unverified here: the Windows and Linux run time (the lint for both is `scripts/check-targets.sh`).
 - Depends on: core.ui, core.focus, infra.accessibility, motion.transitions, layout.stack, widget.scrollbar
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_scroll_area.rs::a_wheel_line_steps_48_px_and_settles_exactly, crates/lune-ui-core/tests/widget_scroll_area.rs::the_wheel_clamps_at_both_ends, crates/lune-ui-core/tests/widget_scroll_area.rs::a_trackpad_delta_moves_the_offset_one_to_one_at_once, crates/lune-ui-core/tests/widget_scroll_area.rs::clamp_restore_offset_known_answers, crates/lune-ui-core/tests/widget_scroll_area.rs::a_hidden_area_under_keep_alive_keeps_its_offset_for_600_undrawn_frames, crates/lune-ui-core/tests/widget_scroll_area.rs::centring_row_100_of_45_in_a_400_viewport_is_4322_5_before_the_clamp, crates/lune-ui-core/tests/widget_scroll_area.rs::the_clip_edge_is_exact_and_content_at_offset_40_is_shifted_by_80_device_px, crates/lune-ui-core/tests/widget_scroll_area.rs::the_wheel_and_into_view_rows_conform_in_every_tier, crates/lune-ui-core/tests/widget_scroll_area.rs::the_node_is_a_scroll_area_with_the_offset_as_its_value_and_children_nested`; page `scroll-area` (8 scenes); unverified here: Windows and Linux run time.
 
 ## Open questions
 

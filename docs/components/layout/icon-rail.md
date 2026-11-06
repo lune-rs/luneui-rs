@@ -2,10 +2,10 @@
 id: layout.icon-rail
 title: Icon rail
 area: layout
-status: in-progress
+status: done
 consumers: lunegit
-source: Lunegit: src/Lunegit.Desktop/Views/IconRailView.axaml
-owner: toolkit-v1 M7
+source: crates/lune-ui-core/src/widgets/icon_rail.rs
+owner: —
 summary: Narrow icon column of 40 px toolbar buttons that switch the side panels and toggle the terminal, with a notification badge
 ---
 
@@ -118,15 +118,17 @@ Dropped by [D149] (app text, hard rule 1): the keys below name an app's panels; 
 
 ### Acceptance
 
-- Behaviour (scripted input, injected time): each button fires its toggle command once with its key; the dot and the badge follow their bindings. None exists.
+- Behaviour (scripted input, injected time): each button fires its toggle command once with its key; the dot and the badge follow their bindings.
 - Pixel probes at scale 2: button 80 × 80 px; icon 40 px; rail padding 8 px sides and 20 px top and bottom; top stack gap 8 px.
 - Conformance: press reaches scale 0.98 in 180 ms, quad-out, and back on release; Reduced snaps.
 - Semantic node: `toolbar` with `button` children named by the strings above.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_icon_rail.rs`: behaviour `click_enter_and_space_each_activate_once_and_report_the_key`, `the_dot_and_the_badge_appear_at_once_and_at_their_offsets`, `a_count_above_99_reads_99_plus_and_zero_shows_no_badge`; pixel probes `pixel_probes_at_scale_two`, `the_buttons_are_40_with_gap_4_from_the_padding_and_the_bottom_group_is_docked`, `rest_is_ghost_hover_and_press_use_the_toolbars_fills`, `the_dot_and_the_badge_scale_with_the_press`; conformance `press_hover_and_focus_conform_in_three_tiers`; keys `the_rail_is_one_tab_stop_entered_once_on_the_active_item`, `the_arrows_move_through_both_groups_and_wrap_at_the_ends`, `a_disabled_item_is_skipped_inert_and_drawn_at_0_4`; node `the_nodes_are_a_toolbar_of_named_buttons_pressed_when_active_and_described_by_the_note`, `a_tooltip_names_the_button_after_the_delay_and_the_description_stays_the_note`, `a_disabled_rail_is_disabled_all_the_way_down_and_consumes_no_key`.
 
 ### Build
 
 - Milestone: M7.
 - Depends on: widget.button, widget.badge, layout.side-panel, layout.split-panes, core.focus, infra.accessibility, motion.transitions.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_icon_rail.rs::click_enter_and_space_each_activate_once_and_report_the_key, crates/lune-ui-core/tests/widget_icon_rail.rs::the_dot_and_the_badge_appear_at_once_and_at_their_offsets, crates/lune-ui-core/tests/widget_icon_rail.rs::pixel_probes_at_scale_two, crates/lune-ui-core/tests/widget_icon_rail.rs::press_hover_and_focus_conform_in_three_tiers, crates/lune-ui-core/tests/widget_icon_rail.rs::the_rail_is_one_tab_stop_entered_once_on_the_active_item, crates/lune-ui-core/tests/widget_icon_rail.rs::the_nodes_are_a_toolbar_of_named_buttons_pressed_when_active_and_described_by_the_note, crates/lune-ui-core/tests/widget_icon_rail.rs::a_disabled_rail_is_disabled_all_the_way_down_and_consumes_no_key`; page `icon-rail`; unverified here: none.
 
 ## Open questions
 

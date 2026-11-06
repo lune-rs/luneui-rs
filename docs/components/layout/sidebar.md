@@ -2,10 +2,10 @@
 id: layout.sidebar
 title: Sidebar
 area: layout
-status: in-progress
+status: done
 consumers: wane
-source: —
-owner: toolkit-v1 M7
+source: crates/lune-ui-core/src/widgets/sidebar.rs
+owner: —
 summary: 208 px column on the window glass: nav list (or wizard steps) and a status footer
 ---
 
@@ -95,19 +95,21 @@ None: nav labels and footer text are app text (Wane mock content, [W docs/ui/com
 
 ### Acceptance
 
-- Behaviour (scripted input, injected time): a click on a nav item fires navigate once; the footer ignores input; the wizard has no nav links. None exists.
+- Behaviour (scripted input, injected time): a click on a nav item fires navigate once; the footer ignores input; the wizard has no nav links.
 - Pixel probes at scale 2: column 416 px wide; nav padding 16 px; footer padding 24 px top and bottom, 32 px sides; hairline 2 px.
 - Conformance: none (no motion here).
 - Semantic node: nav `group`; items `button` with `selected`; footer `status`.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_sidebar.rs`: behaviour `a_click_on_a_nav_row_navigates_once_and_the_footer_ignores_input`, `the_list_is_one_tab_stop_and_the_footer_is_none`, `the_wizard_has_steps_in_the_nav_slot_and_no_links`, `a_chord_on_a_nav_row_is_a_shortcut_and_navigates_nothing`; pixel probes `pixel_probes_at_scale_two`, `the_nav_is_padded_8_and_the_rows_are_34_apart_with_no_fill_of_the_column`, `the_footer_is_an_ok_dot_and_text_or_an_err_dot_and_a_stopped_line`, `a_long_footer_is_elided_to_the_room_beside_the_dot`; node `the_nodes_are_a_group_over_a_list_and_a_polite_status`, `the_steps_node_is_a_navigation_named_by_the_sidebar`; disabled `a_disabled_sidebar_is_disabled_all_the_way_down`, `a_focused_row_turned_disabled_keeps_its_keys_and_leaves_its_chords`.
 
 ### Build
 
 - Milestone: M7.
 - Depends on: widget.nav-item, widget.steps, widget.status-dot, core.theme, core.painter.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_sidebar.rs::a_click_on_a_nav_row_navigates_once_and_the_footer_ignores_input, crates/lune-ui-core/tests/widget_sidebar.rs::the_wizard_has_steps_in_the_nav_slot_and_no_links, crates/lune-ui-core/tests/widget_sidebar.rs::pixel_probes_at_scale_two, crates/lune-ui-core/tests/widget_sidebar.rs::the_footer_is_an_ok_dot_and_text_or_an_err_dot_and_a_stopped_line, crates/lune-ui-core/tests/widget_sidebar.rs::the_nodes_are_a_group_over_a_list_and_a_polite_status, crates/lune-ui-core/tests/widget_sidebar.rs::a_disabled_sidebar_is_disabled_all_the_way_down`; page `sidebar`; unverified here: none (limit: the footer is one line in one family).
 
 ## Open questions
 
-None. Closed by [D149]: the sidebar is a toolkit component (`Ui::sidebar` with `SidebarBody::{Nav, Steps}` and an optional `SidebarFooter`); it has no collapse width of its own (the app owns the width and the rect it passes); the arrows are the nav list's (one stop, no wrap); the footer's bottom sits 10 px above the rect's bottom, its hairline spans the rect's width. Lunegit's side panel column width is the app's (it sets the window's split, not the host). Native rendering: no blur of its own: it shows the window material. Open: Wane's footer sets the label in UI type and only the address in mono, with a second line (`~/.wane`); `SidebarFooter` is one line in one family (`mono` covers it all), so matching needs an API change (a later step). The gallery keeps `mono: true` on the address footer.
+None. Closed by [D149]: the sidebar is a toolkit component (`Ui::sidebar` with `SidebarBody::{Nav, Steps}` and an optional `SidebarFooter`); it has no collapse width of its own (the app owns the width and the rect it passes); the arrows are the nav list's (one stop, no wrap); the footer's bottom sits 10 px above the rect's bottom, its hairline spans the rect's width. Lunegit's side panel column width is the app's (it sets the window's split, not the host). Native rendering: no blur of its own: it shows the window material. Still open, an API gap (D4: no consumer has asked): Wane's footer sets the label in UI type and only the address in mono, with a second line (`~/.wane`); `SidebarFooter` is one line in one family (`mono` covers it all), so matching needs an API change (a later step). The gallery keeps `mono: true` on the address footer.
 
 ## Notes for the planner
 
