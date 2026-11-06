@@ -501,6 +501,9 @@ struct ListMem {
     /// The offset and rect the last frame drew at.
     offset: f64,
     rect: Option<Rect>,
+    /// The offset the last frame's area ended at: past `offset` when a reveal landed after the
+    /// rows drew.
+    ended: f64,
     /// A height changed last frame, so this frame's rows move.
     relaid: bool,
     /// The content moved last frame: this frame's hover is still that movement's result.
@@ -627,14 +630,14 @@ impl Ui<'_> {
             key: row_key,
         };
         let mut out = Outcome::default();
-        let mut left_at = None;
+        let mut opened = false;
         if style.identity != mem.identity {
-            // Another document: nothing of the last one carries over.
-            left_at = Some(mem.offset);
+            // Another document: nothing of the last one carries over. A first draw replaces none.
+            opened = mem.rect.is_some();
             self.scroll_forget_shift(AREA);
             mem = ListMem {
                 identity: style.identity,
-                epoch: mem.epoch + u64::from(mem.rect.is_some()),
+                epoch: mem.epoch + u64::from(opened),
                 ..ListMem::default()
             };
             mem.heights.sync(opts.count, opts.heights);
@@ -645,13 +648,19 @@ impl Ui<'_> {
         let enabled = self.is_enabled();
         self.list_keys(&mut st, &mem, &rows, enabled, &mut out);
 
-        // A linked pane takes the group's offset before its area runs.
+        // A linked pane takes the group's offset before its area runs, from where it stands: the
+        // last frame's end and this pane's own queued shift (a measured height above the first
+        // row). One that opened a document takes nothing, and the group starts over with it.
         let drawn_at = mem.offset;
-        // Where this pane's own queued shift (a measured height above the first row) takes it.
         let pending = self.scroll_pending_shift(AREA);
-        let pulled = style.link.map_or(0.0, |group| {
-            self.scroll_link_pull(group, drawn_at + pending)
-        });
+        let pulled = match style.link {
+            Some(group) if opened => {
+                self.scroll_link_open(group);
+                0.0
+            }
+            Some(group) => self.scroll_link_pull(group, mem.ended + pending),
+            None => 0.0,
+        };
         if pulled != 0.0 {
             self.scroll_shift(AREA, pulled);
         }
@@ -682,13 +691,13 @@ impl Ui<'_> {
             });
             (response, Extent::default())
         });
+        mem.ended = scroll.offset.1;
         *self.persistent::<ListMem>(id) = mem;
         // Only a move of its own publishes; a pane that was just pulled follows, and says nothing.
         if let Some(group) = style.link
             && pulled == 0.0
         {
-            // A new document moved the pane from where it stood, so the group's value goes too.
-            self.scroll_link_push(group, left_at.unwrap_or(drawn_at), scroll.offset.1);
+            self.scroll_link_push(group, drawn_at, scroll.offset.1);
         }
 
         let mut response = scroll.value;
@@ -1392,6 +1401,142 @@ mod tests {
         h.input.scroll_pixels(0.0, -120.0);
         let (a, b, _) = offsets(&mut h, styles);
         assert_eq!((a, b), (120.0, 0.0));
+    }
+
+    fn document(identity: u64) -> ListStyle {
+        ListStyle {
+            identity: Some(identity),
+            ..linked()
+        }
+    }
+
+    /// Both panes at 200 by a wheel on the left, each on document 1.
+    fn apart() -> UiHarness {
+        let mut h = UiHarness::new(WIN);
+        let one = (document(1), document(1));
+        offsets(&mut h, one);
+        h.input.pointer_to(100.0, 60.0);
+        offsets(&mut h, one);
+        h.input.scroll_pixels(0.0, -200.0);
+        let (a, b, _) = offsets(&mut h, one);
+        assert_eq!((a, b), (200.0, 200.0));
+        h
+    }
+
+    #[test]
+    fn a_later_pane_alone_on_a_new_identity_asks_the_frame_that_tops_the_first() {
+        let mut h = apart();
+        let styles = (document(1), document(2));
+        // Long after the wheel: nothing else asks a frame.
+        h.at_ms(5_000);
+        assert_eq!(offsets(&mut h, (document(1), document(1))).2, Repaint::Idle);
+        let (a, b, repaint) = offsets(&mut h, styles);
+        assert_eq!((a, b), (200.0, 0.0), "the first drew before it");
+        assert_eq!(repaint, Repaint::Now);
+        let (a, b, _) = offsets(&mut h, styles);
+        assert_eq!((a, b), (0.0, 0.0));
+        h.at_ms(500);
+        assert_eq!(offsets(&mut h, styles).2, Repaint::Idle);
+    }
+
+    #[test]
+    fn an_earlier_pane_alone_on_a_new_identity_tops_the_later_one_in_the_frame() {
+        let mut h = apart();
+        let (a, b, _) = offsets(&mut h, (document(2), document(1)));
+        assert_eq!((a, b), (0.0, 0.0));
+    }
+
+    #[test]
+    fn both_panes_on_a_new_identity_ask_no_frame_of_each_other() {
+        let mut h = apart();
+        let styles = (document(2), document(2));
+        h.at_ms(500);
+        let (a, b, repaint) = offsets(&mut h, styles);
+        assert_eq!((a, b, repaint), (0.0, 0.0, Repaint::Idle));
+    }
+
+    #[test]
+    fn a_far_jump_then_the_other_pane_on_a_new_identity_tops_the_pane_that_jumped() {
+        // End lands after the content, so the right pane drew 0 and stands at the end: the group's
+        // top must be asked of where it stands.
+        let mut h = UiHarness::new(WIN);
+        let one = (document(1), document(1));
+        offsets(&mut h, one);
+        h.input
+            .pointer_to(300.0, 60.0)
+            .click(PointerButton::Primary);
+        offsets(&mut h, one);
+        h.input.key_down(Key::Named(NamedKey::End), None);
+        let (a, b, _) = offsets(&mut h, one);
+        assert_eq!((a, b), (0.0, 1100.0), "the left pane drew first");
+        let styles = (document(2), document(1));
+        let (a, b, _) = offsets(&mut h, styles);
+        assert_eq!((a, b), (0.0, 0.0));
+        let (a, b, _) = offsets(&mut h, styles);
+        assert_eq!(
+            (a, b),
+            (0.0, 0.0),
+            "and the right pane published nothing back"
+        );
+    }
+
+    #[test]
+    fn a_pane_drawn_first_with_an_identity_takes_the_groups_value() {
+        // A first draw opens no document: a pane joining a moved group joins it.
+        let mut h = UiHarness::new(WIN);
+        let alone = |h: &mut UiHarness| {
+            let mut seen = None;
+            h.frame(|ui| seen = Some(pane(ui, RECT, COUNT, document(1))));
+            seen.expect("drew").resp.offset
+        };
+        alone(&mut h);
+        h.input.pointer_to(100.0, 60.0);
+        alone(&mut h);
+        h.input.scroll_pixels(0.0, -120.0);
+        assert_eq!(alone(&mut h), 120.0);
+        let (a, b, _) = offsets(&mut h, (document(1), document(1)));
+        assert_eq!((a, b), (120.0, 120.0), "in its first frame");
+        let (a, b, _) = offsets(&mut h, (document(1), document(1)));
+        assert_eq!((a, b), (120.0, 120.0), "and the first pane stays");
+    }
+
+    #[test]
+    fn a_short_pane_with_an_identity_comes_back_with_its_group() {
+        // An area keeps `wanted` for its document: asked past its end, it would stay there.
+        let styles = (document(1), document(1));
+        let mut h = UiHarness::new(WIN);
+        let two = |h: &mut UiHarness| {
+            let (a, b, _) = both(h, styles, (COUNT, 8));
+            (a.resp.offset, b.resp.offset)
+        };
+        two(&mut h);
+        h.input.pointer_to(100.0, 60.0);
+        two(&mut h);
+        h.input.scroll_pixels(0.0, -500.0);
+        assert_eq!(two(&mut h), (500.0, 60.0));
+        h.input.scroll_pixels(0.0, 460.0);
+        assert_eq!(two(&mut h), (40.0, 40.0));
+    }
+
+    #[test]
+    fn a_document_keeps_its_place_through_a_short_frame() {
+        let style = ListStyle {
+            identity: Some(1),
+            ..ListStyle::LIST
+        };
+        let mut h = UiHarness::new(WIN);
+        let at = |h: &mut UiHarness, count: usize| {
+            let mut seen = None;
+            h.frame(|ui| seen = Some(pane(ui, RECT, count, style)));
+            seen.expect("drew").resp.offset
+        };
+        at(&mut h, COUNT);
+        h.input.pointer_to(100.0, 60.0);
+        at(&mut h, COUNT);
+        h.input.scroll_pixels(0.0, -500.0);
+        assert_eq!(at(&mut h, COUNT), 500.0);
+        assert_eq!(at(&mut h, 3), 0.0, "the short frame shows its top");
+        assert_eq!(at(&mut h, COUNT), 500.0, "and the place comes back");
     }
 
     #[test]

@@ -93,7 +93,7 @@ Rows never animate: the diff rows are virtualized, and recycled rows would tween
 ### Retained state
 
 - Transient: hunk button hover and press, selection drag [core.ui].
-- Persistent: the selected row keys and anchor, the scroll offsets of the unified view and of the split panes; the offset is kept when the app replaces the lines with the same document key, and a different key starts at the top [L src/Lunegit.Desktop/Views/SplitDiffView.axaml.cs:102-104], [layout.scroll-area]. A new key also ends what its rows held: a hunk button loses the focus (D72) even when the new document has one in its place; the focus on a pane stays (D202).
+- Persistent: the selected row keys and anchor, the scroll offsets of the unified view and of the split panes; the offset is kept when the app replaces the lines with the same document key, and a different key starts at the top [L src/Lunegit.Desktop/Views/SplitDiffView.axaml.cs:102-104], [layout.scroll-area]. A new key also ends what its rows held: a hunk button loses the focus (D72) even when the new document has one in its place; the focus on a pane stays (D202). Both split panes draw the new document's top in the frame of the switch, however close it lands after a scroll (D203).
 - App-owned: the lines, the document key, the view mode (unified or split), word wrap, whether hunk actions show and of which kind, the intra-line spans.
 - Exit retention: no.
 - Selection is by row key: a row scrolled out of view stays selected [layout.virtualized-list].

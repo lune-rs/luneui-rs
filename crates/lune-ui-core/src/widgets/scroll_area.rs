@@ -481,18 +481,25 @@ impl Ui<'_> {
         self.transient::<Requests>(id).shift_x += by;
     }
 
-    /// A pane of a scroll link (D8) asks what to apply before its area runs: the shift that takes
-    /// `own_offset`, the vertical offset it drew last frame, to the group's value. Zero when the
-    /// group has no value yet, when the pane already took that value (a pane that clamps does not
-    /// ask every frame), or when they are equal. The pane is the current scope.
-    pub(crate) fn scroll_link_pull(&mut self, group: WidgetId, own_offset: f64) -> f64 {
-        let (pane, frame) = (self.scope_id(), self.frame_number());
+    /// The state of the scroll link `group`, with the asking pane counted among the frame's.
+    fn link_drawn(&mut self, group: WidgetId) -> &mut LinkState {
+        let frame = self.frame_number();
         let link = self.persistent::<LinkState>(group);
         if link.frame != frame {
             link.frame = frame;
             link.drawn = 0;
         }
         link.drawn += 1;
+        link
+    }
+
+    /// A pane of a scroll link (D8) asks what to apply before its area runs: the shift that takes
+    /// `own_offset`, where the last frame left it, to the group's value. Zero when the group has
+    /// no value yet, when the pane already took that value (a pane that clamps does not ask every
+    /// frame), or when they are equal. The pane is the current scope.
+    pub(crate) fn scroll_link_pull(&mut self, group: WidgetId, own_offset: f64) -> f64 {
+        let pane = self.scope_id();
+        let link = self.link_drawn(group);
         let Some(value) = link.value else {
             return 0.0;
         };
@@ -504,6 +511,20 @@ impl Ui<'_> {
             value - own_offset
         } else {
             0.0
+        }
+    }
+
+    /// A pane that opened another document asks this in place of [`Self::scroll_link_pull`]. It
+    /// takes nothing, since the group's value measured the last document, and that value goes,
+    /// wherever the pane stood: the group starts over at the top with it (D203). A pane that drew
+    /// the old value before this one asks a catch-up frame. A first draw opens nothing; such a
+    /// pane pulls, as any pane that joins.
+    pub(crate) fn scroll_link_open(&mut self, group: WidgetId) {
+        let link = self.link_drawn(group);
+        let left = link.value.replace(0.0);
+        let stale = link.drawn > 1 && left.is_some_and(|v| v != 0.0);
+        if stale {
+            self.request_catch_up();
         }
     }
 
@@ -612,12 +633,14 @@ impl Ui<'_> {
         for a in &mut st.a {
             a.settle(now);
         }
-        if let Some(k) = known
-            && !preserve
-        {
+        // A preserved document keeps `wanted` through a short frame, but not through a vertical
+        // shift: that is the host placing the area, and a `wanted` past the end would hold it
+        // there when the next shift brings it back (D203).
+        let keep = [preserve, preserve && shift_y == 0.0];
+        if let Some(k) = known {
             for ax in 0..2 {
                 let c = clamp_offset(st.a[ax].wanted, k[ax], vp[ax]);
-                if c != st.a[ax].wanted {
+                if !keep[ax] && c != st.a[ax].wanted {
                     st.a[ax].jump(c);
                 }
             }

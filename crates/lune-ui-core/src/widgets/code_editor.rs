@@ -144,6 +144,8 @@ struct CodeMem {
     /// Where the last frame left the lines, for [`Ui::code_line_rect`].
     viewport: Rect,
     offset: f64,
+    /// A frame drew: a new identity replaces a document, where a first draw replaces none.
+    drew: bool,
 }
 
 /// How a host differs from the editor in the way it draws the frame: the code block (D10) sets a
@@ -823,15 +825,16 @@ impl Ui<'_> {
 
         let mut mem = std::mem::take(self.persistent::<CodeMem>(id));
         // Another document: nothing of the last one carries over, a composition and a pending
-        // paste included. The offset it left is what a linked pane has to hear about.
-        let mut left_at = None;
+        // paste included.
+        let mut opened = false;
         if mem.identity != opts.identity {
+            opened = mem.drew;
             self.scroll_forget_shift(AREA);
             mem = CodeMem {
                 identity: opts.identity,
                 ..CodeMem::default()
             };
-            left_at = Some(std::mem::take(self.persistent::<EditState>(id)).offset.1);
+            *self.persistent::<EditState>(id) = EditState::default();
         }
         let number_width = digits(doc.line_count());
         let cols = Columns::of(opts, advance, doc.line_count());
@@ -908,9 +911,17 @@ impl Ui<'_> {
         }
 
         // A linked pane takes the group's offset before its area runs. Its own queued shift moves
-        // it first, so the group's value is asked of where that takes it (D184).
+        // it first, so the group's value is asked of where that takes it (D184). One that opened
+        // a document takes nothing, and the group starts over with it (D203).
         let pending = self.scroll_pending_shift(AREA);
-        let pulled = group.map_or(0.0, |g| self.scroll_link_pull(g, drawn.1 + pending));
+        let pulled = match group {
+            Some(g) if opened => {
+                self.scroll_link_open(g);
+                0.0
+            }
+            Some(g) => self.scroll_link_pull(g, drawn.1 + pending),
+            None => 0.0,
+        };
         if pulled != 0.0 {
             self.scroll_shift(AREA, pulled);
         }
@@ -1035,13 +1046,14 @@ impl Ui<'_> {
         }
         mem.viewport = viewport;
         mem.offset = out.offset.1;
+        mem.drew = true;
         *self.persistent::<CodeMem>(id) = mem;
 
         // Only a move of its own publishes; a pane that was just pulled follows, and says nothing.
         if let Some(g) = group
             && pulled == 0.0
         {
-            self.scroll_link_push(g, left_at.unwrap_or(drawn.1), out.offset.1);
+            self.scroll_link_push(g, drawn.1, out.offset.1);
         }
 
         let (now_focused, ring) = self.focus_state();

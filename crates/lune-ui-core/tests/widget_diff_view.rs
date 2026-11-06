@@ -1880,3 +1880,191 @@ fn a_new_identity_takes_no_shift_the_last_document_measured() {
         .fold(f32::MAX, f32::min);
     assert_eq!(top, DIFF.y);
 }
+
+// A new identity and the link between the panes: the group holds nothing of the last document.
+
+/// What tops each pane, left first. A pane at any other offset shows another row there, or none.
+fn tops(r: &Run) -> Vec<String> {
+    tree_nodes(&r.out.tree, Role::Cell)
+        .into_iter()
+        .filter(|n| n.bounds.y == DIFF.y && n.name.starts_with("line "))
+        .map(|n| n.name)
+        .collect()
+}
+
+#[test]
+fn a_far_jump_on_the_right_pane_then_a_new_identity_on_the_next_frame_tops_both_panes() {
+    let lines = big(200);
+    for wrap in [false, true] {
+        // End lands after the content: the right pane draws the top and publishes the end.
+        let jumped = |h: &mut UiHarness, s: &Setup| {
+            run(h, &lines, s);
+            click(h, over_pane(1, 3), NONE);
+            run(h, &lines, s);
+            key(h, NamedKey::End, NONE);
+            run(h, &lines, s);
+        };
+        let mut s = Setup { wrap, ..split() };
+        let (mut h, mut ms) = (harness(), 0);
+        jumped(&mut h, &s);
+        let r = settle(&mut h, &lines, &s, &mut ms);
+        assert_eq!(tops(&r), ["line 190", "line 190"], "the instrument: End");
+
+        let mut h = harness();
+        jumped(&mut h, &s);
+        s.identity = 2;
+        let r = run(&mut h, &lines, &s);
+        assert_eq!(tops(&r), ["line 0", "line 0"], "the frame of the switch");
+        let r = settle(&mut h, &lines, &s, &mut ms);
+        assert_eq!(tops(&r), ["line 0", "line 0"], "at rest");
+    }
+}
+
+#[test]
+fn a_wheel_on_the_right_pane_then_a_new_identity_on_the_next_frame_shows_no_old_offset() {
+    let lines = big(200);
+    let mut s = split();
+    let (mut h, mut ms) = (harness(), 0);
+    run(&mut h, &lines, &s);
+    let (x, y) = over_pane(1, 3);
+    h.input.pointer_to(x, y);
+    run(&mut h, &lines, &s);
+    h.input.scroll_pixels(0.0, -500.0);
+    let r = run(&mut h, &lines, &s);
+    assert_eq!(tops(&r), ["line 0", "line 25"], "the left pane drew first");
+    s.identity = 2;
+    let r = run(&mut h, &lines, &s);
+    assert_eq!(tops(&r), ["line 0", "line 0"], "the frame of the switch");
+    let r = settle(&mut h, &lines, &s, &mut ms);
+    assert_eq!(tops(&r), ["line 0", "line 0"], "at rest");
+}
+
+/// A deterministic generator: the tests must not depend on the process.
+struct Lcg(u64);
+
+impl Lcg {
+    fn next(&mut self, below: usize) -> usize {
+        self.0 = self
+            .0
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
+        ((self.0 >> 33) as usize) % below
+    }
+}
+
+/// `n` context lines, every third long enough to wrap in a pane.
+fn uneven(n: usize) -> Vec<DiffLine<'static>> {
+    (0..n)
+        .map(|i| {
+            let tail = if i % 3 == 1 {
+                "w ".repeat(90)
+            } else {
+                String::new()
+            };
+            let text: &'static str = Box::leak(
+                format!("line {i} {tail}")
+                    .trim()
+                    .to_owned()
+                    .into_boxed_str(),
+            );
+            let at = Some(i as u32 + 1);
+            line(LineKind::Context, at, at, text)
+        })
+        .collect()
+}
+
+/// One step of the walk, on `side`: a wheel, a focus, or a key for the focused pane.
+fn wander(h: &mut UiHarness, r: &mut Lcg, side: usize) {
+    let (x, y) = over_pane(side, r.next(8));
+    let down = if r.next(4) == 0 { 1.0 } else { -1.0 };
+    match r.next(7) {
+        0 => {
+            let by = 20.0 * (1 + r.next(60)) as f32;
+            h.input.pointer_to(x, y).scroll_pixels(0.0, by * down);
+        }
+        1 => {
+            h.input.pointer_to(x, y).scroll_lines(0.0, 3.0 * down);
+        }
+        2 => click(h, (x, y), NONE),
+        3 => key(h, NamedKey::End, NONE),
+        4 => key(h, NamedKey::Home, NONE),
+        5 => key(h, NamedKey::PageDown, NONE),
+        _ => key(h, NamedKey::ArrowDown, NONE),
+    }
+}
+
+#[test]
+fn a_walk_of_scrolls_and_new_identities_opens_every_document_at_the_top_of_every_pane() {
+    let (even, long) = (big(200), uneven(200));
+    let setups = [
+        (setup(), &even),
+        (split(), &even),
+        (
+            Setup {
+                wrap: true,
+                ..setup()
+            },
+            &long,
+        ),
+        (
+            Setup {
+                wrap: true,
+                ..split()
+            },
+            &long,
+        ),
+    ];
+    let (mut switches, mut away, mut close) = (0, 0, 0);
+    for (mut s, lines) in setups {
+        let want = vec!["line 0"; if s.split { 2 } else { 1 }];
+        for seed in 0..8 {
+            let mut r = Lcg(seed);
+            let (mut h, mut ms) = (harness(), 0);
+            run(&mut h, lines, &s);
+            for step in 0..100 {
+                let side = r.next(if s.split { 2 } else { 1 });
+                wander(&mut h, &mut r, side);
+                ms += 16;
+                h.at_ms(ms);
+                let mut last = run(&mut h, lines, &s);
+                if r.next(3) != 0 {
+                    continue;
+                }
+                // Zero frames is the window: what the move published has not reached the panes.
+                let gap = r.next(3);
+                for _ in 0..gap {
+                    ms += 16;
+                    h.at_ms(ms);
+                    last = run(&mut h, lines, &s);
+                }
+                away += usize::from(tops(&last) != want);
+                close += usize::from(gap == 0);
+                switches += 1;
+
+                s.identity += 1;
+                ms += 16;
+                h.at_ms(ms);
+                let mut now = run(&mut h, lines, &s);
+                for frame in 0.. {
+                    assert_eq!(tops(&now), want, "seed {seed} step {step} frame {frame}");
+                    if now.out.repaint == Repaint::Idle {
+                        break;
+                    }
+                    assert!(
+                        frame < 40,
+                        "seed {seed} step {step}: the page did not settle"
+                    );
+                    ms += 100;
+                    h.at_ms(ms);
+                    now = run(&mut h, lines, &s);
+                }
+            }
+        }
+    }
+    assert!(away > 500, "the instrument: the walk left the top ({away})");
+    assert!(
+        close > 250,
+        "the instrument: switches in the window ({close})"
+    );
+    assert!(switches > 800, "the instrument: {switches} switches");
+}

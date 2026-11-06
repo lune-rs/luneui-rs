@@ -2012,3 +2012,328 @@ fn a_selection_ending_on_a_line_end_draws_no_sliver_there() {
     let f = fills(&r.scene, DARK.text_selection);
     assert_eq!(f.len(), 1, "the text and nothing past it: {f:?}");
 }
+
+// A new identity and the link: the group holds nothing of the last document.
+
+/// Two linked panes on `docs`, each with its own identity, the first drawn first; their offsets
+/// and the frame's repaint.
+fn pair(
+    h: &mut UiHarness,
+    docs: &mut [CodeDoc; 2],
+    base: &CodeOptions<'_>,
+    ids: [u64; 2],
+) -> ([f64; 2], Repaint) {
+    let [a, b] = docs;
+    let opts = |id| CodeOptions {
+        identity: Some(id),
+        scroll_group: Some("g"),
+        ..*base
+    };
+    let mut seen = [-1.0; 2];
+    let (_, out) = h.frame(|ui| {
+        seen[0] = ui.code_editor("a", A, a, &opts(ids[0])).offset.1;
+        seen[1] = ui.code_editor("b", B, b, &opts(ids[1])).offset.1;
+    });
+    (seen, out.repaint)
+}
+
+#[test]
+fn a_wheel_on_the_second_pane_then_a_new_identity_shows_no_old_offset_in_either_pane() {
+    let mut docs = [numbered(100), numbered(100)];
+    let mut h = UiHarness::new(WIN);
+    let ro = read_only();
+    pair(&mut h, &mut docs, &ro, [1, 1]);
+    h.input.pointer_to(170.0, 50.0).scroll_pixels(0.0, -500.0);
+    let (o, _) = pair(&mut h, &mut docs, &ro, [1, 1]);
+    assert_eq!(o, [0.0, 500.0], "the first pane drew before the move");
+    let (o, _) = pair(&mut h, &mut docs, &ro, [2, 2]);
+    assert_eq!(o, [0.0, 0.0], "the frame of the switch");
+    h.at_ms(5_000);
+    let (o, repaint) = pair(&mut h, &mut docs, &ro, [2, 2]);
+    assert_eq!((o, repaint), ([0.0, 0.0], Repaint::Idle));
+}
+
+#[test]
+fn a_far_jump_on_the_second_pane_then_a_new_identity_tops_both_panes() {
+    let mut docs = [numbered(100), numbered(100)];
+    let mut h = UiHarness::new(WIN);
+    let ro = read_only();
+    pair(&mut h, &mut docs, &ro, [1, 1]);
+    h.input.pointer_to(170.0, 50.0).click(P);
+    pair(&mut h, &mut docs, &ro, [1, 1]);
+    press(&mut h, NamedKey::End);
+    let (o, _) = pair(&mut h, &mut docs, &ro, [1, 1]);
+    assert_eq!(o, [0.0, 1800.0], "the instrument: the jump");
+    let (o, _) = pair(&mut h, &mut docs, &ro, [2, 2]);
+    assert_eq!(o, [0.0, 0.0], "the frame of the switch");
+    h.at_ms(5_000);
+    let (o, repaint) = pair(&mut h, &mut docs, &ro, [2, 2]);
+    assert_eq!((o, repaint), ([0.0, 0.0], Repaint::Idle));
+}
+
+#[test]
+fn a_pane_alone_on_a_new_identity_before_it_took_the_last_move_still_takes_the_group_to_the_top() {
+    let mut docs = [numbered(100), numbered(100)];
+    let mut h = UiHarness::new(WIN);
+    let ro = read_only();
+    pair(&mut h, &mut docs, &ro, [1, 1]);
+    h.input.pointer_to(170.0, 50.0).scroll_pixels(0.0, -500.0);
+    let (o, _) = pair(&mut h, &mut docs, &ro, [1, 1]);
+    assert_eq!(o, [0.0, 500.0], "the first pane has not taken it");
+    let (o, _) = pair(&mut h, &mut docs, &ro, [2, 1]);
+    assert_eq!(o, [0.0, 0.0], "it pulled nothing, and the second followed");
+    h.at_ms(5_000);
+    let (o, repaint) = pair(&mut h, &mut docs, &ro, [2, 1]);
+    assert_eq!((o, repaint), ([0.0, 0.0], Repaint::Idle));
+
+    // The same value again reaches the pane that opened.
+    h.input.scroll_pixels(0.0, -500.0);
+    let (o, _) = pair(&mut h, &mut docs, &ro, [2, 1]);
+    assert_eq!(o, [0.0, 500.0]);
+    let (o, _) = pair(&mut h, &mut docs, &ro, [2, 1]);
+    assert_eq!(o, [500.0, 500.0], "the pane follows the group again");
+}
+
+#[test]
+fn a_short_pane_at_its_top_opening_a_document_alone_takes_the_group_to_the_top() {
+    // It fits, so it stands at 0 with the group's value taken: no move of its own shows it left.
+    let mut docs = [numbered(100), numbered(5)];
+    let mut h = UiHarness::new(WIN);
+    let ro = read_only();
+    pair(&mut h, &mut docs, &ro, [1, 1]);
+    h.input.pointer_to(50.0, 50.0).scroll_pixels(0.0, -500.0);
+    let (o, _) = pair(&mut h, &mut docs, &ro, [1, 1]);
+    assert_eq!(o, [500.0, 0.0]);
+    docs[1] = numbered(100);
+    let (o, repaint) = pair(&mut h, &mut docs, &ro, [1, 2]);
+    assert_eq!(o, [500.0, 0.0], "the first pane drew before it");
+    assert_eq!(
+        repaint,
+        Repaint::Now,
+        "so it asks the frame that carries it"
+    );
+    let (o, _) = pair(&mut h, &mut docs, &ro, [1, 2]);
+    assert_eq!(o, [0.0, 0.0], "the panes line up again");
+}
+
+#[test]
+fn a_pane_with_an_identity_drawn_again_catches_up_with_its_group() {
+    // A first draw is no new document: nothing of the pane's last draw is left, and it joins.
+    let (mut a, mut b) = (numbered(100), numbered(100));
+    let synced = CodeOptions {
+        identity: Some(1),
+        scroll_group: Some("g"),
+        ..read_only()
+    };
+    let mut h = UiHarness::new(WIN);
+    h.frame(|ui| {
+        ui.code_editor("a", A, &mut a, &synced);
+        ui.code_editor("b", B, &mut b, &synced);
+    });
+    h.frame(|ui| {
+        ui.code_editor("a", A, &mut a, &synced);
+    });
+    h.input.pointer_to(50.0, 50.0).scroll_pixels(0.0, -120.0);
+    h.frame(|ui| {
+        ui.code_editor("a", A, &mut a, &synced);
+    });
+    let mut o = [-1.0; 2];
+    h.frame(|ui| {
+        o[0] = ui.code_editor("a", A, &mut a, &synced).offset.1;
+        o[1] = ui.code_editor("b", B, &mut b, &synced).offset.1;
+    });
+    assert_eq!(o, [120.0, 120.0], "in the frame it came back");
+}
+
+#[test]
+fn a_pane_that_joins_after_the_group_opened_a_document_finds_no_old_value() {
+    // The pane that published is gone, the one left stands at 0: only the group held the value.
+    let (mut long, mut short, mut late) = (numbered(100), numbered(5), numbered(100));
+    let synced = |identity| CodeOptions {
+        identity: Some(identity),
+        scroll_group: Some("g"),
+        ..read_only()
+    };
+    let mut h = UiHarness::new(WIN);
+    h.frame(|ui| {
+        ui.code_editor("a", A, &mut long, &synced(1));
+        ui.code_editor("b", B, &mut short, &synced(1));
+    });
+    h.input.pointer_to(50.0, 50.0).scroll_pixels(0.0, -500.0);
+    h.frame(|ui| {
+        ui.code_editor("a", A, &mut long, &synced(1));
+        ui.code_editor("b", B, &mut short, &synced(1));
+    });
+    h.frame(|ui| {
+        ui.code_editor("b", B, &mut short, &synced(2));
+    });
+    let mut o = -1.0;
+    h.frame(|ui| {
+        ui.code_editor("b", B, &mut short, &synced(2));
+        o = ui.code_editor("c", C, &mut late, &synced(1)).offset.1;
+    });
+    assert_eq!(o, 0.0);
+}
+
+#[test]
+fn a_short_pane_with_an_identity_comes_back_with_its_group() {
+    // An area keeps `wanted` for its document: asked past its end, it would stay there.
+    let mut docs = [numbered(100), numbered(14)];
+    let mut h = UiHarness::new(WIN);
+    let ro = read_only();
+    pair(&mut h, &mut docs, &ro, [1, 1]);
+    h.input.pointer_to(50.0, 50.0).scroll_pixels(0.0, -500.0);
+    pair(&mut h, &mut docs, &ro, [1, 1]);
+    assert_eq!(pair(&mut h, &mut docs, &ro, [1, 1]).0, [500.0, 80.0]);
+    h.input.scroll_pixels(0.0, 460.0);
+    assert_eq!(pair(&mut h, &mut docs, &ro, [1, 1]).0, [40.0, 40.0]);
+    h.input.scroll_pixels(0.0, -500.0);
+    pair(&mut h, &mut docs, &ro, [1, 1]);
+    assert_eq!(pair(&mut h, &mut docs, &ro, [1, 1]).0, [540.0, 80.0]);
+    // The long pane opens a document alone: the short one goes to the top with the group.
+    let (o, _) = pair(&mut h, &mut docs, &ro, [2, 1]);
+    assert_eq!(o, [0.0, 0.0]);
+}
+
+/// A deterministic generator: the tests must not depend on the process.
+struct Lcg(u64);
+
+impl Lcg {
+    fn next(&mut self, below: usize) -> usize {
+        self.0 = self
+            .0
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
+        ((self.0 >> 33) as usize) % below
+    }
+}
+
+/// One step of the walk on a pane: a wheel, a focus, or a key for the focused pane. Whether it
+/// animates, for a pane that keeps its course through another pane's switch.
+fn wander(h: &mut UiHarness, r: &mut Lcg, read_only: bool) -> bool {
+    let (x, y) = ([50.0, 170.0][r.next(2)], 20.0 + 20.0 * r.next(8) as f32);
+    let down = if r.next(4) == 0 { 1.0 } else { -1.0 };
+    let mut flies = false;
+    match r.next(6) {
+        0 => {
+            let by = 20.0 * (1 + r.next(60)) as f32;
+            h.input.pointer_to(x, y).scroll_pixels(0.0, by * down);
+        }
+        1 => {
+            h.input.pointer_to(x, y).scroll_lines(0.0, 3.0 * down);
+            flies = true;
+        }
+        2 => {
+            h.input.pointer_to(x, y).click(P);
+        }
+        3 if read_only => press(h, NamedKey::End),
+        3 => with_mods(h, META, Key::Named(NamedKey::End)),
+        4 if read_only => press(h, NamedKey::Home),
+        4 => with_mods(h, META, Key::Named(NamedKey::Home)),
+        _ => {
+            press(h, NamedKey::PageDown);
+            flies = true;
+        }
+    }
+    flies
+}
+
+/// How often a walk did what it is there to do.
+#[derive(Default)]
+struct Walked {
+    switches: usize,
+    /// Switches made with a pane away from the top.
+    away: usize,
+    /// Switches in the frame after a move.
+    close: usize,
+    /// Switches of one pane.
+    alone: usize,
+}
+
+/// One pair of linked panes walked at random: moves, then a new identity on one pane or both.
+fn walk(wrap: bool, read_only: bool, second: usize, seed: u64, seen: &mut Walked) {
+    let base = CodeOptions {
+        wrap,
+        read_only,
+        ..plain()
+    };
+    let doc = |n| {
+        if wrap { long_lines(n, 30) } else { numbered(n) }
+    };
+    let mut docs = [doc(200), doc(second)];
+    let (mut r, mut ids, mut ms) = (Lcg(seed), [1, 1], 0);
+    let mut h = UiHarness::new(WIN);
+    let mut frame = |h: &mut UiHarness, by: u64, ids: [u64; 2]| {
+        ms += by;
+        h.at_ms(ms);
+        pair(h, &mut docs, &base, ids)
+    };
+    frame(&mut h, 16, ids);
+    let mut flying = false;
+    for step in 0..100 {
+        // A jump in the frame after a far one, wrapped, lands off by what that frame measured
+        // there: the area's own limit, no document's.
+        if wrap {
+            frame(&mut h, 16, ids);
+        }
+        flying |= wander(&mut h, &mut r, read_only);
+        let mut last = frame(&mut h, 16, ids).0;
+        if r.next(3) != 0 {
+            continue;
+        }
+        // Zero frames is the window: what the move published has not reached the panes.
+        let gap = r.next(3);
+        for _ in 0..gap {
+            last = frame(&mut h, 16, ids).0;
+        }
+        let which = r.next(3);
+        // A pane alone leaves the other's flight on its course, so that one rests first.
+        if which != 2 && flying {
+            for _ in 0..8 {
+                last = frame(&mut h, 100, ids).0;
+            }
+        }
+        flying = false;
+        seen.switches += 1;
+        seen.away += usize::from(last != [0.0, 0.0]);
+        seen.close += usize::from(gap == 0);
+        seen.alone += usize::from(which != 2);
+
+        let opens = [which != 1, which != 0];
+        ids[0] += u64::from(opens[0]);
+        ids[1] += u64::from(opens[1]);
+        let at = format!("wrap {wrap} read-only {read_only} {second} seed {seed} step {step}");
+        let (mut o, mut repaint) = frame(&mut h, 16, ids);
+        for (o, opens) in o.iter().zip(opens) {
+            assert!(!opens || *o == 0.0, "{at}: the frame of the switch: {o}");
+        }
+        for n in 0.. {
+            assert!(which != 2 || o == [0.0, 0.0], "{at} frame {n}: {o:?}");
+            if repaint == Repaint::Idle {
+                break;
+            }
+            assert!(n < 40, "{at}: the page did not settle");
+            (o, repaint) = frame(&mut h, 100, ids);
+        }
+        assert_eq!(o, [0.0, 0.0], "{at}: at rest");
+    }
+}
+
+#[test]
+fn a_walk_of_scrolls_and_new_identities_opens_every_document_at_the_top_of_every_linked_pane() {
+    let mut seen = Walked::default();
+    for wrap in [false, true] {
+        for read_only in [true, false] {
+            // Equal, one that stops short of the other, and one that fits.
+            for second in [200, 14, 5] {
+                for seed in 0..5 {
+                    walk(wrap, read_only, second, seed, &mut seen);
+                }
+            }
+        }
+    }
+    assert!(seen.away > 900, "the instrument: {}", seen.away);
+    assert!(seen.close > 500, "the instrument: {}", seen.close);
+    assert!(seen.alone > 800, "the instrument: {}", seen.alone);
+    assert!(seen.switches > 1_500, "the instrument: {}", seen.switches);
+}
