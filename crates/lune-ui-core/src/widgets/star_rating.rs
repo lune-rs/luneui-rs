@@ -156,9 +156,8 @@ impl Ui<'_> {
                 Sense::CLICK_ROVE
             };
             let r = self.interact(kid, rects[i], sense);
-            let enter = self.consume_key(kid, NamedKey::Enter);
-            let space = self.consume_key(kid, NamedKey::Space);
-            if r.enabled && (r.clicked || enter || space) && chosen.is_none() {
+            let keyed = self.activation_keys(kid, r.enabled, &[NamedKey::Enter, NamedKey::Space]);
+            if r.enabled && (r.clicked || keyed) && chosen.is_none() {
                 chosen = Some(i as u32 + 1);
             }
             kids.push(r);

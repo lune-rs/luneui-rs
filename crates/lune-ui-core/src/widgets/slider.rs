@@ -288,23 +288,28 @@ impl Ui<'_> {
                 next = s.snap(s.min + f * (s.max - s.min));
             }
         }
-        if r.enabled {
-            for (index, event) in self.focus_events(id) {
-                let FocusEvent::Key {
-                    key: Key::Named(k), ..
-                } = event
-                else {
-                    continue;
-                };
-                let up = match k {
-                    NamedKey::ArrowRight | NamedKey::ArrowUp => true,
-                    NamedKey::ArrowLeft | NamedKey::ArrowDown => false,
-                    _ => continue,
-                };
-                self.consume_focus_event(index);
-                if let (Some(s), false) = (stops, following) {
-                    next = s.next(next, up);
-                }
+        // The arrows are taken whether or not the slider is enabled (D140); a Control, Alt or
+        // Command chord on them is left to the shortcuts (D157); only an enabled slider acts.
+        for (index, event) in self.focus_events(id) {
+            let FocusEvent::Key {
+                key: Key::Named(k),
+                modifiers,
+                ..
+            } = event
+            else {
+                continue;
+            };
+            if modifiers.control || modifiers.alt || modifiers.logo {
+                continue;
+            }
+            let up = match k {
+                NamedKey::ArrowRight | NamedKey::ArrowUp => true,
+                NamedKey::ArrowLeft | NamedKey::ArrowDown => false,
+                _ => continue,
+            };
+            self.consume_focus_event(index);
+            if let (true, Some(s), false) = (r.enabled, stops, following) {
+                next = s.next(next, up);
             }
         }
         let mut jumped = following;

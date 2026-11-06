@@ -195,6 +195,14 @@ the hunk actions are hosts of `icon_button`; the diff's panes are `virtual_list`
 own disabled tests for these (`widget_markdown`, `widget_code_editor`, `widget_diff_view`) bind no shortcut on the key, so none of
 them fails under any of those mutants: they hold the walk and the reports, not the keys.
 
+Re-run for M11 (`c4::m11`, `m9`'s typed form: one stop per reader on a page of its own, a `Global` binding on 12 keys, the dialog's
+on `Scope::Overlay`): the three "Does not hold" readers (`stepper`, `slider`, `search_picker`'s trigger) and the two that took a
+Control, Alt or Command chord (`tab_strip`, `star_rating`) now take their keys through `consume_plain_key`, `activation_keys` or the
+slider's event filter, taking them whether or not they are enabled and acting only when enabled; a chord on them is a shortcut. All
+five run a Command chord on each named key they take, enabled and disabled. Each of the five has a mutant (its reader put back as it
+was) that fails the disabled test or the chord test or both, and `activation_keys` leaving a disabled key fails the readers' test
+(the search picker's trigger and the tab strip) and the hosts' test (the dialog's two buttons first). The Probe rows became Test rows.
+
 A new reader, or a change to one, gets its row here. **Test** means a named test fails when that reader is made to leak
 (a mutant of it, run at 406f780). **Probe** means only the scratch probe showed it: nothing in the repo holds it.
 
@@ -205,8 +213,8 @@ Holds, for the keys listed:
 | `button`, `icon_button`, `toolbar_label` | Enter, Space | Test: `widget_button::a_disabled_widget_keeps_the_keys_it_handles_from_the_shortcuts` |
 | `checkbox`, `toggle` | Space | Test: the same |
 | `radio_group` | Space, arrows, Home, End | Test: the same |
-| Hosts of `Ui::button` or `icon_button`: `dialog`'s confirm and cancel, `toolbar_action`, the filter bar's clear, the tab strip's new tab | Enter, Space | Probe. `widget_dialog`'s `enter_and_space_on_a_disabled_confirm_...` binds `Global`, so it cannot fail (review F19) |
-| `star_rating` | Enter, Space, arrows, Home, End | Probe; no test failed under a mutant of its keys or of its `rove_keys` |
+| Hosts of `Ui::button` or `icon_button`: `dialog`'s confirm and cancel, `toolbar_action`, the filter bar's clear, the tab strip's new tab | Enter, Space | Test (M11): `c4::m11::a_disabled_host_of_a_button_takes_enter_and_space_and_fires_no_binding` (the dialog's two on `Scope::Overlay`: `widget_dialog`'s own test binds `Global`, which cannot fail there, review F19); mutant: `activation_keys` leaving a disabled key fails it |
+| `star_rating` | Enter, Space, arrows, Home, End | Test (M11): `c4::m11::a_disabled_reader_takes_every_key_it_takes_enabled_and_fires_no_global_binding` (Enter, Space, the arrows, Home, End), and Command on them: `a_chord_on_the_keys_of_the_five_readers_is_a_shortcut_enabled_and_disabled`; mutant: the reader back on `consume_key` gated on `enabled` fails both |
 | `nav_list`, so `sidebar` | Enter, Space, Up, Down, Home, End | Test: `widget_sidebar::a_focused_row_turned_disabled_keeps_its_keys_and_leaves_its_chords` (Enter, Space), `c4::m7::a_disabled_page_takes_every_key_a_focused_composite_takes_and_fires_no_global_binding` (the rest) |
 | `icon_rail` | Enter, Space, Up, Down, Home, End | Test: `c4`, the same |
 | `split_panes` | arrows, Home, End | Test: `c4`, the same, and `widget_split_panes::a_strip_that_was_focused_and_is_then_disabled_still_takes_its_keys_and_acts_on_none` |
@@ -215,9 +223,13 @@ Holds, for the keys listed:
 | `flyout`, its rows (`menu_rows`) | Enter, Space, Up, Down, Home, End | Test: `widget_flyout::a_disabled_flyout_closes_on_escape_picks_nothing_and_marks_every_node` |
 | `dropdown`, with and without `max_rows` | Enter, Up, Down | Test: `widget_dropdown::a_disabled_dropdown_takes_the_keys_picks_nothing_and_marks_every_node` |
 | `tree_view` | Enter, Space, arrows, Home, End, PageUp, PageDown | Test: `widget_tree_view::a_disabled_tree_toggles_and_selects_nothing_takes_its_keys_and_passes_the_walk` |
-| `toasts`, the action buttons | Enter, Space | Probe (`toast.rs:954`: no test failed under a mutant) |
-| `toasts`, Cancel and Dismiss (`icon_button`, the `button` row's reader) | Enter, Space | Test: `widget_toast::the_toast_is_called_in_a_disabled_scope_and_every_node_says_so` holds Cancel; probe (Dismiss) |
-| `settings_page`, the restart action | Enter, Space | Probe. `widget_settings_page::a_disabled_page_reports_nothing_and_leaves_the_keys_to_shortcuts` never focuses it |
+| `toasts`, the action buttons | Enter, Space | Test (M11): `c4::m11::a_disabled_host_of_a_button_takes_enter_and_space_and_fires_no_binding` (the `toast action` stop); mutant: the same `activation_keys` one |
+| `toasts`, Cancel and Dismiss (`icon_button`, the `button` row's reader) | Enter, Space | Test: `widget_toast::the_toast_is_called_in_a_disabled_scope_and_every_node_says_so` holds Cancel; Dismiss (M11): the c4 test above (the `toast dismiss` stop) |
+| `settings_page`, the restart action | Enter, Space | Test (M11): the c4 test above (the `settings restart` stop, focused); `widget_settings_page::a_disabled_page_reports_nothing_and_leaves_the_keys_to_shortcuts` never focuses it |
+| `Ui::empty_state`'s and `Ui::callout`'s actions, `Ui::toast_history`'s clear (`Ui::button`, `icon_button`) | Enter, Space | Test (M11): the c4 test above (the `empty state action`, `callout action` and `toast history clear` stops) |
+| `stepper` | Up, Down | Test (M11): `c4::m11::a_disabled_reader_takes_every_key_it_takes_enabled_and_fires_no_global_binding`; mutant: back on `consume_key` gated on `enabled` fails it and the chord test. Chords: `a_chord_on_the_keys_of_the_five_readers_is_a_shortcut_enabled_and_disabled` |
+| `slider` | arrows | Test (M11): the same two c4 tests; mutant: the event filter back on `enabled` with no chord check fails both |
+| `search_picker`, the trigger (`activation_keys`) | Enter, Space | Test (M11): the same two c4 tests; mutant: back on `consume_key` gated on `enabled` fails both. An open picker closes when disabled and focus returns to the trigger one frame later, so the frame that disables it has nothing to hold the box's keys; that is the close, not a reader |
 | `command_palette`, its own keys | Up, Down, Enter | Test: `widget_command_palette::a_disabled_palette_takes_its_keys_activates_nothing_and_passes_the_walk` (`Scope::Overlay`) |
 | `combo` | Enter, Space, Down | Test (D160): `widget_combo::a_combo_focused_then_disabled_keeps_its_keys_from_the_shortcuts`; a chord on them stays a shortcut, enabled and disabled: `a_chord_on_the_combos_keys_is_a_shortcut_and_opens_nothing` |
 | `virtual_list`, so the list frame the table runs on | Up, Down, Home, End, PageUp, PageDown; Command+C with a selection | Test (D160): `widget_virtual_list::a_list_focused_then_disabled_takes_its_keys_and_changes_nothing`, `command_c_on_a_list_focused_then_disabled_copies_nothing_and_fires_no_binding`; chords: `a_chord_on_the_lists_keys_stays_a_shortcut` |
@@ -237,15 +249,6 @@ Holds, for the keys listed:
 | Hosts of `Ui::icon_button`: the copy buttons of the code block and of markdown's fenced code, the diff's hunk actions | Enter, Space | Test (M9): the same (copy and hunk stops); mutant: `activation_keys` leaving a disabled key leaks `code block copy`, `diff hunk action`, `markdown link` and `markdown task box` |
 | `diff_view`, the unified pane and each split pane, through `virtual_list` | Up, Down, Home, End, PageUp, PageDown | Test (M9): the same (body, left and right stops); mutant: `virtual_list` consuming only when enabled leaks all three. Command+C with a selection is the `virtual_list` row above, run on a list, not on a diff pane |
 
-Does not hold: each key listed fired nothing enabled and fired its binding disabled, with focus kept. All by probe;
-nothing acted. Each gates on `enabled` or a focus that is false in a disabled scope before it takes the key.
-
-| Reader | Keys that reach the shortcut |
-|---|---|
-| `stepper` | Up, Down |
-| `slider` | arrows |
-| `search_picker`, the trigger | Enter, Space. An open picker closes when disabled and focus returns to the trigger, so this row is what is left of its box |
-
 Not a leak: Escape in a pointer drag (`consume_key_while_pressed`: the splitter, `drag_gesture`) fired nothing enabled
 and fired its binding once the scope turned disabled mid-drag (probe, splitter and tab strip). From reading: `Ui::interact`
 reports no press in a disabled scope, so the drag has ended and Escape has nothing to cancel, which `drag.rs` leaves to
@@ -260,8 +263,7 @@ dialog's disabled confirm. A disabled radio option takes its keys, and the arrow
 
 Not checked, from reading only:
 
-- `Ui::empty_state`'s and `Ui::callout`'s actions (`Ui::button`), not run. `Ui::toast_history`'s clear (`icon_button`) holds Enter and Space by probe, with no test.
-- The tab strip's menu (`menu`), not run.
+- The tab strip's menu (`menu`): the strip closes it when it turns disabled (`disabling_the_strip_closes_an_open_menu` pins that), so no widget holds the key focus afterwards and the keys of the closed menu reach the shortcuts for the frame in which it closed. A menu opened in a disabled scope is the `menu` row, which holds. Ran in a scratch probe at M11 (`c4::m11` with the menu as a stop: Up, Down, Home, End, Enter and Space reached a `Global` binding); not a reader that takes a key, so no row.
 - `free_drag_gesture`: no library caller, not run.
 - Keys outside the 27, such as Alt word moves in a text field and Control chords. D157 leaves chords to the shortcuts where it applies.
 - A closure host (`dialog` body, `popover`, `panel`, `page`, `side_panel`, `form_field`, `setting_row`, and a table's cell closure) reads no key: what it

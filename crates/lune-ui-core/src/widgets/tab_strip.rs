@@ -550,13 +550,13 @@ impl Ui<'_> {
             });
 
             let pressed_here = st.pressed == Some(tab.key);
-            // Both keys are consumed whether or not the strip is enabled, so a focused tab of a
+            // Both keys are taken whether or not the strip is enabled, so a focused tab of a
             // disabled strip does not let Enter or Space fall through to whatever handles them
-            // next.
-            let enter = self.consume_key(item.id, NamedKey::Enter);
-            let space = self.consume_key(item.id, NamedKey::Space);
-            let activated = resp.enabled
-                && (resp.press_started || (resp.clicked && !pressed_here) || enter || space);
+            // next; a Control, Alt or Command chord on them stays a shortcut (D157).
+            let keyed =
+                self.activation_keys(item.id, resp.enabled, &[NamedKey::Enter, NamedKey::Space]);
+            let activated =
+                resp.enabled && (resp.press_started || (resp.clicked && !pressed_here) || keyed);
             if activated {
                 events.push(TabEvent::Activate(tab.key));
             }
