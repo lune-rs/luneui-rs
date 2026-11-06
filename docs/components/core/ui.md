@@ -2,10 +2,10 @@
 id: core.ui
 title: Ui frame context
 area: core
-status: in-progress
+status: done
 consumers: any
-source: crates/lune-ui-core/src/ui.rs
-owner: orch/toolkit-v1
+source: crates/lune-ui-core/src/ui.rs, crates/lune-ui-core/src/ui
+owner: —
 summary: Immediate-mode Ui frame: ids, transient and persistent retained state, Response, layers and modality, Repaint
 ---
 
@@ -30,7 +30,7 @@ parts that have their own entry.
 
 ## Existing code
 
-Today there is no `Ui`. The pieces it builds on: `RawInput` and `FrameOutput` (`crates/lune-ui-core/src/input.rs:16-27,155-164`);
+`Ui` is `crates/lune-ui-core/src/ui.rs:114`, its parts in `src/ui/` (`id`, `store`, `pointer`, `keys`, `focus`, `animate`, `overlay`, `access`, `response`). The pieces it builds on (line numbers as of the M4 plan, before the move): `RawInput` and `FrameOutput` (`crates/lune-ui-core/src/input.rs:16-27,155-164`);
 `LayerId` draw order (`crates/lune-ui-core/src/scene.rs:16-22`); the painter's flat `hits: Vec<(Rect, H)>`, the
 app-supplied `hover: Option<H>`, `hit` and `hovered` (`crates/lune-ui-core/src/paint.rs:116-118,315-326`);
 the modal idiom of a window-sized blocking hit (`crates/lune-ui-core/src/widgets/dialog.rs:46-48,69`) and the
@@ -142,11 +142,13 @@ n/a — no drawing of its own; the frame builds on the existing painter [core.pa
 - `Repaint`: `Idle` on a settled frame with no state-changing input; `Now` while a transition is in flight and for one catch-up frame after state-changing input or a stale hover ([D81]: a dropdown's pick frame, a modal opening under a still pointer); `At(t)` equals the earliest deadline after now, and a request already due never hides a later one [motion].
 - Determinism and isolation: the same `RawInput` script gives byte-identical `Scene` and `FrameOutput`; two windows' stores never share an id; no clock or environment read (boundary script rule 4 stays green) [R crates/lune-ui-core/src/input.rs:5-6].
 - The moved widgets keep drawing at zero pixel delta (`controls`, `menu`, `dropdown`, `dialog-*`) when called through the old `Painter<H>` API [R apps/gallery/src/scenes.rs:96,103].
+- Tests, bullet by bullet (`crates/lune-ui-core/tests/`). Retention: `ui_core.rs::a_hidden_tab_under_keep_alive_keeps_its_state_until_the_scope_ends` (600 undrawn frames; a stand-in scroll offset and undo history, the store being the thing under test), `ui_overlays.rs::an_overlay_the_app_stops_calling_keeps_drawing_until_its_close_ends` (180, 120, 0 ms, then `Idle`), `ui_core.rs::a_selection_survives_frames_where_the_selected_row_is_not_drawn`, `ui_core.rs::an_unused_transient_id_is_gone_after_one_frame`. Input: `ui_overlays.rs::a_click_on_a_page_button_under_an_open_modal_does_nothing`, `ui_overlays.rs::escape_closes_only_the_top_overlay`, `ui_focus.rs::tab_inside_a_modal_never_leaves_it`, `ui_focus.rs::closing_restores_the_previous_focus`. `Response`: `ui_core.rs::a_click_needs_press_and_release_on_the_same_id`, `a_release_outside_the_rect_is_no_click`, `double_click_is_strictly_under_400_ms`, `a_drag_starts_at_4_px_with_the_full_travel`, `a_capture_outside_the_rect_keeps_pressed_and_blocks_other_hover`. Layers: `ui_core.rs::a_later_hit_in_the_same_layer_wins`, `popup_over_page_wins_at_the_same_point`, `all_five_layers_are_ordered_pairwise`. `Repaint`: `ui_core.rs::repaint_follows_the_animation`, `repaint_at_the_earliest_future_request` (a due request never hides a later one), `ui_overlays.rs::a_modal_opening_under_a_still_pointer_asks_for_the_frame_with_the_right_hover` (D81). Determinism and isolation: `ui_core.rs::a_script_run_in_two_fresh_stores_gives_identical_frames`, `the_same_keys_in_two_stores_keep_independent_state`; the clock and environment rule is `scripts/check-boundaries.sh`. Transitions: the model's rows are realised in the widgets and proved there (`widget_button.rs::every_motion_row_conforms_under_every_tier` for hover and press; `widget_dialog.rs::close_hides_at_180_120_and_0_ms` for the exit); the frame's own animation is `ui_core.rs::a_colour_animates_and_settles_exactly` and `off_tier_snaps_and_a_tier_change_snaps_in_flight_values`.
 
 ### Build
 
 - Milestone: M4.
 - Depends on: core.input, core.painter, core.scene, core.theme, text.shaping, motion.transitions.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/ui_core.rs::a_hidden_tab_under_keep_alive_keeps_its_state_until_the_scope_ends, crates/lune-ui-core/tests/ui_core.rs::a_click_needs_press_and_release_on_the_same_id, crates/lune-ui-core/tests/ui_core.rs::a_drag_starts_at_4_px_with_the_full_travel, crates/lune-ui-core/tests/ui_core.rs::popup_over_page_wins_at_the_same_point, crates/lune-ui-core/tests/ui_core.rs::repaint_at_the_earliest_future_request, crates/lune-ui-core/tests/ui_core.rs::a_script_run_in_two_fresh_stores_gives_identical_frames, crates/lune-ui-core/tests/ui_overlays.rs::an_overlay_the_app_stops_calling_keeps_drawing_until_its_close_ends, crates/lune-ui-core/tests/ui_overlays.rs::a_click_on_a_page_button_under_an_open_modal_does_nothing, crates/lune-ui-core/tests/ui_overlays.rs::escape_closes_only_the_top_overlay, crates/lune-ui-core/tests/ui_focus.rs::tab_inside_a_modal_never_leaves_it, crates/lune-ui-core/tests/ui_focus.rs::closing_restores_the_previous_focus`; page `ui`; unverified here: none.
 
 ## Open questions
 

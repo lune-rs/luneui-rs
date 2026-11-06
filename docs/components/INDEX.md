@@ -12,8 +12,8 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | in-luneterm | 0 |
 | planned | 0 |
 | stub | 0 |
-| in-progress | 92 |
-| done | 1 |
+| in-progress | 91 |
+| done | 2 |
 | external | 4 |
 | **total** | **97** |
 
@@ -32,7 +32,7 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | [core.tab-outline](core/tab-outline.md) | Tab outline geometry | in-progress | luneterm | Tab-chrome outline loop geometry |
 | [core.testing](core/testing.md) | Seam fakes and contract suites | in-progress | any | Public testing module: RecordingRenderer, FakeText, ScriptedInput, NullMaterial and the contract suites |
 | [core.theme](core/theme.md) | Theme tokens and Lunegit dark preset | in-progress | luneterm | Theme token struct and the lunegit_dark preset with the WINDOW, PANEL and CARD glass layers |
-| [core.ui](core/ui.md) | Ui frame context | in-progress | any | Immediate-mode Ui frame: ids, transient and persistent retained state, Response, layers and modality, Repaint |
+| [core.ui](core/ui.md) | Ui frame context | done | any | Immediate-mode Ui frame: ids, transient and persistent retained state, Response, layers and modality, Repaint |
 
 ## render
 
