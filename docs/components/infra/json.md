@@ -2,9 +2,9 @@
 id: infra.json
 title: Bounded JSON reader
 area: infra
-status: planned
+status: in-progress
 consumers: any
-source: —
+source: crates/lune-ui-core/src/json.rs
 owner: —
 summary: Small JSON reader in core with input, depth and string limits, fail-closed errors and no panics; backs theme and locale loading
 ---
@@ -26,7 +26,7 @@ Lunegit reads the same two kinds of file with `System.Text.Json` and sets no lim
 
 ## Existing code
 
-None in luneui-rs. Lunegit's loaders: `src/Lunegit.Infrastructure/Theming/JsonThemeRegistry.cs:75-76,138-139` and
+`crates/lune-ui-core/src/json.rs` (M10 step 1), tests `crates/lune-ui-core/tests/json.rs` and `apps/gallery/tests/lunegit_files.rs`. Lunegit's loaders: `src/Lunegit.Infrastructure/Theming/JsonThemeRegistry.cs:75-76,138-139` and
 `src/Lunegit.Infrastructure/Localization/JsonLanguageRegistry.cs:78-79,144-145`, `LocalizationService.cs:104-130` (the embedded English file).
 
 ## Spec
@@ -115,9 +115,11 @@ n/a — the reader draws nothing; it is exercised through the theme loader, whic
 
 ## Open questions
 
-- The limit values above are proposals derived from today's files; M10's security review confirms or changes them, and they stay constants in one place.
-- Whether numbers beyond `f64` exactness (integers above 2^53) are an error or an inexact value: the real files carry only small integers (`version`) and opacities.
-- Whether a byte-order mark is skipped or refused: none of the real files has one; skipping matches `File.ReadAllText`, which detects it.
+None open. Answered in M10 step 1 (D204):
+
+- The limit values stay as proposed, in one place (`json::MAX_*`), plus `MAX_VALUES` 65,536 for the whole tree. M10's security review still confirms them.
+- An integer above 2^53 is an inexact value: `Number::is_exact_int` is false and `Value::as_int` refuses it; `as_f64` still answers.
+- A leading byte-order mark is skipped, and still counts in offsets and in the size limit.
 
 ## Notes for the planner
 

@@ -21,6 +21,7 @@
 //! - `text_edit` (the pure editing engine: caret, selection, undo, clipboard commands, preedit);
 //! - `input` (the input seam: `RawInput` in, `FrameOutput` out, plain data), `layout` (pure stack,
 //!   row, column and grid helpers);
+//! - `json` (the bounded JSON reader behind theme and locale files);
 //! - `shortcuts` (the scoped key-chord registry the frame resolves in two phases);
 //! - `drag` (in-window drag and drop: the pure reorder and free machines and their `Ui` glue);
 //! - `ui` (the per-window frame: ids, retained state, layered hits, overlays, focus, semantic
@@ -47,6 +48,7 @@ pub mod drag;
 pub mod icon;
 pub mod image;
 pub mod input;
+pub mod json;
 pub mod layout;
 pub mod motion;
 pub mod paint;
