@@ -88,6 +88,7 @@ None. The banner text, the empty view's title and subtitle and the action labels
 
 - `banner-shown`: banner with the spinner, 300 ms in (the spinner runs: moving).
 - `banner-empty-state`: empty-repository view with two actions, settled.
+- `banner-empty-state-disabled`: the empty view disabled (0.4 opacity) with the pointer on the first action: no hover fill, settled.
 - `banner-empty-state-action-mid`: action pressed, t = 90 ms (half of `fast`).
 - `banner-empty-state-hover-mid`: action rest → hover, t = 60 ms (half of `instant`).
 

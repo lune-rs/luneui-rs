@@ -30,6 +30,16 @@ fn state(field: bool, link: bool) -> Box<dyn PageState> {
     Box::new(Live {
         field: field.then_some(Some(4)),
         link: link.then_some(Some(8)),
+        disabled: false,
+    })
+}
+
+/// Both triggers, disabled.
+fn disabled() -> Box<dyn PageState> {
+    Box::new(Live {
+        field: Some(Some(4)),
+        link: Some(Some(8)),
+        disabled: true,
     })
 }
 
@@ -57,6 +67,7 @@ const LINK: Rect = Rect::new(X + LABEL_W, Y + 76.0, 160.0, 24.0);
 struct Live {
     field: Option<Option<usize>>,
     link: Option<Option<usize>>,
+    disabled: bool,
 }
 
 impl PageState for Live {
@@ -71,7 +82,9 @@ impl PageState for Live {
                 placeholder: "Find a tree",
                 name: "Tree",
             };
-            ui.search_picker("field", FIELD, &ITEMS, selected, &opts);
+            ui.with_enabled(!self.disabled, |ui| {
+                ui.search_picker("field", FIELD, &ITEMS, selected, &opts)
+            });
         }
         if let Some(selected) = &mut self.link {
             caption(ui, "Link", X, LINK.y + 5.0);
@@ -81,7 +94,9 @@ impl PageState for Live {
                 placeholder: "Find a tree",
                 name: "Other tree",
             };
-            ui.search_picker("link", LINK, &ITEMS, selected, &opts);
+            ui.with_enabled(!self.disabled, |ui| {
+                ui.search_picker("link", LINK, &ITEMS, selected, &opts)
+            });
         }
     }
 }
@@ -106,6 +121,42 @@ const fn scene(
 const SCENES: &[UiScene] = &[
     scene("search-picker-field", field_only, &[], 0),
     scene("search-picker-link", link_only, &[], 0),
+    // Tab reaches the trigger and its ring settles: the field's edge ring, then the link's button
+    // ring (D124).
+    scene(
+        "search-picker-focus-field",
+        field_only,
+        &[Step {
+            at_ms: 0,
+            events: &[Ev::Tab],
+        }],
+        400,
+    ),
+    scene(
+        "search-picker-focus-link",
+        link_only,
+        &[Step {
+            at_ms: 0,
+            events: &[Ev::Tab],
+        }],
+        400,
+    ),
+    // Both disabled (0.4 opacity) with the pointer on the link: no hover, no popup on a click.
+    scene(
+        "search-picker-disabled",
+        disabled,
+        &[
+            Step {
+                at_ms: 0,
+                events: &[Ev::PointerOver(&["link"])],
+            },
+            Step {
+                at_ms: 50,
+                events: &[Ev::Click],
+            },
+        ],
+        400,
+    ),
     // A click opens the link's popup (`fast`, 180 ms) and typing narrows the list; the pointer
     // stays on the trigger, under no row.
     scene(

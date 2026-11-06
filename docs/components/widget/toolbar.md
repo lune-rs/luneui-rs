@@ -87,6 +87,7 @@ None. The tooltips and labels are the app's commands: `Ui::toolbar_action` and `
 
 - `toolbar-actions`: three action buttons and the branch label button, rest and hover on the second, its tooltip shown; settled.
 - `toolbar-inactive`: the window inactive, fallback background shown; settled.
+- `toolbar-disabled`: the push action disabled (0.4 opacity, transparent) with the pointer on it: no hover fill, the tooltip still shown (a disabled anchor keeps it); settled.
 - `toolbar-action-mid`: press on the first action, t = 90 ms (half of `fast`).
 - `toolbar-hover-mid`: second action rest → hover, t = 60 ms (half of `instant`).
 

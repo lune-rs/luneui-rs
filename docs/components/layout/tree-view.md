@@ -118,6 +118,7 @@ None: row names and costs are app text.
 - `tree-view-expanded` (new): one folder expanded, settled.
 - `tree-view-expand-mid` (new): expand at t = 125 ms (half of base, 250 ms) [L src/Lunegit.Desktop/App.axaml:153].
 - `tree-view-selected` (new): one row selected, settled.
+- `tree-view-disabled` (new): the tree in a disabled scope (0.4 opacity), a row selected, the pointer on a row, Tab and Down pressed: no hover fill, no ring, settled.
 - `tree-view-focus` (new): the ring on the cursor's row, settled.
 
 ### Painter primitives

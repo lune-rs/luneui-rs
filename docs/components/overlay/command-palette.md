@@ -107,6 +107,7 @@ The gallery's data is neutral (files and commands), not git words.
 - `command-palette-selected`: one Down moves the selection to the second row, settled.
 - `command-palette-destructive`: the pointer on the destructive row, its tooltip above the card, settled.
 - `command-palette-date-error`: the error line and no rows, settled.
+- `command-palette-disabled`: the palette in a disabled scope with the pointer on the destructive row and Enter pressed: no dialog opens and no row activates (the overlay layer is not dimmed by the scope; the tooltip still shows), settled.
 - `command-palette-opening`: half way through the open (125 ms).
 
 ### Painter primitives

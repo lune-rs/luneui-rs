@@ -95,6 +95,9 @@ None: placeholder and item text are owner data (`SearchPlaceholder`, `DisplayMem
 
 - `search-picker-field`: field trigger with a value, settled.
 - `search-picker-link`: link trigger with a value, settled.
+- `search-picker-focus-field`: Tab on the field trigger: the `RingKind::Edge` ring at the trigger's radius, settled.
+- `search-picker-focus-link`: Tab on the link trigger: the `RingKind::Button` ring, settled.
+- `search-picker-disabled`: both triggers disabled (0.4 opacity) with the pointer on the link and a click: no hover, no popup, settled.
 - `search-picker-open`: link trigger with the popup open, search text, filtered list; settled.
 
 ### Painter primitives

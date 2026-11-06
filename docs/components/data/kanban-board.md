@@ -119,6 +119,7 @@ Every way a card's position could jump is one path: an accepted drop, a refused 
 - `kanban-board-focus` (new): the cards' stop with its ring, settled.
 - `kanban-board-inactive` (new): the fallback fill, settled.
 - `kanban-board-empty` (new): three empty columns with their hints, settled.
+- `kanban-board-disabled` (new): the board at 0.4 opacity after a drag attempt from the first card to the second column and a Tab: no ghost, no landing slot, no ring, the cards where they were, settled.
 - `kanban-board-settle-mid` (new): a card landing half way, in motion.
 
 ### Painter primitives

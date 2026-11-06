@@ -217,7 +217,7 @@ and 4 `external`. Ids no entry cites are met by a script, a rule or a manifest, 
   re-baselined with its reason. The baseline form is decided: dumps are regenerated from
   `git archive <base>`, not committed (D11).
   Since M2 the gate is `scripts/pixel-gate.sh` over the gallery's own scenes (every name `gallery --list`
-  prints, 421 at M11's close), the 18 spike scenes having served M1 only.
+  prints, 431 at M11's close), the 18 spike scenes having served M1 only.
 - R-ext-3 [new] Luneterm switches from its in-tree `lune-ui` to this repo's. How it depends on it
   before a remote exists is a vendored snapshot (D13); a git dependency follows once a remote exists.
   Met by `scripts/export-snapshot.sh` (D239) and `docs/consuming.md`, which also holds the migration

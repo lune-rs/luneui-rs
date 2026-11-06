@@ -165,6 +165,8 @@ struct Live {
     notice: Option<&'static str>,
     /// The live state's toggle shows.
     toggle: bool,
+    /// Draw the first view inside `with_enabled(false, ..)`.
+    disabled: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -185,6 +187,7 @@ fn state(doc: CodeDoc) -> Live {
         bands: Vec::new(),
         notice: None,
         toggle: false,
+        disabled: false,
     }
 }
 
@@ -210,6 +213,15 @@ fn highlighted() -> Box<dyn PageState> {
 fn editable() -> Box<dyn PageState> {
     Box::new(Live {
         read_only: false,
+        ..state(code(40))
+    })
+}
+
+/// The editable view, disabled.
+fn disabled() -> Box<dyn PageState> {
+    Box::new(Live {
+        read_only: false,
+        disabled: true,
         ..state(code(40))
     })
 }
@@ -360,7 +372,10 @@ impl Live {
             identity: Some(1),
             ..CodeOptions::default()
         };
-        ui.code_editor("code", RECT, &mut self.docs[0], &opts);
+        let doc = &mut self.docs[0];
+        ui.with_enabled(!self.disabled, |ui| {
+            ui.code_editor("code", RECT, doc, &opts)
+        });
     }
 
     fn synced(&mut self, ui: &mut Ui<'_>) {
@@ -465,6 +480,16 @@ const SCENES: &[UiScene] = &[
         &[
             key(0, &[Ev::PointerAt(line(3, 8).0, line(3, 8).1), Ev::Click]),
             key(100, &[AWAY]),
+        ],
+        600,
+    ),
+    // The view is disabled: a click on line 3 and typing set no caret and change nothing.
+    scene(
+        "code-editor-view-disabled",
+        disabled,
+        &[
+            key(0, &[Ev::PointerAt(line(3, 8).0, line(3, 8).1), Ev::Click]),
+            key(100, &[Ev::Type("x"), AWAY]),
         ],
         600,
     ),

@@ -105,6 +105,8 @@ struct Board {
     error: bool,
     active: bool,
     added: u64,
+    /// Draw the board inside `with_enabled(false, ..)`.
+    disabled: bool,
 }
 
 fn board(columns: Vec<Col>, error: bool, active: bool) -> Box<dyn PageState> {
@@ -113,6 +115,17 @@ fn board(columns: Vec<Col>, error: bool, active: bool) -> Box<dyn PageState> {
         error,
         active,
         added: 100,
+        disabled: false,
+    })
+}
+
+fn disabled() -> Box<dyn PageState> {
+    Box::new(Board {
+        columns: model(),
+        error: false,
+        active: true,
+        added: 100,
+        disabled: true,
     })
 }
 
@@ -191,7 +204,7 @@ impl PageState for Board {
             under: CARD.premultiplied(),
             name: "",
         };
-        let r = ui.kanban_board("board", rect, &opts);
+        let r = ui.with_enabled(!self.disabled, |ui| ui.kanban_board("board", rect, &opts));
         if let Some(m) = r.moved {
             self.apply(m);
         }
@@ -288,6 +301,27 @@ const SCENES: &[UiScene] = &[
             events: &[Ev::Tab, Ev::Tab, Ev::Tab, Ev::Tab],
         }],
         capture_ms: 400,
+        expect: Expect::Settled,
+    },
+    // The board is disabled (0.4 opacity): a drag from the first card to the second column and
+    // the release move nothing, no ghost or landing slot shows, and Tab finds no stop.
+    UiScene {
+        id: "kanban-board-disabled",
+        scale: 2.0,
+        tier: MotionTier::Full,
+        state: disabled,
+        script: &[
+            DROP[0],
+            DROP[1],
+            DROP[2],
+            DROP[3],
+            DROP[4],
+            Step {
+                at_ms: 500,
+                events: &[Ev::Tab],
+            },
+        ],
+        capture_ms: 900,
         expect: Expect::Settled,
     },
     UiScene {
@@ -436,6 +470,7 @@ mod tests {
             error: false,
             active: true,
             added: 100,
+            disabled: false,
         };
         let order = |b: &Board, c: usize| -> Vec<u64> {
             b.columns[c].cards.iter().map(|k| k.key).collect()

@@ -99,6 +99,7 @@ Never animated: the section content swap (no motion in the view, [L src/Lunegit.
 - `settings-page-restart` (new): the banner revealed at the bottom, settled.
 - `settings-page-restart-mid` (new): the banner 125 ms into its reveal (half of base, 250 ms) [L src/Lunegit.Desktop/App.axaml:153].
 - `settings-page-inactive` (new): the page with the window inactive (solid fallback, same corner), settled.
+- `settings-page-disabled` (new): the first row in `with_enabled(false, ..)` (0.4 opacity), the pointer and a click on its toggle: no hover fill, the toggle unchanged, no restart banner, settled.
 
 ### Painter primitives
 

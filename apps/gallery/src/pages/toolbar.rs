@@ -38,6 +38,14 @@ fn inactive() -> Box<dyn PageState> {
     })
 }
 
+/// The push action disabled.
+fn push_disabled() -> Box<dyn PageState> {
+    Box::new(Live {
+        active: true,
+        push_enabled: false,
+    })
+}
+
 /// The actions: key, glyph, and the name that is also the tooltip.
 const ACTIONS: [(&str, &str, &str); 3] = [
     ("fetch", icon::SYNC, "Fetch"),
@@ -102,6 +110,7 @@ impl PageState for Live {
 
 const FETCH: &[&str] = &["bar", "fetch"];
 const PULL: &[&str] = &["bar", "pull"];
+const PUSH: &[&str] = &["bar", "push"];
 
 const SCENES: &[UiScene] = &[
     // The pointer rests on the second action: its hover fill has settled and its tooltip has
@@ -132,6 +141,26 @@ const SCENES: &[UiScene] = &[
         state: inactive,
         script: &[],
         capture_ms: 0,
+        expect: Expect::Settled,
+    },
+    // The push action is disabled (0.4 opacity, transparent) and the pointer rests on it: no hover
+    // fill; its tooltip still shows (a disabled anchor keeps it, `overlay.tooltip`); settled.
+    UiScene {
+        id: "toolbar-disabled",
+        scale: 2.0,
+        tier: MotionTier::Full,
+        state: push_disabled,
+        script: &[
+            Step {
+                at_ms: 0,
+                events: &[Ev::PointerOver(PUSH)],
+            },
+            Step {
+                at_ms: 800,
+                events: &[],
+            },
+        ],
+        capture_ms: 1200,
         expect: Expect::Settled,
     },
     // Press is `fast` (180 ms): half way at 90 ms.

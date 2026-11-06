@@ -661,4 +661,36 @@ mod tests {
         assert_eq!(clicks.get(), 2);
         assert_eq!(path_id("p", &["a"]), WidgetId::ROOT.with("p").with("a"));
     }
+    /// The `*-disabled` scenes of the D47 pass (M11 review round 1): each draws a scope in
+    /// `with_enabled(false, ..)`, so a node is `Disabled`, and its pointer, click, Tab or key
+    /// script leaves no widget focused.
+    #[test]
+    fn the_disabled_scenes_hold_a_disabled_node_and_no_focus() {
+        use lune_ui::access::State;
+        const SCENES: [(&str, &str); 8] = [
+            ("toolbar", "toolbar-disabled"),
+            ("search-picker", "search-picker-disabled"),
+            ("banner", "banner-empty-state-disabled"),
+            ("tree-view", "tree-view-disabled"),
+            ("settings-page", "settings-page-disabled"),
+            ("kanban-board", "kanban-board-disabled"),
+            ("command-palette", "command-palette-disabled"),
+            ("code-editor-view", "code-editor-view-disabled"),
+        ];
+        for (page, id) in SCENES {
+            let PageKind::Ui(ui) = PAGES.iter().find(|p| p.id == page).expect("a page").kind else {
+                panic!("{page} is a Ui page");
+            };
+            let scene = ui.scenes.iter().find(|s| s.id == id).expect("a scene");
+            let (_, out) = run_scene(page, scene, &mut FakeText).expect("runs");
+            assert!(
+                out.tree
+                    .nodes
+                    .iter()
+                    .any(|n| n.states.contains(State::Disabled)),
+                "{id}: a Disabled node"
+            );
+            assert!(out.focused.is_none(), "{id}: nothing focused");
+        }
+    }
 }
