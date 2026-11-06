@@ -1,7 +1,7 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-06 (M10 built, steps 1 to 11 and review round 2 done on `orch/toolkit-v1`, awaiting the final gate and the merge; M9 is merged at 8f499d0)
+Last updated: 2026-11-07 (M10 merged to main at 55cfaaf; M11 next)
 
 ## Now
 
@@ -22,7 +22,10 @@ next. What it added:
 - Step 11: `c4::m10`, the theme reach audit (below), the catalogue and architecture notes, and the checks.
 - Review rounds 2 and 3 fixed (D228 to D233): the tray's reopen guard is per surface and the focus watch follows the window (F1, F4); tray placement is in logical pixels (F2); a theme swap drops closing overlays (F3); a password field is `Role::PasswordInput` (S1); a text field and text area refuse an insert over 1 MiB (S2, S3, D232, D233).
 
-Counts at the tip: gallery 73 pages, 413 scene names in `--list`; `cargo test --workspace -- --list` names 2,520 tests.
+Final gate at b8faaf1: fmt, clippy both ways, `cargo test --workspace` 0 failed, boundaries, component index, GPU tests, `--list` 413, pixel gate against 8f499d0 389 identical and 24 new, nothing allowed, Windows and Linux (Docker), smoke exit 0.
+Bench: not repeated at the tip, waived by the user. The last full run, at 295aadc, read 15 pages OVER at load 10 to 36 with a self-test spread of +17.01/+45.46, on the drawing code that read 0 over in step 11. Load is the likely cause, not proved: `flyout` (5 of 5 runs, p99 49.35) and `code-editor-view` (4 of 5, p99 36.15) were the worst and stay unexplained.
+
+Counts at the tip: gallery 73 pages, 413 scene names in `--list`; `cargo test --workspace -- --list` names 2,522 tests.
 Release size (macOS, `cargo build --release -p gallery`, strip, fat LTO): 9,448,688 bytes at the M9 merge (8f499d0), 9,869,408 at this tip, +420,720 (+4.45%);
 the AccessKit bridge is +237,728 of that (D216), the tray stack about +150,000 (a scratch estimate at step 8), `arboard` the rest.
 Checked here at the tip (not the final gate, which is the orchestrator's): `gallery --smoke-platform` exit 0 (a real tray item, its rect, a synthetic click, the surface in its window, 25 frames in the
@@ -199,9 +202,8 @@ frame 19.01 ms (`radio-group`).
 
 ## Next
 
-1. M10 review, the final gate (including the AccessKit-off line and `scripts/check-targets.sh`) and the merge.
-2. CI (fmt, clippy `-D warnings`, tests on macOS, Windows and Linux) now that there is code to run.
-3. M11: the done-standard pass on every entry, the export script for Luneterm's vendored snapshot (it must leave out `apps/gallery/assets/lunegit/`, D206), and the migration
+1. CI (fmt, clippy `-D warnings`, tests on macOS, Windows and Linux) now that there is code to run.
+2. M11: the done-standard pass on every entry, the export script for Luneterm's vendored snapshot (it must leave out `apps/gallery/assets/lunegit/`, D206), and the migration
    map, which is "API changes since M1" in `docs/architecture.md`. The release size for its report: the figures above.
 
 ## Blockers / open questions
