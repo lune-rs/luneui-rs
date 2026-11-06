@@ -2376,7 +2376,7 @@ fn a_walk_of_scrolls_and_new_identities_opens_every_document_at_the_top_of_every
 }
 
 #[test]
-fn the_code_editor_sets_no_insert_limit_so_it_takes_more_than_the_one_line_cap() {
+fn the_code_editor_sets_no_insert_limit_so_it_takes_more_than_the_shaped_limit() {
     use lune_ui_core::text_edit::MAX_SHAPED_INSERT;
     // It draws only the lines in view, so the adapter's cap is its bound. Lines of 49 bytes: just
     // over the shaped widgets' limit goes in by set-value and by paste.

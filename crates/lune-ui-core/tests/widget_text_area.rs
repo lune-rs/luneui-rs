@@ -477,7 +477,7 @@ fn the_ime_area_in_a_scrolled_area_is_on_screen() {
 }
 
 #[test]
-fn an_insert_over_the_cap_is_refused_whole_by_paste_and_by_set_value() {
+fn an_insert_over_the_cap_is_refused_whole_by_set_value_and_by_paste() {
     use lune_ui_core::text_edit::MAX_SHAPED_INSERT;
     // The area builds one spec of all its text, as the field does (the round 3 measures are in
     // D233), so it takes the same 1 MiB: the cap itself goes in, one byte more is refused whole.

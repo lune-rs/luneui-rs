@@ -638,8 +638,8 @@ fn run_events(
 }
 
 /// Replaces the text with an assistive technology's `value`, under the rules a paste follows. The
-/// history goes, even for an equal text, and the caret lands at the end. `false` when a one-line
-/// field refused an oversize value and changed nothing.
+/// history goes, even for an equal text, and the caret lands at the end. `false` when the widget's
+/// insert limit refused the value and nothing changed.
 pub(super) fn set_value(
     ui: &mut Ui<'_>,
     cfg: &EditConfig,

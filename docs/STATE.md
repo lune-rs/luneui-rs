@@ -20,7 +20,7 @@ next. What it added:
 - Gallery: pages `theme`, `tray` and `file-drop` (24 new scenes), the live tray (`popover.rs`) and `gallery --smoke-platform` (D225).
 - Step 10: the director accepted the tray icon and the two window surfaces in round 1 (D226, D227).
 - Step 11: `c4::m10`, the theme reach audit (below), the catalogue and architecture notes, and the checks.
-- Review round 2 fixed (D228 to D232): the tray's reopen guard is per surface and the focus watch follows the window (F1, F4); tray placement is in logical pixels (F2); a theme swap drops closing overlays (F3); a password field is `Role::PasswordInput` (S1); a text field and text area refuse an insert over 1 MiB (S2, S3, D232, D233).
+- Review rounds 2 and 3 fixed (D228 to D233): the tray's reopen guard is per surface and the focus watch follows the window (F1, F4); tray placement is in logical pixels (F2); a theme swap drops closing overlays (F3); a password field is `Role::PasswordInput` (S1); a text field and text area refuse an insert over 1 MiB (S2, S3, D232, D233).
 
 Counts at the tip: gallery 73 pages, 413 scene names in `--list`; `cargo test --workspace -- --list` names 2,520 tests.
 Release size (macOS, `cargo build --release -p gallery`, strip, fat LTO): 9,448,688 bytes at the M9 merge (8f499d0), 9,869,408 at this tip, +420,720 (+4.45%);

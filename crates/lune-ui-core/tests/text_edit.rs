@@ -807,13 +807,17 @@ fn shaped(multiline: bool) -> EditFlags {
 
 #[test]
 fn an_editor_that_shapes_its_text_refuses_an_insert_over_the_cap_whole() {
-    // A paste and an assistive set-value both come in as `PasteText`; typing and an input method's
-    // commit as `Insert`. Past 1 MiB a widget that shapes all its text would shape the lot every
+    // A paste and an assistive set-value both come in as `PasteText`, typing as `Insert` and an
+    // input method's commit as `ImeCommit`; all three end in the same `insert`. Past 1 MiB a widget that shapes all its text would shape the lot every
     // frame, one line or many.
     let at_cap = "a".repeat(MAX_SHAPED_INSERT);
     let over = "a".repeat(MAX_SHAPED_INSERT + 1);
     for multiline in [false, true] {
-        for make in [EditCommand::PasteText, EditCommand::Insert] {
+        for make in [
+            EditCommand::PasteText,
+            EditCommand::Insert,
+            EditCommand::ImeCommit,
+        ] {
             let mut ed = Ed::with_flags("ab", shaped(multiline));
             ed.edit.set_selection(1, 1);
             ed.sync();
