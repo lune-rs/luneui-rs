@@ -8,7 +8,10 @@
 //! - `--dump <dir>`: renders every scene offscreen on a headless GPU device (no event loop, no
 //!   window) and writes `<id>@<scale>x.png` files, the frames the pixel gate compares;
 //! - `--list`: prints the scene names, legacy pages first;
-//! - `--bench [--runs N] [--frames N] [--size WxH]`: times frames offscreen (see `bench`).
+//! - `--bench [--runs N] [--frames N] [--size WxH]`: times frames offscreen (see `bench`);
+//! - `--smoke-platform`: puts an item in the tray, opens and closes its surface and tears down,
+//!   in about two seconds (see `smoke`). It needs a logged-in GUI session: exit 0 when it ran
+//!   and held, 1 when a check failed, 2 when there is no session to run in.
 //!
 //! Dump mode reads no clock and no environment: time comes from the scene tables and scripts,
 //! pixels from the offscreen target's readback (no screen or window capture).
@@ -17,7 +20,9 @@ mod bench;
 mod custom;
 mod page;
 mod pages;
+mod popover;
 mod scenes;
+mod smoke;
 mod window;
 
 use std::path::{Path, PathBuf};
@@ -32,20 +37,21 @@ use page::{PageKind, meets_expectation, register_images, release_images, run_sce
 use pages::PAGES;
 use scenes::{BLUR_SATURATION, BLUR_SIGMA, H, W};
 
-const USAGE: &str =
-    "usage: gallery [--dump <dir> | --list | --bench [--runs N] [--frames N] [--size WxH]]";
+const USAGE: &str = "usage: gallery [--dump <dir> | --list | --bench [--runs N] [--frames N] [--size WxH] | --smoke-platform]\n  --smoke-platform needs a logged-in GUI session (it puts an item in the tray for about 2 s); exit 2 without one";
 
 enum Command {
     Window,
     Dump(PathBuf),
     List,
     Bench(bench::Options),
+    SmokePlatform,
 }
 
 fn parse(args: &[String]) -> Result<Command, String> {
     match args {
         [] => Ok(Command::Window),
         [a] if a == "--list" => Ok(Command::List),
+        [a] if a == "--smoke-platform" => Ok(Command::SmokePlatform),
         [a, dir] if a == "--dump" => Ok(Command::Dump(PathBuf::from(dir))),
         [a, rest @ ..] if a == "--bench" => bench::Options::parse(rest).map(Command::Bench),
         _ => Err(USAGE.to_owned()),
@@ -84,6 +90,7 @@ fn main() -> ExitCode {
             }
         },
         Command::Bench(opts) => bench::run(&opts),
+        Command::SmokePlatform => smoke::run(),
         Command::Window => window::run(),
     }
 }

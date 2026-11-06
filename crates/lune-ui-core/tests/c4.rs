@@ -86,69 +86,71 @@ type Frame = (Scene, FrameOutput);
 
 /// One frame of the page every test uses: a button, a toggle, a checkbox, a label, a stepper, a
 /// text field, a combo and, while the app says so, a dropdown, a menu and a confirm dialog.
+fn page(ui: &mut Ui<'_>, app: &mut App) {
+    ui.painter().on(LayerId::Page);
+    let r = ui.button("page-button", PAGE_BTN, "Page", ButtonKind::Secondary);
+    app.page_clicks += u32::from(r.clicked);
+    app.page_hovered = r.hovered;
+    ui.toggle("toggle", TOGGLE, &mut app.toggle, "Notifications");
+    let c = ui.checkbox("check", CHECK, &mut app.check, "Remember");
+    app.check_changed += u32::from(c.changed);
+    ui.label("label", (20.0, 150.0), "Hello", LabelRole::Base);
+    let s = ui.stepper("stepper", STEPPER, app.value, RANGE, "Amount");
+    if let Some(step) = s.step {
+        app.value = app.value.saturating_add_signed(step);
+    }
+    ui.text_field(
+        "field",
+        FIELD,
+        &mut app.text,
+        "Search",
+        FieldState::default(),
+    );
+    ui.combo("combo", COMBO, OPTIONS[0].0, &mut app.combo_open, "Font");
+    if app.combo_open {
+        let DropdownResponse { picked, dismissed } =
+            ui.dropdown("dropdown", COMBO, id("combo"), &OPTIONS, 0);
+        if picked.is_some() || dismissed {
+            app.combo_open = false;
+        }
+        app.dropdown_dismissed += u32::from(dismissed);
+    }
+    if app.menu_open {
+        let rows = [
+            MenuRow::Item {
+                glyph: None,
+                text: "New Window",
+                shortcut: "Cmd+N",
+            },
+            MenuRow::Item {
+                glyph: None,
+                text: "Copy",
+                shortcut: "",
+            },
+        ];
+        let MenuResponse { picked, dismissed } = ui.menu("menu", &rows, MENU_AT);
+        app.menu_picked.extend(picked);
+        app.menu_dismissed += u32::from(dismissed);
+    }
+    if app.dialog_open {
+        let d = Dialog {
+            title: "Discard changes",
+            message: "The document has unsaved changes.",
+            extra_h: 0.0,
+            confirm: "Discard",
+            cancel: Cancel::Default,
+        };
+        let DialogResponse {
+            confirmed,
+            cancelled,
+        } = ui.dialog("dialog", &d, &glass(), |_, _, _, _| {});
+        app.confirmed += u32::from(confirmed);
+        app.cancelled += u32::from(cancelled);
+    }
+}
+
 fn frame(h: &mut UiHarness, app: &mut App) -> Frame {
-    h.frame(|ui: &mut Ui<'_>| {
-        ui.painter().on(LayerId::Page);
-        let r = ui.button("page-button", PAGE_BTN, "Page", ButtonKind::Secondary);
-        app.page_clicks += u32::from(r.clicked);
-        app.page_hovered = r.hovered;
-        ui.toggle("toggle", TOGGLE, &mut app.toggle, "Notifications");
-        let c = ui.checkbox("check", CHECK, &mut app.check, "Remember");
-        app.check_changed += u32::from(c.changed);
-        ui.label("label", (20.0, 150.0), "Hello", LabelRole::Base);
-        let s = ui.stepper("stepper", STEPPER, app.value, RANGE, "Amount");
-        if let Some(step) = s.step {
-            app.value = app.value.saturating_add_signed(step);
-        }
-        ui.text_field(
-            "field",
-            FIELD,
-            &mut app.text,
-            "Search",
-            FieldState::default(),
-        );
-        ui.combo("combo", COMBO, OPTIONS[0].0, &mut app.combo_open, "Font");
-        if app.combo_open {
-            let DropdownResponse { picked, dismissed } =
-                ui.dropdown("dropdown", COMBO, id("combo"), &OPTIONS, 0);
-            if picked.is_some() || dismissed {
-                app.combo_open = false;
-            }
-            app.dropdown_dismissed += u32::from(dismissed);
-        }
-        if app.menu_open {
-            let rows = [
-                MenuRow::Item {
-                    glyph: None,
-                    text: "New Window",
-                    shortcut: "Cmd+N",
-                },
-                MenuRow::Item {
-                    glyph: None,
-                    text: "Copy",
-                    shortcut: "",
-                },
-            ];
-            let MenuResponse { picked, dismissed } = ui.menu("menu", &rows, MENU_AT);
-            app.menu_picked.extend(picked);
-            app.menu_dismissed += u32::from(dismissed);
-        }
-        if app.dialog_open {
-            let d = Dialog {
-                title: "Discard changes",
-                message: "The document has unsaved changes.",
-                extra_h: 0.0,
-                confirm: "Discard",
-                cancel: Cancel::Default,
-            };
-            let DialogResponse {
-                confirmed,
-                cancelled,
-            } = ui.dialog("dialog", &d, &glass(), |_, _, _, _| {});
-            app.confirmed += u32::from(confirmed);
-            app.cancelled += u32::from(cancelled);
-        }
-    })
+    h.frame(|ui: &mut Ui<'_>| page(ui, app))
 }
 
 /// Runs a frame at `ms` of app time.
@@ -3859,6 +3861,671 @@ mod nested_wheel {
                 ui.code_block("b", INNER, &text, &CodeBlockOptions::default());
             });
             assert_eq!(at, (page_x, 0.0), "a line of {width}: the sideways wheel");
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// M10: the theme reach audit. A loaded theme must reach every widget: draw the controls and a
+// spread of the M6 and M7 widgets under a theme whose every colour field is a value no preset
+// field has, and no fill, stroke or text may hold a preset colour. A hit is a colour a widget
+// hard-codes (or takes from the preset instead of `ui.theme()`).
+// ---------------------------------------------------------------------------------------------
+
+mod m10 {
+    use super::*;
+    use lune_ui_core::color::Rgba;
+    use lune_ui_core::icon;
+    use lune_ui_core::strings::DisplayFormat;
+    use lune_ui_core::testing::FakeText;
+    use lune_ui_core::text::{CaretPos, LineSpan, Spec, TextKey, TextSystem, Unit};
+    use lune_ui_core::theme::{DARK, Theme};
+    use lune_ui_core::ui::FrameConfig;
+    use lune_ui_core::widgets::button::{ButtonOptions, IconButton};
+    use lune_ui_core::widgets::filter_bar::FilterOptions;
+    use lune_ui_core::widgets::progress::ProgressOptions;
+    use lune_ui_core::widgets::radio_group::RadioOption;
+    use lune_ui_core::widgets::slider::SliderOptions;
+    use lune_ui_core::widgets::spinner::SpinnerOptions;
+    use lune_ui_core::widgets::tab_strip::{Tab, TabKey, TabStripOptions};
+    use lune_ui_core::widgets::toast::{ToastKind, ToastSpec, Toasts};
+    use lune_ui_core::widgets::tone::Tone;
+    use std::time::Duration;
+
+    type Rgb = [u8; 3];
+
+    /// Every colour field of a theme by name, in one list, the glass tints last. The destructuring
+    /// below does not compile when `Theme` gains a field this list does not name.
+    macro_rules! colour_fields {
+        ($($f:ident),+ $(,)?) => {
+            fn fields(t: &Theme) -> Vec<(&'static str, Rgba)> {
+                let mut v = vec![$((stringify!($f), t.$f)),+];
+                v.push(("glass.window.tint", t.glass.window.tint));
+                v.push(("glass.panel.tint", t.glass.panel.tint));
+                v.push(("glass.card.tint", t.glass.card.tint));
+                v
+            }
+
+            fn set_field(t: &mut Theme, i: usize, c: Rgba) {
+                let mut n = 0;
+                $( if i == n { t.$f = c; } n += 1; )+
+                if i == n { t.glass.window.tint = c; }
+                if i == n + 1 { t.glass.panel.tint = c; }
+                if i == n + 2 { t.glass.card.tint = c; }
+            }
+
+            #[allow(dead_code)]
+            fn every_field_is_named(t: Theme) {
+                let Theme {
+                    $($f: _,)+
+                    glass: _,
+                    font_s: _,
+                    font_base: _,
+                    font_m: _,
+                    font_title: _,
+                    line_title: _,
+                    item_radius: _,
+                    motion: _,
+                } = t;
+            }
+        };
+    }
+
+    colour_fields!(
+        fg_primary,
+        fg_secondary,
+        fg_tertiary,
+        surface_input,
+        surface_hover,
+        surface_selected,
+        border,
+        border_subtle,
+        accent,
+        accent_hover,
+        scroll_thumb,
+        scroll_thumb_hover,
+        text_selection,
+        on_accent,
+        on_accent_text,
+        dropdown_bg,
+        dialog_backdrop,
+        dialog_footer,
+        menu_text_primary,
+        menu_text_tertiary,
+        menu_text_quaternary,
+        menu_popup_border,
+        menu_item_hover,
+        menu_separator,
+        menu_glass,
+        menu_item_pressed,
+        menu_text_disabled,
+        toast_bg,
+        toast_border,
+        toast_info,
+        toast_success,
+        toast_warning,
+        toast_error,
+        toast_log_bg,
+        toast_log_fg,
+        dirty_indicator,
+        count_badge,
+        caption_close_hover,
+        caption_close_fg,
+        fg_muted,
+        fg_subtle,
+        fg_bright,
+        fg_quaternary,
+        fg_dim,
+        fg_faint,
+        surface_overlay,
+        surface_active,
+        surface_separator,
+        surface_divider,
+        ok,
+        warn,
+        err,
+        status_warning,
+        status_warning_light,
+        status_error_light,
+        status_error,
+        status_warning_dark,
+        data,
+        data_hi,
+        gold,
+        paused,
+        window_fallback,
+        link,
+        code_inline,
+        diff_added,
+        diff_removed,
+        diff_added_mark,
+        diff_removed_mark,
+    );
+
+    fn rgb(c: Rgba) -> Rgb {
+        [c[0], c[1], c[2]]
+    }
+
+    fn far(a: Rgb, b: Rgb) -> bool {
+        a.iter().zip(&b).any(|(x, y)| x.abs_diff(*y) > 3)
+    }
+
+    fn same(a: Rgb, b: Rgb) -> bool {
+        !far(a, b)
+    }
+
+    /// A theme whose every colour field has a colour no preset field has and no other field of
+    /// itself has (more than 3 apart on some channel), at alpha 0xF0 so the colour comes back out
+    /// of a premultiplied shape.
+    fn distinct() -> Theme {
+        let n = fields(&DARK).len();
+        let mut used: Vec<Rgb> = fields(&DARK).iter().map(|f| rgb(f.1)).collect();
+        let mut t = DARK;
+        let mut k = 1_u32;
+        for i in 0..n {
+            let c = loop {
+                let c = [
+                    ((k * 37) % 253) as u8 + 1,
+                    ((k * 91 + 40) % 253) as u8 + 1,
+                    ((k * 53 + 90) % 253) as u8 + 1,
+                ];
+                k += 1;
+                if used.iter().all(|u| far(*u, c)) {
+                    break c;
+                }
+            };
+            used.push(c);
+            set_field(&mut t, i, [c[0], c[1], c[2], 0xF0]);
+        }
+        t
+    }
+
+    /// The fake's shaping, recording the colour of every run drawn (`prepare`); `measure` is not
+    /// recorded, since a measured spec is not drawn.
+    #[derive(Default)]
+    struct Rec {
+        inner: FakeText,
+        colours: Vec<Rgb>,
+    }
+
+    impl TextSystem for Rec {
+        fn prepare(&mut self, spec: &Spec, scale: f32) -> (TextKey, (f32, f32)) {
+            for (text, style) in &spec.runs {
+                if !text.is_empty() {
+                    self.colours.push(rgb(style.color));
+                }
+            }
+            self.inner.prepare(spec, scale)
+        }
+        fn measure(&mut self, spec: &Spec, scale: f32) -> (f32, f32) {
+            self.inner.measure(spec, scale)
+        }
+        fn caret(&mut self, spec: &Spec, scale: f32, offset: usize) -> CaretPos {
+            self.inner.caret(spec, scale, offset)
+        }
+        fn hit(&mut self, spec: &Spec, scale: f32, pos: (f32, f32)) -> usize {
+            self.inner.hit(spec, scale, pos)
+        }
+        fn lines(&mut self, spec: &Spec, scale: f32) -> Vec<LineSpan> {
+            self.inner.lines(spec, scale)
+        }
+        fn segments(&self, text: &str, unit: Unit) -> Vec<usize> {
+            self.inner.segments(text, unit)
+        }
+    }
+
+    /// `UiHarness::frame` over the recording text system.
+    fn run(h: &mut UiHarness, rec: &mut Rec, f: impl FnOnce(&mut Ui<'_>)) -> Scene {
+        let raw = h.input.end_frame();
+        let config = FrameConfig {
+            theme: h.theme,
+            tier: h.tier,
+            strings: &h.strings,
+            arg_format: &DisplayFormat,
+            keymap: h.keymap,
+            shortcuts: &h.shortcuts,
+        };
+        let mut ui = Ui::begin(&mut h.store, &raw, config, rec);
+        f(&mut ui);
+        ui.finish().0
+    }
+
+    /// The colours a scene draws and the colours its texts were shaped with.
+    #[derive(Default)]
+    struct Seen {
+        fills: Vec<Rgb>,
+        texts: Vec<Rgb>,
+    }
+
+    fn straight(c: [f32; 4]) -> Option<Rgb> {
+        if c[3] < 0.02 {
+            return None;
+        }
+        let k = |v: f32| (v / c[3] * 255.0).round().clamp(0.0, 255.0) as u8;
+        Some([k(c[0]), k(c[1]), k(c[2])])
+    }
+
+    impl Seen {
+        fn take(&mut self, scene: &Scene, rec: &Rec) {
+            let mut colours = Vec::new();
+            for layer in &scene.layers {
+                let g = &layer.geometry;
+                colours.extend(g.under.iter().map(|s| s.color));
+                colours.extend(g.over.iter().map(|s| s.color));
+                colours.extend(g.acrylic.iter().map(|a| a.shape.color));
+                colours.extend(g.strokes.iter().map(|v| v.color));
+                colours.extend(g.fills.iter().map(|v| v.color));
+            }
+            self.fills.extend(colours.into_iter().filter_map(straight));
+            self.texts.extend(rec.colours.iter().copied());
+        }
+    }
+
+    // The widgets beside the controls: the same calls the M6 and M7 sections make.
+    const RADIOS: [RadioOption<'static>; 2] = [
+        RadioOption {
+            key: 1,
+            label: "Small",
+            enabled: true,
+        },
+        RadioOption {
+            key: 2,
+            label: "Medium",
+            enabled: true,
+        },
+    ];
+    const SLIDER: SliderOptions<'static> = SliderOptions {
+        min: 0.0,
+        max: 100.0,
+        step: 10.0,
+        name: "Volume",
+    };
+
+    #[derive(Default)]
+    struct Extra {
+        radio: u64,
+        stars: u32,
+        volume: f32,
+        filter: String,
+    }
+
+    /// The right half of the window: buttons, a radio group, stars, a slider, a tab strip, a
+    /// filter bar, progress bars and a spinner, a badge and a status dot in each tone, a banner
+    /// and the four toasts.
+    fn more(ui: &mut Ui<'_>, ex: &mut Extra, toasts: &mut Toasts) {
+        ui.painter().on(LayerId::Page);
+        ui.button_with(
+            "ghost",
+            Rect::new(300.0, 10.0, 90.0, 32.0),
+            "Cancel",
+            &ButtonOptions {
+                kind: ButtonKind::Ghost,
+                small: true,
+                icon: None,
+            },
+        );
+        ui.button(
+            "primary",
+            Rect::new(400.0, 10.0, 90.0, 32.0),
+            "Save",
+            ButtonKind::Primary,
+        );
+        ui.icon_button(
+            "icon-button",
+            Rect::new(500.0, 10.0, 32.0, 32.0),
+            &IconButton {
+                glyph: icon::SEARCH,
+                glyph_size: 16.0,
+                color: None,
+                radius: 4.0,
+                name: "Search",
+            },
+        );
+        ui.radio_group(
+            "radio",
+            Rect::new(300.0, 60.0, 180.0, 0.0),
+            &RADIOS,
+            &mut ex.radio,
+            "Size",
+        );
+        ui.star_rating("stars", (500.0, 60.0), &mut ex.stars, 5, "Rating");
+        ui.slider(
+            "slider",
+            Rect::new(300.0, 130.0, 180.0, 24.0),
+            &mut ex.volume,
+            &SLIDER,
+        );
+        let tabs = [
+            Tab {
+                key: TabKey(1),
+                title: "alpha",
+                closable: true,
+                progress: Some(Tone::Ok),
+            },
+            Tab {
+                key: TabKey(2),
+                title: "beta",
+                closable: true,
+                progress: None,
+            },
+        ];
+        ui.tab_strip(
+            "strip",
+            Rect::new(300.0, 170.0, 400.0, 32.0),
+            &tabs,
+            &TabStripOptions {
+                active: Some(TabKey(1)),
+                panel_focused: true,
+                busy: None,
+                busy_tone: Tone::Neutral,
+                card: Rect::new(300.0, 170.0, 400.0, 120.0),
+                menu_extra: &[],
+                name: "Documents",
+                header_tint: None,
+            },
+        );
+        ui.filter_bar(
+            "filter",
+            Rect::new(300.0, 300.0, 200.0, 32.0),
+            &mut ex.filter,
+            &FilterOptions {
+                placeholder: "Filter",
+                label: None,
+                clear_unfocusable: false,
+            },
+        );
+        for (i, tone) in [
+            Tone::Neutral,
+            Tone::Ok,
+            Tone::Warn,
+            Tone::Err,
+            Tone::Data,
+            Tone::Paused,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let y = 350.0 + 22.0 * i as f32;
+            ui.progress(
+                ("bar", i),
+                Rect::new(300.0, y, 120.0, 4.0),
+                &ProgressOptions {
+                    value: Some(0.5),
+                    tone,
+                    name: "Upload",
+                    ..ProgressOptions::default()
+                },
+            );
+            ui.badge(("badge", i), (440.0, y - 6.0), "12", tone, false);
+            ui.badge(("dot-badge", i), (490.0, y - 6.0), "ok", tone, true);
+            ui.status_dot(("dot", i), (550.0, y - 6.0), tone, "word");
+        }
+        ui.spinner(
+            "spinner",
+            (680.0, 360.0),
+            &SpinnerOptions {
+                busy: false,
+                size: 16.0,
+                color: None,
+                name: "Loading",
+            },
+        );
+        ui.banner(
+            "banner",
+            Rect::new(300.0, 500.0, 400.0, 0.0),
+            "Indexing the repository",
+            false,
+        );
+        ui.toasts("toasts", toasts);
+    }
+
+    /// What is open and where the pointer is, for one run of frames.
+    #[derive(Clone, Copy)]
+    struct Setup {
+        combo: bool,
+        menu: bool,
+        dialog: bool,
+        pointer: Option<(f32, f32)>,
+        tabs: u32,
+        /// Press the pointer where it is, then select all with the command chord.
+        select_all: bool,
+    }
+
+    const REST: Setup = Setup {
+        combo: false,
+        menu: false,
+        dialog: false,
+        pointer: None,
+        tabs: 0,
+        select_all: false,
+    };
+
+    /// Three frames of the controls and the extras under `theme`; what the third, settled, one
+    /// draws goes into `seen`.
+    fn observe(theme: Theme, setup: Setup, seen: &mut Seen) {
+        let mut h = UiHarness::new((900.0, 700.0));
+        h.theme = theme;
+        let mut rec = Rec::default();
+        let mut app = App::new();
+        app.combo_open = setup.combo;
+        app.menu_open = setup.menu;
+        app.dialog_open = setup.dialog;
+        let mut ex = Extra {
+            radio: 2,
+            stars: 2,
+            volume: 40.0,
+            ..Extra::default()
+        };
+        let mut toasts = Toasts::default();
+        for (kind, text) in [
+            (ToastKind::Info, "Info"),
+            (ToastKind::Success, "Done"),
+            (ToastKind::Warning, "Careful"),
+            (ToastKind::Error, "Failed"),
+        ] {
+            toasts.push(ToastSpec::new(kind, text), Duration::ZERO);
+        }
+        for (ms, last) in [(0_u64, false), (300, false), (700, false), (1500, true)] {
+            h.at_ms(ms);
+            if ms == 300 {
+                if let Some((x, y)) = setup.pointer {
+                    h.input.pointer_to(x, y);
+                }
+                for _ in 0..setup.tabs {
+                    key(&mut h, NamedKey::Tab);
+                }
+                if setup.select_all {
+                    h.input.click(P);
+                }
+            }
+            if ms == 700 && setup.select_all {
+                let command = Modifiers {
+                    logo: true,
+                    ..Modifiers::default()
+                };
+                h.input
+                    .set_modifiers(command)
+                    .key_down(Key::Character("a".to_owned()), None)
+                    .set_modifiers(Modifiers::default());
+            }
+            rec.colours.clear();
+            let scene = run(&mut h, &mut rec, |ui| {
+                page(ui, &mut app);
+                more(ui, &mut ex, &mut toasts);
+            });
+            if last {
+                seen.take(&scene, &rec);
+            }
+        }
+    }
+
+    fn setups() -> Vec<Setup> {
+        let mut v = vec![
+            REST,
+            Setup {
+                combo: true,
+                ..REST
+            },
+            Setup { menu: true, ..REST },
+            Setup {
+                dialog: true,
+                ..REST
+            },
+        ];
+        for rect in [PAGE_BTN, TOGGLE, CHECK, STEPPER, FIELD, COMBO] {
+            v.push(Setup {
+                pointer: Some(centre(rect)),
+                ..REST
+            });
+        }
+        for at in [(310.0, 20.0), (410.0, 20.0), (510.0, 20.0), (320.0, 70.0)] {
+            v.push(Setup {
+                pointer: Some(at),
+                ..REST
+            });
+        }
+        for tabs in 1..=4 {
+            v.push(Setup { tabs, ..REST });
+        }
+        // A menu with the pointer on its first rows, and a field whose text is selected.
+        for y in [48.0, 70.0] {
+            v.push(Setup {
+                menu: true,
+                pointer: Some((100.0, y)),
+                ..REST
+            });
+        }
+        v.push(Setup {
+            pointer: Some(centre(FIELD)),
+            select_all: true,
+            ..REST
+        });
+        v
+    }
+
+    fn seen_under(theme: Theme) -> Seen {
+        let mut seen = Seen::default();
+        for setup in setups() {
+            observe(theme, setup, &mut seen);
+        }
+        seen
+    }
+
+    #[test]
+    fn the_audit_theme_has_a_colour_no_preset_field_has_in_every_field() {
+        let (t, p) = (fields(&distinct()), fields(&DARK));
+        assert_eq!(t.len(), p.len());
+        assert_eq!(t.len(), 71, "the colour fields of `Theme`");
+        for (i, (name, c)) in t.iter().enumerate() {
+            assert_ne!(*c, p[i].1, "{name}");
+            for (_, q) in &p {
+                assert!(far(rgb(*c), rgb(*q)), "{name} is a preset colour");
+            }
+            for (j, (_, d)) in t.iter().enumerate() {
+                assert!(i == j || far(rgb(*c), rgb(*d)), "{name} repeats a field");
+            }
+        }
+    }
+
+    /// The instrument, on a known answer: under the preset itself the same frames draw preset
+    /// colours (every control reads one), so the scan finds them and does not report "none" by
+    /// looking at nothing.
+    #[test]
+    fn the_scan_finds_preset_colours_under_the_preset() {
+        let seen = seen_under(DARK);
+        let preset = fields(&DARK);
+        let found = |colours: &[Rgb]| {
+            preset
+                .iter()
+                .filter(|(_, p)| colours.iter().any(|c| same(rgb(*p), *c)))
+                .count()
+        };
+        assert!(
+            found(&seen.fills) >= 30,
+            "{} fill fields",
+            found(&seen.fills)
+        );
+        assert!(
+            found(&seen.texts) >= 4,
+            "{} text fields",
+            found(&seen.texts)
+        );
+    }
+
+    /// A colour the toolkit draws on purpose in a fixed value, whatever the theme: none among
+    /// the widgets this frame draws.
+    const FIXED: &[Rgb] = &[];
+
+    #[test]
+    fn no_fill_or_text_holds_a_preset_colour_under_a_theme_of_distinct_colours() {
+        let seen = seen_under(distinct());
+        assert!(
+            seen.fills.len() > 500 && seen.texts.len() > 100,
+            "the frames draw something: {} fills, {} texts",
+            seen.fills.len(),
+            seen.texts.len()
+        );
+        let preset = fields(&DARK);
+        let mut hits: Vec<String> = Vec::new();
+        for (kind, colours) in [("fill", &seen.fills), ("text", &seen.texts)] {
+            for c in colours {
+                if FIXED.iter().any(|f| same(*f, *c)) {
+                    continue;
+                }
+                let names: Vec<&str> = preset
+                    .iter()
+                    .filter(|(_, p)| same(rgb(*p), *c))
+                    .map(|(n, _)| *n)
+                    .collect();
+                if !names.is_empty() {
+                    let line = format!("{kind} {c:02X?} is the preset's {names:?}");
+                    if !hits.contains(&line) {
+                        hits.push(line);
+                    }
+                }
+            }
+        }
+        assert!(hits.is_empty(), "hard-coded colours:\n{}", hits.join("\n"));
+    }
+
+    /// The audit is only as wide as what it draws (the controls and a spread of the M6 and M7
+    /// widgets): 38 of the 71 colour fields are reached. The rest (scroll thumbs, the markdown
+    /// and diff colours, the glass tints of the page and panel, the caption buttons, the tab's
+    /// dirty mark, the count badge and a few text greys) belong to widgets this frame does not
+    /// draw; they are a limit of the audit, listed in `docs/STATE.md`, not a finding. The
+    /// literals in `widgets/` are covered by the grep recorded there.
+    #[test]
+    fn the_audit_reaches_most_fields_and_names_those_it_does_not() {
+        let t = distinct();
+        let seen = seen_under(t);
+        let mut missed = Vec::new();
+        for (name, c) in fields(&t) {
+            let hit = seen
+                .fills
+                .iter()
+                .chain(&seen.texts)
+                .any(|s| same(*s, rgb(c)));
+            if !hit {
+                missed.push(name);
+            }
+        }
+        let total = fields(&t).len();
+        println!("unreached ({} of {total}): {missed:?}", missed.len());
+        assert!(
+            total - missed.len() >= 36,
+            "only {} of {total} fields reached: missed {missed:?}",
+            total - missed.len()
+        );
+        // The ones every control reads.
+        for must in [
+            "fg_primary",
+            "fg_secondary",
+            "surface_input",
+            "border",
+            "accent",
+            "on_accent",
+        ] {
+            assert!(!missed.contains(&must), "{must} not reached: {missed:?}");
         }
     }
 }

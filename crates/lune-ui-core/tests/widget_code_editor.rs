@@ -2374,3 +2374,33 @@ fn a_walk_of_scrolls_and_new_identities_opens_every_document_at_the_top_of_every
     assert!(seen.alone > 800, "the instrument: {}", seen.alone);
     assert!(seen.switches > 1_500, "the instrument: {}", seen.switches);
 }
+
+#[test]
+fn the_code_editor_sets_no_insert_limit_so_it_takes_more_than_the_shaped_limit() {
+    use lune_ui_core::text_edit::MAX_SHAPED_INSERT;
+    // It draws only the lines in view, so the adapter's cap is its bound. Lines of 49 bytes: just
+    // over the shaped widgets' limit goes in by set-value and by paste.
+    let big =
+        "0123456789012345678901234567890123456789012345678\n".repeat(MAX_SHAPED_INSERT / 50 + 2);
+    assert!(big.len() > MAX_SHAPED_INSERT);
+
+    let mut doc = CodeDoc::new("old");
+    let mut h = focused(&mut doc, &plain());
+    h.input.access(AccessAction {
+        target: id(),
+        action: Action::SetValue,
+        value: Some(AccessValue::Text(big.clone())),
+    });
+    let r = run(&mut h, &mut doc, &plain());
+    assert!(r.r.changed);
+    assert_eq!(doc.text().len(), big.len());
+
+    let mut doc = CodeDoc::new("old");
+    let mut h = focused(&mut doc, &plain());
+    chord(&mut h, "v");
+    run(&mut h, &mut doc, &plain());
+    h.input.clipboard_text(&big);
+    let r = run(&mut h, &mut doc, &plain());
+    assert!(r.r.changed);
+    assert_eq!(doc.text().len(), big.len() + 3);
+}

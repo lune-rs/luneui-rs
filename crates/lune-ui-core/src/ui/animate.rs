@@ -53,7 +53,8 @@ impl Ui<'_> {
     }
 
     /// [`Self::animate_f32`] for a colour, channel by channel (straight alpha); exactly `target`
-    /// once settled.
+    /// once settled. In the frame the theme changes it snaps to `target`, whether `target` moved
+    /// or not: a theme swap is a hard cut (D5), so no colour fades from the old theme to the new.
     pub fn animate_color(&mut self, id: WidgetId, target: Rgba, motion: &Motion) -> Rgba {
         let (now, frame) = (self.time(), self.store.frame);
         let resolved = self.config.theme.motion.resolve(motion, self.config.tier);
@@ -63,7 +64,9 @@ impl Ui<'_> {
             transition: Transition::settled(goal),
         });
         a.used = frame;
-        if a.transition.target() != goal {
+        if self.theme_cut {
+            a.transition.snap(goal);
+        } else if a.transition.target() != goal {
             match resolved {
                 Some(r) => a.transition.retarget(now, goal, r.duration, r.easing),
                 None => a.transition.snap(goal),

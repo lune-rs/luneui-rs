@@ -26,7 +26,9 @@ use crate::input::{CursorIcon, FocusEvent, ImeEvent, Key, Modifiers, NamedKey};
 use crate::motion::{Kind, Lerp, Motion};
 use crate::paint::{Painter, Rect};
 use crate::text::{CaretPos, Font, LineSpan, Spec, Style, TextSystem, Unit};
-use crate::text_edit::{EditCommand, EditFlags, EditLayout, EditOutcome, SpecLayout, TextEdit};
+use crate::text_edit::{
+    EditCommand, EditFlags, EditLayout, EditOutcome, MAX_SHAPED_INSERT, SpecLayout, TextEdit,
+};
 use crate::theme::Theme;
 use crate::ui::{Response, Sense, Ui, WidgetId};
 
@@ -274,6 +276,7 @@ impl EditConfig<'_> {
             password: self.password,
             multiline: self.multiline,
             max_chars: self.max_chars,
+            max_insert: Some(MAX_SHAPED_INSERT),
             composing: false,
         }
     }
@@ -635,14 +638,20 @@ fn run_events(
 }
 
 /// Replaces the text with an assistive technology's `value`, under the rules a paste follows. The
-/// history goes, even for an equal text, and the caret lands at the end.
+/// history goes, even for an equal text, and the caret lands at the end. `false` when the widget's
+/// insert limit refused the value and nothing changed.
 pub(super) fn set_value(
     ui: &mut Ui<'_>,
     cfg: &EditConfig,
     st: &mut EditState,
     text: &mut String,
     value: String,
-) {
+) -> bool {
+    // The paste rule would refuse an oversize value against an empty text and leave the widget
+    // emptied: refuse it before anything is replaced, so the text and its history stay.
+    if cfg.flags().max_insert.is_some_and(|max| value.len() > max) {
+        return false;
+    }
     let mut next = String::new();
     let mut fresh = TextEdit::new();
     fresh.set_flags(cfg.flags());
@@ -659,6 +668,7 @@ pub(super) fn set_value(
     st.edit.set_flags(cfg.flags());
     st.edit.set_selection(end, end);
     sync(ui, cfg, &mut st.edit, text);
+    true
 }
 
 /// Runs a response's press and drag through the engine. `origin` is the text's top-left corner in
@@ -1063,8 +1073,8 @@ impl Ui<'_> {
         }
         if let Some(AccessValue::Text(value)) = r.set_value.clone()
             && !opts.read_only
+            && set_value(self, &cfg, &mut st, text, value)
         {
-            set_value(self, &cfg, &mut st, text, value);
             r.mark_changed();
         }
         let left = rect.x
@@ -1163,7 +1173,11 @@ impl Ui<'_> {
         }
 
         let facts = NodeFacts {
-            role: Role::TextInput,
+            role: if opts.variant == Variant::Password {
+                Role::PasswordInput
+            } else {
+                Role::TextInput
+            },
             name,
             description: opts.description,
             error: opts.error,

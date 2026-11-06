@@ -7,38 +7,46 @@
 
 use std::process::ExitCode;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, StartCause, WindowEvent};
-use winit::event_loop::{ActiveEventLoop, EventLoop};
+use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoopProxy};
 use winit::keyboard::{Key, ModifiersState, NamedKey};
 use winit::window::{Window, WindowId};
 
+use lune_ui::access::{AccessBridge, RootInfo};
+use lune_ui::clipboard::Clipboard;
 use lune_ui::gpu::{self, Gpu};
-use lune_ui::input::{ClipboardRequest, Keymap, OutputState, Repaint, Translator, control_flow};
+use lune_ui::input::{
+    ClipboardRequest, FrameOutput, OutputState, Repaint, Translator, control_flow, keymap,
+};
 use lune_ui::lunegit_dark::THEME;
 use lune_ui::material::{self, Material};
 use lune_ui::motion::MotionTier;
 use lune_ui::shortcuts::Shortcuts;
 use lune_ui::strings::{DisplayFormat, StringTable};
 use lune_ui::surface::{Acquired, WindowSurface};
+use lune_ui::tray::TrayState;
 use lune_ui::ui::{FrameConfig, Ui, UiStore};
 use lune_ui::window::glass_attributes;
 
 use crate::page::{Page, PageKind, PageState, register_images, release_images};
 use crate::pages::PAGES;
+use crate::popover::{AppEvent, TrayHost, event_loop, route_tray_events};
 use crate::scenes::{H, W};
 use crate::{Renderer, custom, draw_scene, text_cache};
 use lune_ui::image::ImageId;
 
 /// Window mode: the window, its surface and the renderer drawing into it.
-struct Shown {
-    window: Arc<Window>,
-    surface: WindowSurface,
-    r: Renderer,
-    translator: Translator,
-    output: OutputState,
+pub(crate) struct Shown {
+    /// First, so it drops before the window it serves.
+    pub(crate) bridge: AccessBridge,
+    pub(crate) window: Arc<Window>,
+    pub(crate) surface: WindowSurface,
+    pub(crate) r: Renderer,
+    pub(crate) translator: Translator,
+    pub(crate) output: OutputState,
 }
 
 /// What a keyboard shortcut of the gallery does.
@@ -67,6 +75,8 @@ fn shortcut(key: &Key, mods: ModifiersState, legacy: bool) -> Option<Shortcut> {
 
 struct App {
     shown: Option<Shown>,
+    /// Lets the accessibility handlers, on their own thread, reach the event loop.
+    proxy: EventLoopProxy<AppEvent>,
     /// Index of the page on screen.
     page: usize,
     /// The legacy scene on screen.
@@ -80,8 +90,15 @@ struct App {
     /// The shortcut table; the gallery's own keys are handled before the frame.
     shortcuts: Shortcuts,
     mods: ModifiersState,
-    /// The in-process clipboard standing in for the OS's until the platform layer has one.
-    clipboard: Option<String>,
+    /// The OS clipboard; opened on the first copy or paste.
+    clipboard: Clipboard,
+    /// The live tray, while the `tray` page is on screen.
+    tray: Option<TrayHost>,
+    /// The state the page's tray control said last: the surface follows it.
+    tray_state: TrayState,
+    /// The control flow the main window's last frame asked for, and the tray surface's.
+    main_flow: ControlFlow,
+    pop_flow: ControlFlow,
     /// The app's time origin: the frame time is the time since it.
     start: Instant,
     /// Process exit status (non-zero when setup or a frame failed).
@@ -90,15 +107,17 @@ struct App {
 
 /// Opens the window and runs until it closes.
 pub(crate) fn run() -> ExitCode {
-    let event_loop = match EventLoop::new() {
+    let event_loop = match event_loop(false) {
         Ok(l) => l,
         Err(e) => {
-            eprintln!("event loop: {e}");
+            eprintln!("{e}");
             return ExitCode::from(1);
         }
     };
+    route_tray_events(event_loop.create_proxy());
     let mut app = App {
         shown: None,
+        proxy: event_loop.create_proxy(),
         page: 0,
         scene: 0,
         store: UiStore::default(),
@@ -107,7 +126,11 @@ pub(crate) fn run() -> ExitCode {
         strings: StringTable::default(),
         shortcuts: Shortcuts::default(),
         mods: ModifiersState::empty(),
-        clipboard: None,
+        clipboard: Clipboard::new(),
+        tray: None,
+        tray_state: TrayState::Serving,
+        main_flow: ControlFlow::Wait,
+        pop_flow: ControlFlow::Wait,
         start: Instant::now(),
         exit_code: 0,
     };
@@ -118,18 +141,30 @@ pub(crate) fn run() -> ExitCode {
     ExitCode::from(app.exit_code)
 }
 
-fn setup(event_loop: &ActiveEventLoop) -> Result<Shown, String> {
+/// The window, its surface, the GPU and the accessibility bridge. The window is created hidden (the
+/// bridge wants one never shown) and shown at the end when `show` is set; the smoke leaves it hidden.
+pub(crate) fn setup(
+    event_loop: &ActiveEventLoop,
+    proxy: EventLoopProxy<AppEvent>,
+    show: bool,
+) -> Result<Shown, String> {
     let attrs = glass_attributes(
         "luneui gallery",
         (f64::from(W), f64::from(H)),
         (560.0, 360.0),
         true,
-    );
+    )
+    .with_visible(false);
     let window = Arc::new(
         event_loop
             .create_window(attrs)
             .map_err(|e| format!("window: {e}"))?,
     );
+    // The bridge wants a window never shown yet. A wake only posts: the event loop redraws.
+    let bridge = AccessBridge::new(event_loop, &window, move || {
+        let _ = proxy.send_event(AppEvent::Wake);
+    })
+    .map_err(|e| format!("accessibility: {e}"))?;
     if let Err(e) = material::apply(&window, Material::Vibrancy) {
         eprintln!("glass: {e}");
     }
@@ -144,7 +179,11 @@ fn setup(event_loop: &ActiveEventLoop) -> Result<Shown, String> {
     let frame = lune_ui::frame::FrameRenderer::new(&mut gpu, surface.format());
     let fill = custom::Fill::new(&gpu.device, surface.format());
     let translator = Translator::new(size, window.scale_factor());
+    if show {
+        window.set_visible(true);
+    }
     Ok(Shown {
+        bridge,
         window,
         surface,
         r: Renderer {
@@ -156,6 +195,11 @@ fn setup(event_loop: &ActiveEventLoop) -> Result<Shown, String> {
         translator,
         output: OutputState::new(),
     })
+}
+
+/// The window's title on `page`.
+pub(crate) fn window_title(page: &Page) -> String {
+    format!("luneui gallery - {}", page.title)
 }
 
 impl App {
@@ -181,10 +225,33 @@ impl App {
             self.images.clear();
         }
         if let Some(shown) = &self.shown {
-            shown
-                .window
-                .set_title(&format!("luneui gallery - {}", PAGES[index].title));
+            shown.window.set_title(&window_title(PAGES[index]));
         }
+        self.sync_tray();
+    }
+
+    /// Puts the live tray in while the `tray` page is on screen and takes it out otherwise. An
+    /// item that cannot be made (no tray here, or the OS refused) is reported once and the page
+    /// draws without it.
+    fn sync_tray(&mut self) {
+        let wanted = self.current().id == "tray";
+        match (wanted, self.tray.is_some()) {
+            (true, false) => {
+                let scale = self.shown.as_ref().map_or(1.0, |s| s.window.scale_factor());
+                match TrayHost::new(self.tray_state, scale) {
+                    Ok(host) => self.tray = Some(host),
+                    Err(e) => eprintln!("tray: {e}"),
+                }
+            }
+            (false, true) => self.tray = None,
+            _ => {}
+        }
+        self.pop_flow = ControlFlow::Wait;
+    }
+
+    /// Hands the event loop the earlier of what the main window and the tray surface ask for.
+    fn set_flow(&self, event_loop: &ActiveEventLoop) {
+        event_loop.set_control_flow(merge_flow(self.main_flow, self.pop_flow));
     }
 
     /// Draws the current page into the window and sets the loop's control flow from the frame's
@@ -195,6 +262,7 @@ impl App {
             return Ok(());
         };
         let Shown {
+            bridge,
             window,
             surface,
             r,
@@ -212,10 +280,19 @@ impl App {
         let view = frame.texture.create_view(&Default::default());
         let size = surface.size();
         let s = window.scale_factor() as f32;
+        bridge.drain(translator);
         let input = translator.take(self.start.elapsed());
         let mut repaint = Repaint::Idle;
+        // The status item learns what bar it is on a few turns after it is made: ask again soon.
+        let mut poll_tray = false;
+        let root = RootInfo {
+            title: window_title(page),
+            scale: window.scale_factor(),
+        };
         let display = match page.kind {
             PageKind::Legacy(scenes) => {
+                // A legacy page has no tree, but an activation still needs its update.
+                bridge.update(&FrameOutput::default(), &root);
                 scenes[self.scene % scenes.len()].paint(&mut r.text, s, size)
             }
             PageKind::Ui(ui_page) => {
@@ -231,15 +308,11 @@ impl App {
                     return Ok(());
                 };
                 let config = FrameConfig {
-                    theme: THEME,
+                    theme: state.theme().unwrap_or(THEME),
                     tier: MotionTier::Full,
                     strings: &self.strings,
                     arg_format: &DisplayFormat,
-                    keymap: if cfg!(target_os = "macos") {
-                        Keymap::MAC
-                    } else {
-                        Keymap::PC
-                    },
+                    keymap: keymap(),
                     shortcuts: &self.shortcuts,
                 };
                 let mut ui = Ui::begin(&mut self.store, &input, config, &mut r.text);
@@ -248,20 +321,24 @@ impl App {
                 if output.apply(window, &out) {
                     event_loop.exit();
                 }
-                // The clipboard stub: a write stores, a read is answered with the next frame's
-                // input.
-                for req in &out.clipboard {
-                    match req {
-                        ClipboardRequest::Write(text) => self.clipboard = Some(text.clone()),
-                        ClipboardRequest::Read => {
-                            match &self.clipboard {
-                                Some(text) => translator.clipboard_text(text),
-                                None => translator.clipboard_unavailable(),
-                            }
-                            window.request_redraw();
-                        }
+                if let Some(ts) = state.tray_state() {
+                    self.tray_state = ts;
+                    if let Some(host) = &mut self.tray {
+                        host.sync(event_loop, ts);
+                        poll_tray = host.wants_poll();
                     }
                 }
+                // Writes go to the OS; a read is answered with the next frame's input, which needs
+                // a frame.
+                self.clipboard.service(&out, translator);
+                if out
+                    .clipboard
+                    .iter()
+                    .any(|r| matches!(r, ClipboardRequest::Read))
+                {
+                    window.request_redraw();
+                }
+                bridge.update(&out, &root);
                 repaint = out.repaint;
                 display
             }
@@ -270,21 +347,25 @@ impl App {
         window.pre_present_notify();
         surface.present(&r.gpu, frame);
         r.gpu.end_frame(&mut r.text);
-        let (flow, redraw) = control_flow(repaint, self.start);
-        event_loop.set_control_flow(flow);
+        let (mut flow, redraw) = control_flow(repaint, self.start);
+        if poll_tray && flow == ControlFlow::Wait {
+            flow = ControlFlow::WaitUntil(Instant::now() + Duration::from_millis(50));
+        }
         if redraw {
             window.request_redraw();
         }
+        self.main_flow = flow;
+        self.set_flow(event_loop);
         Ok(())
     }
 }
 
-impl ApplicationHandler for App {
+impl ApplicationHandler<AppEvent> for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if self.shown.is_some() {
             return;
         }
-        let shown = match setup(event_loop) {
+        let shown = match setup(event_loop, self.proxy.clone(), true) {
             Ok(v) => v,
             Err(e) => {
                 eprintln!("{e}");
@@ -295,25 +376,59 @@ impl ApplicationHandler for App {
         };
         shown.window.request_redraw();
         self.shown = Some(shown);
+        self.sync_tray();
+    }
+
+    /// A wake from the accessibility handlers (an action or a tree request waits for a frame), or
+    /// a click on the tray item.
+    fn user_event(&mut self, event_loop: &ActiveEventLoop, event: AppEvent) {
+        match event {
+            AppEvent::Wake => {
+                if let Some(shown) = &self.shown {
+                    shown.window.request_redraw();
+                }
+            }
+            AppEvent::Tray(click) => {
+                let now = self.start.elapsed();
+                if let (Some(host), Some(shown)) = (&mut self.tray, &mut self.shown)
+                    && let Err(e) =
+                        host.click(event_loop, &mut shown.r, click, self.tray_state, now)
+                {
+                    eprintln!("tray: {e}");
+                }
+            }
+        }
     }
 
     fn new_events(&mut self, _event_loop: &ActiveEventLoop, cause: StartCause) {
         // A `Repaint::At` request: its time has come.
-        if matches!(cause, StartCause::ResumeTimeReached { .. })
-            && let Some(shown) = &self.shown
-        {
-            shown.window.request_redraw();
+        if matches!(cause, StartCause::ResumeTimeReached { .. }) {
+            if let Some(shown) = &self.shown {
+                shown.window.request_redraw();
+            }
+            if let Some(p) = self.tray.as_ref().and_then(TrayHost::popover) {
+                p.window().request_redraw();
+            }
         }
     }
 
-    fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
+    /// The event loop is done: the tray item and its window go before it returns, the window
+    /// through the guard that restores it.
+    fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
+        self.tray = None;
+    }
+
+    fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
         // After `exit()` winit still delivers queued events; ignore them so no frame is acquired.
         if event_loop.exiting() {
             return;
         }
-        if self.shown.is_none() {
+        if self.tray.as_ref().and_then(TrayHost::window_id) == Some(id) {
+            self.tray_window_event(event_loop, &event);
             return;
         }
+        let Some(shown) = &mut self.shown else { return };
+        shown.bridge.window_event(&shown.window, &event);
         let action = match &event {
             WindowEvent::KeyboardInput { event: key, .. } if key.state == ElementState::Pressed => {
                 shortcut(&key.logical_key, self.mods, self.legacy_len().is_some())
@@ -364,6 +479,51 @@ impl ApplicationHandler for App {
     }
 }
 
+impl App {
+    /// An event of the tray surface's window: a frame, or input for it.
+    fn tray_window_event(&mut self, event_loop: &ActiveEventLoop, event: &WindowEvent) {
+        let now = self.start.elapsed();
+        let (Some(host), Some(shown)) = (&mut self.tray, &mut self.shown) else {
+            return;
+        };
+        if !matches!(event, WindowEvent::RedrawRequested) {
+            host.window_event(event, now);
+            return;
+        }
+        match host.render(&mut shown.r, self.tray_state, now) {
+            Ok(Some(drawn)) => {
+                let (flow, redraw) = TrayHost::flow(&drawn, self.start);
+                self.pop_flow = if drawn.hidden {
+                    ControlFlow::Wait
+                } else {
+                    flow
+                };
+                if redraw && let Some(p) = host.popover() {
+                    p.window().request_redraw();
+                }
+            }
+            Ok(None) => self.pop_flow = ControlFlow::Wait,
+            Err(e) => {
+                eprintln!("tray surface: {e}");
+                self.exit_code = 1;
+                event_loop.exit();
+            }
+        }
+        self.set_flow(event_loop);
+    }
+}
+
+/// The earlier of two control flows: polling beats a deadline, a deadline beats waiting.
+fn merge_flow(a: ControlFlow, b: ControlFlow) -> ControlFlow {
+    match (a, b) {
+        (ControlFlow::Poll, _) | (_, ControlFlow::Poll) => ControlFlow::Poll,
+        (ControlFlow::WaitUntil(x), ControlFlow::WaitUntil(y)) => ControlFlow::WaitUntil(x.min(y)),
+        (ControlFlow::WaitUntil(t), ControlFlow::Wait)
+        | (ControlFlow::Wait, ControlFlow::WaitUntil(t)) => ControlFlow::WaitUntil(t),
+        (ControlFlow::Wait, ControlFlow::Wait) => ControlFlow::Wait,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -393,6 +553,23 @@ mod tests {
         assert_eq!(shortcut(&up, none, true), Some(Shortcut::PrevScene));
         assert_eq!(shortcut(&down, none, false), None);
         assert_eq!(shortcut(&up, none, false), None);
+    }
+
+    #[test]
+    fn the_earlier_flow_wins() {
+        let (soon, later) = (Instant::now(), Instant::now() + Duration::from_secs(1));
+        let until = ControlFlow::WaitUntil;
+        assert_eq!(
+            merge_flow(ControlFlow::Wait, ControlFlow::Wait),
+            ControlFlow::Wait
+        );
+        assert_eq!(merge_flow(until(later), ControlFlow::Wait), until(later));
+        assert_eq!(merge_flow(ControlFlow::Wait, until(later)), until(later));
+        assert_eq!(merge_flow(until(later), until(soon)), until(soon));
+        assert_eq!(
+            merge_flow(until(soon), ControlFlow::Poll),
+            ControlFlow::Poll
+        );
     }
 
     #[test]

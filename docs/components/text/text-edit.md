@@ -139,7 +139,8 @@ None: the engine has no text of its own. A cut, copy and paste context menu, if 
 
 ### Build
 
-- Milestone: M5. Built in M5 (steps 11 to 13 and 15; the page is `text-edit`, 10 new scenes). Not verified here: the clipboard adapter (the gallery answers from an in-process string until M10, D107). Open for `done` (D47): M11 re-checks the whole bar on every entry; real typing with an input method (R1) and bidi caret placement are unverified here, and so is the Windows and Linux run time.
+- Insert limit: `EditFlags::max_insert` (bytes; `None` is no limit). The text field and the text area set `MAX_SHAPED_INSERT` (1,048,576) because they shape all their text; an insert over it is refused whole, never cut, by paste, input-method commit and assistive set-value alike (D232, D233). The code editor sets none: it draws only the lines in view.
+- Milestone: M5. Built in M5 (steps 11 to 13 and 15; the page is `text-edit`, 10 new scenes). The clipboard is the OS's since M10 (`platform.clipboard`, D213 to D215; D107's in-process string is gone). Open for `done` (D47): M11 re-checks the whole bar on every entry; real typing with an input method (R1) and bidi caret placement are unverified here, and so is the Windows and Linux run time.
 - Depends on: core.ui, core.focus, core.input, text.shaping, platform.clipboard, text.ime, infra.accessibility, motion.transitions
 
 ## Open questions

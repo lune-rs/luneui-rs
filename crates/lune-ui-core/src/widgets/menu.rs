@@ -4,7 +4,7 @@
 
 use std::hash::Hash;
 
-use super::popover::{PlaceAlign, PlaceRequest, Side, glass_panel, place};
+use super::popover::{PlaceAlign, PlaceRequest, Side, Surface, glass_panel, place};
 use super::status_dot;
 use super::tone::Tone;
 use crate::access::{Action, Node, Role, State};
@@ -211,12 +211,10 @@ pub fn menu_layout<H: Copy + PartialEq>(
     menu_layout_at(p, rows, &MenuPlace::At(at))
 }
 
-/// Sizes a menu of `rows` and places it through [`place`] as `at` says, kept inside the window.
-pub fn menu_layout_at<H: Copy + PartialEq>(
-    p: &mut Painter<'_, H>,
-    rows: &[MenuRow<'_>],
-    at: &MenuPlace,
-) -> MenuLayout {
+/// The size of a menu of `rows`: 190 wide at least, widened to the longest row, and as tall as the
+/// rows and the padding. [`menu_layout_at`] places a panel of this size; a menu in its own window
+/// ([`Ui::menu_window`]) is the window's size.
+pub fn menu_size<H: Copy + PartialEq>(p: &mut Painter<'_, H>, rows: &[MenuRow<'_>]) -> (f32, f32) {
     let t = p.theme;
     let label_style = Style::ui(12.0, t.menu_text_primary);
     let hint_style = Style::ui(t.font_s, t.menu_text_quaternary);
@@ -245,6 +243,28 @@ pub fn menu_layout_at<H: Copy + PartialEq>(
             w = w.max(2.0 * PAD + 8.0 + content + 8.0);
         }
     }
+    (w, h)
+}
+
+/// One rect per row, stacked inside `panel` under its padding.
+fn row_rects(panel: Rect, rows: &[MenuRow<'_>]) -> Vec<Rect> {
+    let mut cy = panel.y + PAD;
+    rows.iter()
+        .map(|e| {
+            let r = Rect::new(panel.x + PAD, cy, panel.w - 2.0 * PAD, e.height());
+            cy += e.height();
+            r
+        })
+        .collect()
+}
+
+/// Sizes a menu of `rows` and places it through [`place`] as `at` says, kept inside the window.
+pub fn menu_layout_at<H: Copy + PartialEq>(
+    p: &mut Painter<'_, H>,
+    rows: &[MenuRow<'_>],
+    at: &MenuPlace,
+) -> MenuLayout {
+    let (w, h) = menu_size(p, rows);
     let (anchor, side, align, gap) = match *at {
         MenuPlace::At((x, y)) => (
             Rect::new(x, y, 0.0, 0.0),
@@ -270,16 +290,10 @@ pub fn menu_layout_at<H: Copy + PartialEq>(
         window: p.window,
     })
     .rect;
-    let mut cy = panel.y + PAD;
-    let rects = rows
-        .iter()
-        .map(|e| {
-            let r = Rect::new(panel.x + PAD, cy, panel.w - 2.0 * PAD, e.height());
-            cy += e.height();
-            r
-        })
-        .collect();
-    MenuLayout { panel, rows: rects }
+    MenuLayout {
+        panel,
+        rows: row_rects(panel, rows),
+    }
 }
 
 /// Draws one item in `r`.
@@ -830,6 +844,38 @@ impl<'a> Ui<'a> {
             let p = ui.painter();
             menu_paint(p, rows, &layout, &rows_frame.looks);
             p.pop_xform();
+            rows_frame.picked
+        });
+        MenuResponse {
+            picked,
+            dismissed: frame.dismissed.is_some(),
+        }
+    }
+
+    /// A glass menu of `rows` that fills the window: the window is [`menu_size`] big and the
+    /// panel is its whole rect (the tray's menu, in a window of its own, D17). It is
+    /// [`Ui::popover`] with the window as the rect, so the keys, Escape, the motion and the exit
+    /// are the popover's, and focus loss dismisses it as well as an outside press: the app hides
+    /// the window once `dismissed` and the frame is idle.
+    pub fn menu_window(&mut self, key: impl Hash, rows: &[MenuRow<'_>]) -> MenuResponse {
+        let size = menu_size(self.painter(), rows);
+        let options = crate::tray::window_popover(self.painter().window, size, Surface::None);
+        let name = self.tr("luneui.menu.name");
+        let (frame, _, picked) = self.popover(&key, &options, |ui, panel| {
+            let layout = MenuLayout {
+                panel,
+                rows: row_rects(panel, rows),
+            };
+            let menu_id = ui.id(&key);
+            let mut menu_node = Node::new(menu_id, Role::Menu, name, panel);
+            menu_node.states.insert(State::Expanded);
+            let rows_frame = ui.node_container(menu_node, |ui| {
+                // The panel blocks what is under it, so a press on a separator or the padding is
+                // not an outside press.
+                ui.interact(menu_id.with("panel"), panel, Sense::HOVER);
+                menu_rows(ui, menu_id, rows, &layout.rows)
+            });
+            menu_paint(ui.painter(), rows, &layout, &rows_frame.looks);
             rows_frame.picked
         });
         MenuResponse {

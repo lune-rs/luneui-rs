@@ -12,6 +12,7 @@ summary: Theme token struct and the lunegit_dark preset with the WINDOW, PANEL a
 ## What it is
 
 `Theme` (tokens the widgets read) and the `lunegit_dark` module: `THEME`, `TINT`, `WINDOW`/`PANEL`/`CARD` layers, `INACTIVE_FALLBACK`, `CARD_CORNER_RADIUS`, `TAB_HEADER_HEIGHT`, `BODY_PADDING`.
+Since M10 the three glass layers also travel inside the theme: `Theme.glass: ThemeGlass { window, panel, card }` (preset: the three consts, which stay), so a theme file's tint and opacities load with the rest (D207). `Theme::from_json` loads a file over a base theme and `Theme::with_acrylic(AcrylicLevel)` scales the glass material opacities; see `infra.theme-hot-reload`. `COLOR_KEYS` and `Theme::color_key` expose the key table.
 
 ## Needs
 
@@ -36,7 +37,7 @@ Conflicts: the repo menu padding (6) and Lunegit's (MenuItem 10,6) differ; overl
 - `DARK` = `lunegit_dark::THEME` [R crates/lune-ui-core/src/theme.rs:47].
 - Glass layers `WINDOW`, `PANEL`, `CARD` [R crates/lune-ui-core/src/theme.rs:91-109]; `INACTIVE_FALLBACK` [R crates/lune-ui-core/src/theme.rs:113]; `CARD_CORNER_RADIUS` 8 [R crates/lune-ui-core/src/theme.rs:115]; `TAB_HEADER_HEIGHT` 32 [R crates/lune-ui-core/src/theme.rs:116]; `BODY_PADDING` 10 [R crates/lune-ui-core/src/theme.rs:117].
 - Motion tokens to add in M4 (SF5 names): durations `instant` 120, `fast` 180, `base` 250, `moderate` 350, `slow` 500 [L src/Lunegit.Desktop/App.axaml:151-155]; easings `linear`, `quad-out`, `quad-in`, `sine-in-out`, `back-out`, `cubic-out` (0.215, 0.61, 0.355, 1), `ease-in` (0.42, 0, 1, 1) [R crates/lune-ui-core/src/widgets/menu.rs:46-58]. Kinds are not theme values.
-- JSON theme (M10): the Lunegit sample theme keys, for example `MenuFlyoutPresenterBackground` [L src/Lunegit.Desktop/SampleThemes/dark-modern.json:95-96].
+- JSON theme (M10, done): `Theme::from_json` and the 50-key table in `theme.rs` (`COLOR_KEYS`), see `infra.theme-hot-reload`. Widgets still take their `GlassLayer` from their options; the app reads it from `theme.glass`.
 
 ### States
 
@@ -47,7 +48,7 @@ Conflicts: the repo menu padding (6) and Lunegit's (MenuItem 10,6) differ; overl
 
 ### Transitions
 
-n/a — the theme is data; theme swaps are not animated in the moved code.
+n/a — the theme is data. A swap between two frames is a hard cut: in the frame `FrameConfig.theme` differs from the last frame's, every `animate_color` snaps to its target (D209); float transitions are untouched.
 
 ### Input and focus
 
@@ -79,7 +80,7 @@ n/a — no text.
 ### Acceptance
 
 - Existing tests: none in `crates/lune-ui-core/src/theme.rs`.
-- Done standard still needs: a test that `THEME` equals the Lunegit values (`DarkTheme.axaml:200-233`) for every token the pixel gate uses; the M4 motion tokens with a test per token; the M10 JSON loader with a bounded reader (R-infra-6).
+- Done standard still needs: a test that `THEME` equals the Lunegit values (`DarkTheme.axaml:200-233`) for every token the pixel gate uses; the M4 motion tokens with a test per token; the M10 JSON loader with a bounded reader (R-infra-6): done, `tests/theme_file.rs` (`Theme::glass` equals the three consts: `theme::tests`).
 
 ### Build
 
@@ -88,7 +89,6 @@ n/a — no text.
 
 ## Open questions
 
-- The theme has no JSON loader; see `infra.theme-hot-reload`.
 - `TAB_HEADER_HEIGHT` and `BODY_PADDING` read as terminal-app values; whether they belong in the toolkit theme is unchecked.
 
 ## Notes for the planner

@@ -1,7 +1,7 @@
 //! Window helpers on winit: the glass window attributes and the resize edge → winit mapping.
 
 use winit::dpi::LogicalSize;
-use winit::window::{ResizeDirection, Window, WindowAttributes};
+use winit::window::{ResizeDirection, Window, WindowAttributes, WindowLevel};
 
 use lune_ui_core::window::ResizeEdge;
 
@@ -24,6 +24,20 @@ pub fn glass_attributes(
     platform::glass(attrs)
 }
 
+/// Window attributes for a tray surface's popover window: hidden, borderless, transparent, above
+/// other windows and of a fixed size (logical pixels). Pass the window to
+/// `lune_ui_platform::popover::PopoverWindow::wrap` before showing it.
+pub fn popover_attributes(size: (f64, f64)) -> WindowAttributes {
+    let attrs = Window::default_attributes()
+        .with_inner_size(LogicalSize::new(size.0, size.1))
+        .with_visible(false)
+        .with_decorations(false)
+        .with_transparent(true)
+        .with_window_level(WindowLevel::AlwaysOnTop)
+        .with_resizable(false);
+    platform::popover(attrs)
+}
+
 /// The winit resize direction of `edge`.
 pub fn resize_direction(edge: ResizeEdge) -> ResizeDirection {
     match edge {
@@ -35,5 +49,25 @@ pub fn resize_direction(edge: ResizeEdge) -> ResizeDirection {
         ResizeEdge::NorthWest => ResizeDirection::NorthWest,
         ResizeEdge::SouthEast => ResizeDirection::SouthEast,
         ResizeEdge::SouthWest => ResizeDirection::SouthWest,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use winit::dpi::Size;
+
+    #[test]
+    fn popover_attributes_are_a_hidden_borderless_fixed_window_on_top() {
+        let attrs = popover_attributes((320.0, 240.0));
+        assert!(!attrs.visible);
+        assert!(!attrs.decorations);
+        assert!(attrs.transparent);
+        assert!(!attrs.resizable);
+        assert_eq!(attrs.window_level, WindowLevel::AlwaysOnTop);
+        assert_eq!(
+            attrs.inner_size,
+            Some(Size::Logical(LogicalSize::new(320.0, 240.0)))
+        );
     }
 }

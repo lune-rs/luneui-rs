@@ -23,17 +23,18 @@ for the extraction; Luneterm's `docs/architecture.md` sections "lune-ui modules"
 - Boundaries: `scripts/check-boundaries.sh`
 - Catalogue index (regenerate after adding or editing a component file): `scripts/gen-component-index.sh`
 - Acceptance bench (milestone acceptance only; runnable on a busy machine, D85: each run judged on its own p99 <= 16.6 ms and worst frame <= 33 ms, a page OVER only in at least half its runs, the self-test spread and load printed beside every verdict; exit 0): `cargo run --release -p gallery -- --bench` (`--runs 5` is the default; `--size 3456x2234` is report-only)
-- Gate (before every commit; must be green): `cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && scripts/check-boundaries.sh && scripts/gen-component-index.sh --check`
+- Gate (before every commit; must be green): `cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && cargo clippy -p lune-ui-winit --all-targets -- -D warnings && cargo test -p lune-ui-winit && scripts/check-boundaries.sh && scripts/gen-component-index.sh --check`
 - Pixel gate (any drawing change): `scripts/pixel-gate.sh [--base <rev>] [--allow <id>…]` dumps the
   gallery's 15 reference scenes for `<rev>` (default `HEAD`) and for the working tree and compares them
   (`dump-compare`); zero delta unless the look change is intended: name its scenes with `--allow <id>`
   and give the reason in a DECISIONS.md row in the same commit. Exit 0 pass, 1 delta, 2 setup error.
   The working tree dumps headless (no window); a base from before M2 step 4 (`52b11d6` and older)
   opens a hidden window, so such a gate needs a logged-in macOS GUI session.
+- Platform smoke (needs a logged-in macOS or Windows GUI session; puts a tray item up for about 2 s; not in the gate; exit 0 held, 1 failed, 2 no session): `cargo run -p gallery -- --smoke-platform`
 - Dump the scenes by hand: `cargo run -p gallery -- --dump <dir>` (`-- --list` prints the scene names)
 - M1-only proof against Luneterm's 18-scene spike gate: `scripts/pixel-gate-luneterm.sh` (its full run
-  cannot build against the M2 API and exits 2; `--parity-only` still checks that `Cargo.lock` holds no
-  version Luneterm's lock lacks)
+  cannot build against the M2 API and exits 2; `--parity-only` checked that `Cargo.lock` holds no
+  version Luneterm's lock lacks, and fails by design from M10 on: `arboard` and its tree are new, D213)
 - Cross-target (Windows clippy, Linux in Docker; skips Linux when Docker is not running): `scripts/check-targets.sh`
 
 Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, resolver 3: in
@@ -59,6 +60,7 @@ Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, r
 - A composite with one tab stop (radio group, star rating, nav list, tab strip, table header, board cards) uses roving focus: `Sense.skip_tab`,
   `Ui::rove_stop`, `rove_keys`, `rove_focus` (D113); text that must fit a width goes through `text::elide` / `Painter::elide`
   (D114). A drag ghost draws one layer group above its source, out of any `record` (`Ui::drag_ghost`, D168).
+- A loaded theme must reach every widget: a widget takes every colour from `ui.theme()` (or its options), never a literal or the preset (`c4::m10` draws the controls under a theme of distinct colours and fails on a preset colour; a fixed colour on purpose is listed in `docs/STATE.md`).
 - One text editing engine: `TextEdit` edits through `EditText` and `EditBuffer`, implemented for `str`, `String` and the line-indexed
   `CodeDoc` (D180); a new text kind implements them, it does not get a second engine. A text view draws only the lines in view and
   never shapes, hashes or clones the whole text per frame (D179, D195).

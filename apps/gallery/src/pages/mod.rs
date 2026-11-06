@@ -2,13 +2,12 @@
 //! scenes), then the Ui pages in the order they are built. Adding a page is its own file plus one
 //! line in [`PAGES`].
 
-use lune_ui::lunegit_dark::THEME;
 use lune_ui::paint::Rect;
 use lune_ui::text::{Spec, Style};
 use lune_ui::ui::Ui;
 
 use crate::page::Page;
-use crate::scenes::background;
+use crate::scenes::background_in;
 
 mod a11y;
 mod badge;
@@ -27,6 +26,7 @@ mod diff_view;
 mod drag_drop;
 mod dropdown;
 pub(crate) mod effects;
+mod file_drop;
 mod filter_bar;
 mod flyout;
 mod focus;
@@ -73,14 +73,18 @@ mod tab_strip;
 mod table;
 mod text_edit;
 mod text_field;
+mod theme;
 mod toast_notifications;
 mod toggle;
 mod toolbar;
 mod tooltip;
+mod tray;
 mod tree_view;
 mod ui;
 mod verdict_row;
 mod virtual_list;
+
+pub(crate) use tray::{SurfaceFrame, draw_surface, surface_size};
 
 /// Every page, in listing and window order.
 pub(crate) static PAGES: &[&Page] = &[
@@ -154,21 +158,27 @@ pub(crate) static PAGES: &[&Page] = &[
     &code_editor::PAGE,
     &markdown::PAGE,
     &diff_view::PAGE,
+    &theme::PAGE,
+    &tray::PAGE,
+    &file_drop::PAGE,
 ];
 
 /// The window background of a Ui page (glass, focused) and its card. Returns the card.
 pub(crate) fn card(ui: &mut Ui<'_>, title: &str) -> Rect {
-    background(ui.painter(), true, true, title)
+    let theme = *ui.theme();
+    background_in(ui.painter(), &theme, true, true, title)
 }
 
 /// A small section heading at (`x`, `y`).
 pub(crate) fn heading(ui: &mut Ui<'_>, text: &str, x: f32, y: f32) {
-    let spec = Spec::plain(text, Style::ui(THEME.font_s, THEME.fg_tertiary).medium());
+    let t = *ui.theme();
+    let spec = Spec::plain(text, Style::ui(t.font_s, t.fg_tertiary).medium());
     ui.painter().text(&spec, x, y);
 }
 
 /// A small caption at (`x`, `y`).
 pub(crate) fn caption(ui: &mut Ui<'_>, text: &str, x: f32, y: f32) {
-    let spec = Spec::plain(text, Style::ui(THEME.font_s, THEME.fg_secondary));
+    let t = *ui.theme();
+    let spec = Spec::plain(text, Style::ui(t.font_s, t.fg_secondary));
     ui.painter().text(&spec, x, y);
 }

@@ -3,9 +3,10 @@
 //! events into [`RawInput`] and applies [`FrameOutput`] to its window; tests script both.
 //!
 //! All positions, sizes and pixel scroll amounts are logical (physical ÷ scale). Time is whatever
-//! the app supplies; the toolkit never reads a clock. Touch, gestures, file drops, theme and
-//! occlusion events are not modelled yet.
+//! the app supplies; the toolkit never reads a clock. File drops arrive as events that carry a path
+//! the toolkit never opens. Touch, gestures, theme and occlusion events are not modelled yet.
 
+use std::path::PathBuf;
 use std::time::Duration;
 
 use crate::access::{AccessAction, SemanticTree};
@@ -72,6 +73,14 @@ pub enum Event {
     ClipboardText(String),
     /// The clipboard holds no text or cannot be read, answering a [`ClipboardRequest::Read`].
     ClipboardUnavailable,
+    /// A file is being dragged over the window, with the pointer at `pos` (the adapter's last
+    /// pointer position: the OS gives none). One event per file. The toolkit only carries the
+    /// path; it never opens it (D20).
+    FileHover { pos: (f32, f32), path: PathBuf },
+    /// The dragged file left the window or the drag was cancelled.
+    FileHoverCancelled,
+    /// A file was dropped on the window, with the pointer at `pos`. One event per file.
+    FileDrop { pos: (f32, f32), path: PathBuf },
 }
 
 /// A pointer button.

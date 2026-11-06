@@ -11,6 +11,7 @@ use lune_ui::lunegit_dark::{self, THEME};
 use lune_ui::paint::{LayerId, Painter, Rect, StrokeStyle};
 use lune_ui::scene::Scene;
 use lune_ui::text::{Spec, Style, TextSystem};
+use lune_ui::theme::Theme;
 use lune_ui::widgets::dialog::{DialogGlass, DialogHits, DialogSpec, dialog};
 use lune_ui::widgets::dropdown::dropdown;
 use lune_ui::widgets::menu::{MENU_IN, MenuEntry, menu, menu_open_anim};
@@ -210,6 +211,18 @@ pub(crate) fn background<H: Copy + PartialEq>(
     focused: bool,
     title: &str,
 ) -> Rect {
+    background_in(p, &THEME, glass, focused, title)
+}
+
+/// [`background`] with the layers and the title colour of `theme`: a page under a loaded theme
+/// file draws its window from the theme's glass.
+pub(crate) fn background_in<H: Copy + PartialEq>(
+    p: &mut Painter<'_, H>,
+    theme: &Theme,
+    glass: bool,
+    focused: bool,
+    title: &str,
+) -> Rect {
     p.on(LayerId::Base);
     let win = p.window;
     let card = Rect::new(
@@ -222,8 +235,8 @@ pub(crate) fn background<H: Copy + PartialEq>(
         let solid = premul(lunegit_dark::INACTIVE_FALLBACK);
         (solid, solid, false)
     } else {
-        let mut panel = lunegit_dark::PANEL.premultiplied();
-        let mut fill = lunegit_dark::CARD.premultiplied();
+        let mut panel = theme.glass.panel.premultiplied();
+        let mut fill = theme.glass.card.premultiplied();
         if !glass {
             let base = premul(OPAQUE_BASE);
             panel = over(panel, base);
@@ -233,7 +246,7 @@ pub(crate) fn background<H: Copy + PartialEq>(
     };
     p.acrylic(win, 0.0, panel, [0.0; 4], noise);
     p.acrylic(card, chrome::CARD_RADIUS, card_fill, panel, noise);
-    let spec = Spec::plain(title, Style::ui(12.0, THEME.fg_secondary).medium());
+    let spec = Spec::plain(title, Style::ui(12.0, theme.fg_secondary).medium());
     p.text_centered(&spec, Rect::new(0.0, 0.0, win.w, TITLE_BAND - 2.0));
     card
 }

@@ -5,7 +5,9 @@
 use crate::paint::Rect;
 use crate::ui::WidgetId;
 
-/// A widget's role, one of the 36 the accessibility component lists, in its order.
+/// A widget's role, one of the 37 the accessibility component lists, in its order (the last, a
+/// password field, was added by M10's review: assistive technology needs to know a field is one
+/// to stop echoing what is typed).
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Role {
     Button,
@@ -44,11 +46,14 @@ pub enum Role {
     Navigation,
     Note,
     Separator,
+    /// A text field whose text is a secret: no value or text is ever exposed, and the role is
+    /// what tells a screen reader not to speak the typed characters.
+    PasswordInput,
 }
 
 impl Role {
     /// Every role, in declaration order.
-    pub const ALL: [Role; 36] = [
+    pub const ALL: [Role; 37] = [
         Role::Button,
         Role::Checkbox,
         Role::Switch,
@@ -85,6 +90,7 @@ impl Role {
         Role::Navigation,
         Role::Note,
         Role::Separator,
+        Role::PasswordInput,
     ];
 }
 
@@ -328,7 +334,7 @@ mod tests {
 
     #[test]
     fn the_closed_sets_have_the_documented_counts() {
-        assert_eq!(Role::ALL.len(), 36);
+        assert_eq!(Role::ALL.len(), 37);
         assert_eq!(STATES.len(), 15);
         assert_eq!(ACTIONS.len(), 10);
         for (i, role) in Role::ALL.iter().enumerate() {

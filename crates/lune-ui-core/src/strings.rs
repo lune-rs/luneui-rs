@@ -7,9 +7,18 @@
 //!
 //! [`format_template`] fills placeholders left to right. The toolkit ships no number or date
 //! locale data: `{n:spec}` hands the argument and the spec to the app's [`ArgFormat`] hook.
+//!
+//! A [`Catalog`] is a language file (JSON, read by the bounded reader in [`crate::json`]) that
+//! holds a `StringTable`: the app overlays it on its base table ([`StringTable::overlay`]), so a key
+//! a translation omits falls back. The templates are data from a file: [`format_template`] returns
+//! for any string and any arguments, in time linear in the template, and its output is at most the
+//! template's length plus what the hook writes for each placeholder the template names.
+//! [`audit_template`] counts a template's placeholders with the same scanner.
 
 use std::collections::BTreeMap;
 use std::fmt::{self, Display, Write as _};
+
+use crate::json::{self, JsonError, Value};
 
 /// The namespace of the toolkit's own keys (a key is in it when it starts with this, then a dot).
 const NAMESPACE: &str = "luneui";
@@ -139,68 +148,178 @@ impl ArgFormat for DisplayFormat {
     }
 }
 
+/// One piece of a template, as the scanner reads it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Piece<'t> {
+    /// Text with no brace in it.
+    Text(&'t str),
+    /// `{{`: a literal `{`.
+    OpenEscape,
+    /// `}}`: a literal `}`.
+    CloseEscape,
+    /// `{n}` or `{n:spec}`; `raw` is all of it, `colon` says whether it had a spec part.
+    Field {
+        index: usize,
+        spec: &'t str,
+        raw: &'t str,
+        colon: bool,
+    },
+    /// A `{` that starts no placeholder (no digits, an index past `usize`, no closing brace, any
+    /// other character after the digits): kept literally.
+    StrayOpen,
+    /// A `}` that closes nothing: kept literally.
+    StrayClose,
+}
+
+/// Splits a template into [`Piece`]s, left to right. [`format_template`] and [`audit_template`]
+/// both read the template through it, so they cannot disagree about what a placeholder is. Linear
+/// in the template: a search for a closing brace that finds none is not repeated, and a run of
+/// digits is read once.
+struct Scanner<'t> {
+    text: &'t str,
+    pos: usize,
+    /// A search for `}` ran to the end and found none: no later placeholder can close.
+    no_more_closers: bool,
+}
+
+impl<'t> Scanner<'t> {
+    fn new(text: &'t str) -> Self {
+        Self {
+            text,
+            pos: 0,
+            no_more_closers: false,
+        }
+    }
+
+    /// The placeholder starting at the `{` at `self.pos`, or `None` when it is none.
+    fn field(&mut self) -> Option<Piece<'t>> {
+        let start = self.pos;
+        let bytes = self.text.as_bytes();
+        let mut j = start + 1;
+        let mut index: Option<usize> = Some(0);
+        while let Some(d) = bytes.get(j).filter(|b| b.is_ascii_digit()) {
+            index = index
+                .and_then(|i| i.checked_mul(10))
+                .and_then(|i| i.checked_add(usize::from(d - b'0')));
+            j += 1;
+        }
+        if j == start + 1 {
+            return None;
+        }
+        // An index past `usize` is read to its end (the run is skipped once) but is no placeholder.
+        let index = index?;
+        let (spec, end, colon) = match bytes.get(j)? {
+            b'}' => ("", j + 1, false),
+            b':' if !self.no_more_closers => {
+                let from = j + 1;
+                let Some(len) = self.text.get(from..)?.find('}') else {
+                    self.no_more_closers = true;
+                    return None;
+                };
+                (self.text.get(from..from + len)?, from + len + 1, true)
+            }
+            _ => return None,
+        };
+        Some(Piece::Field {
+            index,
+            spec,
+            raw: self.text.get(start..end)?,
+            colon,
+        })
+    }
+}
+
+impl<'t> Iterator for Scanner<'t> {
+    type Item = Piece<'t>;
+
+    fn next(&mut self) -> Option<Piece<'t>> {
+        let rest = self.text.get(self.pos..).filter(|r| !r.is_empty())?;
+        let bytes = rest.as_bytes();
+        let piece = match bytes.first()? {
+            b'{' if bytes.get(1) == Some(&b'{') => {
+                self.pos += 2;
+                Piece::OpenEscape
+            }
+            b'{' => match self.field() {
+                Some(field) => {
+                    if let Piece::Field { raw, .. } = field {
+                        self.pos += raw.len();
+                    }
+                    field
+                }
+                None => {
+                    self.pos += 1;
+                    Piece::StrayOpen
+                }
+            },
+            b'}' if bytes.get(1) == Some(&b'}') => {
+                self.pos += 2;
+                Piece::CloseEscape
+            }
+            b'}' => {
+                self.pos += 1;
+                Piece::StrayClose
+            }
+            _ => {
+                // Both braces are ASCII, so the run ends on a character boundary.
+                let len = rest.find(['{', '}']).unwrap_or(rest.len());
+                self.pos += len;
+                Piece::Text(rest.get(..len)?)
+            }
+        };
+        Some(piece)
+    }
+}
+
 /// Fills the placeholders of `template` from `args`, left to right.
 ///
-/// `{{` and `}}` are literal braces; `{n}` and `{n:spec}` (n in ASCII digits) go through `f`; a
-/// placeholder whose argument is missing stays as written; extra arguments are ignored. Any other
-/// `{` and a lone `}` stay literal. Never panics.
+/// `{{` and `}}` are literal braces; `{n}` and `{n:spec}` (n in ASCII digits, within `usize`) go
+/// through `f`; a placeholder whose argument is missing stays as written; extra arguments are
+/// ignored. Any other `{` and a lone `}` stay literal. Never panics, whatever the template, and
+/// takes time linear in it; the output is the template's text plus what `f` writes for each
+/// placeholder that has an argument.
 pub fn format_template(template: &str, args: &[&dyn Display], f: &dyn ArgFormat) -> String {
-    let chars: Vec<char> = template.chars().collect();
     let mut out = String::with_capacity(template.len());
-    let mut i = 0;
-    while i < chars.len() {
-        match chars[i] {
-            '{' => {
-                if chars.get(i + 1) == Some(&'{') {
-                    out.push('{');
-                    i += 2;
-                } else if let Some((index, spec, end)) = placeholder(&chars, i) {
-                    match args.get(index) {
-                        Some(arg) => f.format(index, *arg, &spec, &mut out),
-                        None => out.extend(&chars[i..end]),
-                    }
-                    i = end;
-                } else {
-                    out.push('{');
-                    i += 1;
-                }
-            }
-            '}' => {
-                out.push('}');
-                i += if chars.get(i + 1) == Some(&'}') { 2 } else { 1 };
-            }
-            c => {
-                out.push(c);
-                i += 1;
-            }
+    for piece in Scanner::new(template) {
+        match piece {
+            Piece::Text(t) => out.push_str(t),
+            Piece::OpenEscape | Piece::StrayOpen => out.push('{'),
+            Piece::CloseEscape | Piece::StrayClose => out.push('}'),
+            Piece::Field {
+                index, spec, raw, ..
+            } => match args.get(index) {
+                Some(arg) => f.format(index, *arg, spec, &mut out),
+                None => out.push_str(raw),
+            },
         }
     }
     out
 }
 
-/// Parses `{n}` or `{n:spec}` at `chars[start]` (a `{`): the index, the spec and the position
-/// after the closing brace. `None` for anything else (no digits, an overflowing index, no
-/// closing brace, a character other than `}` or `:` after the digits).
-fn placeholder(chars: &[char], start: usize) -> Option<(usize, String, usize)> {
-    let mut j = start + 1;
-    let mut index: usize = 0;
-    let digits_from = j;
-    // `to_digit(10)` accepts ASCII digits only.
-    while let Some(d) = chars.get(j).and_then(|c| c.to_digit(10)) {
-        index = index.checked_mul(10)?.checked_add(d as usize)?;
-        j += 1;
-    }
-    if j == digits_from {
-        return None;
-    }
-    match chars.get(j)? {
-        '}' => Some((index, String::new(), j + 1)),
-        ':' => {
-            let close = chars[j + 1..].iter().position(|&c| c == '}')? + j + 1;
-            Some((index, chars[j + 1..close].iter().collect(), close + 1))
+/// What [`audit_template`] counted in one template.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct TemplateAudit {
+    /// `{n}` placeholders.
+    pub plain: usize,
+    /// `{n:spec}` placeholders (an empty spec counts: the colon is there).
+    pub spec: usize,
+    /// Stray braces: a `{` that starts no placeholder (no digits, an index past `usize`, no
+    /// closing brace) and a `}` that closes nothing. `{{` and `}}` are escapes, not these.
+    pub malformed: usize,
+}
+
+/// Counts the placeholders of `template` as [`format_template`] reads them: the same scanner.
+pub fn audit_template(template: &str) -> TemplateAudit {
+    let mut audit = TemplateAudit::default();
+    for piece in Scanner::new(template) {
+        match piece {
+            Piece::Field { colon: false, .. } => audit.plain += 1,
+            Piece::Field { colon: true, .. } => audit.spec += 1,
+            Piece::StrayOpen | Piece::StrayClose => audit.malformed += 1,
+            Piece::Text(_) | Piece::OpenEscape | Piece::CloseEscape => {}
         }
-        _ => None,
     }
+    audit
 }
 
 /// Translated strings by key. `Default` holds no entries, so every lookup falls back to the
@@ -229,6 +348,18 @@ impl StringTable {
         Ok(())
     }
 
+    /// Copies every entry of `other` into this table; where both have a key, `other`'s wins. The
+    /// entries were checked when they were inserted, so none is refused here.
+    pub fn overlay(&mut self, other: &StringTable) {
+        self.entries
+            .extend(other.entries.iter().map(|(k, v)| (k.clone(), v.clone())));
+    }
+
+    /// The table's own entries, `(key, text)`, in key order. Defaults are not listed.
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.entries.iter().map(|(k, v)| (k.as_str(), v.as_str()))
+    }
+
     /// The table's own text for `key`, if it has one.
     pub fn get(&self, key: &str) -> Option<&str> {
         self.entries.get(key).map(String::as_str)
@@ -242,5 +373,146 @@ impl StringTable {
     /// [`Self::tr`] with the placeholders filled from `args` through `f`.
     pub fn tr_fmt(&self, key: &str, args: &[&dyn Display], f: &dyn ArgFormat) -> String {
         format_template(self.tr(key), args, f)
+    }
+}
+
+/// Why a language file did not load. A file that fails loads nothing: the app keeps its table.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CatalogError {
+    /// The bytes are not JSON within the reader's limits.
+    Json(JsonError),
+    /// The top-level value is not an object.
+    NotAnObject,
+    /// A required field is absent.
+    Missing(&'static str),
+    /// A field has the wrong type (`strings` not a map of strings included).
+    WrongType(&'static str),
+    /// `code` or `displayName` is empty or only whitespace.
+    Empty(&'static str),
+    /// A key of `strings` was refused (D6: an empty key, or a `luneui.` key that is not a default).
+    Key(StringError),
+}
+
+/// A language file: `{ "code", "displayName", "version", "strings": { key: text } }`. The strings
+/// are a [`StringTable`] like any other; load it, then overlay it on the app's base table.
+#[derive(Debug, Clone)]
+pub struct Catalog {
+    pub code: String,
+    pub display_name: String,
+    /// A monotonic integer an app uses to refresh bundled files; 0 when absent. The loader does
+    /// not read it further.
+    pub version: i64,
+    table: StringTable,
+}
+
+impl Catalog {
+    /// Reads a language file through the bounded JSON reader. `code`, `displayName` (neither empty
+    /// nor blank) and `strings` (an object of strings) are required; `version` is an exact integer
+    /// or absent. Unknown top-level keys are ignored. Every key goes through
+    /// [`StringTable::insert`], and its refusal fails the whole load (D6): a typo in a `luneui.`
+    /// key does not ship. Nothing here reads a file or panics.
+    pub fn from_json(bytes: &[u8]) -> Result<Catalog, CatalogError> {
+        let root = json::parse(bytes).map_err(CatalogError::Json)?;
+        if !matches!(root, Value::Object(_)) {
+            return Err(CatalogError::NotAnObject);
+        }
+        let required = |key: &'static str| root.get(key).map_err(|_| CatalogError::Missing(key));
+        let name = |key: &'static str| -> Result<String, CatalogError> {
+            let text = required(key)?
+                .as_str()
+                .map_err(|_| CatalogError::WrongType(key))?;
+            if text.trim().is_empty() {
+                return Err(CatalogError::Empty(key));
+            }
+            Ok(text.to_string())
+        };
+        let code = name("code")?;
+        let display_name = name("displayName")?;
+        let version = match root.get("version") {
+            Ok(v) => v.as_int().map_err(|_| CatalogError::WrongType("version"))?,
+            Err(_) => 0,
+        };
+        let strings = required("strings")?
+            .string_map()
+            .map_err(|_| CatalogError::WrongType("strings"))?;
+        let mut table = StringTable::default();
+        for (key, text) in strings {
+            table.insert(key, text).map_err(CatalogError::Key)?;
+        }
+        Ok(Catalog {
+            code,
+            display_name,
+            version,
+            table,
+        })
+    }
+
+    /// The catalog's strings.
+    pub fn table(&self) -> &StringTable {
+        &self.table
+    }
+
+    /// The catalog's strings, by value.
+    pub fn into_table(self) -> StringTable {
+        self.table
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Piece, Scanner};
+
+    fn pieces(t: &str) -> Vec<Piece<'_>> {
+        Scanner::new(t).collect()
+    }
+
+    #[test]
+    fn the_scanner_splits_a_template_into_pieces() {
+        assert_eq!(
+            pieces("a{{b}}{0}{1:x}{c}"),
+            [
+                Piece::Text("a"),
+                Piece::OpenEscape,
+                Piece::Text("b"),
+                Piece::CloseEscape,
+                Piece::Field {
+                    index: 0,
+                    spec: "",
+                    raw: "{0}",
+                    colon: false
+                },
+                Piece::Field {
+                    index: 1,
+                    spec: "x",
+                    raw: "{1:x}",
+                    colon: true
+                },
+                Piece::StrayOpen,
+                Piece::Text("c"),
+                Piece::StrayClose,
+            ]
+        );
+        assert!(pieces("").is_empty());
+    }
+
+    #[test]
+    fn pieces_cover_the_template_exactly() {
+        // Every piece consumes at least one byte and the scanner ends at the end of the text.
+        for t in [
+            "{{{",
+            "}}}",
+            "{0:",
+            "{99999999999999999999}",
+            "\u{e9}{\u{e9}}",
+            "{0:{}}",
+        ] {
+            let mut s = Scanner::new(t);
+            let mut last = 0;
+            while s.next().is_some() {
+                assert!(s.pos > last, "{t:?} stalled at {last}");
+                last = s.pos;
+            }
+            assert_eq!(s.pos, t.len(), "{t:?}");
+        }
     }
 }

@@ -13,5 +13,8 @@ lune-ui-wgpu = { path = "../lune-ui-wgpu" }
 lune-ui-winit = { path = "../lune-ui-winit" }
 lune-ui-platform = { path = "../lune-ui-platform" }
 
+[features]
+accesskit = ["lune-ui-winit/accesskit"]
+
 [lints]
 workspace = true

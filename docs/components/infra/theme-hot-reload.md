@@ -2,7 +2,7 @@
 id: infra.theme-hot-reload
 title: Theme JSON loading and hot reload
 area: infra
-status: planned
+status: in-progress
 consumers: lunegit
 source: Lunegit: src/Lunegit.Desktop/Theming/ThemeApplicator.cs
 owner: —
@@ -27,7 +27,7 @@ consumers that bake colours into rendered output.
 
 ## Existing code
 
-None in luneui-rs. The `Theme` value and the dark preset exist (`crates/lune-ui-core/src/theme.rs:11-45,55-118`). Lunegit: `src/Lunegit.Desktop/Theming/ThemeApplicator.cs` (444 lines),
+`Theme::from_json`, `ThemeFile`, `Skip`, `ThemeError` in `crates/lune-ui-core/src/theme/file.rs`; the key table `COLOR_KEYS` / `color_slot`, `AcrylicLevel` and `Theme::with_acrylic` in `crates/lune-ui-core/src/theme.rs` (M10 step 2). Tests `crates/lune-ui-core/tests/theme_file.rs`, `apps/gallery/tests/lunegit_files.rs`. Lunegit: `src/Lunegit.Desktop/Theming/ThemeApplicator.cs` (444 lines),
 `src/Lunegit.Infrastructure/Theming/JsonThemeRegistry.cs` (147), `src/Lunegit.Core/Theme/ThemeFile.cs` (21), `src/Lunegit.Desktop/SampleThemes/*.json`.
 
 ## Spec
@@ -44,24 +44,13 @@ Conflicts: (1) the `AcrylicLevel` doc comments say material opacity 0.3, 0.6, 0.
 
 - What a theme file holds: `name`, `author`, `version` (a monotonic integer, 0 when absent, used by the app to refresh bundled themes), `colors` (key to hex string) and `acrylic` (key to number) [L src/Lunegit.Core/Theme/ThemeFile.cs:10-21]. The glass tint colour is a colour key, not an acrylic one [L src/Lunegit.Core/Theme/ThemeFile.cs:5-7].
 - Colour syntax: `#AARRGGBB` or `#RRGGBB` in the sample files (440 and 2 occurrences) [L src/Lunegit.Desktop/SampleThemes/dark-modern.json:6-17], [infra.json]. The `Theme` stores straight-alpha RGBA, so `#CCFFFFFF` is `[0xFF, 0xFF, 0xFF, 0xCC]` [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:7], [R crates/lune-ui-core/src/theme.rs:56].
-- Mapping onto `Theme` fields, each pair equal in value in the dark preset (so a file with the default values reproduces the preset):
-
-| `Theme` field | Lunegit colour key | value | cite |
-|---|---|---|---|
-| `fg_primary`, `fg_secondary`, `fg_tertiary` | `ForegroundPrimary`, `ForegroundSecondary`, `ForegroundTertiary` | `#CCFFFFFF`, `#AAFFFFFF`, `#88FFFFFF` | [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:7-9], [R crates/lune-ui-core/src/theme.rs:56-58] |
-| `surface_input`, `surface_hover`, `surface_selected` | `SurfaceInput`, `SurfaceHover`, `SurfaceSelected` | `#0AFFFFFF`, `#10FFFFFF`, `#18FFFFFF` | [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:25-28], [R crates/lune-ui-core/src/theme.rs:59-61] |
-| `border`, `border_subtle` | `SurfaceBorder`, `SurfaceBorderSubtle` | `#30FFFFFF`, `#1AFFFFFF` | [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:34-35], [R crates/lune-ui-core/src/theme.rs:62-63] |
-| `accent` | `AccentPrimaryColor` | `#FF767D85` | [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:158], [R crates/lune-ui-core/src/theme.rs:64] |
-| `dropdown_bg` | `BackdropDark` | `#F0000000` | [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:42], [R crates/lune-ui-core/src/theme.rs:68] |
-| `dialog_backdrop`, `dialog_footer` | `DialogBackdropBrush`, `DialogDarkerBlockBackground` | `#80000000`, `#24000000` | [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:317-318], [R crates/lune-ui-core/src/theme.rs:69-70] |
-| `menu_popup_border`, `menu_item_hover` | `PopupMenuOuterBorder`, `PopupMenuItemHover` | `#3AFFFFFF`, `#16FFFFFF` | [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:301,304], [R crates/lune-ui-core/src/theme.rs:75-76] |
-| `menu_separator` | `SurfaceSeparator` | `#22FFFFFF` | [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:30], [R crates/lune-ui-core/src/theme.rs:77] |
-
-  The fields with no Lunegit key (`accent_hover`, `on_accent`, `on_accent_text`, `menu_text_primary`, `menu_text_tertiary`, `menu_text_quaternary`, `menu_glass`, `caption_close_hover`, `caption_close_fg`, the three font sizes and `item_radius`) keep the preset's value in v1 [R crates/lune-ui-core/src/theme.rs:65-67,71-74,78-85].
-  Lunegit's other keys (statuses, diff, file status, Markdown, toast, tree guides and the rest, about 85 to 102 per file) have no `Theme` field today; they arrive with the components that need them (M5 to M9) and are added to the mapping then.
+- Mapping onto `Theme` fields: one table, `COLOR_KEYS` (50 keys) and the `match` behind it in `crates/lune-ui-core/src/theme.rs` (it carries Lunegit's key names, so that file holds them). Each key's value in the dark preset equals the `Theme` field's: checked against `DarkTheme.axaml` for all 50 (name and value). One key can set two fields (`SurfaceSeparator`: `surface_separator` and `menu_separator`) and `GlassTintColor` sets the tint of all three glass layers.
+  The fields with no Lunegit key follow their source when the file sets it (D208): `accent_hover` (each channel of the accent plus 0x10, saturating), `scroll_thumb`, `scroll_thumb_hover` and `text_selection` (the accent at alpha 0x8C, 0xE6, 0x66), `diff_added_mark` and `diff_removed_mark` (the line fill at alpha 0x40), `menu_text_primary`, `menu_text_tertiary` and `menu_text_quaternary` (the matching `fg_*`). These reproduce the preset exactly. The rest (`on_accent`, `on_accent_text`, `menu_glass`, `caption_close_*`, the data tones, the font sizes, `item_radius`) keep the base value; no toolkit-only keys.
+  Lunegit's other colour keys (about fifty per file: file status badges, Markdown tables, tree guides and the rest) have no `Theme` field; the loader reports each as `Skip::UnknownColor` and the app may ignore them.
 - Glass layers: `GlassTintDarkOpacity` and `GlassMaterialDarkOpacity` are the window layer (1.0 and 0.7), `GlassTintLightOpacity` and `GlassMaterialLightOpacity` the panel layer (0.8 and 0.7), `GlassMaterialDarkHeaderOpacity` the card layer's material (0.8); `GlassTintColor` is the tint [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:226-235], [R crates/lune-ui-core/src/theme.rs:88-109], [L src/Lunegit.Desktop/SampleThemes/blue.json:65,92-100].
 - Partial overlay: a theme is applied by restoring the baseline for every themeable key, then writing the file's keys; a key the file omits keeps the baseline value [L src/Lunegit.Desktop/Theming/ThemeApplicator.cs:253-261], [L src/Lunegit.Desktop/SampleThemes/README.txt:21-22]. In the toolkit the baseline is the preset the app starts from and the overlay is a function from (preset, parsed file) to a new `Theme`; nothing is mutated.
-- Acrylic level, applied last over the file: Default changes nothing; Opaque sets the material opacities to 1.0; Less opaque halves each (0.7 gives 0.35, 0.8 gives 0.4); More opaque moves each halfway to 1 (0.7 gives 0.85, 0.8 gives 0.9); the result is clamped to [0, 1]; tint and solid keys never scale [L src/Lunegit.Desktop/Theming/ThemeApplicator.cs:386-426]. It is a restart-required setting in Lunegit [L src/Lunegit.Core/Settings/Enums.cs:76-78]; the toolkit has no such limit.
+- Acrylic keys: `GlassTintDarkOpacity` and `GlassMaterialDarkOpacity` set the window layer, `GlassTintLightOpacity` and `GlassMaterialLightOpacity` the panel layer, `GlassMaterialDarkHeaderOpacity` the card layer's material; a value outside [0, 1] is `Skip::BadAcrylic`, any other key `Skip::UnknownAcrylic`.
+- Acrylic level (`Theme::with_acrylic`, applied last over the file): Default changes nothing; Opaque sets the material opacities to 1.0; Less opaque halves each (0.7 gives 0.35, 0.8 gives 0.4); More opaque moves each halfway to 1 (0.7 gives 0.85, 0.8 gives 0.9); the result is clamped to [0, 1]; tint and solid keys never scale [L src/Lunegit.Desktop/Theming/ThemeApplicator.cs:386-426]. It is a restart-required setting in Lunegit [L src/Lunegit.Core/Settings/Enums.cs:76-78]; the toolkit has no such limit.
 - Font scale: the six font sizes times 0.875, 1.0 or 1.125, applied once at startup (restart required) [L src/Lunegit.Desktop/Theming/ThemeApplicator.cs:211-237]. The toolkit takes the already scaled sizes in `Theme`; the multiplier is the app's.
 - Inactive-window fallback: a solid colour derived from the tint, replacing the acrylic layers while the window is inactive [L src/Lunegit.Desktop/Theming/ThemeApplicator.cs:284-301], [R crates/lune-ui-core/src/theme.rs:111-113]; see `platform.window`.
 - Bad input, as Lunegit forgives it: a file that does not parse or lacks `name`, `colors` or `acrylic` is skipped with a warning [L src/Lunegit.Infrastructure/Theming/JsonThemeRegistry.cs:77-86,105-109]; a duplicate theme name (case-insensitive) is skipped [L src/Lunegit.Infrastructure/Theming/JsonThemeRegistry.cs:88-96]; an unparsable colour skips that key; an unknown acrylic key is skipped [L src/Lunegit.Desktop/Theming/ThemeApplicator.cs:358-369,377-382]. The toolkit loader returns the new `Theme`, or an error for a bad envelope, plus a list of skipped keys (unknown key, bad colour, unknown acrylic key) for the app to show; it never panics ([infra.json]).
@@ -74,7 +63,7 @@ n/a — a theme has no look of its own and no interaction; the loader is a funct
 
 ### Transitions
 
-n/a — Lunegit swaps every resource at once with no tween [L src/Lunegit.Desktop/Theming/ThemeApplicator.cs:11-13,247-264], and no animation rule covers a theme change. Whether a theme change should crossfade is an Open question.
+A swap is a hard cut, as Lunegit's is [L src/Lunegit.Desktop/Theming/ThemeApplicator.cs:11-13,247-264] (D209): in the frame `FrameConfig.theme` differs from the previous frame's, `Ui::animate_color` snaps every colour to its target, whether the target moved or not; nothing crossfades. Float transitions are untouched.
 
 ### Input and focus
 
@@ -101,9 +90,10 @@ None: theme names and warnings are the app's text.
 - `theme-green`: the `controls` scene under `green.json` (Lunegit's bundled theme), settled, after M10.
 - `theme-orange`: the `controls` scene under `orange.json` (Lunegit's bundled theme), settled, after M10.
 - `theme-purple`: the `controls` scene under `purple.json` (Lunegit's bundled theme), settled, after M10.
-- `theme-partial`: a file that overrides only `AccentPrimaryColor`, settled.
-- `theme-acrylic-less`, `theme-acrylic-more`, `theme-acrylic-opaque`: the `menu` scene's glass under each level, settled.
-- `theme-swap`: the same frame drawn with theme A then theme B in consecutive frames (two dumps), settled.
+- `theme-partial`: an inline file that overrides only `AccentPrimaryColor`, settled.
+- `theme-acrylic-less`, `theme-acrylic-more`, `theme-acrylic-opaque`: the preset under each level: a panel taken from `theme.glass.panel` over bright stripes and a glass menu over the panel, settled.
+- `theme-swap`: dark modern, a toggle clicked at 40 ms, a cue at 60 ms that swaps to blue, captured at 80 ms: every colour is already blue (a hard cut) and only the toggle's thumb, which no theme drives, is still moving.
+- `theme-swap-b`: the same script captured at 600 ms, settled; a gallery test (`pages::theme::tests`) proves it equals the blue theme's frame after the same click.
 
 ### Painter primitives
 
@@ -114,10 +104,10 @@ None: theme names and warnings are the app's text.
 
 - Known answers (instrument: the real Lunegit files): loading `dark-modern.json` maps `ForegroundPrimary` `"#FFCCCCCC"` to `fg_primary` `[0xCC, 0xCC, 0xCC, 0xFF]` [L src/Lunegit.Desktop/SampleThemes/dark-modern.json:6]; `blue.json` maps `AccentPrimaryColor` `"#FF71B0F7"` to `accent` `[0x71, 0xB0, 0xF7, 0xFF]` [L src/Lunegit.Desktop/SampleThemes/blue.json:64]; `#CCFFFFFF` is `[0xFF, 0xFF, 0xFF, 0xCC]` (ARGB to RGBA).
 - Partial overlay: a file with only the `accent` key leaves every other field equal to the preset; an empty `colors` object returns the preset unchanged.
-- Preset round trip: the dark preset written with the 15 mapped pairs above and loaded again equals the preset.
+- Preset round trip: the dark preset written through all 50 keys and the five opacity keys, loaded over a base with every table and derived field changed, equals the preset (`the_preset_written_through_the_table_loads_back_equal`).
 - Skips: `"#ZZZZZZ"` for a colour skips that key and reports it; an unknown acrylic key is reported; a file without `name` returns an error; none panics.
 - Acrylic level: 0.7 gives 0.35 (less), 0.85 (more), 1.0 (opaque); 0.8 gives 0.4 and 0.9; results stay in [0, 1]; Default returns the input [L src/Lunegit.Desktop/Theming/ThemeApplicator.cs:419-425].
-- Hot swap: two consecutive frames drawn with theme A then B are each identical to a solo render with that theme (no state leaks across frames) [R-nfr-1].
+- Hot swap: a toggle drawn under theme A, settled, then under theme B in the next frame, gives the Scene of a solo frame under B and no `Repaint::Now` because of the swap; a colour mid-transition at the swap snaps (`tests/theme_file.rs`).
 - Pixel probes and conformance: through the `theme-*` scenes; the sample files' values differ from the preset, so their dumps are new baselines, not zero delta; the mapped-pair round trip above is the zero-delta check; no transitions.
 - Semantic-node test: n/a.
 
@@ -128,10 +118,12 @@ None: theme names and warnings are the app's text.
 
 ## Open questions
 
-- Whether a theme change crossfades (a `page-swap` or none): no source; today it is a hard cut.
-- Toolkit keys for the `Theme` fields Lunegit has no key for (`accent_hover`, the menu text colours, the caption close colours): M10 names them or derives them from the mapped ones (hard rule 8, [D51]).
-- Contrast and legibility checks on loaded colours: none in Lunegit; not in v1 unless M10 adds a warning.
-- The sample themes' colours differ from the dark preset (for instance `ForegroundPrimary` `#FFCCCCCC` against `#CCFFFFFF`): loading them changes the look by design; their dumps are new baselines, not zero-delta against the preset.
+None open. Answered in M10 step 2 (D207 to D209):
+
+- A theme change does not crossfade: it is a hard cut (D209).
+- The `Theme` fields with no Lunegit key derive from the mapped ones (D208); no toolkit keys.
+- Contrast and legibility checks on loaded colours: none (Lunegit has none).
+- The sample themes' colours differ from the dark preset by design; their dumps are new baselines (step 9's `theme-*` scenes, on the gallery's `theme` page, which also lets the window pick a file and an acrylic level).
 
 ## Notes for the planner
 

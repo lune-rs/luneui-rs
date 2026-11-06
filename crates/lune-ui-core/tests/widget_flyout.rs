@@ -614,3 +614,243 @@ fn the_routes_keys_are_small_and_the_strip_has_its_outline() {
     assert_eq!(ring.rect, [strip.x, strip.y, strip.w, strip.h]);
     assert_eq!(ring.color, premul(DARK.border_subtle));
 }
+
+// The flyout in a window of its own (`Ui::flyout_window`, D17): the window is the card's size and
+// the card fills it. The scripts are the anchored flyout's, run on a harness the card's size.
+
+fn win_draw(
+    h: &mut UiHarness,
+    ms: u64,
+    f: Option<&Flyout<'_>>,
+) -> (Scene, FlyoutResponse, FrameOutput) {
+    let mut resp = FlyoutResponse::default();
+    let (scene, out) = h.at_ms(ms).frame(|ui| {
+        if let Some(f) = f {
+            resp = ui.flyout_window("fly", f);
+        }
+    });
+    (scene, resp, out)
+}
+
+/// A harness the card's size, opened and settled past the 180 ms open.
+fn win_opened(f: &Flyout<'_>) -> UiHarness {
+    let mut h = UiHarness::new(size_of(f));
+    win_draw(&mut h, 0, Some(f));
+    win_draw(&mut h, 300, Some(f));
+    h
+}
+
+#[test]
+fn a_window_flyout_card_fills_the_window_at_the_three_states() {
+    for (state, tone) in [
+        ("Serving", Tone::Ok),
+        ("degraded", Tone::Warn),
+        ("paused", Tone::Paused),
+    ] {
+        let f = flyout(state, tone);
+        let (w, h) = size_of(&f);
+        let mut ui = win_opened(&f);
+        let (scene, ..) = win_draw(&mut ui, 600, Some(&f));
+        // The card is the window: its size, at the origin, whatever the anchor says.
+        assert_eq!(card(&scene), [0.0, 0.0, w, h], "{state}");
+        let b = scene.backdrop.expect("a glass card asks for the blur");
+        assert_eq!(b.rect, [0.0, 0.0, w, h], "{state}");
+    }
+}
+
+#[test]
+fn a_window_flyout_dismisses_on_escape_and_focus_loss_and_not_on_its_own_card() {
+    let f = serving();
+    let mut h = win_opened(&f);
+    key(&mut h, NamedKey::Escape);
+    assert!(win_draw(&mut h, 310, Some(&f)).1.dismissed);
+
+    let mut h = win_opened(&f);
+    h.input.focus(false);
+    assert!(win_draw(&mut h, 310, Some(&f)).1.dismissed);
+
+    // A press on the card's header, a margin or a stat is not outside.
+    let mut h = win_opened(&f);
+    for (dx, dy) in [(60.0, 22.0), (10.0, 80.0), (30.0, 60.0)] {
+        h.input.pointer_to(dx, dy).click(P);
+        let (_, r, _) = win_draw(&mut h, 330, Some(&f));
+        assert!(!r.dismissed && r.picked.is_none(), "({dx}, {dy})");
+    }
+}
+
+#[test]
+fn a_focus_loss_before_the_window_flyout_first_opened_does_nothing() {
+    let f = serving();
+    let mut h = UiHarness::new(size_of(&f));
+    h.input.focus(false);
+    let (_, r, _) = win_draw(&mut h, 0, None);
+    assert!(!r.dismissed);
+    let (_, r, _) = win_draw(&mut h, 10, Some(&f));
+    assert!(!r.dismissed && r.picked.is_none());
+    let (_, r, _) = win_draw(&mut h, 400, Some(&f));
+    assert!(!r.dismissed);
+}
+
+#[test]
+fn a_window_flyout_click_picks_once_and_a_disabled_row_picks_nothing() {
+    let f = serving();
+    let mut h = win_opened(&f);
+    let (_, _, out) = win_draw(&mut h, 310, Some(&f));
+    let (x, y) = row_centre(&out, 2);
+    h.input.pointer_to(x, y);
+    win_draw(&mut h, 320, Some(&f));
+    h.input.click(P);
+    let (_, r, _) = win_draw(&mut h, 330, Some(&f));
+    assert_eq!(r.picked, Some(2));
+    assert_eq!(win_draw(&mut h, 340, Some(&f)).1.picked, None, "once");
+    let (x, y) = row_centre(&out, 1);
+    h.input.pointer_to(x, y).click(P);
+    let (_, r, _) = win_draw(&mut h, 350, Some(&f));
+    assert!(r.picked.is_none() && !r.dismissed);
+}
+
+#[test]
+fn a_window_flyout_takes_the_menus_keys() {
+    let f = serving();
+    for k in [NamedKey::Enter, NamedKey::Space] {
+        let mut h = win_opened(&f);
+        let (_, _, out) = win_draw(&mut h, 310, Some(&f));
+        assert_eq!(out.focused, Some(rows_id().with(0_usize)), "{k:?}");
+        key(&mut h, k);
+        assert_eq!(win_draw(&mut h, 320, Some(&f)).1.picked, Some(0), "{k:?}");
+        assert_eq!(
+            win_draw(&mut h, 330, Some(&f)).1.picked,
+            None,
+            "{k:?}: once"
+        );
+    }
+    let mut h = win_opened(&f);
+    win_draw(&mut h, 310, Some(&f));
+    for (ms, k, row) in [
+        (320, NamedKey::ArrowDown, 0),
+        (330, NamedKey::ArrowDown, 2),
+        (340, NamedKey::ArrowDown, 3),
+        (350, NamedKey::ArrowDown, 0),
+        (360, NamedKey::ArrowUp, 3),
+        (370, NamedKey::Home, 0),
+        (380, NamedKey::End, 3),
+    ] {
+        key(&mut h, k);
+        win_draw(&mut h, ms, Some(&f));
+        key(&mut h, NamedKey::Enter);
+        let (_, r, _) = win_draw(&mut h, ms + 5, Some(&f));
+        assert_eq!(r.picked, Some(row), "{k:?}");
+    }
+}
+
+/// Opens, settles, stops calling at 1000 ms and steps 10 ms frames: ms until idle and the closing
+/// frames' fill alphas, in the window.
+fn win_close_run(tier: MotionTier) -> (u64, Vec<f32>, bool) {
+    let f = serving();
+    let mut h = UiHarness::new(size_of(&f));
+    h.tier = tier;
+    win_draw(&mut h, 0, Some(&f));
+    win_draw(&mut h, 300, Some(&f));
+    let (mut alphas, mut blurred) = (Vec::new(), true);
+    let mut t = 1000;
+    loop {
+        let (scene, _, out) = win_draw(&mut h, t, None);
+        if let Some(s) = scene.layers[LayerId::Popup as usize].geometry.under.first() {
+            alphas.push(s.color[3]);
+            blurred &= scene.backdrop.is_some();
+        }
+        if out.repaint == Repaint::Idle {
+            return (t - 1000, alphas, blurred);
+        }
+        t += 10;
+        assert!(t < 2000, "never settled");
+    }
+}
+
+#[test]
+fn a_window_flyout_opens_and_closes_with_the_menus_curves_and_goes_idle() {
+    for (tier, ms) in [
+        (MotionTier::Full, 120),
+        (MotionTier::Reduced, 120),
+        (MotionTier::Off, 0),
+    ] {
+        let (idle_after, alphas, blurred) = win_close_run(tier);
+        assert_eq!(idle_after, if ms == 0 { 10 } else { ms }, "{tier:?}");
+        assert_eq!(alphas.len() as u64, ms / 10, "{tier:?}");
+        assert!(alphas.windows(2).all(|w| w[1] <= w[0]), "{tier:?}");
+        assert!(blurred, "{tier:?}: the exit replays the blur");
+    }
+    let f = serving();
+    let mut h = UiHarness::new(size_of(&f));
+    win_draw(&mut h, 0, Some(&f));
+    let rest = {
+        let mut r = UiHarness::new(size_of(&f));
+        win_draw(&mut r, 0, Some(&f));
+        let (scene, ..) = win_draw(&mut r, 400, Some(&f));
+        scene.layers[LayerId::Popup as usize].geometry.under[0].color[3]
+    };
+    let mut last = 0.0;
+    for k in 1..=15_u64 {
+        let dt = (k * 1000 + 30) / 60;
+        let (scene, _, out) = win_draw(&mut h, dt, Some(&f));
+        let a = scene.layers[LayerId::Popup as usize].geometry.under[0].color[3];
+        assert!(a >= last && a.is_finite(), "{dt}: {a} after {last}");
+        last = a;
+        if dt >= 180 + 17 {
+            assert_eq!(a, rest, "settled at {dt} ms");
+            assert_eq!(out.repaint, Repaint::Idle);
+        }
+    }
+    // Stopped calling, it fades out; once the close is over the blur is gone.
+    let (scene, ..) = win_draw(&mut h, 1200, None);
+    assert!(scene.backdrop.is_some());
+    let (scene, ..) = win_draw(&mut h, 1400, None);
+    assert!(scene.backdrop.is_none());
+}
+
+#[test]
+fn a_window_flyouts_nodes_are_the_anchored_ones_and_a_disabled_one_picks_nothing() {
+    let f = serving();
+    let mut h = win_opened(&f);
+    let (_, _, out) = win_draw(&mut h, 600, Some(&f));
+    let menu = out.tree.get(rows_id()).expect("menu node");
+    assert_eq!((menu.role, menu.name.as_str()), (Role::Menu, "App tray"));
+    let state = out.tree.get(root().with("state")).expect("state node");
+    assert_eq!((state.role, state.live), (Role::Status, Some(Live::Polite)));
+    for id in ["stats-group", "routes-group"] {
+        assert_eq!(out.tree.get(root().with(id)).expect(id).role, Role::Group);
+    }
+
+    let keys = [
+        NamedKey::Enter,
+        NamedKey::Space,
+        NamedKey::ArrowDown,
+        NamedKey::ArrowUp,
+        NamedKey::Home,
+        NamedKey::End,
+    ];
+    for k in keys {
+        h.shortcuts
+            .add(Binding::new(Scope::Global, Chord::key(Key::Named(k)), "go"));
+    }
+    let frame = |h: &mut UiHarness, ms: u64| {
+        let mut resp = FlyoutResponse::default();
+        let (_, out) = h.at_ms(ms).frame(|ui| {
+            ui.with_enabled(false, |ui| resp = ui.flyout_window("fly", &f));
+        });
+        (out, resp)
+    };
+    frame(&mut h, 620);
+    for (i, k) in keys.iter().enumerate() {
+        key(&mut h, *k);
+        let (out, resp) = frame(&mut h, 630 + 10 * i as u64);
+        assert!(out.fired.is_empty(), "{k:?}");
+        assert_eq!(resp.picked, None, "{k:?}");
+    }
+    let (out, _) = frame(&mut h, 700);
+    for id in [rows_id(), root().with("state"), root().with("stats-group")] {
+        assert_eq!(disabled_violations(&out.tree, id), [], "{id:?}");
+    }
+    key(&mut h, NamedKey::Escape);
+    assert!(frame(&mut h, 710).1.dismissed, "Escape still closes it");
+}

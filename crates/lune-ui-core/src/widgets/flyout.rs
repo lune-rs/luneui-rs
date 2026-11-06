@@ -1,7 +1,8 @@
 //! The tray flyout (`overlay.flyout`, D145): a glass popover drawn from the app's anchor. A header
 //! (mark, wordmark, state), a strip of compact stat cells, a list of routes, a separator and the
-//! menu's rows, with the menu's keys. M10 places it from the tray icon's rect; here it is placed
-//! from whatever anchor the app gives.
+//! menu's rows, with the menu's keys. [`Ui::flyout`] places it from whatever anchor the app gives;
+//! [`Ui::flyout_window`] fills a window of its own, which the app placed from the tray icon's rect
+//! (`tray::place_surface`).
 //!
 //! Geometry (the consuming app's design): 340 wide, 5 px of padding inside a 1 px ring (so content starts
 //! 6 px in, as a menu's rows do), the header 6 8 around a 20 px line, the stats and the routes
@@ -304,7 +305,35 @@ impl<'a> Ui<'a> {
             shift: true,
             surface: Surface::Glass,
         };
-        let (frame, _, picked) = self.popover(&key, &options, |ui, rect| {
+        self.flyout_in(key, f, &options)
+    }
+
+    /// The flyout `f` in a window of its own: the window is [`flyout_size`] big and the card is
+    /// its whole rect (the tray's flyout, D17). `f.anchor`, `side` and `align` are not used: the
+    /// app placed the window ([`place_surface`](crate::tray::place_surface)). Everything else is
+    /// [`Self::flyout`], through the same popover, so the keys, Escape, focus loss, the motion and
+    /// the exit are the ones tested there; the app hides the window once `dismissed` and the frame
+    /// is idle.
+    pub fn flyout_window(&mut self, key: impl Hash, f: &Flyout<'_>) -> FlyoutResponse {
+        let size = flyout_size(self.painter(), f);
+        let options = crate::tray::window_popover(self.painter().window, size, Surface::Glass);
+        self.flyout_in(
+            key,
+            f,
+            &PopoverOptions {
+                anchor_id: f.anchor_id,
+                ..options
+            },
+        )
+    }
+
+    fn flyout_in(
+        &mut self,
+        key: impl Hash,
+        f: &Flyout<'_>,
+        options: &PopoverOptions,
+    ) -> FlyoutResponse {
+        let (frame, _, picked) = self.popover(&key, options, |ui, rect| {
             ui.scope(&key, |ui| flyout_body(ui, rect, f))
         });
         FlyoutResponse {

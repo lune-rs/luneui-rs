@@ -163,6 +163,9 @@ pub struct Ui<'a> {
     input_acted: bool,
     /// `(focused, visible)` once begin applied the frame's input.
     focus_at_begin: (Option<WidgetId>, bool),
+    /// The theme differs from the previous frame's: every colour transition snaps to its target
+    /// this frame, moved or not (D5, a swap is a hard cut).
+    theme_cut: bool,
 }
 
 impl std::fmt::Debug for Ui<'_> {
@@ -224,6 +227,7 @@ impl<'a> Ui<'a> {
                 o.phase = overlay::RecPhase::Open;
             }
         }
+        let theme_cut = store.last_theme.is_some_and(|t| t != config.theme);
         let active: Vec<Active> = store
             .overlays
             .iter()
@@ -550,6 +554,7 @@ impl<'a> Ui<'a> {
             node_meta: BTreeMap::new(),
             input_acted: acted,
             focus_at_begin,
+            theme_cut,
         }
     }
 
@@ -577,6 +582,7 @@ impl<'a> Ui<'a> {
             pointer,
             input_acted,
             focus_at_begin,
+            theme_cut,
             ..
         } = self;
         let now = input.time;
@@ -592,6 +598,7 @@ impl<'a> Ui<'a> {
             now,
             &config.theme.motion,
             config.tier,
+            theme_cut,
         );
         // A composition ends with its widget's last drawn frame. Nothing else clears it under a live
         // keep-alive scope, where D15 keeps the focus and the widget's own `end_edit` does not run.
@@ -720,6 +727,7 @@ impl<'a> Ui<'a> {
         store.collect(store.frame);
         store.frame += 1;
         store.last_tier = Some(config.tier);
+        store.last_theme = Some(config.theme);
 
         let repaint = if in_flight || moving || catch_up {
             Repaint::Now

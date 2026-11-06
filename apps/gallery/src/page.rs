@@ -22,6 +22,7 @@ use lune_ui::strings::{DisplayFormat, StringTable};
 use lune_ui::testing::ScriptedInput;
 use lune_ui::text::TextSystem;
 use lune_ui::theme::Theme;
+use lune_ui::tray::TrayState;
 use lune_ui::ui::{FrameConfig, Ui, UiStore, WidgetId};
 
 use crate::scenes::LegacyScene;
@@ -69,6 +70,22 @@ pub(crate) trait PageState {
     /// the gallery. The default is none.
     fn images(&self) -> Vec<(ImageId, ImageData)> {
         Vec::new()
+    }
+
+    /// The theme the page runs under, read at the start of every frame; a page that loads a
+    /// theme file or swaps themes answers it, and the default is the preset's.
+    fn theme(&self) -> Option<Theme> {
+        None
+    }
+
+    /// A named cue from a scene's script (`Ev::Cue`), delivered before the frame it comes with.
+    /// The default ignores it.
+    fn cue(&mut self, _name: &str) {}
+
+    /// What the page's tray control says, for the live tray in window mode; `None` on every page
+    /// that has no tray.
+    fn tray_state(&self) -> Option<TrayState> {
+        None
     }
 }
 
@@ -186,6 +203,15 @@ pub(crate) enum Ev {
     ImeCommit(&'static str),
     /// The clipboard's answer to a read.
     ClipboardText(&'static str),
+    /// A cue for the page's state (`PageState::cue`): the script's way to ask for a change the
+    /// pointer would otherwise have to make.
+    Cue(&'static str),
+    /// A file is dragged over the window, the pointer where it last was.
+    FileHover(&'static str),
+    /// The dragged file left the window.
+    FileHoverCancelled,
+    /// A file is dropped on the window.
+    FileDrop(&'static str),
 }
 
 /// The id of the widget at `path` under page `page`.
@@ -202,7 +228,6 @@ pub(crate) struct Player {
     input: ScriptedInput,
     strings: StringTable,
     tier: MotionTier,
-    theme: Theme,
     /// The modifiers `Ev::Mods` holds.
     held: Modifiers,
     shortcuts: Shortcuts,
@@ -236,7 +261,6 @@ impl Player {
             input,
             strings,
             tier,
-            theme: THEME,
             held: Modifiers::default(),
             shortcuts: Shortcuts::default(),
         }
@@ -352,6 +376,18 @@ impl Player {
             Ev::ClipboardText(text) => {
                 self.input.clipboard_text(text);
             }
+            Ev::Cue(name) => {
+                self.state.cue(name);
+            }
+            Ev::FileHover(path) => {
+                self.input.file_hover(*path);
+            }
+            Ev::FileHoverCancelled => {
+                self.input.file_hover_cancelled();
+            }
+            Ev::FileDrop(path) => {
+                self.input.file_drop(*path);
+            }
         }
         Ok(())
     }
@@ -370,7 +406,8 @@ impl Player {
         }
         let raw = self.input.end_frame();
         let config = FrameConfig {
-            theme: self.theme,
+            // Read after the events, so a cue's change shows in the frame it comes with.
+            theme: self.state.theme().unwrap_or(THEME),
             tier: self.tier,
             strings: &self.strings,
             arg_format: &DisplayFormat,

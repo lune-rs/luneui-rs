@@ -24,7 +24,7 @@ summary: Glass context menu with open and close motion
 
 ## Existing code
 
-`crates/lune-ui-core/src/widgets/menu.rs`: `Ui::menu`, `Ui::menu_with`, `menu_rows`, `menu_layout_at`, `menu_paint`, the free `menu`, `menu_open_anim`, `menu_close_anim`. Tests: `crates/lune-ui-core/tests/widget_menu.rs`, `tests/c4.rs`.
+`crates/lune-ui-core/src/widgets/menu.rs`: `Ui::menu`, `Ui::menu_with`, `menu_rows`, `menu_layout_at`, `menu_size`, `Ui::menu_window` (the menu filling a window of its own, M10 D220), `menu_paint`, the free `menu`, `menu_open_anim`, `menu_close_anim`. Tests: `crates/lune-ui-core/tests/widget_menu.rs`, `tests/c4.rs`.
 
 ## Spec
 
@@ -121,6 +121,7 @@ Never animated: the rows themselves, the pressed fill, and the panel's size (the
 - `menu-pressed`: held on the third row, #FFFFFF23.
 - `menu-anchored`: under its button, `Side::Bottom`, `PlaceAlign::Start`, gap 4.
 - `menu-anchored-flipped`: the same near the window's bottom, flipped above.
+- `tray-menu-window` (M10, `platform.tray-icon`): `Ui::menu_window`, the menu filling a window of its own from its corner, over a flat stand-in for the desktop, settled.
 
 ### Painter primitives
 

@@ -128,6 +128,7 @@ The Wane mock eases with `--ease-out`; the animation rules give Linear for hover
 - `DoubleClick::click` takes a `std::time::Instant`, while frames carry an app-supplied `Duration` (`RawInput`'s time): a `Duration` form would make scripted tests need no real clock; M4 decides.
 - Windows 11 snap layouts on the maximize button need non-client hit-testing from the OS window procedure [W docs/ui/components.md:714]; no helper exists; unverified here.
 - Space for the macOS traffic lights in the app's title strip: no source gives the inset.
+- A loaded theme's `WindowFallbackBackground` sets only `Theme::window_fallback` (M10, D207); Lunegit recomputes the inactive window's fill from the glass tint, and that recomputation is the app's, since the toolkit has no inactive-window policy of its own.
 
 ## Notes for the planner
 

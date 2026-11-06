@@ -131,8 +131,8 @@ impl Ui<'_> {
                 }
                 if let Some(AccessValue::Text(value)) = resp.set_value.clone()
                     && !opts.read_only
+                    && set_value(ui, &cfg, &mut st, text, value)
                 {
-                    set_value(ui, &cfg, &mut st, text, value);
                     resp.mark_changed();
                 }
                 let origin = (viewport.x + PAD_X, viewport.y + PAD_Y);

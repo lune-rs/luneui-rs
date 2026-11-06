@@ -16,14 +16,20 @@ mod windows;
 use macos::BEST_SUPPORTED;
 #[cfg(target_os = "macos")]
 use macos::apply as apply_os;
+#[cfg(target_os = "macos")]
+use macos::apply_rounded as apply_rounded_os;
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use other::BEST_SUPPORTED;
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use other::apply as apply_os;
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+use other::apply_rounded as apply_rounded_os;
 #[cfg(target_os = "windows")]
 use windows::BEST_SUPPORTED;
 #[cfg(target_os = "windows")]
 use windows::apply as apply_os;
+#[cfg(target_os = "windows")]
+use windows::apply_rounded as apply_rounded_os;
 
 pub use crate::backdrop::Material;
 use crate::backdrop::{Backdrop, BackdropKind};
@@ -33,6 +39,17 @@ use crate::backdrop::{Backdrop, BackdropKind};
 /// `Opaque` is `Ok` everywhere. A glass material on a platform without OS glass is an `Err`.
 pub fn apply(window: &winit::window::Window, material: Material) -> Result<(), String> {
     apply_os(window, material)
+}
+
+/// [`apply`], with the OS glass view's corners rounded to `radius` logical pixels, for a window whose
+/// card is rounded. On macOS the glass view follows the radius; elsewhere the radius is ignored: the
+/// window's own corners are the OS's, and this is [`apply`].
+pub fn apply_rounded(
+    window: &winit::window::Window,
+    material: Material,
+    radius: f64,
+) -> Result<(), String> {
+    apply_rounded_os(window, material, radius)
 }
 
 /// A winit window as the OS backdrop: [`Backdrop`] over [`apply`].

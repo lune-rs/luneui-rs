@@ -22,7 +22,7 @@ Windows tray left-click surface: header, stats, route list, action rows. Named b
 
 ## Existing code
 
-`crates/lune-ui-core/src/widgets/flyout.rs` (`Flyout`, `Ui::flyout`, `flyout_size`, `flyout_body`) over `Ui::popover` with `Surface::Glass`, `menu_rows` (the menu's row frame), `Ui::stat_strip` and `Ui::kv_list` [D145]; tests in `crates/lune-ui-core/tests/widget_flyout.rs`. The separate window and the tray anchoring wait for M10. Before M7 there was none in luneui-rs or Luneterm's `lune-ui` (Wane: partial: the glass popup surface exists (popup_panel widgets/mod.rs:200; menu glass widgets/menu.rs:109); the stats block and the separate window are missing). Design source (not code to move): Luneterm crates/lune-ui/src/widgets/menu.rs:109-111 (backdrop, glass fill, ring); Luneium src/renderer/shell/components/Popup.css:2; docs/mockups/Tray.dc.html (content).
+`crates/lune-ui-core/src/widgets/flyout.rs` (`Flyout`, `Ui::flyout`, `flyout_size`, `flyout_body`) over `Ui::popover` with `Surface::Glass`, `menu_rows` (the menu's row frame), `Ui::stat_strip` and `Ui::kv_list` [D145]; tests in `crates/lune-ui-core/tests/widget_flyout.rs`. M10 step 7 added `Ui::flyout_window`, the same body in a window of its own (the card fills the window, `tray::place_surface` places the window; D220). Before M7 there was none in luneui-rs or Luneterm's `lune-ui` (Wane: partial: the glass popup surface exists (popup_panel widgets/mod.rs:200; menu glass widgets/menu.rs:109); the stats block and the separate window are missing). Design source (not code to move): Luneterm crates/lune-ui/src/widgets/menu.rs:109-111 (backdrop, glass fill, ring); Luneium src/renderer/shell/components/Popup.css:2; docs/mockups/Tray.dc.html (content).
 
 ## Spec
 
@@ -101,6 +101,7 @@ None of its own: the header, stats, route and action labels are app text (Wane m
 - `flyout-closed` (new): nothing drawn over the controls scene, settled.
 - `flyout-opening` (new): t = 90 ms (half of fast, 180 ms).
 - `flyout-closing` (new): t = 60 ms (half of instant, 120 ms).
+- `tray-flyout-window` (M10, `platform.tray-icon`): `Ui::flyout_window`, the same body filling a window of its own from its corner, over a flat stand-in for the desktop, settled.
 
 ### Painter primitives
 
@@ -110,7 +111,7 @@ None of its own: the header, stats, route and action labels are app text (Wane m
 
 ### Acceptance
 
-- Behaviour (scripted input, injected time): an outside click, Escape and a focus loss close; a click, Enter and Space pick a row once; arrows wrap and skip a disabled row; the size equals the drawn card at the three states; empty stats or routes take no height (`tests/widget_flyout.rs`). The tray click that toggles it is the app's (M10).
+- Behaviour (scripted input, injected time): an outside click, Escape and a focus loss close; a click, Enter and Space pick a row once; arrows wrap and skip a disabled row; the size equals the drawn card at the three states; empty stats or routes take no height (`tests/widget_flyout.rs`). The tray click that toggles it is `TrayToggle`'s (M10, `platform.tray-icon`); the window form is checked in `crates/lune-ui-core/tests/tray.rs` and, live, by `gallery --smoke-platform` (its menu surface, through the same path).
 - Pixel probes at scale 2: window width 680 px; radius 18 px; header padding 12 px vertical and 16 px horizontal.
 - Conformance: the open and close curves match `overlay.menu`.
 - Semantic node: role `menu` for the actions; the status node polite; the state text follows the tray state.

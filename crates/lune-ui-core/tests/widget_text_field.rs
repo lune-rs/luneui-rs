@@ -190,6 +190,72 @@ fn set_value_replaces_the_text_and_marks_changed() {
 }
 
 #[test]
+fn an_insert_over_the_cap_is_refused_whole_by_set_value_and_by_paste() {
+    use lune_ui_core::input::Modifiers;
+    use lune_ui_core::text_edit::MAX_SHAPED_INSERT;
+    // The field shapes its whole text, so a value past 1 MiB (an assistive set-value, or a paste of
+    // anything from outside the process) would cost seconds and gigabytes: the text stays. The
+    // cap itself goes in.
+    for (len, taken) in [(MAX_SHAPED_INSERT, true), (MAX_SHAPED_INSERT + 1, false)] {
+        let value = "a".repeat(len);
+
+        let mut h = UiHarness::new(WIN);
+        let mut text = String::from("old");
+        frame(&mut h, &mut text);
+        h.input.access(AccessAction {
+            target: id(),
+            action: Action::SetValue,
+            value: Some(AccessValue::Text(value.clone())),
+        });
+        let (_, r, _) = frame(&mut h, &mut text);
+        assert_eq!(r.changed, taken, "set-value of {len}");
+        assert_eq!(
+            text,
+            if taken {
+                value.clone()
+            } else {
+                "old".to_owned()
+            }
+        );
+
+        // The paste: Command+V asks, the clipboard's text answers a frame later.
+        let mut text = String::from("old");
+        let mut h = UiHarness::new(WIN);
+        frame(&mut h, &mut text);
+        h.input.key_down(Key::Named(NamedKey::Tab), None);
+        frame(&mut h, &mut text);
+        let logo = Modifiers {
+            logo: true,
+            ..Modifiers::default()
+        };
+        h.input
+            .set_modifiers(logo)
+            .key_down(Key::Character("v".to_owned()), None)
+            .set_modifiers(Modifiers::default());
+        frame(&mut h, &mut text);
+        h.input.clipboard_text(&value);
+        let (_, r, _) = frame(&mut h, &mut text);
+        assert_eq!(r.changed, taken, "paste of {len}");
+        assert_eq!(
+            text.len(),
+            if taken { 3 + len } else { 3 },
+            "paste of {len}"
+        );
+    }
+    // Under the cap a value still replaces.
+    let mut h = UiHarness::new(WIN);
+    let mut text = String::from("old");
+    frame(&mut h, &mut text);
+    h.input.access(AccessAction {
+        target: id(),
+        action: Action::SetValue,
+        value: Some(AccessValue::Text("new".to_owned())),
+    });
+    frame(&mut h, &mut text);
+    assert_eq!(text, "new");
+}
+
+#[test]
 fn pixel_probes_at_scale_two() {
     let probe = |reach: Reach, error: bool| {
         let mut h = UiHarness::new(WIN);
@@ -720,6 +786,33 @@ mod edit {
             let node = out.tree.get(id()).expect("node");
             assert_eq!((&node.value, &node.text), (&None, &None));
             assert!(!format!("{:?}{:?}", node, scene).contains(secret));
+        }
+    }
+
+    #[test]
+    fn a_password_field_is_a_password_input_and_a_plain_one_a_text_input() {
+        // The role is how assistive technology knows not to speak what is typed (S1): a node of
+        // `Role::TextInput` with no value is not enough.
+        for (variant, role) in [
+            (Variant::Password, Role::PasswordInput),
+            (Variant::Plain, Role::TextInput),
+            (Variant::Mono, Role::TextInput),
+            (Variant::Search, Role::TextInput),
+        ] {
+            let opts = FieldOptions {
+                variant,
+                ..FieldOptions::default()
+            };
+            let mut text = String::from("hunter2");
+            let mut h = focused(&mut text, &opts);
+            let (_, out) = h.frame(|ui| {
+                ui.text_field_with("f", RECT, &mut text, &opts);
+            });
+            let node = out.tree.get(id()).expect("node");
+            assert_eq!(node.role, role, "{variant:?}");
+            if variant == Variant::Password {
+                assert_eq!((&node.value, &node.text), (&None, &None));
+            }
         }
     }
 

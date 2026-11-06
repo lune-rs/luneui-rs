@@ -339,7 +339,8 @@ impl<'a> Ui<'a> {
     ///
     /// Focus follows the scope stack: a closing overlay hands focus back only when focus is in it
     /// (or gone), and a later overlay whose saved focus was inside the closing one inherits the
-    /// closing one's saved focus, so its own close restores to a widget that still exists.
+    /// closing one's saved focus, so its own close restores to a widget that still exists. In a
+    /// frame that swaps the theme (`theme_cut`) closing overlays are dropped, not drawn out.
     pub(crate) fn settle_overlays(
         store: &mut super::UiStore,
         painter: &mut Painter<'_, WidgetId>,
@@ -347,6 +348,7 @@ impl<'a> Ui<'a> {
         now: Time,
         tokens: &MotionTokens,
         tier: MotionTier,
+        theme_cut: bool,
     ) -> bool {
         let live: Vec<(u32, bool)> = store
             .overlays
@@ -387,6 +389,12 @@ impl<'a> Ui<'a> {
         store
             .overlays
             .retain(|rec| rec.active() || rec.closing(now, tokens, tier).is_some());
+        // A theme swap is a hard cut (D209): a closing overlay's exit replays what it recorded, with
+        // the colours of the theme it was drawn under, so it would fade out in the old theme over the
+        // new one. Focus went back when its close began, so dropping it holds nothing.
+        if theme_cut {
+            store.overlays.retain(|rec| rec.active());
+        }
         for rec in &store.overlays {
             if let (Some((p, transforms)), Some(exit)) =
                 (rec.closing(now, tokens, tier), rec.exit.as_ref())
