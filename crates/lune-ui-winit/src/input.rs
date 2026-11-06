@@ -370,6 +370,7 @@ pub struct OutputState {
 }
 
 impl OutputState {
+    /// A state that has set no cursor and no IME area yet.
     pub fn new() -> Self {
         Self::default()
     }

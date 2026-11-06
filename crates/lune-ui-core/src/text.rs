@@ -6,6 +6,7 @@ use std::hash::{Hash, Hasher};
 
 use crate::color::Rgba;
 
+/// Which family a run is shaped in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Font {
     Ui,
@@ -25,6 +26,7 @@ pub struct Style {
 }
 
 impl Style {
+    /// A proportional-font style of `size`, with a line 1.3 times the size, rounded.
     pub fn ui(size: f32, color: Rgba) -> Self {
         Self {
             font: Font::Ui,
@@ -36,6 +38,7 @@ impl Style {
         }
     }
 
+    /// A monospace style of `size` and line height `line`.
     pub fn mono(size: f32, line: f32, color: Rgba) -> Self {
         Self {
             font: Font::Mono,
@@ -47,6 +50,7 @@ impl Style {
         }
     }
 
+    /// The style at weight 500.
     pub fn medium(self) -> Self {
         Self {
             weight: 500,
@@ -54,6 +58,7 @@ impl Style {
         }
     }
 
+    /// The style at weight 700.
     pub fn bold(self) -> Self {
         Self {
             weight: 700,
@@ -61,6 +66,7 @@ impl Style {
         }
     }
 
+    /// The style slanted.
     pub fn italic(self) -> Self {
         Self {
             italic: true,
@@ -86,6 +92,7 @@ pub struct Spec {
 }
 
 impl Spec {
+    /// One run of `text` in `style`, not wrapped.
     pub fn plain(text: impl Into<String>, style: Style) -> Self {
         Self {
             runs: vec![(text.into(), style)],
@@ -93,6 +100,7 @@ impl Spec {
         }
     }
 
+    /// The spec wrapped at `width` logical px.
     pub fn wrapped(mut self, width: f32) -> Self {
         self.wrap = Some(width);
         self

@@ -50,6 +50,7 @@ pub struct DoubleClick {
 }
 
 impl DoubleClick {
+    /// A detector that has seen no click.
     pub fn new() -> Self {
         Self::default()
     }

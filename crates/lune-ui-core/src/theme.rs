@@ -33,7 +33,7 @@ pub struct Theme {
     pub scroll_thumb: Rgba,
     /// The thumb while hovered or held: `accent` at alpha 0xE6.
     pub scroll_thumb_hover: Rgba,
-    /// The fill under selected text: `accent` at alpha 0x66 (the [D51] derivation).
+    /// The fill under selected text: `accent` at alpha 0x66 (the D51 derivation).
     pub text_selection: Rgba,
     /// Knob and check mark on an accent fill.
     pub on_accent: Rgba,

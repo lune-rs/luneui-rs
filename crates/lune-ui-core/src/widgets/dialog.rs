@@ -6,7 +6,7 @@
 //! function (everything at rest, no transform), [`Ui::dialog`] and [`Ui::dialog_with`] (the same
 //! on the overlay machinery, with the open fade and scale), and the exit painter of a closing
 //! dialog (D8). The modal host (scrim, the card's motion, exit retention, the node) is
-//! [`modal_host`], which other modal surfaces share.
+//! `modal_host`, which other modal surfaces share.
 
 use std::cell::RefCell;
 use std::hash::Hash;

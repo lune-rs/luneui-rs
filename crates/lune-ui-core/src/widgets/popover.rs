@@ -138,10 +138,10 @@ pub fn place(req: &PlaceRequest) -> Placement {
 /// What a popover draws behind its content.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Surface {
-    /// [`popup_panel`]: radius 8, `dropdown_bg`, a 1 px `border` ring.
+    /// [`popup_panel`](fn@popup_panel): radius 8, `dropdown_bg`, a 1 px `border` ring.
     #[default]
     Panel,
-    /// [`glass_panel`]: radius 9, the blurred scene under it (`backdrop`), `menu_glass`, a 1 px
+    /// `glass_panel`: radius 9, the blurred scene under it (`backdrop`), `menu_glass`, a 1 px
     /// `menu_popup_border` ring: the surface of the glass menu (D7).
     Glass,
     /// Nothing: the content draws its own surface.

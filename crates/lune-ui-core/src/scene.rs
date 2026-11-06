@@ -93,6 +93,7 @@ pub struct LayerGeometry {
     pub fills: Vec<StrokeVertex>,
 }
 
+/// One text draw: the shaped text's key, its position and clip, and a glyph scale.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TextItem {
     pub key: TextKey,
@@ -148,6 +149,7 @@ pub struct ImageItem {
     pub round_clip: RoundClip,
 }
 
+/// One layer's items, grouped by kind: the geometry, then the customs, the images and the text.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Layer {
     pub geometry: LayerGeometry,

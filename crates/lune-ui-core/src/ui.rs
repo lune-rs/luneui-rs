@@ -778,6 +778,7 @@ impl<'a> Ui<'a> {
         &mut self.painter
     }
 
+    /// The theme this frame draws with.
     pub fn theme(&self) -> &Theme {
         &self.config.theme
     }
@@ -787,6 +788,7 @@ impl<'a> Ui<'a> {
         self.input.time
     }
 
+    /// How much motion this frame plays (see [`MotionTier`]).
     pub fn tier(&self) -> MotionTier {
         self.config.tier
     }

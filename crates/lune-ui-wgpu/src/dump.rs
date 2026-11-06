@@ -99,6 +99,8 @@ fn unpad_to_rgba(
     Ok(rgba)
 }
 
+/// Writes `rgba` (8 bits per channel, `size` wide and high) to `path` as a PNG. Errors as a message
+/// naming what failed.
 pub fn write_png(path: &Path, size: (u32, u32), rgba: &[u8]) -> Result<(), String> {
     let file =
         std::fs::File::create(path).map_err(|e| format!("create {}: {e}", path.display()))?;

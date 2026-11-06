@@ -15,6 +15,8 @@ use crate::text_cache::TextCache;
 use lune_ui_core::image::{ImageData, ImageError, ImageId, ImageStore};
 use lune_ui_core::scene::{ImageSource, Scene, Shape, StrokeVertex};
 
+/// The uniform block of the shape and stroke pipelines: the target size in physical px and the
+/// scale.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 pub struct Globals {

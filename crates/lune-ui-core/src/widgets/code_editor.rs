@@ -4,13 +4,13 @@
 //!
 //! The frame is the [text area](super::text_area)'s, with the document replaced by the lines in
 //! view: the engine's events, then a linked pane's offset, then the reveal, then the area, whose
-//! content takes the press and draws. Nothing a frame does walks the document. [`DocHost`] is the
-//! field's [`EditHost`] over the document, and [`DocLayout`] answers the engine by shaping the line
+//! content takes the press and draws. Nothing a frame does walks the document. `DocHost` is the
+//! field's `EditHost` over the document, and `DocLayout` answers the engine by shaping the line
 //! it is asked about, so a settled frame costs the same at 1,000 lines and at 1,000,000.
 //!
 //! The engine takes the text as `&mut` and a layout that reads it, which one document cannot be at
-//! once. The engine never edits and asks for geometry in the same command, so [`DocHost::apply`]
-//! splits them: a geometric command runs on a [`Frozen`] view with the [`DocLayout`], and every other
+//! once. The engine never edits and asks for geometry in the same command, so `DocHost::apply`
+//! splits them: a geometric command runs on a `Frozen` view with the `DocLayout`, and every other
 //! one on the document with a layout that only segments.
 //!
 //! Line tops are `f64`: at a million lines an `f32` cannot tell two pixels apart. Positions reach
@@ -244,7 +244,7 @@ impl LineTops<'_> {
 }
 
 /// A read of the document with the engine's write side: for the commands that never edit, whose
-/// [`EditLayout`] reads the document at the same time. See [`DocHost::apply`].
+/// [`EditLayout`] reads the document at the same time. See `DocHost::apply`.
 struct Frozen<'a>(&'a CodeDoc);
 
 impl EditText for Frozen<'_> {
@@ -408,7 +408,7 @@ impl EditLayout for DocLayout<'_, '_> {
     }
 }
 
-/// The [`EditHost`] of a document.
+/// The `EditHost` of a document.
 struct DocHost<'a> {
     doc: &'a mut CodeDoc,
     tops: LineTops<'a>,

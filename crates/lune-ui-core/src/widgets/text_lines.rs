@@ -13,7 +13,7 @@ use crate::text::{Spec, Style};
 use crate::text_edit::EditLayout;
 use crate::ui::Ui;
 
-/// A coloured stretch of one line: chars `start..end` (D6). It need not be tidy: [`line_spec`]
+/// A coloured stretch of one line: chars `start..end` (D6). It need not be tidy: `line_spec`
 /// clamps it to the line, skips it if empty or inverted, and cuts its overlap with an earlier one.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HighlightSpan {

@@ -94,6 +94,8 @@ impl WindowSurface {
         self.config.alpha_mode
     }
 
+    /// Reconfigures the surface to `width` by `height` physical px, each at least 1. Call it when
+    /// the window resizes; [`Self::acquire`] does it itself for an outdated surface.
     pub fn resize(&mut self, gpu: &Gpu, width: u32, height: u32) {
         self.config.width = width.max(1);
         self.config.height = height.max(1);

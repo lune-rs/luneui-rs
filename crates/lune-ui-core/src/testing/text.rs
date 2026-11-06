@@ -701,7 +701,7 @@ fn line_contract(ts: &mut dyn TextSystem, style: Style) -> Result<(), String> {
 }
 
 /// P14, P15, the caret around each break of P16, and P17 to P20 for one `spec`, at each of
-/// [`LINE_SCALES`]. For a system that lays text out; [`text_system_contract`] runs it on its own specs, and an adapter's
+/// `LINE_SCALES`. For a system that lays text out; [`text_system_contract`] runs it on its own specs, and an adapter's
 /// tests may run it on generated ones.
 pub fn spec_line_contract(ts: &mut dyn TextSystem, spec: &Spec) -> Result<(), String> {
     for scale in LINE_SCALES {

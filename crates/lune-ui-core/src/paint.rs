@@ -14,6 +14,7 @@ mod path;
 
 pub use crate::scene::{LAYER_COUNT, LayerId};
 
+/// A rectangle by its top-left corner and size, in logical px unless a call says physical.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct Rect {
     pub x: f32,
@@ -23,22 +24,27 @@ pub struct Rect {
 }
 
 impl Rect {
+    /// The rect at `x`, `y` of size `w` by `h`.
     pub const fn new(x: f32, y: f32, w: f32, h: f32) -> Self {
         Self { x, y, w, h }
     }
 
+    /// The x of the right edge.
     pub fn right(&self) -> f32 {
         self.x + self.w
     }
 
+    /// The y of the bottom edge.
     pub fn bottom(&self) -> f32 {
         self.y + self.h
     }
 
+    /// Whether `p` is inside: the left and top edges count, the right and bottom do not.
     pub fn contains(&self, p: (f32, f32)) -> bool {
         p.0 >= self.x && p.0 < self.right() && p.1 >= self.y && p.1 < self.bottom()
     }
 
+    /// The rect shrunk by `dx` on the left and right and `dy` on the top and bottom.
     pub fn inset(&self, dx: f32, dy: f32) -> Self {
         Self::new(
             self.x + dx,
@@ -48,6 +54,7 @@ impl Rect {
         )
     }
 
+    /// The area both rects cover; a rect with zero size when they do not meet.
     pub fn intersect(&self, o: &Rect) -> Rect {
         let x = self.x.max(o.x);
         let y = self.y.max(o.y);
@@ -59,6 +66,7 @@ impl Rect {
         )
     }
 
+    /// The rect as `[x, y, w, h]` at scale `s`, in physical px.
     pub fn phys(&self, s: f32) -> [f32; 4] {
         [self.x * s, self.y * s, self.w * s, self.h * s]
     }
@@ -85,6 +93,7 @@ pub struct StrokeStyle {
 }
 
 impl StrokeStyle {
+    /// A plain stroke of `color` and `width`, no sweep or comet.
     pub fn solid(color: Rgba, width: f32) -> Self {
         Self {
             color: premul(color),
@@ -202,6 +211,8 @@ pub(crate) struct PainterState {
     hit_tag: u32,
 }
 
+/// Records one frame's drawing into a [`Scene`] and the hit regions of what it drew, at scale `s`.
+/// Draw calls are in logical px; the painter turns them into physical px.
 pub struct Painter<'a, H> {
     pub s: f32,
     pub window: Rect,
@@ -243,6 +254,8 @@ impl<H: std::fmt::Debug> std::fmt::Debug for Painter<'_, H> {
 }
 
 impl<'a, H: Copy + PartialEq> Painter<'a, H> {
+    /// A painter at scale `s` over `window`. `hover` is the hit value under the pointer, which
+    /// [`Self::hovered`] compares against.
     pub fn new(
         s: f32,
         window: Rect,
@@ -414,6 +427,8 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         self.hit_tag = tag;
     }
 
+    /// Draws on `layer` from now on, with no clip. A layer's items keep the order they were drawn
+    /// in, and the layers draw back to front ([`LayerId`]).
     pub fn on(&mut self, layer: LayerId) {
         self.rec(|| Op::On(layer));
         self.layer = layer as usize;
@@ -422,6 +437,8 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         self.clips.clear();
     }
 
+    /// Sets the clip to `clip` (logical px), or removes it with `None`. [`Self::push_clip`] nests;
+    /// this replaces.
     pub fn set_clip(&mut self, clip: Option<Rect>) {
         self.rec(|| Op::SetClip(clip));
         self.clip = clip;
@@ -637,6 +654,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         self.fill_radii(r, [radius; 4], color);
     }
 
+    /// [`Self::fill`] with a radius per corner: top-left, top-right, bottom-right, bottom-left.
     pub fn fill_radii(&mut self, r: Rect, radii: [f32; 4], color: Rgba) {
         self.rec(|| Op::FillRadii(r, radii, color));
         let sh = self.shape(r, radii, premul(color));
@@ -716,6 +734,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         });
     }
 
+    /// Draws `spec` with its top-left corner at `x`, `y`. Returns its size in logical px.
     pub fn text(&mut self, spec: &Spec, x: f32, y: f32) -> (f32, f32) {
         self.rec(|| Op::Text(spec.clone(), x, y));
         let size = self.text.prepare(spec, self.s).1;
@@ -847,11 +866,13 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         (w, h)
     }
 
+    /// Draws `spec` centred in `r`.
     pub fn text_centered(&mut self, spec: &Spec, r: Rect) {
         let (_, (w, h)) = self.text.prepare(spec, self.s);
         self.text(spec, r.x + (r.w - w) / 2.0, r.y + (r.h - h) / 2.0);
     }
 
+    /// The size of `spec` in logical px at this painter's scale.
     pub fn measure(&mut self, spec: &Spec) -> (f32, f32) {
         self.text.measure(spec, self.s)
     }
@@ -891,12 +912,15 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         self.tr(r)
     }
 
+    /// Adds a hit region: pointer events over `r` (cut to the clip, then transformed) belong to
+    /// `h`.
     pub fn hit(&mut self, r: Rect, h: H) {
         let r = self.hit_rect(r);
         self.hits.push((r, h));
         self.hit_meta.push((self.layer, self.hit_tag));
     }
 
+    /// Whether the pointer is over `h`'s region.
     pub fn hovered(&self, h: H) -> bool {
         self.hover == Some(h)
     }

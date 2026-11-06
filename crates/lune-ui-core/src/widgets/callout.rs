@@ -3,7 +3,7 @@
 //! Radius 6, a 1 px border, padding 8 10 inside it; a 14 px icon centred in a 20 px slot, 8 px, then
 //! the text (13 on a 20 px line, wrapping). At the right, an optional figure (mono, bright, Medium;
 //! never gold) and an optional small action button. Neutral is `surface_input` with `border_subtle`;
-//! every other tone is the badge recipe from [`Tone`](super::tone::Tone) (fill 1A, border 44, a
+//! every other tone is the badge recipe from [`Tone`] (fill 1A, border 44, a
 //! tone-coloured icon). A callout is static: it takes no input of its own and is not dismissible.
 
 use std::hash::Hash;

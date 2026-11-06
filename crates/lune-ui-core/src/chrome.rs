@@ -10,6 +10,8 @@ pub const STROKE: f32 = 1.0;
 const MIN_NOTCH_WIDTH: f32 = 12.0;
 const MIN_RADIUS: f32 = 0.01;
 
+/// The selected tab's span along the top edge, in logical px from the outline's left: the outline
+/// leaves a notch between `left` and `right`.
 #[derive(Debug, Clone, Copy)]
 pub struct TabSpan {
     pub left: f32,

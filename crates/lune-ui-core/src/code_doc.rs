@@ -59,6 +59,7 @@ fn line_starts_at(text: &[u8], at: usize) -> bool {
 }
 
 impl CodeDoc {
+    /// A document holding `text`, line terminators as given.
     pub fn new(text: impl Into<String>) -> Self {
         let mut doc = Self {
             text: text.into(),

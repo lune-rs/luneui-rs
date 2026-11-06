@@ -1,6 +1,6 @@
 //! The overlay scrollbar of a scroll area (`widget.scrollbar`): a 9 px transparent track with a
 //! 6 px rounded thumb in the `accent` colour, shown while the pointer is over the area or the thumb
-//! is held, taking no layout space. [`thumb_geometry`] is the pure part; [`Ui::scrollbar`] (used by
+//! is held, taking no layout space. [`thumb_geometry`] is the pure part; `Ui::scrollbar` (used by
 //! [`Ui::scroll_area`](crate::ui::Ui::scroll_area), not called by apps) registers and draws it.
 //!
 //! The bar has no node of its own and is no tab stop: the owning area's node carries the offset

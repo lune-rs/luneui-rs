@@ -1,17 +1,17 @@
-//! The text box on the editing engine ([`TextEdit`](crate::text_edit::TextEdit)), on the same four
+//! The text box on the editing engine ([`TextEdit`]), on the same four
 //! layers as the button (see `button.rs`): a [`FieldLook`] and its settled values, [`paint`], the
 //! Painter-API [`field`] and [`Ui::text_field_with`] with [`Ui::text_field`] over it.
 //!
-//! The Painter API draws a static box. The `Ui` form owns an [`EditState`] per id, and a frame runs
+//! The Painter API draws a static box. The `Ui` form owns an `EditState` per id, and a frame runs
 //! in this order: sync the engine with the app's text, run the focus events through it, then the
-//! pointer, then draw. [`begin_edit`], [`edit_pointer`], [`Shown`] and [`draw_shown`] are shared
+//! pointer, then draw. `begin_edit`, `edit_pointer`, `Shown` and `draw_shown` are shared
 //! with the [text area](super::text_area), and the code editor runs the same steps through
-//! [`EditHost`].
+//! `EditHost`.
 //!
 //! Offsets are the engine's chars; `SpecLayout` is the one place they meet the text system's bytes.
 //! While composing, what is drawn is `TextEdit::display`'s string, which the selection offsets do
 //! not index. A password's real text reaches no `Spec`: everything is drawn, measured and hit on
-//! the fixed mask, which has no positions, so [`MaskLayout`] answers for it.
+//! the fixed mask, which has no positions, so `MaskLayout` answers for it.
 
 use std::hash::Hash;
 use std::ops::Range;
@@ -455,7 +455,7 @@ pub(super) trait EditHost {
     }
 }
 
-/// The host of a `String`: [`begin_edit`] and [`edit_pointer`] run on it.
+/// The host of a `String`: `begin_edit` and `edit_pointer` run on it.
 struct TextHost<'h, 'c> {
     cfg: &'h EditConfig<'c>,
     text: &'h mut String,
@@ -522,7 +522,7 @@ pub(super) fn begin_edit(
     begin_edit_with(ui, id, cfg.flags(), &mut TextHost { cfg, text })
 }
 
-/// [`begin_edit`] on any [`EditHost`].
+/// `begin_edit` on any `EditHost`.
 pub(super) fn begin_edit_with(
     ui: &mut Ui<'_>,
     id: WidgetId,
@@ -684,7 +684,7 @@ pub(super) fn edit_pointer(
     edit_pointer_with(ui, &mut TextHost { cfg, text }, st, r, origin);
 }
 
-/// [`edit_pointer`] on any [`EditHost`].
+/// `edit_pointer` on any `EditHost`.
 pub(super) fn edit_pointer_with(
     ui: &mut Ui<'_>,
     host: &mut dyn EditHost,
@@ -831,7 +831,7 @@ pub(super) fn draw_shown(ui: &mut Ui<'_>, shown: &Shown, at: (f32, f32), caret: 
     draw_shown_inked(ui, shown, at, caret, ink)
 }
 
-/// [`draw_shown`] with the caret in `caret_ink`.
+/// `draw_shown` with the caret in `caret_ink`.
 pub(super) fn draw_shown_inked(
     ui: &mut Ui<'_>,
     shown: &Shown,

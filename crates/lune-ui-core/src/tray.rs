@@ -339,6 +339,7 @@ pub struct TrayToggle {
 }
 
 impl TrayToggle {
+    /// A toggle with nothing open.
     pub fn new() -> Self {
         Self::default()
     }
