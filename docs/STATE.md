@@ -32,7 +32,7 @@ What M9 added:
   one `nested_wheel` case per composite; the "Disabled keys" rows; the catalogue audit (every scene name of the four entries in
   `--list`, both ways).
 
-Counts at the tip: gallery 70 pages, 389 scene names in `--list`; `cargo test --workspace` 2,217 passed, 0 failed.
+Counts at the tip: gallery 70 pages, 389 scene names in `--list`; `cargo test --workspace` 2,259 passed, 0 failed.
 
 Final gate at the M9 tip: fmt, clippy `-D warnings`, `cargo test --workspace`, boundaries, component index; `LUNEUI_REQUIRE_GPU=1 cargo
 test -p lune-ui-wgpu` 63 passed; pixel gate against 2474248 (the M8 merge) 332 identical, 57 new, nothing allowed; Windows and Linux (Docker) pass. Bench
