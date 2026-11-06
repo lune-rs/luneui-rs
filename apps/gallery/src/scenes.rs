@@ -29,7 +29,7 @@ pub(crate) const BLUR_SATURATION: f32 = 1.8;
 /// Base under the glass layers when the window has no OS glass.
 const OPAQUE_BASE: Rgba = [0x1F, 0x1F, 0x1F, 0xFF];
 
-const TITLE_BAND: f32 = 34.0;
+pub(crate) const TITLE_BAND: f32 = 34.0;
 const CARD_MARGIN: f32 = 10.0;
 
 /// Hit regions of the gallery's controls (the painter is generic over the app's hit type).

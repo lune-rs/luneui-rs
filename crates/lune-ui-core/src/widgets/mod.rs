@@ -6,6 +6,7 @@ pub mod banner;
 pub mod bar_chart;
 pub mod button;
 pub mod callout;
+pub mod caption;
 pub mod checkbox;
 pub mod code_block;
 pub mod code_editor;

@@ -83,6 +83,7 @@ mod tree_view;
 mod ui;
 mod verdict_row;
 mod virtual_list;
+mod window;
 
 pub(crate) use tray::{SurfaceFrame, draw_surface, surface_size};
 
@@ -161,6 +162,7 @@ pub(crate) static PAGES: &[&Page] = &[
     &theme::PAGE,
     &tray::PAGE,
     &file_drop::PAGE,
+    &window::PAGE,
 ];
 
 /// The window background of a Ui page (glass, focused) and its card. Returns the card.

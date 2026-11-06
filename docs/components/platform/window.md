@@ -23,7 +23,7 @@ Core (`lune-ui-core`): `EDGE_BORDER`, `ResizeEdge`, `edge_at`, `DoubleClick` and
 
 ## Existing code
 
-`crates/lune-ui-core/src/window.rs:26` (`edge_at`), `:48` (`DoubleClick`), `:70` (`caption_buttons`); 99 lines; `crates/lune-ui-winit/src/window.rs:12` (`glass_attributes`), `:28` (`resize_direction`). Integration test `crates/lune-ui-core/tests/window.rs` (edges, 6 px border, double-click gap under 400 ms); `crates/lune-ui-winit/tests/input.rs` covers the direction mapping.
+`crates/lune-ui-core/src/window.rs` (`edge_at`, `DoubleClick`, the Painter-form `caption_buttons` and the shared `CAPTION_BUTTON_WIDTH`, `CAPTION_GLYPH_SIZE`, `caption_rect`); since M11 `Ui::caption_buttons` over `CaptionButton` and `CaptionOptions` in `crates/lune-ui-core/src/widgets/caption.rs` (D7: the Painter form stays, `unfocused` and `chrome` draw through it at zero delta); `crates/lune-ui-winit/src/window.rs:12` (`glass_attributes`), `:28` (`resize_direction`). Integration test `crates/lune-ui-core/tests/window.rs` (edges, 6 px border, double-click gap under 400 ms); `crates/lune-ui-winit/tests/input.rs` covers the direction mapping.
 
 ## Spec
 
@@ -97,7 +97,7 @@ The Wane mock eases with `--ease-out`; the animation rules give Linear for hover
 - `chrome` (existing): the tab-outline chrome in a window.
 - `unfocused` (existing): the inactive window with the solid fill.
 - `glass-off` (existing): glass turned off.
-- `window-caption`: the three caption buttons, rest, settled; `window-caption-maximized` with the restore glyph; `window-caption-hover-min` and `window-caption-hover-close` with the pointer over the button, settled.
+- Page `window` (M11) holds these seven. `window-caption`: the three caption buttons, rest, settled; `window-caption-maximized` with the restore glyph; `window-caption-hover-min` and `window-caption-hover-close` with the pointer over the button, settled.
 - `window-caption-hover-fade`: the pointer entering a caption button, t = 60 ms (half of `instant`).
 - `window-edges`: the 6 px resize border outlined with its eight regions, settled.
 - `window-inactive-wane`: the inactive window under Wane's theme values (`#0b0b0b`, `#141414`), settled.
@@ -109,13 +109,14 @@ The Wane mock eases with `--ease-out`; the animation rules give Linear for hover
 
 ### Acceptance
 
+- M11 step 3 (`crates/lune-ui-core/tests/widget_caption.rs`): `at_rest_and_active_the_scene_is_the_painter_forms`, `a_settled_hover_is_the_painter_forms_hover`, `a_pointer_over_close_fills_caption_close_hover`, `a_click_returns_the_button_once`, `a_press_takes_no_focus_and_tab_finds_no_stop`, `maximized_draws_the_restore_glyph`, `each_button_is_92_device_px_wide_at_scale_2`, `the_hover_fill_passes_motion_conformance_in_every_tier`, `the_fill_fades_in_over_instant_and_off_snaps`, `an_inactive_window_draws_its_glyphs_in_fg_quaternary`, `the_nodes_are_buttons_with_their_names_and_the_default_action_clicks`, `the_names_come_from_the_string_table_and_default_to_english`, `a_disabled_scope_leaves_no_violation_and_no_click`; the gallery page `window` holds the seven scenes below.
 - Existing tests stay green: `corners`, `edges`, `border_is_six_pixels`, `interior_is_none`, `double_click_gap_is_strictly_under_400ms` (`crates/lune-ui-core/tests/window.rs`); the direction mapping test in `crates/lune-ui-winit/tests/input.rs`.
 - Edge known answers (window 400 x 300): (5.9, 100) is west and (6.0, 100) none; (0, 0) north-west; (399, 299) south-east [R crates/lune-ui-core/tests/window.rs:11-37].
 - Caption: a scripted pointer over the close button hovers it and fills `caption_close_hover`; a click returns the close hit; `maximized` draws the restore glyph; at scale 2 each button is 92 device px wide.
 - Behaviour: a press on an edge reports the resize edge; a double click within 399 ms toggles maximize and 400 ms does not.
 - Conformance: the hover fill passes `motion::conformance`; Reduced keeps it, Off snaps [motion].
 - Semantic node: the three buttons exist with the names above and `default` runs the command.
-- Real OS behaviour (transparent windows, round corners, snap layouts, traffic lights) is unverified here: no VM or GUI run (D15); Luneterm's M9 and M10 runs cover it. The "done standard" (D18) for this entry still needs the gallery scenes above and the semantic node.
+- Real OS behaviour (transparent windows, round corners, snap layouts, traffic lights) is unverified here: no VM or GUI run (D15); Luneterm's M9 and M10 runs cover it. The scenes and the semantic node are built (M11 step 3); the "done standard" (D18) now waits on the audit.
 
 ### Build
 
