@@ -338,7 +338,7 @@ else
 fi
 
 # Rule 8: no third-party crate path in any file under the core.
-THIRD='wgpu|winit|glyphon|cosmic_text|bytemuck|png|window_vibrancy|objc2[[:alnum:]_]*|raw_window_handle|pollster'
+THIRD='wgpu|winit|glyphon|cosmic_text|bytemuck|png|window_vibrancy|objc2[[:alnum:]_]*|raw_window_handle|pollster|arboard|accesskit|accesskit_winit|tray_icon'
 check 8 no -rn -E \
   -e "(^|[^[:alnum:]_])($THIRD)::" \
   -e '(^|[^[:alnum:]_])extern[[:space:]]+crate([^[:alnum:]_]|$)' \
@@ -351,7 +351,7 @@ crate_deps() {
   case "$1" in
     lune-ui-core) echo "" ;;
     lune-ui-wgpu) echo "lune-ui-core wgpu glyphon bytemuck png unicode-segmentation" ;;
-    lune-ui-winit) echo "lune-ui-core winit" ;;
+    lune-ui-winit) echo "lune-ui-core winit arboard" ;;
     lune-ui-platform) echo "lune-ui-core winit window-vibrancy objc2-app-kit raw-window-handle" ;;
     lune-ui) echo "lune-ui-core lune-ui-wgpu lune-ui-winit lune-ui-platform" ;;
     *) return 1 ;;

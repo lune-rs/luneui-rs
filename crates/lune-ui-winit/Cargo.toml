@@ -10,6 +10,7 @@ license.workspace = true
 [dependencies]
 lune-ui-core = { path = "../lune-ui-core" }
 winit = "0.30"
+arboard = { version = "3.7", default-features = false }
 
 [lints]
 workspace = true

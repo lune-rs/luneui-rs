@@ -342,8 +342,9 @@ and a contract test the real adapter passes too (R-nfr-8).
 
 ## Dependencies
 
-Locked versions (`Cargo.lock`, unchanged since M1 and identical to Luneterm 296cfdc's; DECISIONS
-D15 to D23 and D38 record each). Each crate's allowed set is enforced by boundary rule 9.
+Locked versions (`Cargo.lock`; the M1 set was identical to Luneterm 296cfdc's, and M10 adds to it,
+so the lock parity check of `scripts/pixel-gate-luneterm.sh --parity-only` fails by design from M10 on;
+DECISIONS D15 to D23, D38 and D213 record each). Each crate's allowed set is enforced by boundary rule 9.
 
 | Crate | Version | Used by | For |
 |---|---|---|---|
@@ -357,6 +358,7 @@ D15 to D23 and D38 record each). Each crate's allowed set is enforced by boundar
 | `objc2-app-kit` | 0.3.2 (macOS) | lune-ui-platform | NSView access for glass |
 | `raw-window-handle` | 0.6.2 (macOS) | lune-ui-platform | native window handle |
 | `pollster` | 0.4.0 | gallery; lune-ui-wgpu (dev) | block on async `Gpu::new` |
+| `arboard` | 3.7.0 (`default-features = false`; pulls `clipboard-win` 5.4.3 and `error-code` 3.4.0 on Windows) | lune-ui-winit | the OS text clipboard (D213) |
 
 `window-vibrancy` also pulls `objc2` 0.5.3 and `objc2-app-kit` 0.2.2 beside `objc2` 0.6.5 and
 `objc2-app-kit` 0.3.2. The facade `lune-ui` depends on the four crates only. Bundled assets and their

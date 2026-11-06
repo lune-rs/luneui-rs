@@ -26,7 +26,7 @@ asynchronous, all reached through one helper. Files, images and rich text are no
 
 ## Existing code
 
-None in luneui-rs: `FrameOutput` carries the cursor, the IME area and window commands only (`crates/lune-ui-core/src/input.rs:154-164`), and `Event` has no clipboard variant (`input.rs:32-67`).
+`crates/lune-ui-winit/src/clipboard.rs` (M10 step 5: `Clipboard`, `MAX_PASTE_BYTES`, the `arboard` backend); tests `crates/lune-ui-winit/tests/clipboard.rs`. The core side (`ClipboardRequest`, the reply events) is `crates/lune-ui-core/src/input.rs`.
 Lunegit: `src/Lunegit.Desktop/ViewModels/SidePanels/ClipboardHelper.cs:1-24`.
 
 ## Spec
@@ -87,7 +87,7 @@ None: no text of its own.
 
 - Core (fake adapter, scripted frames): a copy key on a selection puts one `Write` with exactly the selected text in `FrameOutput`; two copies in one frame keep the last; a cut also edits the text; paste: a `Read` in frame N and a `ClipboardText("x")` event in frame N+1 inserts "x" at the caret; a failure event inserts nothing; a password field emits no `Write` [text.text-edit].
 - Multi-byte text round trips unchanged (a string with an accented letter, a CJK character and an emoji).
-- Adapter (M10, macOS only here): a write then a read returns the same text; reading with no text on the clipboard returns the failure event; a 10,000,000-byte write is either forwarded whole or refused, never truncated silently [derived: the cap is open]. Windows and Linux are compile-checked only [D15].
+- Adapter (M10, done, `crates/lune-ui-winit/tests/clipboard.rs`, on a fake backend; the gate never touches the OS clipboard): `write_then_read_returns_the_text_with_multi_byte_characters_intact`, `two_writes_in_a_frame_keep_the_last`, `a_read_reply_lands_in_the_next_take_exactly_once`, `a_failed_read_gives_the_event`, `a_read_over_the_cap_is_refused_whole`, `a_write_over_the_cap_never_reaches_the_backend`, `ten_million_bytes_pass_whole`, `the_empty_string_round_trips`; and one `#[ignore]`d `real_round_trip` on macOS, run by hand (it skips unless the clipboard holds plain text only, writes, reads, compares and restores). Originally: a write then a read returns the same text; reading with no text on the clipboard returns the failure event; a 10,000,000-byte write is either forwarded whole or refused, never truncated silently [derived: the cap is open]. Windows and Linux are compile-checked only [D15].
 - No panics on any text, including embedded NUL and lone surrogate-like sequences (the type is `String`, so only valid UTF-8 reaches it).
 - Pixel probes, conformance and semantic node: n/a.
 
@@ -98,10 +98,12 @@ None: no text of its own.
 
 ## Open questions
 
-- Which crate or direct OS calls the adapter uses (hard rule 4 and 5: a DECISIONS row and a release-size note); M10 decides.
-- A size cap on forwarded paste text: Lunegit has none; M10 sets one with its security review of untrusted input.
-- Whether a failed write is reported: Lunegit is silent; a toast on failure is the app's choice.
-- Linux and Windows runtime behaviour is unverified here (D15).
+None open. Answered in M10 step 5 (D213):
+
+- The adapter uses `arboard` 3.7 (`default-features = false`) in `lune-ui-winit`, one `Clipboard` per app, behind a backend trait so tests use a fake. Direct OS calls were rejected (X11 selections need a thread and a protocol).
+- The cap is `MAX_PASTE_BYTES` = 33,554,432 bytes (32 MiB, three times the 11 MB document the code view measured). A longer read is `ClipboardUnavailable`, a longer write is dropped, nothing is truncated; text at the cap passes whole.
+- A failed write is silent, as Lunegit's is; the app may add a toast.
+- Linux and Windows runtime behaviour is unverified here (D15); both are compile-checked.
 
 ## Notes for the planner
 

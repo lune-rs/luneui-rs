@@ -32,8 +32,8 @@ for the extraction; Luneterm's `docs/architecture.md` sections "lune-ui modules"
   opens a hidden window, so such a gate needs a logged-in macOS GUI session.
 - Dump the scenes by hand: `cargo run -p gallery -- --dump <dir>` (`-- --list` prints the scene names)
 - M1-only proof against Luneterm's 18-scene spike gate: `scripts/pixel-gate-luneterm.sh` (its full run
-  cannot build against the M2 API and exits 2; `--parity-only` still checks that `Cargo.lock` holds no
-  version Luneterm's lock lacks)
+  cannot build against the M2 API and exits 2; `--parity-only` checked that `Cargo.lock` holds no
+  version Luneterm's lock lacks, and fails by design from M10 on: `arboard` and its tree are new, D213)
 - Cross-target (Windows clippy, Linux in Docker; skips Linux when Docker is not running): `scripts/check-targets.sh`
 
 Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, resolver 3: in

@@ -40,3 +40,6 @@ pub mod input {
     pub use lune_ui_core::input::*;
     pub use lune_ui_winit::input::*;
 }
+
+/// The OS clipboard as text: executes a frame's clipboard requests (`lune-ui-winit`).
+pub use lune_ui_winit::clipboard;
