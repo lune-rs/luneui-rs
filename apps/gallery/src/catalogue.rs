@@ -7,7 +7,7 @@
 //! real catalogue.
 //!
 //! - every hyphenated backticked id under an entry's `### Gallery scenes`, and the first id of
-//!   each bullet, is a scene or a page of the gallery; every scene and page is claimed;
+//!   each bullet, is a scene or a page of the gallery; every scene is claimed;
 //! - a non-external entry names a scene or says `n/a —`;
 //! - the `in-progress` entries are exactly the two Class B ones (D234), each quoting its line;
 //! - a `done` entry has no owner, a `source:` that exists, no open "still needs", and a
@@ -16,6 +16,9 @@
 //! - every requirement id of `docs/requirements.md` is cited by an entry, bar the ones nothing
 //!   in this repo can satisfy;
 //! - every motion kind and easing is named where `motion-kinds` and `motion-easings` are claimed.
+//!
+//! A claim's `@Nx` suffix is dropped: the check reads scene ids, not scales, so an entry claiming
+//! `ui-controls@3x` passes while only `ui-controls` exists.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -296,6 +299,16 @@ pub(crate) fn done_complaints(e: &Entry, root: &Path) -> Vec<String> {
         ));
         return out;
     };
+    // The page and unverified parts must be there; their content is the entry's to word (real
+    // lines say `n/a (...)`, `progress-*`).
+    for part in ["; page ", "; unverified here:"] {
+        if !line.contains(part) {
+            out.push(format!(
+                "{p}: the Done line has no `{}` part",
+                part.trim_start_matches("; ")
+            ));
+        }
+    }
     if line.contains("tests: n/a —") {
         return out;
     }
@@ -548,6 +561,29 @@ mod tests {
     }
 
     #[test]
+    fn a_done_line_without_a_page_part_or_an_unverified_part_is_reported() {
+        let no_page = BUILD_OK.replace("; page n/a", "");
+        let e = entry("done", "—", "crates/lune-ui-core/src/color.rs", &no_page);
+        let bad = done_complaints(&e, &root());
+        assert_eq!(bad.len(), 1, "{bad:?}");
+        assert!(bad[0].contains("no `page ` part"), "{bad:?}");
+        let no_unverified = BUILD_OK.replace("; unverified here: none", "");
+        let e = entry(
+            "done",
+            "—",
+            "crates/lune-ui-core/src/color.rs",
+            &no_unverified,
+        );
+        let bad = done_complaints(&e, &root());
+        assert_eq!(bad.len(), 1, "{bad:?}");
+        assert!(bad[0].contains("no `unverified here:` part"), "{bad:?}");
+        // A docs-only line is held to the same two parts.
+        let docs = "### Build\n\n- Done (D47, M11): tests: n/a — documentation only.\n";
+        let e = entry("done", "—", "docs/architecture.md", docs);
+        assert_eq!(done_complaints(&e, &root()).len(), 2);
+    }
+
+    #[test]
     fn a_done_entry_that_still_needs_something_is_reported() {
         let body = format!("- Done standard still needs: a test.\n\n{BUILD_OK}");
         let e = entry("done", "—", "crates/lune-ui-core/src/color.rs", &body);
@@ -719,10 +755,19 @@ mod tests {
             "the requirements were read"
         );
         none(uncited_requirements(&entries, &req));
-        // The list cannot go stale: each uncited id is still in the requirements.
+        // The list cannot go stale: each listed id is still in the requirements and still cited
+        // by no entry (cite one, and it leaves the list).
         let ids = requirement_ids(&req);
+        let cited: BTreeSet<String> = entries
+            .iter()
+            .flat_map(|e| requirement_ids(&e.body))
+            .collect();
         for (id, why) in UNCITED {
             assert!(ids.contains(*id) && !why.is_empty(), "{id}");
+            assert!(
+                !cited.contains(*id),
+                "{id} is cited now: drop it from UNCITED"
+            );
         }
     }
 

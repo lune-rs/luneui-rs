@@ -68,8 +68,10 @@ Between two `---` lines, one `key: value` per line, no nesting, every key presen
   `### Build` carries one line, `- Done (D47, M11): tests `<path>.rs::<fn>`, ...; page `<id>` or n/a;
   unverified here: <list or none>.`, which cites at least one test by file and function (a docs-only
   entry says `tests: n/a — <reason>` instead), has `owner: —`, and holds no "still needs" or "Open for
-  `done`". A gallery test (`apps/gallery/src/catalogue.rs`) checks every one of these: a cited function that
-  is not in its file fails the gate. What only a real OS shows stays in the entry as `unverified here`
+  `done`". A gallery test (`apps/gallery/src/catalogue.rs`) checks the owner, the source paths, the absent
+  "still needs" text, that the line has its `page` and `unverified here` parts, and that each cited
+  function is in its file (one that is not fails the gate). It does not read what follows `page` or
+  `unverified here:`: those words are the entry's. What only a real OS shows stays in the entry as `unverified here`
   and is never ticked.
 - `external`: needed by a consumer but stays in the consumer's repo
 
