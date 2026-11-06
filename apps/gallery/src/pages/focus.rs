@@ -152,7 +152,7 @@ const BUTTON: &[&str] = &["primary"];
 const SCENES: &[UiScene] = &[
     UiScene {
         id: "focus-ring-kinds",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: || Box::new(Kinds),
         script: &[],
@@ -162,7 +162,7 @@ const SCENES: &[UiScene] = &[
     // Tab focuses the first stop, the primary button; the ring is `fast`: half way at 90 ms.
     UiScene {
         id: "focus-ring-appearing",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: controls,
         script: &[Step {
@@ -175,7 +175,7 @@ const SCENES: &[UiScene] = &[
     // Tab at 0, the dialog opens at 100 ms: its confirm button is focused, ring visible.
     UiScene {
         id: "focus-modal-initial",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: dialog_after,
         script: &[
@@ -201,7 +201,7 @@ const SCENES: &[UiScene] = &[
     // field (focused last) shows its accent border.
     UiScene {
         id: "focus-pointer",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: controls,
         script: &[

@@ -77,7 +77,7 @@ const SCENES: &[UiScene] = &[
     // A click puts the caret in the third bar; the settled look is all the page has.
     UiScene {
         id: "filter-bar-states",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[

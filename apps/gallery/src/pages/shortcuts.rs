@@ -87,7 +87,7 @@ fn menus() -> Box<dyn PageState> {
 /// The menus open at time 0 (the open motion is 180 ms); the capture at 600 ms is settled.
 const SCENES: &[UiScene] = &[UiScene {
     id: "shortcut-hints",
-    scale: 2,
+    scale: 2.0,
     tier: MotionTier::Full,
     state: menus,
     script: &[Step {

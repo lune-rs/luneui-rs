@@ -145,7 +145,7 @@ const SCENES: &[UiScene] = &[
     // The spinner runs from the first frame: a quarter turn at 300 ms.
     UiScene {
         id: "banner-shown",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: banner_only,
         script: &[],
@@ -154,7 +154,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "banner-empty-state",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: view_only,
         script: &[],
@@ -164,7 +164,7 @@ const SCENES: &[UiScene] = &[
     // Press is `fast` (180 ms): half way at 90 ms.
     UiScene {
         id: "banner-empty-state-action-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: view_only,
         script: &[Step {
@@ -177,7 +177,7 @@ const SCENES: &[UiScene] = &[
     // Hover is `instant` (120 ms): half way at 60 ms.
     UiScene {
         id: "banner-empty-state-hover-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: view_only,
         script: &[Step {

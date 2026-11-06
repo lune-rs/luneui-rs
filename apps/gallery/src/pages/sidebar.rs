@@ -203,7 +203,7 @@ const SCENES: &[UiScene] = &[
     // Six nav items, one selected, the ok footer.
     UiScene {
         id: "sidebar-main",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: main_column,
         script: &[],
@@ -213,7 +213,7 @@ const SCENES: &[UiScene] = &[
     // The stopped footer: err dot, no address.
     UiScene {
         id: "sidebar-footer-error",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: error_column,
         script: &[],
@@ -223,7 +223,7 @@ const SCENES: &[UiScene] = &[
     // The wizard's steps in the nav slot: one done, one current, two upcoming.
     UiScene {
         id: "sidebar-wizard",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: wizard_column,
         script: &[],

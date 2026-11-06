@@ -43,7 +43,7 @@ mod list_row;
 mod locale;
 mod markdown;
 mod menu;
-mod motion;
+pub(crate) mod motion;
 mod nav_item;
 mod panel;
 mod pie_chart;

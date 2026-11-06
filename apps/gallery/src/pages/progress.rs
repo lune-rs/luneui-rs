@@ -111,7 +111,7 @@ fn indeterminate() -> Box<dyn PageState> {
 const SCENES: &[UiScene] = &[
     UiScene {
         id: "progress-determinate",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: determinate,
         script: &[],
@@ -120,7 +120,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "progress-variants",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: variants,
         script: &[],
@@ -129,7 +129,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "progress-pending",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: pending,
         script: &[],
@@ -139,7 +139,7 @@ const SCENES: &[UiScene] = &[
     // The segment travels 2400 ms: a quarter of the way at 600 ms.
     UiScene {
         id: "progress-indeterminate",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: indeterminate,
         script: &[],
@@ -149,7 +149,7 @@ const SCENES: &[UiScene] = &[
     // The Reduced fill breathes over 1800 ms: fully up at 900 ms.
     UiScene {
         id: "progress-indeterminate-reduced",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Reduced,
         state: indeterminate,
         script: &[],

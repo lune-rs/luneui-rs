@@ -32,7 +32,7 @@ type P<'a> = Painter<'a, WidgetId>;
 // ---------------------------------------------------------------------------------------------
 // Names
 
-fn kind_name(k: Kind) -> &'static str {
+pub(crate) fn kind_name(k: Kind) -> &'static str {
     match k {
         Kind::Hover => "hover",
         Kind::Press => "press",
@@ -63,7 +63,7 @@ fn token_name(t: Token) -> &'static str {
     }
 }
 
-fn easing_name(e: Easing) -> &'static str {
+pub(crate) fn easing_name(e: Easing) -> &'static str {
     match e {
         Easing::Linear => "linear",
         Easing::QuadOut => "quad-out",
@@ -77,7 +77,7 @@ fn easing_name(e: Easing) -> &'static str {
 }
 
 /// The seven easings of `docs/motion.md`.
-const EASINGS: [Easing; 7] = [
+pub(crate) const EASINGS: [Easing; 7] = [
     Easing::Linear,
     Easing::QuadOut,
     Easing::QuadIn,
@@ -790,7 +790,7 @@ const KIND_STARTS: &[Step] = &[at(125), at(175), at(210), at(240)];
 const SCENES: &[UiScene] = &[
     UiScene {
         id: "motion-easings",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: easings,
         script: &[],
@@ -799,7 +799,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "motion-curve-cubic-out",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: curve_cubic_out,
         script: &[],
@@ -808,7 +808,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "motion-curve-ease-in",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: curve_ease_in,
         script: &[],
@@ -818,7 +818,7 @@ const SCENES: &[UiScene] = &[
     // Each swatch is at half its own default duration at 300 ms; spin shows 300 ms.
     UiScene {
         id: "motion-kinds",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: kinds_halfway,
         script: KIND_STARTS,
@@ -827,7 +827,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "motion-kinds-settled",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: kinds_settled,
         script: &[],
@@ -837,7 +837,7 @@ const SCENES: &[UiScene] = &[
     // The run starts at 0 ms (the second frame), reverses at 60 ms, is drawn at 120 ms.
     UiScene {
         id: "motion-retarget",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: retarget,
         script: &[at(0), at(60)],
@@ -847,7 +847,7 @@ const SCENES: &[UiScene] = &[
     // Every change starts at 0 ms and is drawn 90 ms in (half of `fast`).
     UiScene {
         id: "motion-tiers",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: tiers_moving,
         script: &[at(0)],
@@ -856,7 +856,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "motion-tiers-settled",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: tiers_settled,
         script: &[],

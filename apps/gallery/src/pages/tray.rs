@@ -533,7 +533,7 @@ const fn scene(
 ) -> UiScene {
     UiScene {
         id,
-        scale,
+        scale: scale as f32,
         tier: MotionTier::Full,
         state,
         script: &[],

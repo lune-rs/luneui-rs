@@ -236,7 +236,7 @@ fn too_large() -> Box<dyn PageState> {
 const SCENES: &[UiScene] = &[
     UiScene {
         id: "image-contain-wide",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: wide,
         script: &[],
@@ -245,7 +245,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "image-contain-tall",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: tall,
         script: &[],
@@ -254,7 +254,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "image-align-left",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: align_left,
         script: &[],
@@ -263,7 +263,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "image-alpha",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: alpha,
         script: &[],
@@ -272,7 +272,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "image-scale-1",
-        scale: 1,
+        scale: 1.0,
         tier: MotionTier::Full,
         state: scale_1,
         script: &[],
@@ -281,7 +281,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "image-missing-id",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: missing,
         script: &[],
@@ -290,7 +290,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "image-too-large",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: too_large,
         script: &[],

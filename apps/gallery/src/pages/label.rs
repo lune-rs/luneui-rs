@@ -41,7 +41,7 @@ impl PageState for Roles {
 
 const SCENES: &[UiScene] = &[UiScene {
     id: "label-roles",
-    scale: 2,
+    scale: 2.0,
     tier: MotionTier::Full,
     state: || Box::new(Roles),
     script: &[],

@@ -163,7 +163,7 @@ impl PageState for Live {
 const fn settled(id: &'static str, scale: u32, state: fn() -> Box<dyn PageState>) -> UiScene {
     UiScene {
         id,
-        scale,
+        scale: scale as f32,
         tier: MotionTier::Full,
         state,
         script: &[],
@@ -180,7 +180,7 @@ const SCENES: &[UiScene] = &[
     settled("tree-view-depth", 1, all_open),
     UiScene {
         id: "tree-view-hover",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: one_open,
         script: &[Step {
@@ -194,7 +194,7 @@ const SCENES: &[UiScene] = &[
     // The expand is base (250 ms): half way 125 ms after the key.
     UiScene {
         id: "tree-view-expand-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: closed,
         script: &[
@@ -214,7 +214,7 @@ const SCENES: &[UiScene] = &[
     // Tab enters on the first row, Down moves the cursor and its ring.
     UiScene {
         id: "tree-view-focus",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: one_open,
         script: &[
@@ -280,7 +280,7 @@ mod tests {
     fn run(id: &str, scale: u32) -> (Scene, FrameOutput) {
         let scene = SCENES
             .iter()
-            .find(|s| s.id == id && s.scale == scale)
+            .find(|s| s.id == id && s.scale == scale as f32)
             .expect("a scene");
         run_scene(PAGE.id, scene, &mut FakeText).expect("runs")
     }

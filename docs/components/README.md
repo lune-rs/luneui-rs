@@ -54,7 +54,7 @@ Between two `---` lines, one `key: value` per line, no nesting, every key presen
 | `area` | one of the areas above, equal to the directory |
 | `status` | see below |
 | `consumers` | comma list: `luneterm`, `lunegit`, `wane`, `any` |
-| `source` | existing code: a Luneterm-relative path for `in-luneterm`, `Lunegit: <path>` for a Lunegit stub, or `—` |
+| `source` | existing code: a Luneterm-relative path for `in-luneterm`, `Lunegit: <path>` for a Lunegit stub, or `—`; for `done`, the repo paths (comma separated, from the workspace root) of the code, every one of which exists |
 | `owner` | agent or task working on it, or `—` |
 | `summary` | one line |
 
@@ -64,8 +64,20 @@ Between two `---` lines, one `key: value` per line, no nesting, every key presen
 - `planned`: a consumer has named the need; no code anywhere
 - `stub`: rough placeholder, not analysed; a planner must look before anyone builds (none left since M3: an analysed stub becomes `planned`, DECISIONS D49)
 - `in-progress`: someone owns it (`owner:`)
-- `done`: lives in this repo
+- `done`: lives in this repo and holds the done standard (DECISIONS D47) by something that runs here. Its
+  `### Build` carries one line, `- Done (D47, M11): tests `<path>.rs::<fn>`, ...; page `<id>` or n/a;
+  unverified here: <list or none>.`, which cites at least one test by file and function (a docs-only
+  entry says `tests: n/a — <reason>` instead), has `owner: —`, and holds no "still needs" or "Open for
+  `done`". A gallery test (`apps/gallery/src/catalogue.rs`) checks every one of these: a cited function that
+  is not in its file fails the gate. What only a real OS shows stays in the entry as `unverified here`
+  and is never ticked.
 - `external`: needed by a consumer but stays in the consumer's repo
+
+Class A and B (D1). Class A: every D47 item of the entry holds by something that runs here, so it goes
+`done`. Class B: the entry's own text ties its done standard to a run that cannot happen here (an OS
+material on real machines, a pixel gate on a presented frame); it stays `in-progress`, `owner:` names who
+runs it, and the reason is under `## Open questions`. An audit may add a Class B entry only by quoting that
+line of the entry; it may not remove one by rewording the line.
 
 ## Body sections
 
@@ -77,7 +89,8 @@ Five sections, in this order, with `## Spec` after `## Existing code` (DECISIONS
 4. `## Spec` with exactly these twelve `###` subsections in this order: `Evidence`, `Anatomy`, `States`,
    `Transitions`, `Input and focus`, `Retained state`, `Accessibility`, `Strings`, `Gallery scenes`,
    `Painter primitives`, `Acceptance`, `Build`. A subsection that does not apply reads
-   `n/a — <reason>`; none is omitted.
+   `n/a — <reason>`; none is omitted. An entry may add `### Unverified` (what only a real OS shows) and
+   `### Limits` (what the entry knowingly does not do, each with its DECISIONS row) after `Build`.
 5. `## Open questions` (only what is still open, else `- None.`) and `## Notes for the planner`
 
 An `external` entry (status `external`) has a short `## Spec` of three subsections only: `Evidence`,

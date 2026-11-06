@@ -64,7 +64,7 @@ impl PageState for Nodes {
 
 const SCENES: &[UiScene] = &[UiScene {
     id: "a11y-nodes",
-    scale: 2,
+    scale: 2.0,
     tier: MotionTier::Full,
     state: nodes,
     // Frame 0 has no previous tree; the second frame outlines the first's nodes.

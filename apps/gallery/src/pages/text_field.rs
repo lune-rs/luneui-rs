@@ -197,7 +197,7 @@ const FIELD: &[&str] = &["field"];
 const SCENES: &[UiScene] = &[
     UiScene {
         id: "text-field-states",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: specimens,
         script: &[],
@@ -206,7 +206,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "text-field-empty",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[],
@@ -216,7 +216,7 @@ const SCENES: &[UiScene] = &[
     // Settled: nothing is focused or hovered, so the page reports `Idle`.
     UiScene {
         id: "text-field-variants",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: variants,
         script: &[],
@@ -226,7 +226,7 @@ const SCENES: &[UiScene] = &[
     // Not focused, so the clear button is the only extra: a press on it empties the field.
     UiScene {
         id: "text-field-search-clear",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: search,
         script: &[],
@@ -237,7 +237,7 @@ const SCENES: &[UiScene] = &[
     // gallery has no CJK font, so "かな" draws as boxes (D90).
     UiScene {
         id: "text-field-composing",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: lune,
         script: &[
@@ -256,7 +256,7 @@ const SCENES: &[UiScene] = &[
     // Hover is `instant` (120 ms): half way at 60 ms.
     UiScene {
         id: "text-field-hover-fade",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[Step {
@@ -269,7 +269,7 @@ const SCENES: &[UiScene] = &[
     // Tab focuses the field; the ring is `fast` (180 ms): half way at 90 ms.
     UiScene {
         id: "text-field-focus-fade",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[Step {

@@ -143,7 +143,7 @@ pub(crate) enum Expect {
 pub(crate) struct UiScene {
     pub(crate) id: &'static str,
     /// Device pixels per logical pixel in dump mode.
-    pub(crate) scale: u32,
+    pub(crate) scale: f32,
     pub(crate) tier: MotionTier,
     /// The state the scene starts from.
     pub(crate) state: fn() -> Box<dyn PageState>,
@@ -158,6 +158,15 @@ impl UiScene {
     /// `<id>@<scale>x`, the listing name.
     pub(crate) fn name(&self) -> String {
         format!("{}@{}x", self.id, self.scale)
+    }
+
+    /// The dump's size in physical pixels: the window times the scale, whole at 1.5 (1560 by 990).
+    pub(crate) fn size(&self) -> (u32, u32) {
+        let (w, h) = (
+            (W as f32 * self.scale).round(),
+            (H as f32 * self.scale).round(),
+        );
+        (w as u32, h as u32)
     }
 }
 
@@ -602,7 +611,7 @@ mod tests {
     fn probe_scene(script: &'static [Step], capture_ms: u32, expect: Expect) -> UiScene {
         UiScene {
             id: "probe",
-            scale: 1,
+            scale: 1.0,
             tier: MotionTier::Full,
             state: || Box::new(Probe::default()),
             script,

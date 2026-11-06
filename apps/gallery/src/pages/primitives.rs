@@ -188,7 +188,7 @@ fn rotate() -> Box<dyn PageState> {
 const fn still(id: &'static str, state: fn() -> Box<dyn PageState>) -> UiScene {
     UiScene {
         id,
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state,
         script: &[],

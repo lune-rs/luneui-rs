@@ -95,7 +95,7 @@ impl PageState for Specimens {
 const SCENES: &[UiScene] = &[
     UiScene {
         id: "star-rating-states",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: specimens,
         script: &[],
@@ -105,7 +105,7 @@ const SCENES: &[UiScene] = &[
     // Star 4 rest to hover: `instant` (120 ms), half way at 60 ms.
     UiScene {
         id: "star-rating-hover-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: unrated,
         script: &[Step {

@@ -88,6 +88,8 @@ None: the head text is app text.
 - `progress-determinate` (new): fills at 40%, with a head, settled.
 - `progress-variants` (new): default, warn and err bars, settled.
 - `progress-pending` (new): the pending row the probe scene uses instead of an indeterminate bar, settled.
+- `progress-indeterminate`: the 3 px indeterminate bar, the segment a quarter of the way along its 2400 ms travel, t = 600 ms.
+- `progress-indeterminate-reduced`: the same under Reduced, where the fill breathes over 1800 ms, fully up at t = 900 ms.
 
 ### Painter primitives
 

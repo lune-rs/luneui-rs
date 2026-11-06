@@ -72,7 +72,7 @@ const SCENES: &[UiScene] = &[
     // The spin starts on the first frame: a quarter turn at 300 ms.
     UiScene {
         id: "spinner-spinning",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: busy,
         script: &[],
@@ -81,7 +81,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "spinner-spinning",
-        scale: 1,
+        scale: 1.0,
         tier: MotionTier::Full,
         state: busy,
         script: &[],
@@ -90,7 +90,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "spinner-stopped",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: idle,
         script: &[],
@@ -99,7 +99,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "spinner-reduced",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Reduced,
         state: busy,
         script: &[],
@@ -109,7 +109,7 @@ const SCENES: &[UiScene] = &[
     // The switch is clicked at 0 ms; the capture is 250 ms into the first run.
     UiScene {
         id: "spinner-start-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: idle,
         script: &[Step {

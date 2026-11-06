@@ -129,7 +129,7 @@ const COMMAND: Modifiers = Modifiers {
 const SCENES: &[UiScene] = &[
     UiScene {
         id: "kv-list-default",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: default,
         script: &[],
@@ -138,7 +138,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "kv-list-stacked",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: stacked,
         script: &[],
@@ -147,7 +147,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "kv-list-wrap",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: wrap,
         script: &[],
@@ -158,7 +158,7 @@ const SCENES: &[UiScene] = &[
     // selects the whole value, which is elided: the fill covers what is drawn.
     UiScene {
         id: "kv-list-selected",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: default,
         script: &[

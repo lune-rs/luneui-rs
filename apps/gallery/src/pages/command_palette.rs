@@ -310,7 +310,7 @@ const FOCUSED: &[Step] = &[Step {
 const fn settled(id: &'static str, state: fn() -> Box<dyn PageState>) -> UiScene {
     UiScene {
         id,
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state,
         script: FOCUSED,
@@ -330,7 +330,7 @@ const SCENES: &[UiScene] = &[
     // A Down moves the selection from the first row to the second.
     UiScene {
         id: "command-palette-selected",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: results,
         script: &[Step {
@@ -344,7 +344,7 @@ const SCENES: &[UiScene] = &[
     // and has settled by 1400 ms.
     UiScene {
         id: "command-palette-destructive",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: clear_only,
         script: &[
@@ -364,7 +364,7 @@ const SCENES: &[UiScene] = &[
     // The open is `pop`, base (250 ms): half way at 125 ms.
     UiScene {
         id: "command-palette-opening",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: results,
         script: &[],

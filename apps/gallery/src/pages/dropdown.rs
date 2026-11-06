@@ -127,7 +127,7 @@ const ROW_SCROLLED: &[&str] = &["dd", "list", "19"];
 const SCENES: &[UiScene] = &[
     UiScene {
         id: "dropdown-hover",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: opened,
         script: &[Step {
@@ -140,7 +140,7 @@ const SCENES: &[UiScene] = &[
     // "Coming soon" is disabled: no hover, no hit region.
     UiScene {
         id: "dropdown-disabled",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: opened,
         script: &[],
@@ -150,7 +150,7 @@ const SCENES: &[UiScene] = &[
     // The glass surface: the blurred page shows through the fill.
     UiScene {
         id: "dropdown-glass",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: glass,
         script: &[],
@@ -161,7 +161,7 @@ const SCENES: &[UiScene] = &[
     // list's right edge while the pointer is in it.
     UiScene {
         id: "dropdown-scroll",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: scrolling,
         script: &[Step {

@@ -256,7 +256,7 @@ const SCENES: &[UiScene] = &[
     // MENU_OUT is 120 ms: half way at 60 ms. The frame at 300 ms is the first without the call.
     UiScene {
         id: "menu-closing",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: closing,
         script: &[Step {
@@ -269,7 +269,7 @@ const SCENES: &[UiScene] = &[
     // The same picture under the motion.curves id.
     UiScene {
         id: "curves-menu-closing",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: closing,
         script: &[Step {
@@ -282,7 +282,7 @@ const SCENES: &[UiScene] = &[
     // Tab to the button, Enter opens with the first row lit, Down twice lights the third.
     UiScene {
         id: "menu-keyboard",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[
@@ -308,7 +308,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "menu-variants",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: variants,
         script: &[],
@@ -318,7 +318,7 @@ const SCENES: &[UiScene] = &[
     // Held on the third row: the pressed fill.
     UiScene {
         id: "menu-pressed",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: pinned,
         script: &[
@@ -336,7 +336,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "menu-anchored",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: anchored,
         script: &[],
@@ -346,7 +346,7 @@ const SCENES: &[UiScene] = &[
     // No room below the button: the menu sits above it.
     UiScene {
         id: "menu-anchored-flipped",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: anchored_low,
         script: &[],

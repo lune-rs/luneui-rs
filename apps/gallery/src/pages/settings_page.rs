@@ -204,7 +204,7 @@ const SCENES: &[UiScene] = &[
     // Three rows, no banner, settled.
     UiScene {
         id: "settings-page-rows",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[],
@@ -214,7 +214,7 @@ const SCENES: &[UiScene] = &[
     // The restart flag set from the first frame: the banner, settled.
     UiScene {
         id: "settings-page-restart",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: restart,
         script: &[],
@@ -224,7 +224,7 @@ const SCENES: &[UiScene] = &[
     // The reveal is `base` (250 ms): the flag rises at 200 ms, half way 125 ms after.
     UiScene {
         id: "settings-page-restart-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: restart_later,
         script: &[Step {
@@ -237,7 +237,7 @@ const SCENES: &[UiScene] = &[
     // The window is inactive: the solid fallback replaces the glass.
     UiScene {
         id: "settings-page-inactive",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: inactive,
         script: &[],

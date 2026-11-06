@@ -252,7 +252,7 @@ const DROP: &[Step] = &[
 const SCENES: &[UiScene] = &[
     UiScene {
         id: "kanban-board-columns",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[],
@@ -261,7 +261,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "kanban-board-dragging",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: DRAG,
@@ -270,7 +270,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "kanban-board-error",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: errored,
         script: &[],
@@ -280,7 +280,7 @@ const SCENES: &[UiScene] = &[
     // Four stops in: the add-column button, the first column's two buttons, then the cards.
     UiScene {
         id: "kanban-board-focus",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[Step {
@@ -292,7 +292,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "kanban-board-inactive",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: inactive,
         script: &[],
@@ -301,7 +301,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "kanban-board-empty",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: empty,
         script: &[],
@@ -311,7 +311,7 @@ const SCENES: &[UiScene] = &[
     // The landing is `fast` (180 ms): half way at 90 ms after the release.
     UiScene {
         id: "kanban-board-settle-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: DROP,

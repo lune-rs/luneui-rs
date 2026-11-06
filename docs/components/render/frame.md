@@ -64,6 +64,7 @@ n/a — no text.
 ### Gallery scenes
 
 - Every gallery scene draws through this renderer: `controls` (existing) [R apps/gallery/src/scenes.rs:82-93].
+- `ui-controls`: the M4 controls composition (`controls_ui`) at scale 1.5, settled, dumped at 1560 by 990 physical px: a scale that is not a whole number of device pixels per logical one (R-nfr-6, M11) [R apps/gallery/src/pages/ui.rs].
 
 ### Painter primitives
 

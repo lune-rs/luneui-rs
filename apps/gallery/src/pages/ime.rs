@@ -107,7 +107,7 @@ const SCENES: &[UiScene] = &[
     // The gallery has no CJK font, so the preedit draws as boxes: the user's decision (D90).
     UiScene {
         id: "ime-preedit",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: lune,
         script: &[
@@ -123,7 +123,7 @@ const SCENES: &[UiScene] = &[
     // No cursor: no caret and no emphasised clause, only the underline.
     UiScene {
         id: "ime-preedit-no-cursor",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: lune,
         script: &[
@@ -139,7 +139,7 @@ const SCENES: &[UiScene] = &[
     // Home and two Rights put the caret between "lu" and "ne"; "ne" shifts right by the preedit.
     UiScene {
         id: "ime-preedit-middle",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: lune,
         script: &[
@@ -163,7 +163,7 @@ const SCENES: &[UiScene] = &[
     // The commit turns the preedit into text and the caret goes after it.
     UiScene {
         id: "ime-committed",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: lune,
         script: &[
@@ -183,7 +183,7 @@ const SCENES: &[UiScene] = &[
     // Up from the end of line 3 puts the caret on line 2, where the preedit goes.
     UiScene {
         id: "ime-multiline",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: lines,
         script: &[
@@ -203,7 +203,7 @@ const SCENES: &[UiScene] = &[
     // The reported `ime_area` (here the caret's rect) outlined over a focused field.
     UiScene {
         id: "ime-area",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: outlined,
         script: &[FOCUS],

@@ -117,7 +117,7 @@ const SCENES: &[UiScene] = &[
     // A file is over the window, the pointer at (300, 200).
     UiScene {
         id: "file-drop-hover",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[Step {
@@ -130,7 +130,7 @@ const SCENES: &[UiScene] = &[
     // Hovered, then dropped.
     UiScene {
         id: "file-drop-dropped",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[

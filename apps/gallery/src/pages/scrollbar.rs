@@ -80,7 +80,7 @@ const TO_40: Ev = Ev::Scroll {
 const SCENES: &[UiScene] = &[
     UiScene {
         id: "scrollbar-hidden",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[],
@@ -89,7 +89,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "scrollbar-visible",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[
@@ -107,7 +107,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "scrollbar-thumb-hover",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[Step {
@@ -121,7 +121,7 @@ const SCENES: &[UiScene] = &[
     // the thumb stays shown, in its hover colour, and the content has followed.
     UiScene {
         id: "scrollbar-dragging",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[
@@ -143,7 +143,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "scrollbar-fits",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: fits,
         script: &[Step {
@@ -155,7 +155,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "scrollbar-disabled",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: disabled,
         script: &[Step {
@@ -168,7 +168,7 @@ const SCENES: &[UiScene] = &[
     // The pointer enters the area at 300 ms: the thumb fades in over `fast` (180 ms).
     UiScene {
         id: "scrollbar-reveal",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[Step {
@@ -182,7 +182,7 @@ const SCENES: &[UiScene] = &[
     // follows over `instant` (120 ms).
     UiScene {
         id: "scrollbar-hover-colour",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[

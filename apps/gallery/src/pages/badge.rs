@@ -56,7 +56,7 @@ impl PageState for Tones {
 const SCENES: &[UiScene] = &[
     UiScene {
         id: "badge-tones",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: tones,
         script: &[],
@@ -65,7 +65,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "badge-tones",
-        scale: 1,
+        scale: 1.0,
         tier: MotionTier::Full,
         state: tones,
         script: &[],

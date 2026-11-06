@@ -108,7 +108,7 @@ const SCENES: &[UiScene] = &[
     // appeared (800 ms delay, a frame at 800 ms starts the fade) and settled.
     UiScene {
         id: "toolbar-actions",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[
@@ -127,7 +127,7 @@ const SCENES: &[UiScene] = &[
     // The window is inactive: the fallback fill replaces the glass.
     UiScene {
         id: "toolbar-inactive",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: inactive,
         script: &[],
@@ -137,7 +137,7 @@ const SCENES: &[UiScene] = &[
     // Press is `fast` (180 ms): half way at 90 ms.
     UiScene {
         id: "toolbar-action-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[Step {
@@ -150,7 +150,7 @@ const SCENES: &[UiScene] = &[
     // Hover is `instant` (120 ms): half way at 60 ms.
     UiScene {
         id: "toolbar-hover-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[Step {

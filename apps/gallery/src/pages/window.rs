@@ -175,7 +175,7 @@ const CLOSE: &[&str] = &["caption", "close"];
 const SCENES: &[UiScene] = &[
     UiScene {
         id: "window-caption",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[],
@@ -184,7 +184,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "window-caption-maximized",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: maximized,
         script: &[],
@@ -193,7 +193,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "window-caption-hover-min",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[Step {
@@ -205,7 +205,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "window-caption-hover-close",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[Step {
@@ -218,7 +218,7 @@ const SCENES: &[UiScene] = &[
     // Hover is `instant` (120 ms): half way at 60 ms.
     UiScene {
         id: "window-caption-hover-fade",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[Step {
@@ -230,7 +230,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "window-edges",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: edges,
         script: &[],
@@ -239,7 +239,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "window-inactive-wane",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: wane,
         script: &[],

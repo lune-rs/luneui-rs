@@ -90,7 +90,7 @@ None: no user-visible text.
 
 ### Gallery scenes
 
-- `motion-easings`: the seven easings plotted as curves over a unit square, each labelled with its token name; settled.
+- `motion-easings`: the seven easings (linear, quad-out, quad-in, sine-in-out, back-out, cubic-out, ease-in) plotted as curves over a unit square, each labelled with its token name; settled.
 - `motion-kinds`: one swatch per kind of `docs/motion.md` showing its change at t = half its default duration (hover 60 ms, press 90 ms, focus 90 ms, appear 125 ms, dismiss 90 ms, page-swap 175 ms, drawer 175 ms, pop 125 ms, selection 90 ms, move 90 ms, expand 125 ms, value 90 ms, scroll 90 ms, settle 90 ms; spin at 300 ms).
 - `motion-kinds-settled`: the same swatches settled.
 - `motion-retarget`: one `move` retargeted at t = 60 ms of its 180 ms run, drawn at t = 120 ms, showing the path leaves from the current value without a jump.

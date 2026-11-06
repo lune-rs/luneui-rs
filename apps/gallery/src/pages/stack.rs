@@ -258,7 +258,7 @@ fn insets_state() -> Box<dyn PageState> {
 const SCENES: &[UiScene] = &[
     UiScene {
         id: "stack-gaps",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: gaps_state,
         script: &[],
@@ -267,7 +267,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "stack-sizing",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: sizing_state,
         script: &[],
@@ -276,7 +276,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "stack-align",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: align_state,
         script: &[],
@@ -285,7 +285,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "stack-grid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: grid_state,
         script: &[],
@@ -295,7 +295,7 @@ const SCENES: &[UiScene] = &[
     // The pair: the same insets at scale 1 and scale 2.
     UiScene {
         id: "stack-insets",
-        scale: 1,
+        scale: 1.0,
         tier: MotionTier::Full,
         state: insets_state,
         script: &[],
@@ -304,7 +304,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "stack-insets",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: insets_state,
         script: &[],

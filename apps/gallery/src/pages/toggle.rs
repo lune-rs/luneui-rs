@@ -145,7 +145,7 @@ const SWITCH: &[&str] = &["switch"];
 const SCENES: &[UiScene] = &[
     UiScene {
         id: "toggle-states",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: specimens,
         script: &[],
@@ -156,7 +156,7 @@ const SCENES: &[UiScene] = &[
     // slide is `fast` (180 ms): half way at 90 ms.
     UiScene {
         id: "toggle-switching",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[
@@ -175,7 +175,7 @@ const SCENES: &[UiScene] = &[
     // Hover is `instant` (120 ms): half way at 60 ms.
     UiScene {
         id: "toggle-hover-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[Step {
@@ -187,7 +187,7 @@ const SCENES: &[UiScene] = &[
     },
     UiScene {
         id: "toggle-focus-mid",
-        scale: 2,
+        scale: 2.0,
         tier: MotionTier::Full,
         state: live,
         script: &[Step {
