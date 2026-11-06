@@ -26,7 +26,7 @@ on real machines (`owner: Luneterm M9 to M11 runs`); the second needs a pixel ga
 - Final gate at ace3648, the merged tip: fmt, clippy, boundaries, index, `cargo doc -D warnings`: clean. `cargo test --workspace`: 2,620 passed, 0 failed, 111 binaries.
   `LUNEUI_REQUIRE_GPU=1 cargo test -p lune-ui-wgpu`: 73 passed. `scripts/check-targets.sh`: Windows passed, Linux skipped (Docker not running). Export and an offline consumer: passed.
 - Pixel gate: `scripts/pixel-gate.sh --base 55cfaaf` at ace3648: 413 files identical, 0 differ, max delta 0; 18 new scenes (`ui-controls@1.5x`, seven `window-*`, and ten
-  disabled or focus states from review), nothing allowed. The new scenes were looked at once by the fix round's author; no director reviewed them.
+  disabled or focus states from review), nothing allowed. Viewed by eye once, no director: the ten review scenes, and `ui-controls@1.5x` (1560 x 990), `window-caption-hover-close`, `window-edges`, `window-inactive-wane`. The other four `window-*` scenes were not viewed.
 - Release size: `cargo build --release -p gallery` at a9d1292, `wc -c target/release/gallery` (macOS, strip, fat LTO): 9,869,520 bytes, against 9,869,408 at
   the M10 tip (+112) and 9,448,688 at the M9 merge. Also in `docs/consuming.md`.
 - Bench (`cargo run --release -p gallery -- --bench`, per D85) at d14069f, one reading, 2080 x 1320, 5 runs, M1 Pro, no GUI session: 0 of 74 pages over budget at load
