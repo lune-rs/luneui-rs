@@ -49,7 +49,7 @@ Conflicts: (1) radius: Lunegit's filter box 4 [L src/Lunegit.Desktop/Controls/Fi
 - Caret: `text.text-edit` Anatomy (1.5 px, `fg_primary`) [R crates/lune-ui-core/src/widgets/field.rs:60-116].
 - Variant `fill`: width 100 percent of the parent; `sm`: 24 high; default width 240 [W docs/ui/components.md:350,352].
 - Variant `mono`: the mono face for ids, URLs and paths [W docs/ui/components.md:350].
-- Variant `password`: a fixed mask of 16 dots, never the real length; not copyable [W docs/ui/components.md:350,353].
+- Variant `password`: a fixed mask of 16 dots, never the real length; not copyable [W docs/ui/components.md:350,353]. Its semantic node is `Role::PasswordInput` with no value and no text (D231), so an assistive client treats it as a password and does not echo the typed characters.
 - Variant `search`: a 16 px search icon at the left, text padding-left 33 [W docs/ui/components.md:350,352]. Lunegit's filter box: icon 14 px in `ForegroundDim`, margin right 8, and a clear button 18 x 18 with a 12 px icon shown while the text is non-empty [L src/Lunegit.Desktop/Controls/FilterBar.axaml:10-20]. Wane's 16 px icon and 33 px inset win for the Wane look; Lunegit's clear button is taken as is (Wane has none).
 - Variant `date`: a calendar icon at the right, mono text, padding-right 28 [W docs/ui/components.md:350,352]. Only the look: no picker (none in either source).
 - Error: border in the error colour, set by the form field around it [W docs/ui/components.md:351], [widget.form-field].

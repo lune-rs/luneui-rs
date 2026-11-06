@@ -27,7 +27,7 @@ use lune_ui_core::testing::{FakeText, UiHarness};
 use lune_ui_core::theme::DARK;
 use lune_ui_core::ui::{FrameConfig, Ui, UiStore, WidgetId};
 use lune_ui_core::widgets::dialog::{Cancel, Dialog, DialogGlass};
-use lune_ui_core::widgets::field::FieldState;
+use lune_ui_core::widgets::field::{FieldOptions, FieldState, Variant};
 use lune_ui_core::widgets::slider::SliderOptions;
 use lune_ui_winit::access::{NodeCache, RootInfo, action_from, tree_update};
 use lune_ui_winit::clipboard::MAX_PASTE_BYTES;
@@ -180,6 +180,7 @@ mod mapping {
             AkRole::Navigation,
             AkRole::Note,
             AkRole::Splitter,
+            AkRole::PasswordInput,
         ];
         assert_eq!(Role::ALL.len(), expected.len());
         for (role, ak) in Role::ALL.iter().zip(expected) {
@@ -729,7 +730,7 @@ mod shapes {
     }
 
     fn any_node(r: &mut Rng) -> Node {
-        let role = Role::ALL[r.below(36)];
+        let role = Role::ALL[r.below(Role::ALL.len() as u64)];
         let mut n = Node::new(any_id(r), role, "n", AT);
         if r.chance(40) {
             n.parent = Some(any_id(r));
@@ -889,6 +890,36 @@ mod frames {
         let (mut prev, mut mirror) = (NodeCache::default(), Mirror::default());
         mirror.apply(tree_update(&out.tree, out.focused, &root(), &mut prev));
         (h, app, prev, mirror, ms, out)
+    }
+
+    #[test]
+    fn a_password_field_reaches_the_client_as_a_password_input_with_no_value() {
+        // The role is the only thing that tells a screen reader to stop speaking the typed
+        // characters: AccessKit derives every platform's password signal from it alone.
+        const SECRET: &str = "hunter2-secret";
+        let mut text = SECRET.to_owned();
+        let mut h = UiHarness::new((300.0, 100.0));
+        let opts = FieldOptions {
+            variant: Variant::Password,
+            ..FieldOptions::default()
+        };
+        let mut out = None;
+        for ms in [0, 1000] {
+            h.at_ms(ms);
+            out = Some(
+                h.frame(|ui| {
+                    ui.text_field_with("pw", Rect::new(20.0, 20.0, 200.0, 28.0), &mut text, &opts);
+                })
+                .1,
+            );
+        }
+        let out = out.expect("ran");
+        let update = tree_update(&out.tree, out.focused, &root(), &mut NodeCache::default());
+        let node = sent(&update, id_of(&out, Role::PasswordInput));
+        assert_eq!(node.role(), AkRole::PasswordInput);
+        assert_eq!(node.value(), None);
+        assert!(node.children().is_empty() && node.text_selection().is_none());
+        assert!(!format!("{update:?}").contains(SECRET));
     }
 
     #[test]

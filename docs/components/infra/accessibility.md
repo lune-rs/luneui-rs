@@ -50,7 +50,7 @@ Wane's roles that the enum lacks are recorded as `role-gap` below. No source giv
 ### Anatomy
 
 - Node: `id` (the widget's `WidgetId`), `role`, `name`, `description`, `value`, for text inputs the text and its selection as char offsets, `bounds` (logical, after `Xform`), child order, a live-region politeness, `states`, supported `actions` [derived: C4 semantic tree], [R crates/lune-ui-core/src/paint.rs:86-93].
-- `role` (36 values, one enum): button, checkbox, switch, radio, radio-group, slider, spin-button, text-input, multiline-text, combo-box, list, list-item, tree, tree-item, tab-list, tab, menu, menu-item, dialog, alert, tooltip, table, row, cell, column-header, progress, scroll-area, toolbar, group, image, link, static-text, status, navigation, note, separator (the last three added by [D55]) [derived: C4 role enum].
+- `role` (37 values, one enum): button, checkbox, switch, radio, radio-group, slider, spin-button, text-input, multiline-text, combo-box, list, list-item, tree, tree-item, tab-list, tab, menu, menu-item, dialog, alert, tooltip, table, row, cell, column-header, progress, scroll-area, toolbar, group, image, link, static-text, status, navigation, note, separator (the last three added by [D55]), password-input (added in M10's review, D231: a password field is this role and exposes no value or text, so a screen reader does not speak what is typed) [derived: C4 role enum].
 - `name`: the accessible name: the widget's visible text, else the string the app or the toolkit supplies; `description`: secondary text such as a row's description; Lunegit names its icon-only buttons through the string table (`AutomationProperties.Name="{loc:Tr ...}"`) [L src/Lunegit.Desktop/Views/AiProjectDetailView.axaml:94,111], [infra.localization].
 - `value`: text, or a number with `min`, `max` and `step` (slider, spin button, progress) [derived: C4].
 - `states` (15 flags): focusable, focused, disabled, checked (including mixed), selected, expanded, pressed, modal, read-only, required, invalid, busy, hidden, current (the active page, step or location: Wane's `aria-current` [W docs/ui/components.md:423]), dragging (the item under a drag: kanban cards, reordered rows and tabs); the last two added by [D55] [derived: C4 states].
@@ -87,11 +87,11 @@ n/a — the tree is rebuilt every frame; nothing animates. A widget's node repor
 
 ### Accessibility
 
-- This entry defines the contract; a component's own `### Accessibility` subsection picks a role from the 36 values, a name source, and its states and actions.
+- This entry defines the contract; a component's own `### Accessibility` subsection picks a role from the 37 values, a name source, and its states and actions.
 - Resolved by [D55]: `navigation` (Wane's steps list is a navigation landmark with a label [W docs/ui/mocks/js/shell.js:117]), `note` (Wane's callouts are `role="note"` [W docs/ui/mocks/overview.html:28]; a warning callout that must be announced still uses `alert`), `separator` (a splitter or divider; a resizable one carries a value), the `current` state and the `dragging` state, and the `sort` field. The mapping to the nearest older role is no longer needed.
 - Still open, listed in Open questions: multi-select lists, tab-to-panel association, composition range, ranged text, a keyboard move action.
 - The bridge (M10, `lune-ui-winit`'s `access` module, feature `accesskit`, re-exported through `lune_ui::access`) [D216], [D217]:
-  - All 36 roles map one to one; a `static-text` with `level` set is AccessKit's `Heading`, which answers the heading-level gap at the bridge, and `separator` is `Splitter` (AccessKit has no separator role).
+  - All 37 roles map one to one (`password-input` is AccessKit's `PasswordInput`, the one signal every platform derives its password handling from); a `static-text` with `level` set is AccessKit's `Heading`, which answers the heading-level gap at the bridge, and `separator` is `Splitter` (AccessKit has no separator role).
   - States: `focused` is the update's `focus`, `focusable` the focus action, `checked` and `pressed` `Toggled::True`, and a `checkbox`, `switch` or `radio` without either says `Toggled::False`. A node offering expand or collapse without `expanded` says collapsed.
   - The update carries the changed nodes only, so a live region that changes every frame is one node per frame; the bridge does not debounce.
   - A text node gets one `TextRun` child per `\n`-separated line, its value holding its line break; all of a node's runs have the node's bounds.
@@ -121,7 +121,7 @@ None: node names come from each widget's visible text or from keys in that widge
 ### Acceptance
 
 - Contract test: a scripted frame of every M4 widget yields the expected roles, names and states, and an injected `AccessAction` default on a checkbox node toggles it and sets `changed` [derived: C4 contract test].
-- Every role, state and action value of the three enums is constructible and round-trips through the tree; the enums have 36, 15 and 10 members.
+- Every role, state and action value of the three enums is constructible and round-trips through the tree; the enums have 37, 15 and 10 members.
 - Node bounds equal the painter rect after `Xform` for a widget drawn under a scale 0.97 transform [R crates/lune-ui-core/src/paint.rs:86-93].
 - Child order equals call order; a parent precedes its children; the focused id in `FrameOutput` equals the node whose `focused` state is set [core.focus].
 - A modal overlay's node is `modal`; nodes under it are not reachable by `AccessAction` while it is open [core.ui].

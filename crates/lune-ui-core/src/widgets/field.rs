@@ -1163,7 +1163,11 @@ impl Ui<'_> {
         }
 
         let facts = NodeFacts {
-            role: Role::TextInput,
+            role: if opts.variant == Variant::Password {
+                Role::PasswordInput
+            } else {
+                Role::TextInput
+            },
             name,
             description: opts.description,
             error: opts.error,

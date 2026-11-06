@@ -724,6 +724,33 @@ mod edit {
     }
 
     #[test]
+    fn a_password_field_is_a_password_input_and_a_plain_one_a_text_input() {
+        // The role is how assistive technology knows not to speak what is typed (S1): a node of
+        // `Role::TextInput` with no value is not enough.
+        for (variant, role) in [
+            (Variant::Password, Role::PasswordInput),
+            (Variant::Plain, Role::TextInput),
+            (Variant::Mono, Role::TextInput),
+            (Variant::Search, Role::TextInput),
+        ] {
+            let opts = FieldOptions {
+                variant,
+                ..FieldOptions::default()
+            };
+            let mut text = String::from("hunter2");
+            let mut h = focused(&mut text, &opts);
+            let (_, out) = h.frame(|ui| {
+                ui.text_field_with("f", RECT, &mut text, &opts);
+            });
+            let node = out.tree.get(id()).expect("node");
+            assert_eq!(node.role, role, "{variant:?}");
+            if variant == Variant::Password {
+                assert_eq!((&node.value, &node.text), (&None, &None));
+            }
+        }
+    }
+
+    #[test]
     fn a_password_copies_nothing_and_its_selection_fills_the_mask() {
         let opts = FieldOptions {
             variant: Variant::Password,

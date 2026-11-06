@@ -258,6 +258,7 @@ fn role_of(n: &Node) -> AkRole {
         Role::Navigation => AkRole::Navigation,
         Role::Note => AkRole::Note,
         Role::Separator => AkRole::Splitter,
+        Role::PasswordInput => AkRole::PasswordInput,
     }
 }
 
