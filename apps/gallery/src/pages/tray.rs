@@ -422,9 +422,9 @@ struct Surface {
 }
 
 impl PageState for Surface {
-    fn draw(&mut self, ui: &mut Ui<'_>, _stage: &Stage) {
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
         let t = *ui.theme();
-        let win = ui.painter().window;
+        let win = stage.area(ui);
         {
             let p = ui.painter();
             p.on(lune_ui::paint::LayerId::Base);
@@ -438,7 +438,18 @@ impl PageState for Surface {
         .enumerate()
         {
             let spec = Spec::plain(line, Style::ui(t.font_base, t.fg_secondary));
-            ui.painter().text(&spec, 400.0, 40.0 + i as f32 * 22.0);
+            ui.painter()
+                .text(&spec, win.x + 400.0, win.y + 40.0 + i as f32 * 22.0);
+        }
+        if stage.rect().is_some() {
+            // The surface is an overlay the toolkit puts at the corner of the window, so it
+            // cannot be moved into a pane: say so instead of drawing it at the window's corner.
+            let spec = Spec::plain(
+                "This surface fills a window of its own, so a pane cannot show it. The tray page opens it for real.",
+                Style::ui(t.font_base, t.fg_tertiary),
+            );
+            ui.painter().text(&spec, win.x + 400.0, win.y + 94.0);
+            return;
         }
         draw_surface(ui, self.surface, TrayState::Serving);
     }

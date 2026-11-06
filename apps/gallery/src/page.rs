@@ -82,6 +82,13 @@ impl Stage {
     pub(crate) const fn rect(&self) -> Option<Rect> {
         self.rect
     }
+
+    /// The area the page owns: the stage's rect, or the painter's whole window. A page that
+    /// anchors to the edges of "its window" (caption buttons, a resize border) reads it here
+    /// instead of from `ui.painter().window`.
+    pub(crate) fn area(&self, ui: &mut Ui<'_>) -> Rect {
+        self.rect.unwrap_or(ui.painter().window)
+    }
 }
 
 /// What a Ui page draws each frame. The runner calls `draw` under `ui.scope(page.id)`.
@@ -699,93 +706,89 @@ mod tests {
         assert_eq!(clicks.get(), 2);
         assert_eq!(path_id("p", &["a"]), WidgetId::ROOT.with("p").with("a"));
     }
-    /// Pages not yet laid out relative to their card (step 1 ports them; the list empties as it
-    /// does): the stage test skips them and fails if one on the list has become clean.
-    const NOT_ON_STAGE: &[&str] = &[
-        "locale",
-        "scroll-area",
-        "scrollbar",
-        "virtual-list",
-        "drag-and-drop",
-        "row",
-        "list-row",
-        "form-field",
-        "nav-item",
-        "radio-group",
-        "star-rating",
-        "slider",
-        "filter-bar",
-        "search-picker",
-        "sidebar",
-        "side-panel",
-        "icon-rail",
-        "split-panes",
-        "settings-page",
-        "lane-graph",
-        "code-block",
-        "code-editor-view",
-        "markdown-preview",
-        "diff-view",
-        "window",
-    ];
+    /// Nodes of overlays that centre themselves in the window, not in the stage (a modal dialog):
+    /// the test cannot tell an overlay's node from a page's, so it names these `(page, name)`
+    /// pairs, the name being a substring of the node's.
+    const OVERLAY_NODES: &[(&str, &str)] =
+        &[("locale", "Discard changes"), ("ui", "Discard changes")];
+
+    /// Pages whose scenes open a modal or a popup list that fills the window (a dialog, a palette,
+    /// a dropdown's scrolled rows): their nodes are an overlay's, so only their shapes and text
+    /// on the base and page layers are checked.
+    const OVERLAY_PAGES: &[&str] = &["dialog", "dropdown", "command-palette"];
 
     /// Where the page's content lies on a stage: its semantic nodes' bounds and the shapes and
-    /// text it draws on the page layer (overlay layers are left out) when `drawn_on`. Names what lies
-    /// left of `stage`'s x or above its y.
+    /// text it draws on the base and page layers (overlay layers are left out), in the live
+    /// state and in each scene's starting state, when `drawn_on`. Names what, as far as a clip
+    /// lets it show, lies left of `stage`'s x or above its y.
     fn off_stage(page: &Page, drawn_on: Stage, stage: Rect) -> Vec<String> {
         let PageKind::Ui(ui_page) = page.kind else {
             return Vec::new();
         };
-        let mut player = Player::new(
-            page.id,
-            (ui_page.state)(),
-            (W as f32, H as f32),
-            1.0,
-            MotionTier::Full,
-        );
-        player.set_stage(drawn_on);
+        let mut states: Vec<(String, fn() -> Box<dyn PageState>)> =
+            vec![("live".to_owned(), ui_page.state)];
+        states.extend(ui_page.scenes.iter().map(|s| (s.id.to_owned(), s.state)));
         let mut out = BTreeSet::new();
-        for ms in [0, 16, 300] {
-            let (scene, frame) = player.frame(&mut FakeText, ms, &[]).expect("frame");
+        for (which, state) in states {
+            let mut player = Player::new(
+                page.id,
+                state(),
+                (W as f32, H as f32),
+                1.0,
+                MotionTier::Full,
+            );
+            player.set_stage(drawn_on);
             let outside = |x: f32, y: f32| x < stage.x - 0.5 || y < stage.y - 0.5;
-            for n in &frame.tree.nodes {
-                if outside(n.bounds.x, n.bounds.y) {
-                    out.insert(format!("{} node {:?}", n.name, n.bounds));
+            for ms in [0, 16, 300] {
+                let (scene, frame) = player.frame(&mut FakeText, ms, &[]).expect("frame");
+                for n in &frame.tree.nodes {
+                    let overlay = OVERLAY_NODES
+                        .iter()
+                        .any(|(page_id, name)| *page_id == page.id && n.name.contains(name));
+                    let overlay = overlay || OVERLAY_PAGES.contains(&page.id);
+                    if outside(n.bounds.x, n.bounds.y) && !overlay {
+                        out.insert(format!("{which}: {} node {:?}", n.name, n.bounds));
+                    }
                 }
-            }
-            let layer = &scene.layers[LayerId::Page as usize];
-            for t in &layer.texts {
-                if outside(t.x, t.y) {
-                    out.insert(format!("text at ({}, {})", t.x, t.y));
-                }
-            }
-            for s in layer.geometry.under.iter().chain(&layer.geometry.over) {
-                if s.rect[2] > 0.0 && s.rect[3] > 0.0 && outside(s.rect[0], s.rect[1]) {
-                    out.insert(format!("shape {:?}", s.rect));
+                for id in [LayerId::Base, LayerId::Page] {
+                    let layer = &scene.layers[id as usize];
+                    for t in &layer.texts {
+                        if outside(t.x.max(t.clip.x), t.y.max(t.clip.y)) {
+                            out.insert(format!("{which}: {id:?} text at ({}, {})", t.x, t.y));
+                        }
+                    }
+                    let geometry = &layer.geometry;
+                    let acrylic = geometry.acrylic.iter().map(|a| &a.shape);
+                    for s in geometry.under.iter().chain(&geometry.over).chain(acrylic) {
+                        let [mut x, mut y, w, h] = s.rect;
+                        if s.clip[2] > 0.0 {
+                            (x, y) = (x.max(s.clip[0]), y.max(s.clip[1]));
+                        }
+                        if w > 0.0 && h > 0.0 && outside(x, y) {
+                            out.insert(format!("{which}: {id:?} shape {:?}", s.rect));
+                        }
+                    }
                 }
             }
         }
         out.into_iter().collect()
     }
 
-    /// Every Ui page's live state draws inside a content rect: nothing it makes lies left of or
-    /// above it. Names each offender.
+    /// Every Ui page's live state and scene states draw inside a content rect: nothing they make
+    /// lies left of or above it. Names each offender.
     #[test]
     fn every_ui_page_draws_inside_its_stage() {
         let stage = Rect::new(300.0, 80.0, 1020.0, 592.0);
         let mut bad = Vec::new();
         for page in PAGES {
             let off = off_stage(page, Stage::at(stage), stage);
-            let pending = NOT_ON_STAGE.contains(&page.id);
-            match (off.is_empty(), pending) {
-                (false, false) => bad.push(format!(
-                    "{}: {} off the stage, e.g. {}",
+            if !off.is_empty() {
+                bad.push(format!(
+                    "{}: {} off the stage\n  {}",
                     page.id,
                     off.len(),
-                    off.iter().take(2).cloned().collect::<Vec<_>>().join("; ")
-                )),
-                (true, true) => bad.push(format!("{}: clean, drop it from NOT_ON_STAGE", page.id)),
-                _ => {}
+                    off.join("\n  ")
+                ));
             }
         }
         assert!(bad.is_empty(), "{}", bad.join("\n"));

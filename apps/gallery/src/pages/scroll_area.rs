@@ -11,7 +11,7 @@ use lune_ui::text::{Spec, Style};
 use lune_ui::ui::Ui;
 use lune_ui::widgets::scroll_area::{Bars, Extent, Reveal, ScrollOptions, ScrollView, Target};
 
-use super::{card, heading};
+use super::{card, heading, on_card};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
@@ -137,7 +137,9 @@ impl PageState for Live {
                 Reveal::Center,
             );
         }
-        ui.scroll_area("area", AREA, &opts, |ui, view| ((), lines(ui, view, count)));
+        ui.scroll_area("area", on_card(card, AREA), &opts, |ui, view| {
+            ((), lines(ui, view, count))
+        });
     }
 }
 

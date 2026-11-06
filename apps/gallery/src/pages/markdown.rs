@@ -15,7 +15,7 @@ use lune_ui::widgets::markdown::{
 };
 use lune_ui::widgets::text_lines::HighlightSpan;
 
-use super::{caption, card, heading};
+use super::{caption, card, heading, on_card};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
@@ -407,7 +407,7 @@ impl PageState for Live {
             tasks_live: self.tasks_live,
             identity: Some(1),
         };
-        let out = ui.markdown("doc", RECT, &self.blocks, &opts);
+        let out = ui.markdown("doc", on_card(card, RECT), &self.blocks, &opts);
         if let Some(url) = out.link {
             self.opened = Some(url);
         }

@@ -101,8 +101,8 @@ pub(super) fn rows(tray: Tray) -> [MenuRow<'static>; 5] {
 }
 
 /// The stand-in for the tray icon, near the window's bottom right.
-fn tray_button(ui: &mut Ui<'_>) -> Rect {
-    let win = ui.painter().window;
+fn tray_button(ui: &mut Ui<'_>, stage: &Stage) -> Rect {
+    let win = stage.area(ui);
     Rect::new(win.right() - 96.0, win.bottom() - 56.0, 64.0, 28.0)
 }
 
@@ -168,7 +168,7 @@ impl PageState for Live {
             card.x + 24.0,
             card.y + 44.0,
         );
-        let button = tray_button(ui);
+        let button = tray_button(ui, stage);
         let tray = ui.button("tray", button, "Tray icon", ButtonKind::Secondary);
         if tray.clicked {
             self.open = !self.open;

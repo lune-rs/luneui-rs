@@ -8,7 +8,7 @@ use lune_ui::paint::Rect;
 use lune_ui::ui::Ui;
 use lune_ui::widgets::search_picker::{PickerOptions, Trigger};
 
-use super::{caption, card, heading};
+use super::{caption, card, heading, on_card};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
@@ -73,10 +73,12 @@ struct Live {
 
 impl PageState for Live {
     fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
-        card(ui, stage, "Search picker");
-        heading(ui, "SEARCH PICKER", X, Y);
+        let card = card(ui, stage, "Search picker");
+        let (ox, oy) = (card.x + 24.0, card.y + 24.0);
+        let (field, link) = (on_card(card, FIELD), on_card(card, LINK));
+        heading(ui, "SEARCH PICKER", ox, oy);
         if let Some(selected) = &mut self.field {
-            caption(ui, "Field", X, FIELD.y + 11.0);
+            caption(ui, "Field", ox, field.y + 11.0);
             let opts = PickerOptions {
                 trigger: Trigger::Field,
                 icon: None,
@@ -84,11 +86,11 @@ impl PageState for Live {
                 name: "Tree",
             };
             ui.with_enabled(!self.disabled, |ui| {
-                ui.search_picker("field", FIELD, &ITEMS, selected, &opts)
+                ui.search_picker("field", field, &ITEMS, selected, &opts)
             });
         }
         if let Some(selected) = &mut self.link {
-            caption(ui, "Link", X, LINK.y + 5.0);
+            caption(ui, "Link", ox, link.y + 5.0);
             let opts = PickerOptions {
                 trigger: Trigger::Link,
                 icon: Some(icon::GEAR),
@@ -96,7 +98,7 @@ impl PageState for Live {
                 name: "Other tree",
             };
             ui.with_enabled(!self.disabled, |ui| {
-                ui.search_picker("link", LINK, &ITEMS, selected, &opts)
+                ui.search_picker("link", link, &ITEMS, selected, &opts)
             });
         }
     }

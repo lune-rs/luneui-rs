@@ -74,10 +74,11 @@ fn states() -> Box<dyn PageState> {
 impl PageState for Rows {
     fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
         let card = card(ui, stage, "Row");
+        let (x, top) = (card.x + 24.0, card.y + 48.0);
         match self.mode {
             Mode::Setting => {
                 heading(ui, "SETTING ROW", card.x + 24.0, card.y + 24.0);
-                let mut y = TOP;
+                let mut y = top;
                 let first = SettingRow {
                     title: "Launch at login",
                     description: Some("Open the app when you sign in to this computer."),
@@ -86,7 +87,7 @@ impl PageState for Rows {
                 };
                 let on = &mut self.on;
                 y += GAP
-                    + ui.setting_row("first", Rect::new(X, y, WIDTH, 0.0), &first, |ui, slot| {
+                    + ui.setting_row("first", Rect::new(x, y, WIDTH, 0.0), &first, |ui, slot| {
                         ui.toggle("switch", slot, on, "Launch at login");
                     });
                 let second = SettingRow {
@@ -98,7 +99,7 @@ impl PageState for Rows {
                 let on = &mut self.second;
                 ui.setting_row(
                     "second",
-                    Rect::new(X, y, WIDTH, 0.0),
+                    Rect::new(x, y, WIDTH, 0.0),
                     &second,
                     |ui, slot| {
                         ui.toggle("switch", slot, on, "Compact lists");
@@ -113,13 +114,13 @@ impl PageState for Rows {
                     ("Upload the report", "waiting", Tone::Neutral, "-"),
                     ("Verify the signature", "failed", Tone::Err, "0.4 s"),
                 ];
-                let mut y = TOP;
+                let mut y = top;
                 for (i, (title, badge, tone, value)) in rows.into_iter().enumerate() {
                     let checked = &mut self.checked[i];
                     y += GAP
                         + ui.item_row(
                             ("item", i),
-                            Rect::new(X, y, WIDTH, 0.0),
+                            Rect::new(x, y, WIDTH, 0.0),
                             &ItemRow { name: title },
                             |ui, c| {
                                 ui.checkbox(
@@ -148,7 +149,7 @@ impl PageState for Rows {
                     card.x + 24.0,
                     card.y + 24.0,
                 );
-                let mut y = TOP;
+                let mut y = top;
                 for (i, (title, off, disabled)) in [
                     ("Rest", false, false),
                     ("Hover", false, false),
@@ -169,7 +170,7 @@ impl PageState for Rows {
                         + ui.with_enabled(!disabled, |ui| {
                             ui.setting_row(
                                 ("row", i),
-                                Rect::new(X, y, WIDTH, 0.0),
+                                Rect::new(x, y, WIDTH, 0.0),
                                 &row,
                                 |ui, slot| {
                                     ui.toggle("switch", slot, &mut on, title);

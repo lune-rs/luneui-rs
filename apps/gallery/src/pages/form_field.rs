@@ -21,9 +21,7 @@ pub(crate) static PAGE: Page = Page {
     }),
 };
 
-const X: f32 = 34.0;
 const WIDTH: f32 = 360.0;
-const TOP: f32 = 82.0;
 /// The controls' height.
 const CONTROL: f32 = 32.0;
 
@@ -45,7 +43,7 @@ impl PageState for States {
     fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
         let card = card(ui, stage, "Form field");
         heading(ui, "NORMAL, ERROR, INLINE", card.x + 24.0, card.y + 24.0);
-        let mut y = TOP;
+        let (x, mut y) = (card.x + 24.0, card.y + 48.0);
 
         let normal = FormField {
             label: "Display name",
@@ -56,7 +54,7 @@ impl PageState for States {
         };
         let name = &mut self.name;
         y += 24.0
-            + ui.form_field("name", Rect::new(X, y, WIDTH, 0.0), &normal, |ui, r| {
+            + ui.form_field("name", Rect::new(x, y, WIDTH, 0.0), &normal, |ui, r| {
                 ui.text_field("input", r, name, "Name", FieldState::default())
                     .id
             });
@@ -70,7 +68,7 @@ impl PageState for States {
         };
         let email = &mut self.email;
         y += 24.0
-            + ui.form_field("email", Rect::new(X, y, WIDTH, 0.0), &error, |ui, r| {
+            + ui.form_field("email", Rect::new(x, y, WIDTH, 0.0), &error, |ui, r| {
                 ui.text_field("input", r, email, "Email", FieldState::default())
                     .id
             });
@@ -83,7 +81,7 @@ impl PageState for States {
             control_size: (120.0, CONTROL),
         };
         let port = &mut self.port;
-        ui.form_field("port", Rect::new(X, y, WIDTH, 0.0), &inline, |ui, r| {
+        ui.form_field("port", Rect::new(x, y, WIDTH, 0.0), &inline, |ui, r| {
             ui.text_field("input", r, port, "Port", FieldState::default())
                 .id
         });

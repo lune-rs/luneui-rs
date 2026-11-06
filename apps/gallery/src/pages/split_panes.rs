@@ -14,7 +14,7 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::button::{ButtonKind, ButtonOptions};
 use lune_ui::widgets::split_panes::{Pane, SplitOptions, SplitSide};
 
-use super::{card, heading};
+use super::{card, heading, on_card};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
@@ -98,8 +98,9 @@ fn pane(ui: &mut Ui<'_>, rect: Rect, tint: [u8; 4], title: &str, detail: &str) {
 
 impl PageState for Live {
     fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
-        card(ui, stage, "Split panes");
-        heading(ui, "SPLIT PANES", X, Y);
+        let card = card(ui, stage, "Split panes");
+        let (ox, oy) = (card.x + 24.0, card.y + 24.0);
+        heading(ui, "SPLIT PANES", ox, oy);
         let ghost = ButtonOptions {
             kind: ButtonKind::Secondary,
             small: true,
@@ -110,7 +111,10 @@ impl PageState for Live {
         } else {
             "Hide first pane"
         };
-        if ui.button_with("toggle", TOGGLE, label, &ghost).clicked {
+        if ui
+            .button_with("toggle", on_card(card, TOGGLE), label, &ghost)
+            .clicked
+        {
             self.hidden = !self.hidden;
         }
 
@@ -119,40 +123,50 @@ impl PageState for Live {
             ..COLS_OPTS
         };
         let (width, height) = (self.cols, self.rows);
-        let r = ui.split_panes("cols", COLS, &cols, |ui, which, rect| match which {
-            Pane::First => pane(
-                ui,
-                rect,
-                THEME.surface_overlay,
-                "First pane",
-                &format!("Width {width:.0}"),
-            ),
-            Pane::Second => pane(
-                ui,
-                rect,
-                THEME.surface_hover,
-                "Second pane",
-                "Keeps at least 200",
-            ),
-        });
+        let r = ui.split_panes(
+            "cols",
+            on_card(card, COLS),
+            &cols,
+            |ui, which, rect| match which {
+                Pane::First => pane(
+                    ui,
+                    rect,
+                    THEME.surface_overlay,
+                    "First pane",
+                    &format!("Width {width:.0}"),
+                ),
+                Pane::Second => pane(
+                    ui,
+                    rect,
+                    THEME.surface_hover,
+                    "Second pane",
+                    "Keeps at least 200",
+                ),
+            },
+        );
         self.cols = r.size;
 
-        let r = ui.split_panes("rows", ROWS, &ROWS_OPTS, |ui, which, rect| match which {
-            Pane::First => pane(
-                ui,
-                rect,
-                THEME.surface_hover,
-                "Content",
-                "Keeps at least 60",
-            ),
-            Pane::Second => pane(
-                ui,
-                rect,
-                THEME.surface_overlay,
-                "Panel below",
-                &format!("Height {height:.0}"),
-            ),
-        });
+        let r = ui.split_panes(
+            "rows",
+            on_card(card, ROWS),
+            &ROWS_OPTS,
+            |ui, which, rect| match which {
+                Pane::First => pane(
+                    ui,
+                    rect,
+                    THEME.surface_hover,
+                    "Content",
+                    "Keeps at least 60",
+                ),
+                Pane::Second => pane(
+                    ui,
+                    rect,
+                    THEME.surface_overlay,
+                    "Panel below",
+                    &format!("Height {height:.0}"),
+                ),
+            },
+        );
         self.rows = r.size;
     }
 }

@@ -10,7 +10,7 @@ use lune_ui::paint::{Rect, Xform};
 use lune_ui::ui::Ui;
 use lune_ui::widgets::nav_item::{NavEntry, NavLook, NavState, paint};
 
-use super::{card, heading};
+use super::{card, heading, on_card};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
@@ -62,8 +62,9 @@ struct Live {
 
 impl PageState for Live {
     fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
-        card(ui, stage, "Navigation item");
-        heading(ui, "NAVIGATION", X, Y);
+        let card = card(ui, stage, "Navigation item");
+        let (ox, oy) = (card.x + 24.0, card.y + 24.0);
+        heading(ui, "NAVIGATION", ox, oy);
         if self.select_at.is_some_and(|t| ui.time() >= t) {
             self.selected = 3;
         }
@@ -80,7 +81,13 @@ impl PageState for Live {
             entry(4, "Local models", icon::COPY, false),
             entry(5, "Settings", icon::GEAR, true),
         ];
-        ui.nav_list("nav", LIST, &entries, &mut self.selected, "Screens");
+        ui.nav_list(
+            "nav",
+            on_card(card, LIST),
+            &entries,
+            &mut self.selected,
+            "Screens",
+        );
     }
 }
 
@@ -89,8 +96,9 @@ struct Specimens;
 
 impl PageState for Specimens {
     fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
-        card(ui, stage, "Navigation item states");
-        heading(ui, "NAV ITEM STATES", X, Y);
+        let card = card(ui, stage, "Navigation item states");
+        let (ox, oy) = (card.x + 24.0, card.y + 24.0);
+        heading(ui, "NAV ITEM STATES", ox, oy);
         let theme = *ui.theme();
         let rest = NavState::default();
         let active = NavState {
@@ -135,7 +143,7 @@ impl PageState for Specimens {
             ("Disabled", rest, true),
         ];
         for (i, (name, state, disabled)) in cases.into_iter().enumerate() {
-            let r = Rect::new(X, Y + 24.0 + i as f32 * 34.0, 220.0, 32.0);
+            let r = Rect::new(ox, oy + 24.0 + i as f32 * 34.0, 220.0, 32.0);
             let look = NavLook::of(&theme, state);
             let p = ui.painter();
             if disabled {

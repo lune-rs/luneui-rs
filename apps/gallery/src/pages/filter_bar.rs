@@ -6,7 +6,7 @@ use lune_ui::paint::Rect;
 use lune_ui::ui::Ui;
 use lune_ui::widgets::filter_bar::FilterOptions;
 
-use super::{caption, card, heading};
+use super::{caption, card, heading, on_card};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
@@ -56,13 +56,15 @@ struct Live {
 
 impl PageState for Live {
     fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
-        card(ui, stage, "Filter bar");
-        heading(ui, "FILTER BAR", X, Y);
+        let card = card(ui, stage, "Filter bar");
+        let (ox, oy) = (card.x + 24.0, card.y + 24.0);
+        let row = |i| on_card(card, row(i));
+        heading(ui, "FILTER BAR", ox, oy);
         for (i, name) in ["Empty", "With text", "Focused", "Disabled"]
             .into_iter()
             .enumerate()
         {
-            caption(ui, name, X, row(i).y + 8.0);
+            caption(ui, name, ox, row(i).y + 8.0);
         }
         ui.filter_bar("empty", row(0), &mut self.empty, &OPTS);
         ui.filter_bar("text", row(1), &mut self.text, &OPTS);

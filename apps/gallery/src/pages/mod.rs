@@ -180,12 +180,14 @@ pub(crate) fn card(ui: &mut Ui<'_>, stage: &Stage, title: &str) -> Rect {
 /// in `card`: a page keeps its layout constants (a scene's script aims at them) and lays them
 /// out from the card it was given, wherever its stage puts it.
 pub(crate) fn on_card(card: Rect, r: Rect) -> Rect {
-    Rect::new(
-        r.x - CARD_MARGIN + card.x,
-        r.y - TITLE_BAND + card.y,
-        r.w,
-        r.h,
-    )
+    let (dx, dy) = card_shift(card);
+    Rect::new(r.x + dx, r.y + dy, r.w, r.h)
+}
+
+/// How far `card` lies from where a page alone in the window has it: add it to a coordinate
+/// given in window coordinates.
+pub(crate) fn card_shift(card: Rect) -> (f32, f32) {
+    (card.x - CARD_MARGIN, card.y - TITLE_BAND)
 }
 
 /// A small section heading at (`x`, `y`).

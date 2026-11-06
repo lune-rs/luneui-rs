@@ -8,7 +8,7 @@ use lune_ui::widgets::scroll_area::{Bars, ScrollOptions};
 
 use super::scroll_area::{AREA, TALL, lines};
 const FEW: u32 = 5;
-use super::{card, heading};
+use super::{card, heading, on_card};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
@@ -58,7 +58,9 @@ impl PageState for Live {
             ..ScrollOptions::default()
         };
         let count = self.lines;
-        ui.scroll_area("area", AREA, &opts, |ui, view| ((), lines(ui, view, count)));
+        ui.scroll_area("area", on_card(card, AREA), &opts, |ui, view| {
+            ((), lines(ui, view, count))
+        });
     }
 }
 

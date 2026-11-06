@@ -14,7 +14,7 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::button::{ButtonKind, ButtonOptions};
 use lune_ui::widgets::side_panel::SidePanelOptions;
 
-use super::{caption, card, heading};
+use super::{caption, card, heading, on_card};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
@@ -69,8 +69,10 @@ impl Live {
 
 impl PageState for Live {
     fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
-        card(ui, stage, "Side panel");
-        heading(ui, "SIDE PANEL", X, Y);
+        let card = card(ui, stage, "Side panel");
+        let (ox, oy) = (card.x + 24.0, card.y + 24.0);
+        let host = on_card(card, HOST);
+        heading(ui, "SIDE PANEL", ox, oy);
         if self.switch_at.is_some_and(|t| ui.time() >= t) {
             self.panel = 2;
         }
@@ -81,7 +83,7 @@ impl PageState for Live {
             icon: None,
         };
         for (i, (key, title)) in KEYS.iter().zip(TITLES).enumerate() {
-            let r = Rect::new(X + i as f32 * 116.0, Y + 24.0, 108.0, 24.0);
+            let r = Rect::new(ox + i as f32 * 116.0, oy + 24.0, 108.0, 24.0);
             if ui.button_with(("switch", *key), r, title, &ghost).clicked {
                 self.panel = *key;
             }
@@ -94,7 +96,7 @@ impl PageState for Live {
             under: CARD.premultiplied(),
             name: TITLES[(self.panel - 1) as usize],
         };
-        ui.side_panel("host", HOST, &opts, |ui, inner| {
+        ui.side_panel("host", host, &opts, |ui, inner| {
             let title = Spec::plain(
                 TITLES[(opts.panel - 1) as usize],
                 Style::ui(THEME.font_base, THEME.fg_bright).medium(),
@@ -115,11 +117,11 @@ impl PageState for Live {
         });
         ui.toggle(
             "active",
-            Rect::new(X, HOST.bottom() + 16.0, 40.0, 24.0),
+            Rect::new(ox, host.bottom() + 16.0, 40.0, 24.0),
             &mut self.active,
             "Window active",
         );
-        caption(ui, "Window active", X + 52.0, HOST.bottom() + 19.0);
+        caption(ui, "Window active", ox + 52.0, host.bottom() + 19.0);
     }
 }
 

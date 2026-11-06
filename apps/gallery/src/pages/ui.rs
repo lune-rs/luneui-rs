@@ -10,8 +10,8 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::dialog::{Cancel, Dialog};
 use lune_ui::widgets::menu::MenuRow;
 
-use super::card;
 use super::controls_ui::{Controls, glass};
+use super::{card, card_shift};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
@@ -105,7 +105,8 @@ impl PageState for Demo {
                         shortcut: "Cmd+C",
                     },
                 ];
-                ui.menu("menu", &rows, MENU_AT);
+                let (dx, dy) = card_shift(area);
+                ui.menu("menu", &rows, (MENU_AT.0 + dx, MENU_AT.1 + dy));
             }
         }
     }

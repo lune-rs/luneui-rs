@@ -15,7 +15,7 @@ use lune_ui::widgets::settings_page::SettingsPage;
 use lune_ui::widgets::stepper::StepRange;
 
 use super::controls_ui::OPTIONS;
-use super::{card, heading};
+use super::{card, heading, on_card};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
@@ -119,7 +119,7 @@ impl PageState for Live {
         );
         let mut changed = false;
         let first_enabled = !self.row_disabled;
-        let resp = ui.settings_page("page", PAGE_RECT, &page, |ui, vp| {
+        let resp = ui.settings_page("page", on_card(card, PAGE_RECT), &page, |ui, vp| {
             let mut y = vp.y;
             let before = *updates;
             let row = SettingRow {

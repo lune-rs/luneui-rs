@@ -223,7 +223,7 @@ impl PageState for Anchored {
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "MENU", x, y);
         let top = if self.low {
-            ui.painter().window.bottom() - 72.0
+            stage.area(ui).bottom() - 72.0
         } else {
             y + 20.0
         };

@@ -7,7 +7,7 @@ use lune_ui::paint::{Rect, Xform};
 use lune_ui::ui::Ui;
 use lune_ui::widgets::radio_group::{RadioLook, RadioOption, RadioState, paint};
 
-use super::{card, heading};
+use super::{card, heading, on_card};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
@@ -47,8 +47,9 @@ struct Live {
 
 impl PageState for Live {
     fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
-        card(ui, stage, "Radio group");
-        heading(ui, "RADIO GROUP", X, Y);
+        let card = card(ui, stage, "Radio group");
+        let (ox, oy) = (card.x + 24.0, card.y + 24.0);
+        heading(ui, "RADIO on_card(card, GROUP)", ox, oy);
         let options = [
             RadioOption {
                 key: 1,
@@ -71,7 +72,13 @@ impl PageState for Live {
                 enabled: false,
             },
         ];
-        ui.radio_group("group", GROUP, &options, &mut self.selected, "Density");
+        ui.radio_group(
+            "group",
+            on_card(card, GROUP),
+            &options,
+            &mut self.selected,
+            "Density",
+        );
     }
 }
 
@@ -80,8 +87,9 @@ struct Specimens;
 
 impl PageState for Specimens {
     fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
-        card(ui, stage, "Radio group states");
-        heading(ui, "RADIO STATES", X, Y);
+        let card = card(ui, stage, "Radio group states");
+        let (ox, oy) = (card.x + 24.0, card.y + 24.0);
+        heading(ui, "RADIO STATES", ox, oy);
         let theme = *ui.theme();
         let off = RadioState::default();
         let on = RadioState {
@@ -111,7 +119,7 @@ impl PageState for Specimens {
             ("Disabled, selected", on, true),
         ];
         for (i, (name, state, disabled)) in cases.into_iter().enumerate() {
-            let r = Rect::new(X, Y + 24.0 + i as f32 * 32.0, 260.0, 28.0);
+            let r = Rect::new(ox, oy + 24.0 + i as f32 * 32.0, 260.0, 28.0);
             let look = RadioLook::of(&theme, state);
             let p = ui.painter();
             if disabled {

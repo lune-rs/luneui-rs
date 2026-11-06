@@ -13,7 +13,7 @@ use lune_ui::widgets::virtual_list::{
     HIGHLIGHT_INSET, Heights, ListOptions, RowKey, SelectionMode, row_fill,
 };
 
-use super::{card, heading};
+use super::{card, heading, on_card};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
@@ -120,6 +120,7 @@ struct Live;
 impl PageState for Live {
     fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
         let card = card(ui, stage, "List row");
+        let list = on_card(card, LIST);
         heading(ui, "LIST ROWS", card.x + 24.0, card.y + 24.0);
         let opts = ListOptions {
             count: 200,
@@ -128,7 +129,7 @@ impl PageState for Live {
             index_of: None,
             label: "Branches",
         };
-        ui.virtual_list("list", LIST, &opts, key, |ui, ctx| {
+        ui.virtual_list("list", list, &opts, key, |ui, ctx| {
             ui.list_row(ctx, &row_of(ctx.index), SIDE_PANEL_PADDING)
         });
     }
@@ -146,6 +147,7 @@ impl PageState for Specimens {
             card.x + 24.0,
             card.y + 24.0,
         );
+        let list = on_card(card, LIST);
         let theme = *ui.theme();
         let h = row_height();
         // Name, hovered, selected, focus-visible, disabled.
@@ -158,7 +160,7 @@ impl PageState for Specimens {
             ("Disabled", false, false, false, true),
         ];
         for (i, (name, hovered, selected, focus, disabled)) in cases.into_iter().enumerate() {
-            let slot = Rect::new(LIST.x, LIST.y + i as f32 * (h + 4.0), LIST.w, h);
+            let slot = Rect::new(list.x, list.y + i as f32 * (h + 4.0), list.w, h);
             let p = ui.painter();
             if disabled {
                 p.push_xform(Xform {

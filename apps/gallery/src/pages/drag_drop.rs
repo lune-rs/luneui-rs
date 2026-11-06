@@ -18,7 +18,7 @@ use lune_ui::paint::{Rect, Xform};
 use lune_ui::text::{Spec, Style};
 use lune_ui::ui::{Sense, Ui};
 
-use super::{card, heading};
+use super::{card, card_shift, heading};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
@@ -81,6 +81,8 @@ impl PageState for Tabs {
     fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
         let card = card(ui, stage, "Drag and drop");
         heading(ui, "TABS", card.x + 24.0, card.y + 24.0);
+        let (dx, dy) = card_shift(card);
+        let (origin, top) = (ORIGIN + f64::from(dx), TOP + dy);
         let theme = *ui.theme();
         let widths: Vec<f64> = self.keys.iter().map(|k| self.widths[*k as usize]).collect();
         let x = layout_x(&widths);
@@ -88,8 +90,8 @@ impl PageState for Tabs {
 
         // The strip's track, then each tab's hit region and node.
         let track = Rect::new(
-            ORIGIN as f32 - 4.0,
-            TOP - 4.0,
+            origin as f32 - 4.0,
+            top - 4.0,
             VIEWPORT as f32 + 8.0,
             HEIGHT + 8.0,
         );
@@ -98,8 +100,8 @@ impl PageState for Tabs {
         let mut rects = Vec::new();
         for (i, key) in self.keys.iter().enumerate() {
             let rect = Rect::new(
-                (ORIGIN + x[i] - self.offset) as f32,
-                TOP,
+                (origin + x[i] - self.offset) as f32,
+                top,
                 widths[i] as f32,
                 HEIGHT,
             );
@@ -123,7 +125,7 @@ impl PageState for Tabs {
         for (i, key) in self.keys.iter().enumerate() {
             let strip = Strip {
                 index: i,
-                origin: ORIGIN,
+                origin,
                 metrics,
             };
             let id = ui.id(("tab", *key));
@@ -146,8 +148,8 @@ impl PageState for Tabs {
             .chain(dragged);
         let p = ui.painter();
         p.push_clip(Rect::new(
-            ORIGIN as f32,
-            TOP - 4.0,
+            origin as f32,
+            top - 4.0,
             VIEWPORT as f32,
             HEIGHT + 8.0,
         ));
@@ -198,8 +200,8 @@ const CARD_TOP: f32 = 124.0;
 const CARD_H: f32 = 40.0;
 const CARD_STEP: f32 = 48.0;
 
-fn col_x(c: usize) -> f32 {
-    COL_X + c as f32 * (COL_W + COL_GAP)
+fn col_x(dx: f32, c: usize) -> f32 {
+    COL_X + dx + c as f32 * (COL_W + COL_GAP)
 }
 
 /// The board's page state: the card keys of each column, and the free drag.
@@ -215,10 +217,10 @@ fn board() -> Box<dyn PageState> {
     })
 }
 
-fn card_rect(column: usize, index: usize) -> Rect {
+fn card_rect((dx, dy): (f32, f32), column: usize, index: usize) -> Rect {
     Rect::new(
-        col_x(column) + 10.0,
-        CARD_TOP + index as f32 * CARD_STEP,
+        col_x(dx, column) + 10.0,
+        CARD_TOP + dy + index as f32 * CARD_STEP,
         COL_W - 20.0,
         CARD_H,
     )
@@ -228,6 +230,7 @@ impl PageState for Board {
     fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
         let card = card(ui, stage, "Drag and drop");
         heading(ui, "BOARD", card.x + 24.0, card.y + 24.0);
+        let shift = card_shift(card);
         let theme = *ui.theme();
 
         // Columns in window coordinates, with each card's vertical midpoint.
@@ -237,7 +240,7 @@ impl PageState for Board {
             .enumerate()
             .map(|(c, cards)| {
                 (0..cards.len())
-                    .map(|i| f64::from(card_rect(c, i).y + CARD_H / 2.0))
+                    .map(|i| f64::from(card_rect(shift, c, i).y + CARD_H / 2.0))
                     .collect()
             })
             .collect();
@@ -245,7 +248,7 @@ impl PageState for Board {
             .iter()
             .enumerate()
             .map(|(c, m)| Column {
-                x: f64::from(col_x(c)),
+                x: f64::from(col_x(shift.0, c)),
                 w: f64::from(COL_W),
                 card_mids: m,
             })
@@ -255,7 +258,7 @@ impl PageState for Board {
         let mut cards = Vec::new();
         for (c, keys) in self.columns.iter().enumerate() {
             for (i, key) in keys.iter().enumerate() {
-                let rect = card_rect(c, i);
+                let rect = card_rect(shift, c, i);
                 let id = ui.id(("card", *key));
                 let resp = ui.interact(id, rect, Sense::DRAG);
                 ui.node(Node::new(id, Role::ListItem, &format!("Card {key}"), rect));
@@ -281,7 +284,7 @@ impl PageState for Board {
             } else {
                 theme.surface_input
             };
-            let rect = Rect::new(col_x(c), COL_TOP, COL_W, COL_H);
+            let rect = Rect::new(col_x(shift.0, c), COL_TOP + shift.1, COL_W, COL_H);
             ui.painter().fill(rect, 8.0, fill);
         }
         // Cards; the source stays in place, dimmed.
@@ -305,8 +308,13 @@ impl PageState for Board {
         }
         // The drop line sits in the gap before the card at the target index.
         if let Some(t) = target {
-            let y = CARD_TOP + t.index as f32 * CARD_STEP - (CARD_STEP - CARD_H);
-            let gap = Rect::new(col_x(t.column) + 10.0, y, COL_W - 20.0, CARD_STEP - CARD_H);
+            let y = CARD_TOP + shift.1 + t.index as f32 * CARD_STEP - (CARD_STEP - CARD_H);
+            let gap = Rect::new(
+                col_x(shift.0, t.column) + 10.0,
+                y,
+                COL_W - 20.0,
+                CARD_STEP - CARD_H,
+            );
             paint_drop_line(ui.painter(), gap, &theme);
         }
 

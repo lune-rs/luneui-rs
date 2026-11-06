@@ -49,15 +49,16 @@ struct Live {
 
 impl PageState for Live {
     fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
-        card(ui, stage, "Star rating");
-        heading(ui, "STAR RATING", X, Y);
-        ui.star_rating("stars", AT, &mut self.value, MAX, "Rating");
+        let card = card(ui, stage, "Star rating");
+        let (ox, oy) = (card.x + 24.0, card.y + 24.0);
+        heading(ui, "STAR RATING", ox, oy);
+        ui.star_rating("stars", (ox, oy + 24.0), &mut self.value, MAX, "Rating");
         let text = if self.value == 0 {
             "Unrated".to_owned()
         } else {
             format!("{} of {MAX}", self.value)
         };
-        caption(ui, &text, X, AT.1 + 36.0);
+        caption(ui, &text, ox, (oy + 24.0) + 36.0);
     }
 }
 
@@ -66,8 +67,9 @@ struct Specimens;
 
 impl PageState for Specimens {
     fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
-        card(ui, stage, "Star rating states");
-        heading(ui, "STAR RATING STATES", X, Y);
+        let card = card(ui, stage, "Star rating states");
+        let (ox, oy) = (card.x + 24.0, card.y + 24.0);
+        heading(ui, "STAR RATING STATES", ox, oy);
         let theme = *ui.theme();
         let rows = [
             ("Value 0", 0, None),
@@ -75,7 +77,7 @@ impl PageState for Specimens {
             ("Hover on star 4", 3, Some(4)),
         ];
         for (i, (name, value, hover)) in rows.into_iter().enumerate() {
-            let y = Y + 24.0 + i as f32 * 40.0;
+            let y = oy + 24.0 + i as f32 * 40.0;
             for n in 1..=MAX {
                 let state = StarState {
                     filled: n <= value,
@@ -84,11 +86,11 @@ impl PageState for Specimens {
                 };
                 paint(
                     ui.painter(),
-                    button_rect((X, y), n - 1),
+                    button_rect((ox, y), n - 1),
                     &StarLook::of(&theme, state),
                 );
             }
-            caption(ui, name, X + 150.0, y + 5.0);
+            caption(ui, name, ox + 150.0, y + 5.0);
         }
     }
 }

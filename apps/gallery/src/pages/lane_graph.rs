@@ -12,7 +12,7 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::lane_graph::{LaneEdge, LaneLine, LaneRow, ROW_H, width};
 use lune_ui::widgets::virtual_list::{Heights, ListOptions, RowKey, SelectionMode};
 
-use super::{card, heading};
+use super::{card, heading, on_card};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
@@ -115,7 +115,7 @@ impl PageState for Listed {
             index_of: None,
             label: "Commits",
         };
-        ui.virtual_list("list", LIST, &opts, key, |ui, row| {
+        ui.virtual_list("list", on_card(card, LIST), &opts, key, |ui, row| {
             let (dot, lanes, edges) = generated(row.index);
             graph_row(
                 ui,

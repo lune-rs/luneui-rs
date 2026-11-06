@@ -104,17 +104,19 @@ impl Live {
 
 impl PageState for Live {
     fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
-        card(ui, stage, "Sidebar");
-        heading(ui, "SIDEBAR", X, Y);
+        let card = card(ui, stage, "Sidebar");
+        let (ox, oy) = (card.x + 24.0, card.y + 24.0);
+        let top = oy + 36.0;
+        heading(ui, "SIDEBAR", ox, oy);
         let all = self.show == Show::All;
         let mut col = 0.0;
         let mut next = |label: &str, ui: &mut Ui<'_>| {
-            let x = X + col * STRIDE;
+            let x = ox + col * STRIDE;
             col += 1.0;
             if all {
-                caption(ui, label, x, TOP - 20.0);
+                caption(ui, label, x, top - 20.0);
             }
-            Rect::new(x, TOP, WIDTH, HEIGHT)
+            Rect::new(x, top, WIDTH, HEIGHT)
         };
         let entries: Vec<NavEntry<'_>> = SCREENS
             .iter()

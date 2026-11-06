@@ -251,18 +251,22 @@ const MENU: [MenuRow<'static>; 3] = [
 ];
 
 impl PageState for Acrylic {
-    fn draw(&mut self, ui: &mut Ui<'_>, _stage: &Stage) {
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
         let theme = *ui.theme();
-        let win = ui.painter().window;
+        let win = stage.area(ui);
         let band = win.w / STRIPES.len() as f32;
-        let panel = Rect::new(60.0, 70.0, 560.0, 480.0);
+        let panel = Rect::new(win.x + 60.0, win.y + 70.0, 560.0, 480.0);
         let material = theme.glass.panel.material_opacity;
         let under = premul([0x70, 0x70, 0x70, 0xFF]);
         {
             let p = ui.painter();
             p.on(LayerId::Base);
             for (i, c) in STRIPES.iter().enumerate() {
-                p.fill(Rect::new(i as f32 * band, 0.0, band, win.h), 0.0, *c);
+                p.fill(
+                    Rect::new(win.x + i as f32 * band, win.y, band, win.h),
+                    0.0,
+                    *c,
+                );
             }
             // Acrylic replaces what is below it within a layer, so the panel is above the stripes.
             p.on(LayerId::Page);

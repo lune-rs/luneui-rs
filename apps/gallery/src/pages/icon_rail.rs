@@ -10,7 +10,7 @@ use lune_ui::paint::Rect;
 use lune_ui::ui::Ui;
 use lune_ui::widgets::icon_rail::{PITCH, RailItem};
 
-use super::{caption, card, heading};
+use super::{caption, card, heading, on_card};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
@@ -96,8 +96,9 @@ impl Live {
 
 impl PageState for Live {
     fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
-        card(ui, stage, "Icon rail");
-        heading(ui, "ICON RAIL", X, Y);
+        let card = card(ui, stage, "Icon rail");
+        let (ox, oy) = (card.x + 24.0, card.y + 24.0);
+        heading(ui, "ICON on_card(card, RAIL)", ox, oy);
         let item = |(key, glyph, name): (u64, &'static str, &'static str)| RailItem {
             key,
             glyph,
@@ -114,12 +115,17 @@ impl PageState for Live {
         };
         let top: Vec<RailItem<'_>> = TOP.iter().map(|i| item(*i)).collect();
         let bottom: Vec<RailItem<'_>> = BOTTOM.iter().map(|i| item(*i)).collect();
-        if let Some(key) = ui.icon_rail("rail", RAIL, &top, &bottom, "Panels") {
+        if let Some(key) = ui.icon_rail("rail", on_card(card, RAIL), &top, &bottom, "Panels") {
             self.active = key;
             self.last = Some(key);
         }
         let shown = self.last.map_or("none".to_owned(), |k| k.to_string());
-        caption(ui, &format!("Last activated: {shown}"), X + 72.0, Y + 34.0);
+        caption(
+            ui,
+            &format!("Last activated: {shown}"),
+            ox + 72.0,
+            oy + 34.0,
+        );
     }
 }
 

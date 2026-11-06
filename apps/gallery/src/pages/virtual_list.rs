@@ -11,7 +11,7 @@ use lune_ui::text::{Spec, Style};
 use lune_ui::ui::Ui;
 use lune_ui::widgets::virtual_list::{Heights, ListOptions, RowKey, SelectionMode};
 
-use super::{card, heading};
+use super::{card, heading, on_card};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
@@ -98,6 +98,7 @@ impl PageState for Live {
     fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
         let card = card(ui, stage, "Virtualized list");
         heading(ui, "VIRTUALIZED LIST", card.x + 24.0, card.y + 24.0);
+        let list = on_card(card, LIST);
         if !self.seeded {
             self.seeded = true;
             let state = ui.list_state("list");
@@ -111,7 +112,7 @@ impl PageState for Live {
             label: "Rows",
         };
         ui.with_enabled(self.enabled, |ui| {
-            ui.virtual_list("list", LIST, &opts, key, |ui, row| {
+            ui.virtual_list("list", list, &opts, key, |ui, row| {
                 let spec = Spec::plain(
                     format!("Row {}", row.index),
                     Style::ui(THEME.font_base, THEME.fg_primary),
@@ -123,7 +124,7 @@ impl PageState for Live {
         });
         if self.count == 0 {
             let spec = Spec::plain("No rows", Style::ui(THEME.font_base, THEME.fg_tertiary));
-            ui.painter().text_centered(&spec, LIST);
+            ui.painter().text_centered(&spec, list);
         }
     }
 }

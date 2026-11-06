@@ -12,7 +12,7 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::code_block::{CodeBlockOptions, height};
 use lune_ui::widgets::text_lines::HighlightSpan;
 
-use super::{card, heading};
+use super::{card, heading, on_card};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
@@ -220,7 +220,12 @@ impl PageState for Live {
             base
         };
         let h = height(ui, self.text, &opts);
-        ui.code_block("block", Rect::new(AT.0, AT.1, WIDTH, h), self.text, &opts);
+        ui.code_block(
+            "block",
+            on_card(card, Rect::new(AT.0, AT.1, WIDTH, h)),
+            self.text,
+            &opts,
+        );
     }
 }
 
