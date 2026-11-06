@@ -284,3 +284,95 @@ fn bad_numbers_equal_zero_not_just_finite() {
     assert_eq!(with(-3.0), zero);
     assert_eq!(with(f32::INFINITY), zero);
 }
+
+#[test]
+fn a_single_child_is_laid_out_whatever_its_size_kind_and_gap() {
+    let hug = |m| Child {
+        main: Size::Hug(m),
+        cross: 10.0,
+    };
+    // A gap goes only between children, so one child has none to its side.
+    for gap in [0.0, 8.0, f32::NAN] {
+        assert_eq!(
+            row(
+                PARENT,
+                &[fixed(50.0, 10.0)],
+                gap,
+                Align::Start,
+                Insets::ZERO
+            ),
+            [Rect::new(10.0, 20.0, 50.0, 10.0)]
+        );
+        assert_eq!(
+            row(PARENT, &[hug(70.0)], gap, Align::Start, Insets::ZERO),
+            [Rect::new(10.0, 20.0, 70.0, 10.0)]
+        );
+        // One fill child takes the whole main axis, at any weight above zero.
+        for w in [0.5, 1.0, 7.0] {
+            assert_eq!(
+                row(PARENT, &[fill(w)], gap, Align::Stretch, Insets::ZERO),
+                [PARENT],
+                "weight {w}"
+            );
+        }
+    }
+    // Under insets it fills what is left; a column is the same on the other axis.
+    let inset = Insets::new(5.0, 6.0, 7.0, 8.0);
+    assert_eq!(
+        column(PARENT, &[fill(1.0)], 4.0, Align::Stretch, inset),
+        [Rect::new(15.0, 26.0, 288.0, 86.0)]
+    );
+}
+
+#[test]
+fn rects_come_back_in_the_order_the_children_were_given() {
+    let kids = [
+        fixed(10.0, 4.0),
+        fixed(20.0, 5.0),
+        fill(1.0),
+        fixed(30.0, 6.0),
+    ];
+    let rs = row(PARENT, &kids, 2.0, Align::Start, Insets::ZERO);
+    assert_eq!(rs.len(), 4);
+    // Left to right in call order, each with its own main and cross size.
+    assert!(rs.windows(2).all(|w| w[0].right() <= w[1].x), "{rs:?}");
+    assert_eq!((rs[0].w, rs[0].h), (10.0, 4.0));
+    assert_eq!((rs[1].w, rs[1].h), (20.0, 5.0));
+    assert_eq!((rs[3].w, rs[3].h), (30.0, 6.0));
+    let rs = column(PARENT, &kids, 2.0, Align::Start, Insets::ZERO);
+    assert!(rs.windows(2).all(|w| w[0].bottom() <= w[1].y), "{rs:?}");
+    assert_eq!((rs[0].h, rs[1].h, rs[3].h), (10.0, 20.0, 30.0));
+}
+
+/// The gap and the inset at scale 2, in device px, through the painter: the rects the helpers
+/// return are logical, and a filled box is twice as many device pixels.
+#[test]
+fn at_scale_2_a_gap_of_8_is_16_device_px_and_an_inset_of_12_is_24() {
+    use lune_ui_core::paint::Painter;
+    use lune_ui_core::testing::FakeText;
+    use lune_ui_core::theme::DARK;
+    let parent = Rect::new(0.0, 0.0, 200.0, 100.0);
+    let rs = row(
+        parent,
+        &[fixed(40.0, 30.0), fixed(40.0, 30.0)],
+        8.0,
+        Align::Start,
+        Insets::all(12.0),
+    );
+    let mut t = FakeText;
+    let mut p: Painter<'_, u8> = Painter::new(2.0, parent, &mut t, None, DARK);
+    for r in &rs {
+        p.fill(*r, 0.0, [255; 4]);
+    }
+    let boxes: Vec<[f32; 4]> = p.scene.layers[0]
+        .geometry
+        .under
+        .iter()
+        .map(|s| s.rect)
+        .collect();
+    // Inset 12 is 24 device px from the parent's left and top edge.
+    assert_eq!((boxes[0][0], boxes[0][1]), (24.0, 24.0));
+    // The gap of 8 is 16 device px between the two boxes: 80 wide, then 16, then the next.
+    assert_eq!(boxes[1][0] - (boxes[0][0] + boxes[0][2]), 16.0);
+    assert_eq!(boxes[1][1], 24.0);
+}

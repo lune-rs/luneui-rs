@@ -2,10 +2,10 @@
 id: widget.callout
 title: Callout
 area: widget
-status: in-progress
+status: done
 consumers: wane
-source: —
-owner: toolkit-v1 M6
+source: crates/lune-ui-core/src/widgets/callout.rs
+owner: —
 summary: Callout: static notice with 1 px tone border, 14 px icon, optional figure and action button; not dismissible
 ---
 
@@ -86,11 +86,13 @@ None: the notice text is app data.
 - Pixel probes at scale 2: radius 12 px; 2 px border; icon 28 px in a 28 px wide slot, 22 px in from the box edge; text starts 66 px from the box edge (2 px border, 20 px padding, the 28 px slot, 16 px gap; the earlier 20 px slot misread the slot's height).
 - Conformance: n/a — no transition.
 - Semantic node: role `note`; live region polite on appear.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_callout.rs`: pixel probes `the_box_is_radius_6_with_a_1_px_border_and_padding_8_by_10`, `at_scale_2_the_radius_is_12_px_the_border_2_px_and_the_icon_slot_40_px` (the slot is 28 device px and the text follows after 16, so it starts 66 from the box edge), `the_icon_is_14_px_in_a_14_by_20_slot_and_the_text_follows_after_8`, `neutral_is_surface_input_with_border_subtle_and_a_tone_is_the_badge_recipe`, `a_figure_sits_at_the_right_in_mono_bright_and_never_gold`, `a_long_text_wraps_and_grows_the_box`; the action `an_action_is_a_small_button_at_the_right_edge_and_reports_clicks`, `two_callouts_in_one_scope_have_their_own_action_buttons`, `a_callout_without_an_action_is_static`; node `the_node_is_a_note_named_by_the_text_with_a_polite_live_region_when_announced`.
 
 ### Build
 
 - Milestone: M6
 - Depends on: widget.button, core.painter, text.shaping
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_callout.rs::at_scale_2_the_radius_is_12_px_the_border_2_px_and_the_icon_slot_40_px, crates/lune-ui-core/tests/widget_callout.rs::the_icon_is_14_px_in_a_14_by_20_slot_and_the_text_follows_after_8, crates/lune-ui-core/tests/widget_callout.rs::neutral_is_surface_input_with_border_subtle_and_a_tone_is_the_badge_recipe, crates/lune-ui-core/tests/widget_callout.rs::an_action_is_a_small_button_at_the_right_edge_and_reports_clicks, crates/lune-ui-core/tests/widget_callout.rs::the_node_is_a_note_named_by_the_text_with_a_polite_live_region_when_announced`; page `callout`; unverified here: none (limit with a row: no title line and no inline figure, batch 1 ruling).
 
 ## Open questions
 

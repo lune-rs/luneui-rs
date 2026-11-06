@@ -2,10 +2,10 @@
 id: widget.radio-group
 title: Radio group
 area: widget
-status: in-progress
+status: done
 consumers: wane
-source: —
-owner: toolkit-v1 M6
+source: crates/lune-ui-core/src/widgets/radio_group.rs
+owner: —
 summary: Radio group: vertical 16 px rings, accent ring and 6 px dot when selected; arrow keys move the selection inside the group
 ---
 
@@ -98,11 +98,13 @@ None: option labels are app data.
 - Pixel probes at scale 2: circle 32 px; dot 12 px at the centre of the circle; row min height 56 px.
 - Conformance: selection fill over 60 Hz samples is monotonic, ends exact, settles within 180 ms + 1 frame; Reduced keeps the fill.
 - Semantic node: role radio-group; checked follows the selected key.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_radio_group.rs`: `an_arrow_moves_focus_and_selection_in_the_same_frame_and_marks_changed_once`, `the_arrows_wrap_both_ways`, `a_disabled_option_is_skipped_both_ways_and_never_selected`, `tab_enters_once_on_the_selected_option_and_leaves_once`, `a_disabled_group_changes_nothing_and_reports_nothing`, `space_selects_the_focused_option_once`, `a_click_selects_once_and_a_click_on_the_selected_option_changes_nothing`; `pixel_probes_at_scale_two`; conformance `the_fill_rises_monotonically_and_settles_within_180_ms_and_a_frame`, `reduced_keeps_the_fill_change_and_off_snaps_it`, `every_motion_row_conforms_under_every_tier`; node `the_nodes_are_a_radio_group_over_radios_and_checked_follows_the_selection`, `the_accessibility_default_action_selects_and_focus_reaches_a_child`.
 
 ### Build
 
 - Milestone: M6
 - Depends on: core.focus, core.ui, infra.accessibility, motion.transitions
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_radio_group.rs::the_arrows_wrap_both_ways, crates/lune-ui-core/tests/widget_radio_group.rs::tab_enters_once_on_the_selected_option_and_leaves_once, crates/lune-ui-core/tests/widget_radio_group.rs::a_disabled_group_changes_nothing_and_reports_nothing, crates/lune-ui-core/tests/widget_radio_group.rs::pixel_probes_at_scale_two, crates/lune-ui-core/tests/widget_radio_group.rs::the_fill_rises_monotonically_and_settles_within_180_ms_and_a_frame, crates/lune-ui-core/tests/widget_radio_group.rs::the_nodes_are_a_radio_group_over_radios_and_checked_follows_the_selection`; page `radio-group`; unverified here: none.
 
 ## Open questions
 

@@ -2,10 +2,10 @@
 id: widget.banner-empty-state
 title: Banners, empty states and loading gates
 area: widget
-status: in-progress
+status: done
 consumers: lunegit
-source: Lunegit: src/Lunegit.Desktop/Controls/IndexingBanner.axaml
-owner: toolkit-v1 M6
+source: crates/lune-ui-core/src/widgets/banner.rs
+owner: —
 summary: Indexing banner (warning tone, spinning sync icon) and the empty-repository view: centred icon, title, subtitle, action buttons
 ---
 
@@ -103,11 +103,13 @@ None. The banner text, the empty view's title and subtitle and the action labels
 - Pixel probes at scale 2: banner radius 12 px, 2 px border; empty icon 200 x 200 px; subtitle centred; action buttons at least 280 wide and 102 high with a 2 px ring.
 - Conformance: action press scale over 60 Hz samples settles within 180 ms + 1 frame; Reduced snaps the scale.
 - Semantic node: banner role status, polite live region; empty-view title role static-text.
+- Tests, bullet by bullet. Banner (`crates/lune-ui-core/tests/widget_banner.rs`): `the_banner_is_the_warning_fill_with_a_one_px_light_border`, `a_one_line_banner_is_the_icon_and_padding_high_and_a_long_one_wraps`, `the_banner_spins_while_busy_and_holds_still_when_not`, `the_banner_node_is_a_polite_status_named_by_the_text`, `pixel_probes_at_scale_two_banner`. Empty view: `the_column_is_centred_with_the_entrys_sizes_and_spacing`, `the_column_is_never_wider_than_520_or_the_rect`, `the_subtitle_rows_are_each_centred`, `an_action_click_reports_its_index_once`, `title_and_subtitle_are_static_text_and_actions_are_buttons`, `the_picture_node_is_hidden_and_none_means_no_picture`, `pixel_probes_at_scale_two_empty_view`, `each_action_has_a_one_px_border_ring_on_the_button_rect`. Conformance: `the_action_press_scale_settles_within_180_ms_and_reduced_snaps_it`, `the_action_hover_fill_tweens_over_instant_and_a_settled_view_is_idle`.
 
 ### Build
 
 - Milestone: M6
 - Depends on: widget.spinner, widget.button, core.image, text.shaping
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_banner.rs::the_banner_is_the_warning_fill_with_a_one_px_light_border, crates/lune-ui-core/tests/widget_banner.rs::the_banner_node_is_a_polite_status_named_by_the_text, crates/lune-ui-core/tests/widget_banner.rs::pixel_probes_at_scale_two_banner, crates/lune-ui-core/tests/widget_banner.rs::pixel_probes_at_scale_two_empty_view, crates/lune-ui-core/tests/widget_banner.rs::an_action_click_reports_its_index_once, crates/lune-ui-core/tests/widget_banner.rs::the_action_press_scale_settles_within_180_ms_and_reduced_snaps_it`; page `banner` (4 scenes); unverified here: none (limit with a row: the actions have no glyph, ruling C13, D136).
 
 ## Open questions
 

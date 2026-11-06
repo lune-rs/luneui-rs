@@ -2,10 +2,10 @@
 id: widget.checkbox
 title: Checkbox
 area: widget
-status: in-progress
+status: done
 consumers: luneterm, wane
 source: crates/lune-ui-core/src/widgets/checkbox.rs
-owner: orch/toolkit-v1
+owner: —
 summary: Checkbox: 16 px box, accent fill and check when checked, label beside it
 ---
 
@@ -105,11 +105,13 @@ None: the label is app text.
 - Pixel probes at scale 2: box 32 x 32 px, radius 6 px; checked centre fill = `accent`; check glyph 24 px; label starts 16 px past the box edge.
 - Conformance: fill change over 60 Hz samples is monotonic, ends exact, settles within 180 ms + 1 frame; Reduced keeps the fill change.
 - Semantic node: role checkbox, checked follows `checked`, injected `AccessAction` default toggles.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_checkbox.rs`: `click_and_space_flip_once_each_and_mark_changed`, `a_disabled_checkbox_reports_no_click`, `pixel_probes_at_scale_two`, conformance `every_motion_row_conforms_under_every_tier`, `the_fill_rises_monotonically_and_settles_within_180_ms_and_a_frame`, `reduced_keeps_the_fill_change_and_off_snaps_everything`, node `the_node_is_a_checkbox_whose_checked_state_follows_the_value` (the default action toggles: `ui_access.rs::default_clicks_a_checkbox_and_sets_changed`), and `at_rest_the_ui_checkbox_draws_exactly_what_the_painter_checkbox_does`.
 
 ### Build
 
 - Milestone: M4 (retrofit: transitions, focus, semantic node); done by M11.
 - Depends on: core.ui, core.focus, infra.accessibility, motion.transitions.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_checkbox.rs::click_and_space_flip_once_each_and_mark_changed, crates/lune-ui-core/tests/widget_checkbox.rs::a_disabled_checkbox_reports_no_click, crates/lune-ui-core/tests/widget_checkbox.rs::pixel_probes_at_scale_two, crates/lune-ui-core/tests/widget_checkbox.rs::the_fill_rises_monotonically_and_settles_within_180_ms_and_a_frame, crates/lune-ui-core/tests/widget_checkbox.rs::the_node_is_a_checkbox_whose_checked_state_follows_the_value`; page `checkbox`; unverified here: none.
 
 ## Open questions
 

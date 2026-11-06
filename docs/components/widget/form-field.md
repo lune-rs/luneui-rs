@@ -2,10 +2,10 @@
 id: widget.form-field
 title: Form field (label, control, hint)
 area: widget
-status: in-progress
+status: done
 consumers: wane
-source: —
-owner: toolkit-v1 M6
+source: crates/lune-ui-core/src/widgets/form_field.rs
+owner: —
 summary: Form field: label above a control, hint below; error state rings the control and colours the hint in err
 ---
 
@@ -82,11 +82,13 @@ None: label and hint text are app data.
 - Pixel probes at scale 2: column gap 8 px; error ring 2 px in `--err` at the control rect.
 - Conformance: n/a — no transition of its own.
 - Semantic node: role group; name equals the label; invalid follows the error flag.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_form_field.rs`: `at_scale_2_the_gap_is_8_px_and_the_error_ring_2_px_in_err_at_the_control_rect`, `stacked_the_label_is_20_high_then_4_px_then_the_control_then_4_px_then_the_hint`, `inline_the_label_is_at_the_left_centred_on_the_control_with_the_hint_under_it`, `an_error_draws_one_ring_even_around_a_text_field_and_replaces_the_hint`, `a_label_press_focuses_the_control_and_the_label_is_no_tab_stop`, `a_disabled_field_ignores_the_label_press`, node `the_node_is_a_group_named_by_the_label_invalid_with_an_error`.
 
 ### Build
 
 - Milestone: M6
 - Depends on: widget.text-field, core.painter, infra.accessibility
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_form_field.rs::at_scale_2_the_gap_is_8_px_and_the_error_ring_2_px_in_err_at_the_control_rect, crates/lune-ui-core/tests/widget_form_field.rs::an_error_draws_one_ring_even_around_a_text_field_and_replaces_the_hint, crates/lune-ui-core/tests/widget_form_field.rs::a_label_press_focuses_the_control_and_the_label_is_no_tab_stop, crates/lune-ui-core/tests/widget_form_field.rs::the_node_is_a_group_named_by_the_label_invalid_with_an_error`; page `form-field`; unverified here: none.
 
 ## Open questions
 

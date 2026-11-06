@@ -2,10 +2,10 @@
 id: widget.list-row-badge
 title: List rows with status badges
 area: widget
-status: in-progress
+status: done
 consumers: lunegit, wane
-source: Lunegit: src/Lunegit.Desktop/App.axaml
-owner: toolkit-v1 M6
+source: crates/lune-ui-core/src/widgets/list_row.rs
+owner: —
 summary: Master list row: name, value and sub-line with a badge in the head; rest transparent, hover surface-hover, selected surface-selected
 ---
 
@@ -99,11 +99,13 @@ None: names, values and meta are app data.
 - Pixel probes at scale 2: row radius 12 px; padding 16 horizontal, 12 vertical in the side-panel form; selected fill = `surface_selected`.
 - Conformance: hover background over 60 Hz samples is monotonic, ends exact, settles within 120 ms + 1 frame.
 - Semantic node: role list-item; selected follows the selection key; injected `AccessAction` default selects.
+- Tests, bullet by bullet. The row draws the content; the list owns selection, keys and the hover fill (its Acceptance is `layout.virtualized-list`'s): Up and Down, click and the default action are `widget_virtual_list.rs::up_and_down_move_the_cursor_and_the_selection`, `a_click_selects_one_row_and_sets_the_anchor`, `an_access_default_action_selects_the_row`; the hover fill conforms in `the_two_transitions_conform_at_every_tier`. The row itself (`crates/lune-ui-core/tests/widget_list_row.rs`): pixel probes `at_scale_2_the_padding_is_16_by_12_px_the_radius_12_and_selected_is_surface_selected`, `the_height_is_the_inset_the_padding_and_the_lines`, `the_two_lists_pad_8_and_12_horizontally_and_6_vertically` (`conflict-padding`, D127); the name fade `the_name_is_secondary_at_rest_and_bright_once_selected`, `selecting_fades_the_name_at_fast_and_ends_exact`, `nothing_animates_while_the_list_scrolls`; content `the_head_has_the_dot_the_name_the_badge_and_the_value_then_the_sub_line_and_the_meta`, `a_long_name_value_and_sub_are_elided_never_wrapped`; node `the_row_adds_its_name_and_value_under_the_lists_list_item`; `the_public_paint_draws_what_the_list_row_draws_at_rest`.
 
 ### Build
 
 - Milestone: M6
 - Depends on: widget.badge, widget.status-dot, core.focus, core.ui, infra.accessibility, motion.transitions
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_list_row.rs::at_scale_2_the_padding_is_16_by_12_px_the_radius_12_and_selected_is_surface_selected, crates/lune-ui-core/tests/widget_list_row.rs::selecting_fades_the_name_at_fast_and_ends_exact, crates/lune-ui-core/tests/widget_list_row.rs::nothing_animates_while_the_list_scrolls, crates/lune-ui-core/tests/widget_list_row.rs::the_row_adds_its_name_and_value_under_the_lists_list_item, crates/lune-ui-core/tests/widget_virtual_list.rs::up_and_down_move_the_cursor_and_the_selection, crates/lune-ui-core/tests/widget_virtual_list.rs::an_access_default_action_selects_the_row, crates/lune-ui-core/tests/widget_virtual_list.rs::the_two_transitions_conform_at_every_tier`; page `list-row`; unverified here: none.
 
 ## Open questions
 
