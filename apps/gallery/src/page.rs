@@ -281,7 +281,7 @@ impl Player {
             page,
             (scene.state)(),
             (W as f32, H as f32),
-            scene.scale as f32,
+            scene.scale,
             scene.tier,
         )
     }

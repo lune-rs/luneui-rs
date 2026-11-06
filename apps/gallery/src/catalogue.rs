@@ -544,7 +544,11 @@ mod tests {
             "—",
             "### Gallery scenes\n\n- `motion-kinds`: hover and press\n",
         );
-        let bad = missing_from_scene(&[e.clone()], "motion-kinds", &["hover", "focus"]);
+        let bad = missing_from_scene(
+            std::slice::from_ref(&e),
+            "motion-kinds",
+            &["hover", "focus"],
+        );
         assert_eq!(bad, ["`motion-kinds` does not name `focus`"]);
         assert_eq!(
             missing_from_scene(&[e], "motion-nothing", &["hover"]).len(),
