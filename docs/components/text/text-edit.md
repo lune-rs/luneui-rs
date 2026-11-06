@@ -2,10 +2,10 @@
 id: text.text-edit
 title: Text editing engine
 area: text
-status: in-progress
+status: done
 consumers: any
 source: crates/lune-ui-core/src/text_edit.rs
-owner: orch/toolkit-v1
+owner: —
 summary: Caret, selection, word and line navigation, undo and redo, clipboard through FrameOutput and preedit for single- and multi-line text
 ---
 
@@ -136,12 +136,14 @@ None: the engine has no text of its own. A cut, copy and paste context menu, if 
 - Pixel probes at scale 2: field 64 device px high, radius 12, ring 2 px (`accent` when focused, `border` otherwise); caret 3 px wide and the text line tall; placeholder colour `fg_tertiary` [R crates/lune-ui-core/src/widgets/mod.rs:50-69,137-141].
 - Conformance: the ring and hover transitions pass `motion::conformance`; Reduced keeps them, Off snaps [motion].
 - Semantic node: role `text-input`, value and selection follow the text; an injected `AccessAction` set-value replaces the text and reports `changed`.
+- Tests, bullet by bullet. The engine (`crates/lune-ui-core/tests/text_edit.rs`): behaviour `typing_puts_the_caret_after_the_text`, `left_twice_then_shift_right_selects_one_to_two`, `select_all_then_typing_replaces`, `backspace_at_zero_and_delete_at_the_end_do_nothing`; graphemes `one_backspace_takes_a_whole_cluster`; offsets `a_preedit_cursor_is_bytes_converted_to_chars` ("héllo", bytes (3, 3) is chars (2, 2)), `a_preedit_cursor_inside_a_char_or_past_the_end_clamps`, `any_stale_or_wild_offset_never_panics_on_an_empty_text`, `any_command_sequence_keeps_offsets_valid_and_undo_exact`; undo `typing_undoes_in_one_step_and_redoes`, `an_external_change_clears_history_and_clamps`, `undo_keeps_two_hundred_steps`; clipboard `cut_copy_and_paste`, `a_password_copies_and_cuts_nothing`; the key maps `the_primary_chords_map_on_each_keymap`. The widgets (`widget_text_field.rs`, `widget_text_area.rs`): retention `caret_selection_and_undo_survive_600_hidden_frames_under_keep_alive` (field), `caret_selection_undo_and_offset_survive_600_hidden_frames_under_keep_alive` (area); pixel probes `pixel_probes_at_scale_two`; conformance `every_motion_row_conforms_under_every_tier`; node `the_node_is_a_text_input_named_by_the_placeholder`, `the_node_carries_text_selection_and_states`, `set_value_replaces_the_text_and_marks_changed`. Clipboard through the frame: `copy_cut_and_paste_go_through_the_frame_output` (`platform.clipboard`).
 
 ### Build
 
 - Insert limit: `EditFlags::max_insert` (bytes; `None` is no limit). The text field and the text area set `MAX_SHAPED_INSERT` (1,048,576) because they shape all their text; an insert over it is refused whole, never cut, by paste, input-method commit and assistive set-value alike (D232, D233). The code editor sets none: it draws only the lines in view.
-- Milestone: M5. Built in M5 (steps 11 to 13 and 15; the page is `text-edit`, 10 new scenes). The clipboard is the OS's since M10 (`platform.clipboard`, D213 to D215; D107's in-process string is gone). Open for `done` (D47): M11 re-checks the whole bar on every entry; real typing with an input method (R1) and bidi caret placement are unverified here, and so is the Windows and Linux run time.
+- Milestone: M5. Built in M5 (steps 11 to 13 and 15; the page is `text-edit`, 10 new scenes). The clipboard is the OS's since M10 (`platform.clipboard`, D213 to D215; D107's in-process string is gone). M11 audited it against D47 (the `Done` line). Unverified here: real typing with an input method (R1; Luneterm's M9 run covers it, D15), bidi caret placement, and the Windows and Linux run time.
 - Depends on: core.ui, core.focus, core.input, text.shaping, platform.clipboard, text.ime, infra.accessibility, motion.transitions
+- Done (D47, M11): tests `crates/lune-ui-core/tests/text_edit.rs::typing_puts_the_caret_after_the_text, crates/lune-ui-core/tests/text_edit.rs::one_backspace_takes_a_whole_cluster, crates/lune-ui-core/tests/text_edit.rs::a_preedit_cursor_is_bytes_converted_to_chars, crates/lune-ui-core/tests/text_edit.rs::typing_undoes_in_one_step_and_redoes, crates/lune-ui-core/tests/text_edit.rs::a_password_copies_and_cuts_nothing, crates/lune-ui-core/tests/text_edit.rs::any_command_sequence_keeps_offsets_valid_and_undo_exact, crates/lune-ui-core/tests/widget_text_field.rs::caret_selection_and_undo_survive_600_hidden_frames_under_keep_alive, crates/lune-ui-core/tests/widget_text_field.rs::pixel_probes_at_scale_two, crates/lune-ui-core/tests/widget_text_field.rs::every_motion_row_conforms_under_every_tier, crates/lune-ui-core/tests/widget_text_field.rs::the_node_carries_text_selection_and_states, crates/lune-ui-core/tests/widget_text_field.rs::set_value_replaces_the_text_and_marks_changed`; page `text-edit`; unverified here: real typing with an input method (Luneterm's M9 run, D15), bidi caret placement, Windows and Linux run time.
 
 ## Open questions
 

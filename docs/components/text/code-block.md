@@ -2,10 +2,10 @@
 id: text.code-block
 title: Code block
 area: text
-status: in-progress
+status: done
 consumers: lunegit, wane
 source: crates/lune-ui-core/src/widgets/code_block.rs
-owner: toolkit-v1 M9
+owner: —
 summary: Read-only mono block with optional app-supplied highlight spans, horizontal scroll, selectable text and a copy button with feedback
 ---
 
@@ -25,7 +25,7 @@ and the data folder listing (key, operator and value in three text tones).
 
 ## Existing code
 
-None in `lune-ui` or Luneterm (Wane: missing). Design sources (not code to move): Lunegit `src/Lunegit.Desktop/Views/MarkdownPreviewView.axaml:68-80,176-187` (the block and its copy button),
+Built in M9 step 5: `crates/lune-ui-core/src/widgets/code_block.rs` (`Ui::code_block`, `code_block::height`, `CodeBlockOptions`, `CodeBlockResponse`), tests `crates/lune-ui-core/tests/widget_code_block.rs`. Design sources (not code to move): Lunegit `src/Lunegit.Desktop/Views/MarkdownPreviewView.axaml:68-80,176-187` (the block and its copy button),
 `Markdown/TextMateInlineHighlighter.cs` (per-line colour segments), `Views/MarkdownPreviewView.axaml.cs:386-402` (copy); Wane `docs/ui/components.md:655-667`.
 
 ## Spec
@@ -124,11 +124,13 @@ Lunegit's copy button has no transition (neither tier file styles it). Never ani
 - Pixel probes at scale 2: radius 12, padding 20 device px, fill `surface_input`, copy icon 26 px; a 1 px ring (2 device px) only when the border is on.
 - Conformance: the two transitions pass `motion::conformance`; Reduced keeps them, Off snaps [motion].
 - Semantic node: role `multiline-text` read-only; the copy button's default action copies; the `status` node appears after the copy.
+- Tests, bullet by bullet (`crates/lune-ui-core/tests/widget_code_block.rs`). Behaviour: `a_click_on_copy_writes_the_whole_text_and_the_check_shows_until_feedback_ms_exactly`, `a_second_copy_during_the_feedback_restarts_it`, `a_change_of_text_ends_the_feedback`, `enter_and_space_on_the_focused_button_copy`, `a_drag_selects_and_the_shortcut_copies_the_selection_not_the_whole`, `an_empty_block_disables_copy_and_emits_nothing`. Spans: `spans_clamp_empty_and_inverted_ones_draw_nothing_and_a_missing_line_is_ignored`, `spans_for_a_line_colour_that_line_only`. Pixel probes at scale 2: `at_scale_2_the_box_has_radius_12_padding_20_the_input_fill_and_a_26_px_copy_icon`, `a_ring_of_1_px_shows_only_when_the_border_is_on`, `the_roomy_look_is_13_over_20_with_the_padding_inside_the_border_and_the_button_at_6`. Conformance: `the_copy_hover_and_the_crossfade_conform_under_the_three_tiers`, `the_crossfade_runs_instant_in_full_and_snaps_off`. Node: `the_text_node_is_read_only_multiline_text_under_the_label`, `the_copy_button_is_a_named_button_whose_default_action_copies`, `the_status_node_is_polite_and_there_only_while_the_check_shows`. Wheel routing: `a_block_that_overflows_takes_the_horizontal_wheel_and_leaves_the_vertical_to_the_page`, `a_block_that_fits_gives_both_axes_to_the_page`.
 
 ### Build
 
 - Milestone: M9. Built in M9 step 5: `Ui::code_block`, `code_block::height`, `CodeBlockOptions`, `CodeBlockResponse`, `COPY_FADE`, 12 scenes on the page `code-block`.
 - Depends on: text.text-edit, platform.clipboard, layout.scroll-area, widget.scrollbar, widget.button, core.ui, core.focus, infra.accessibility, motion.transitions
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_code_block.rs::a_click_on_copy_writes_the_whole_text_and_the_check_shows_until_feedback_ms_exactly, crates/lune-ui-core/tests/widget_code_block.rs::an_empty_block_disables_copy_and_emits_nothing, crates/lune-ui-core/tests/widget_code_block.rs::a_drag_selects_and_the_shortcut_copies_the_selection_not_the_whole, crates/lune-ui-core/tests/widget_code_block.rs::spans_clamp_empty_and_inverted_ones_draw_nothing_and_a_missing_line_is_ignored, crates/lune-ui-core/tests/widget_code_block.rs::at_scale_2_the_box_has_radius_12_padding_20_the_input_fill_and_a_26_px_copy_icon, crates/lune-ui-core/tests/widget_code_block.rs::the_copy_hover_and_the_crossfade_conform_under_the_three_tiers, crates/lune-ui-core/tests/widget_code_block.rs::the_text_node_is_read_only_multiline_text_under_the_label, crates/lune-ui-core/tests/widget_code_block.rs::the_status_node_is_polite_and_there_only_while_the_check_shows`; page `code-block` (12 scenes); unverified here: the OS clipboard the copy reaches (`platform.clipboard`).
 
 ## Open questions
 

@@ -2,10 +2,10 @@
 id: text.code-editor-view
 title: Code viewer and editor with syntax highlighting
 area: text
-status: in-progress
+status: done
 consumers: lunegit, wane
-source: crates/lune-ui-core/src/widgets/code_editor.rs
-owner: toolkit-v1 M9
+source: crates/lune-ui-core/src/widgets/code_editor.rs, crates/lune-ui-core/src/code_doc.rs
+owner: —
 summary: Multi-line code view and editor over an app-supplied document: gutter, app-supplied highlight spans, line bands, synced scrolling, overlay anchors
 ---
 
@@ -28,7 +28,7 @@ Parsing, tokenizing and the grammar registry stay in the app (D13, D45).
 
 ## Existing code
 
-None in `lune-ui`. Design sources (not code to move): Lunegit `src/Lunegit.Desktop/Views/FileViewerView.axaml:333-346` (viewer), `Views/Scratchpad/ScratchpadNoteView.axaml:101-120` (editable),
+Built in M9 step 4: `crates/lune-ui-core/src/widgets/code_editor.rs` (`Ui::code_editor`, `Ui::code_line_rect`, `CodeOptions`, `LineBand`) over `crates/lune-ui-core/src/code_doc.rs` (`CodeDoc`); tests `crates/lune-ui-core/tests/widget_code_editor.rs`, `code_doc.rs`. Design sources (not code to move): Lunegit `src/Lunegit.Desktop/Views/FileViewerView.axaml:333-346` (viewer), `Views/Scratchpad/ScratchpadNoteView.axaml:101-120` (editable),
 `Views/ConflictResolverView.axaml:161-305` and `.axaml.cs:19-98` (panes, synced scroll), `Rendering/LineBackgroundHighlighter.cs` (bands), `Rendering/ConflictHunkStripOverlay.cs` (anchored strips),
 `Markdown/TextMateEditorSupport.cs` (the grammar wiring that stays in the app).
 
@@ -141,11 +141,13 @@ n/a — typing, caret movement, selection, scrolling and line bands are high-fre
 - Pixel probes at scale 2: gutter numbers in `fg_faint`; a band row spans the viewport width; mono 13 px text.
 - Conformance: none, no transitions.
 - Semantic node: role `multiline-text`, read-only follows the mode, selection follows the engine; an injected `AccessAction` set-value changes the text when editable.
+- Tests, bullet by bullet (`crates/lune-ui-core/tests/widget_code_editor.rs`). Behaviour: `the_wheel_scrolls_by_the_step_and_clamps_and_the_caret_stays`, `typing_caret_keys_and_selection_follow_the_engine`, `undo_and_redo_run_on_the_view_and_an_external_change_clears_them`, `a_read_only_view_draws_no_caret_and_ignores_edits`, `paste_of_three_lines_lands_and_undoes_in_one_step`. Bands: `a_band_tints_a_full_row_and_a_set_of_0_3_and_10000_on_5_lines_tints_only_line_3`, `a_band_out_of_view_draws_nothing_and_one_on_a_wrapped_line_takes_its_height`. Spans: `a_span_past_the_end_clamps_and_empty_or_inverted_ones_draw_nothing`, `the_highlighter_is_asked_for_the_lines_in_view_only`. Synced scroll: `panes_of_a_group_scroll_together_and_the_editable_one_stays`, `a_hidden_pane_is_skipped_and_catches_up_when_drawn`, `a_pane_with_no_group_scrolls_alone`. Anchors: `line_7_has_a_rect_and_out_of_view_or_range_none` (the rect at the line, `ANCHOR_INSET` 16 from the right edge), `an_overlay_on_a_line_out_of_view_registers_nothing_and_hits_nothing`. Scale: `settled_scrolled_and_keystroke_frames_cost_the_same_at_1_000_and_1_000_000_lines`, `a_million_line_view_reports_idle_at_rest_and_lands_a_far_jump`. Pixel probes at scale 2: `at_scale_2_the_numbers_are_fg_faint_a_band_spans_the_view_and_the_text_is_mono_13`. Node: `the_node_carries_the_lines_in_view_and_the_selection_clipped_to_them`, `a_set_value_replaces_the_document_when_editable_and_only_then`. Keys and disabled: `a_disabled_view_takes_its_keys_and_acts_on_none`.
 
 ### Build
 
 - Milestone: M9. Built in M9 step 4: `Ui::code_editor`, `Ui::code_line_rect`, `CodeOptions`, `LineBand`, 15 scenes on the page `code-editor-view`.
 - Depends on: text.text-edit, layout.scroll-area, widget.scrollbar, layout.virtualized-list, text.shaping, platform.clipboard, core.ui, core.focus, infra.accessibility
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_code_editor.rs::typing_caret_keys_and_selection_follow_the_engine, crates/lune-ui-core/tests/widget_code_editor.rs::a_read_only_view_draws_no_caret_and_ignores_edits, crates/lune-ui-core/tests/widget_code_editor.rs::a_band_tints_a_full_row_and_a_set_of_0_3_and_10000_on_5_lines_tints_only_line_3, crates/lune-ui-core/tests/widget_code_editor.rs::a_span_past_the_end_clamps_and_empty_or_inverted_ones_draw_nothing, crates/lune-ui-core/tests/widget_code_editor.rs::panes_of_a_group_scroll_together_and_the_editable_one_stays, crates/lune-ui-core/tests/widget_code_editor.rs::line_7_has_a_rect_and_out_of_view_or_range_none, crates/lune-ui-core/tests/widget_code_editor.rs::settled_scrolled_and_keystroke_frames_cost_the_same_at_1_000_and_1_000_000_lines, crates/lune-ui-core/tests/widget_code_editor.rs::at_scale_2_the_numbers_are_fg_faint_a_band_spans_the_view_and_the_text_is_mono_13, crates/lune-ui-core/tests/widget_code_editor.rs::the_node_carries_the_lines_in_view_and_the_selection_clipped_to_them, crates/lune-ui-core/tests/widget_code_editor.rs::a_disabled_view_takes_its_keys_and_acts_on_none`; page `code-editor-view` (15 scenes); unverified here: real typing with an input method (Luneterm's M9 run, D15), the OS clipboard.
 
 ## Open questions
 
