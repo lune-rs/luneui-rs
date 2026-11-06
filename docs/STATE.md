@@ -37,7 +37,7 @@ Counts at the tip: gallery 70 pages, 389 scene names in `--list`; `cargo test --
 Final gate at 9efda0b: fmt, clippy `-D warnings`, `cargo test --workspace` 2,279 passed and 0 failed, boundaries, component index;
 `LUNEUI_REQUIRE_GPU=1 cargo test -p lune-ui-wgpu` passed; `--list` 389; pixel gate against 2474248 (the M8 merge) 332 identical, nothing allowed;
 Windows and Linux (Docker) pass. Bench at 9efda0b (`cargo run --release -p gallery -- --bench`, verdict per D85, 2080 x 1320, 5 runs, 70 pages, M1 Pro;
-load 4.8 to 6.3; self-test in range, cpu p50 4.18, spread p99 +3.62, max +4.97): 0 over budget, every page 0 of 5 runs over; highest page p99 9.05 ms and
+load 4.31 to 6.47; self-test in range, cpu p50 4.18, spread p99 +3.62, max +4.97): 0 over budget, every page 0 of 5 runs over; highest page p99 9.05 ms and
 worst frame 30.64 ms, both `code-editor-view` (under the 33 ms limit, the closest page to it); `diff-view` p99 2.34, `markdown-preview` 1.92, `code-block` 1.71.
 
 M8 (data views: table, bar chart, pie chart, kanban board, lane graph) is merged to main at 2474248 (7 steps, DECISIONS
