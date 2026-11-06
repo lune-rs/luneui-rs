@@ -236,25 +236,21 @@ impl PopoverHost {
             let mut p: Painter<'_, ()> = Painter::new(scale as f32, win, &mut r.text, None, THEME);
             surface_size(&mut p, kind, state)
         };
-        let size = (
-            (f64::from(logical.0) * scale).ceil() as f32,
-            (f64::from(logical.1) * scale).ceil() as f32,
-        );
-        let tray_rect = Rect::new(tray.x as f32, tray.y as f32, tray.w as f32, tray.h as f32);
-        let bar = bar_from_tray(screen, tray_rect);
-        let placed = place_surface(kind, screen, bar, size);
+        let at = placed_position(kind, screen, scale, tray, logical);
         let window = self.window().clone();
         // Size first, then move: macOS keeps a resized window's bottom edge where it was, so a move
         // made before the resize lands a different top edge than the one asked for.
         let _ =
             window.request_inner_size(LogicalSize::new(f64::from(logical.0), f64::from(logical.1)));
-        window.set_outer_position(PhysicalPosition::new(
-            f64::from(placed.x).round(),
-            f64::from(placed.y).round(),
-        ));
+        window.set_outer_position(PhysicalPosition::new(at.0.round(), at.1.round()));
         self.kind = kind;
         self.open = true;
-        self.had_focus = false;
+        // A window that is not shown gets `Focused(true)` when it is, and a late `Focused(false)`
+        // from its last hide must not count, so it starts without focus. One that is still shown (a
+        // swap, a reopen during the exit) keeps the focus it has and gets no new `Focused(true)`:
+        // ask the window, or the next real focus loss would pass unseen and the click that took it
+        // would reopen the surface.
+        self.had_focus = had_focus_at_open(self.visible, window.has_focus());
         if !self.visible {
             self.guard.show();
             self.visible = true;
@@ -274,10 +270,7 @@ impl PopoverHost {
         if matches!(event, WindowEvent::Focused(true)) && self.open {
             self.had_focus = true;
         }
-        let lost = matches!(event, WindowEvent::Focused(false))
-            && self.open
-            && self.visible
-            && self.had_focus;
+        let lost = is_focus_loss(event, self.open, self.visible, self.had_focus);
         // The window has no close button, so a close request is ignored. A resize reaches the
         // surface in `render`, which compares it with the window's size.
         if !matches!(
@@ -388,6 +381,53 @@ pub(crate) struct TrayHost {
 }
 
 /// The tooltip for a state: its name in words, the second channel for colour.
+/// Where the window of `kind`, `logical` px across, goes, in physical desktop pixels: the one place
+/// the tray item's physical rect and the monitor's physical rect become logical ones. `place_surface`
+/// and `bar_from_tray` work in logical pixels in one coordinate space, so its 4, 12 and 8 px gaps and
+/// its margins are logical whatever the monitor's scale. The space is the monitor's: its origin
+/// stays physical (and global, so a second monitor's offset is its own) and only the offsets from it
+/// are divided by the monitor's own scale, then the result is multiplied back.
+fn placed_position(
+    kind: TraySurface,
+    screen: Rect,
+    scale: f64,
+    tray: TrayRect,
+    logical: (f32, f32),
+) -> (f64, f64) {
+    let (ox, oy) = (f64::from(screen.x), f64::from(screen.y));
+    let screen_l = Rect::new(
+        0.0,
+        0.0,
+        (f64::from(screen.w) / scale) as f32,
+        (f64::from(screen.h) / scale) as f32,
+    );
+    let tray_l = Rect::new(
+        ((tray.x - ox) / scale) as f32,
+        ((tray.y - oy) / scale) as f32,
+        (tray.w / scale) as f32,
+        (tray.h / scale) as f32,
+    );
+    let placed = place_surface(kind, screen_l, bar_from_tray(screen_l, tray_l), logical);
+    (
+        ox + f64::from(placed.x) * scale,
+        oy + f64::from(placed.y) * scale,
+    )
+}
+
+/// Whether the popover's window counts as focused when a surface opens: a window that is not shown
+/// starts without focus (a late `Focused(false)` from its last hide must not count, and it gets
+/// `Focused(true)` when shown); one that is still shown (a swap, a reopen during the exit) has the
+/// focus the window reports and gets no new `Focused(true)`.
+fn had_focus_at_open(visible: bool, window_has_focus: bool) -> bool {
+    visible && window_has_focus
+}
+
+/// A real focus loss of the surface: the window lost focus while a surface was open and shown, and
+/// it had had it.
+fn is_focus_loss(event: &WindowEvent, open: bool, visible: bool, had_focus: bool) -> bool {
+    matches!(event, WindowEvent::Focused(false)) && open && visible && had_focus
+}
+
 fn tooltip(state: TrayState) -> &'static str {
     match state {
         TrayState::Serving => "Wane - serving on :4646",
@@ -581,5 +621,110 @@ impl TrayHost {
     /// The control flow the popover's frame asks for, and whether to draw again now.
     pub(crate) fn flow(drawn: &Drawn, origin: std::time::Instant) -> (ControlFlow, bool) {
         control_flow(drawn.repaint, origin)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const LOST: WindowEvent = WindowEvent::Focused(false);
+
+    #[test]
+    fn a_window_shown_for_the_first_time_has_no_focus_until_it_gets_it() {
+        // Hidden: the open starts without focus, and a late loss from the last hide is no loss.
+        let had = had_focus_at_open(false, false);
+        assert!(!is_focus_loss(&LOST, true, true, had));
+        // `Focused(true)` sets it, the next loss counts.
+        assert!(is_focus_loss(&LOST, true, true, true));
+    }
+
+    #[test]
+    fn a_reopen_of_a_shown_window_keeps_its_focus_so_the_next_loss_counts() {
+        // A swap on Windows, or a reopen during the exit: the window is shown and focused, no
+        // `Focused(true)` follows, and the loss that comes next is the click on the icon.
+        let had = had_focus_at_open(true, true);
+        assert!(had);
+        assert!(is_focus_loss(&LOST, true, true, had));
+        // A shown window that is not focused (the exit ran after a loss) has none to lose.
+        let had = had_focus_at_open(true, false);
+        assert!(!is_focus_loss(&LOST, true, true, had));
+    }
+
+    fn tray(x: f64, y: f64, w: f64, h: f64) -> TrayRect {
+        TrayRect { x, y, w, h }
+    }
+
+    #[test]
+    fn the_menu_sits_4_logical_px_under_the_bar_at_scale_2() {
+        // The numbers measured on this Mac: a 4800 x 2700 monitor at scale 2, the item at
+        // (3726, -2, 68, 66) physical, which is (1863, -1, 34, 33) logical: a bar 32 high. The menu
+        // is 4 logical px under it (36), so 72 physical, and flush right: 2400 - 220 logical.
+        let screen = Rect::new(0.0, 0.0, 4800.0, 2700.0);
+        let at = placed_position(
+            TraySurface::MenuUnderBar,
+            screen,
+            2.0,
+            tray(3726.0, -2.0, 68.0, 66.0),
+            (220.0, 270.0),
+        );
+        assert_eq!(at, (4360.0, 72.0));
+        // The same at scale 1 on the halved monitor: the same logical placement.
+        let at1 = placed_position(
+            TraySurface::MenuUnderBar,
+            Rect::new(0.0, 0.0, 2400.0, 1350.0),
+            1.0,
+            tray(1863.0, -1.0, 34.0, 33.0),
+            (220.0, 270.0),
+        );
+        assert_eq!(at1, (2180.0, 36.0));
+    }
+
+    #[test]
+    fn the_windows_flyout_keeps_its_logical_gap_and_margin_at_150_percent() {
+        // 2880 x 1620 physical at 150% is 1920 x 1080 logical; the taskbar's item at (2460, 1560, 48,
+        // 60) physical is (1640, 1040, 32, 40) logical: the flyout is 12 logical px above the bar
+        // (bottom 1028) and 12 in from the right.
+        let at = placed_position(
+            TraySurface::FlyoutOverBar,
+            Rect::new(0.0, 0.0, 2880.0, 1620.0),
+            1.5,
+            tray(2460.0, 1560.0, 48.0, 60.0),
+            (340.0, 420.0),
+        );
+        assert_eq!(at, ((1920.0 - 12.0 - 340.0) * 1.5, (1028.0 - 420.0) * 1.5));
+    }
+
+    #[test]
+    fn a_second_monitor_places_by_its_own_origin_and_scale() {
+        // A monitor 4800 px to the right (the first one's width) at scale 2: the same surface
+        // lands the same logical offset from its own origin.
+        let first = placed_position(
+            TraySurface::MenuUnderBar,
+            Rect::new(0.0, 0.0, 4800.0, 2700.0),
+            2.0,
+            tray(3726.0, -2.0, 68.0, 66.0),
+            (220.0, 270.0),
+        );
+        let second = placed_position(
+            TraySurface::MenuUnderBar,
+            Rect::new(4800.0, 0.0, 4800.0, 2700.0),
+            2.0,
+            tray(4800.0 + 3726.0, -2.0, 68.0, 66.0),
+            (220.0, 270.0),
+        );
+        assert_eq!(second, (first.0 + 4800.0, first.1));
+    }
+
+    #[test]
+    fn a_loss_counts_only_while_a_surface_is_open_and_shown() {
+        assert!(!is_focus_loss(&LOST, false, true, true));
+        assert!(!is_focus_loss(&LOST, true, false, true));
+        assert!(!is_focus_loss(
+            &WindowEvent::Focused(true),
+            true,
+            true,
+            true
+        ));
     }
 }

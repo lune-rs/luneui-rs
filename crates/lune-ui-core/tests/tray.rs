@@ -381,6 +381,38 @@ fn a_right_click_with_the_flyout_open_swaps_to_the_menu() {
 }
 
 #[test]
+fn a_click_for_another_surface_after_a_focus_loss_opens_it() {
+    // Windows, the right button with the flyout open: the click takes focus first, so the
+    // flyout closes from focus loss and then the click asks for the menu.
+    let mut t = TrayToggle::new();
+    t.click(FLY, ms(0));
+    assert_eq!(t.focus_lost(ms(5000)), TrayAction::Close);
+    assert_eq!(t.click(MEN, ms(5100)), TrayAction::Open(MEN));
+    assert_eq!(t.open(), Some(MEN));
+
+    // The same the other way round.
+    let mut t = TrayToggle::new();
+    t.click(MEN, ms(0));
+    t.focus_lost(ms(5000));
+    assert_eq!(t.click(FLY, ms(5100)), TrayAction::Open(FLY));
+
+    // The guard still holds for the surface that closed, and that click is spent.
+    let mut t = TrayToggle::new();
+    t.click(FLY, ms(0));
+    t.focus_lost(ms(5000));
+    assert_eq!(t.click(FLY, ms(5100)), TrayAction::None);
+    assert_eq!(t.click(MEN, ms(5150)), TrayAction::Open(MEN));
+
+    // A click for another surface spends the guard: the next one for the first opens.
+    let mut t = TrayToggle::new();
+    t.click(FLY, ms(0));
+    t.focus_lost(ms(5000));
+    t.click(MEN, ms(5100));
+    t.click(MEN, ms(5120));
+    assert_eq!(t.click(FLY, ms(5140)), TrayAction::Open(FLY));
+}
+
+#[test]
 fn focus_lost_when_closed_is_nothing() {
     let mut t = TrayToggle::new();
     assert_eq!(t.focus_lost(ms(100)), TrayAction::None);

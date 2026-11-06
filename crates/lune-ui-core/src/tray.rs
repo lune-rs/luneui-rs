@@ -216,6 +216,11 @@ pub enum TraySurface {
 /// screen edge the icon is nearest, reaching through the icon. On macOS this is the menu bar
 /// exactly; on Windows the icon's rect may sit a few px inside the taskbar, so the strip may
 /// start a little inside it. Ties go to the top, then the bottom, the left, the right.
+///
+/// Logical pixels in one coordinate space: `screen` and `tray` are in the same unit and share an
+/// origin. A tray item's rect from the OS is physical, so the caller divides it (and the screen) by
+/// the monitor's scale first (the offsets from the monitor's origin), as `place_surface`'s gaps are
+/// logical.
 pub fn bar_from_tray(screen: Rect, tray: Rect) -> Rect {
     let top = tray.y - screen.y;
     let bottom = screen.bottom() - tray.bottom();
@@ -248,7 +253,10 @@ pub fn bar_from_tray(screen: Rect, tray: Rect) -> Rect {
 /// Where `surface` of `size` goes for a bar: on the screen side of the bar (below a bar on the
 /// top edge, above one on the bottom, beside one on a side), its end edge on the screen's end
 /// edge, kept on screen by [`place`]. The gap to the bar is 4, 12 and 8 px and the margin to the
-/// screen's edges 0, 12 and 12 px, in the order of [`TraySurface`]. A surface larger than the
+/// screen's edges 0, 12 and 12 px, in the order of [`TraySurface`]. Logical pixels, one coordinate
+/// space: `screen`, `bar` and `size` are in the same unit, which is the unit of the gaps, so a
+/// caller on a monitor at scale 2 passes physical rects divided by 2 and multiplies the answer
+/// back, or its gaps come out halved. A surface larger than the
 /// screen keeps its size and sits on the margin, as `place` has it.
 pub fn place_surface(surface: TraySurface, screen: Rect, bar: Rect, size: (f32, f32)) -> Rect {
     let (gap, margin) = match surface {
@@ -316,7 +324,9 @@ const REOPEN_GUARD: Duration = Duration::from_millis(250);
 ///
 /// A click on the icon takes focus from the open surface first, so the surface closes from focus
 /// loss a moment before the click arrives; reading the click as "open" would flicker the surface
-/// shut and open. A click within 250 ms after a focus-loss close is ignored.
+/// shut and open. A click within 250 ms after a focus-loss close is ignored when it asks for the
+/// surface that closed; a click for another surface (the right button with the flyout open, on
+/// Windows) opens it, since it cannot be that reopen.
 ///
 /// The app calls [`Self::focus_lost`] when the surface's window loses focus, from its event
 /// handler before the frame runs, and [`Self::closed`] for every other way the surface went away
@@ -324,7 +334,8 @@ const REOPEN_GUARD: Duration = Duration::from_millis(250);
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct TrayToggle {
     open: Option<TraySurface>,
-    focus_closed_at: Option<Duration>,
+    /// The surface a focus loss closed and when: the click that took the focus is for this one.
+    focus_closed: Option<(TraySurface, Duration)>,
 }
 
 impl TrayToggle {
@@ -339,7 +350,7 @@ impl TrayToggle {
 
     /// A click on the icon that asks for `surface` at `now`: the same surface open closes, a
     /// different one swaps, and with none open it opens, unless the click is the one that took
-    /// focus from a surface a moment ago.
+    /// focus from that same surface a moment ago.
     pub fn click(&mut self, surface: TraySurface, now: Duration) -> TrayAction {
         match self.open {
             Some(open) if open == surface => {
@@ -351,10 +362,9 @@ impl TrayToggle {
                 TrayAction::Open(surface)
             }
             None => {
-                let recent = self
-                    .focus_closed_at
-                    .take()
-                    .is_some_and(|at| now.saturating_sub(at) < REOPEN_GUARD);
+                let recent = self.focus_closed.take().is_some_and(|(closed, at)| {
+                    closed == surface && now.saturating_sub(at) < REOPEN_GUARD
+                });
                 if recent {
                     TrayAction::None
                 } else {
@@ -368,8 +378,8 @@ impl TrayToggle {
     /// The surface's window lost focus at `now`: it closes, and the click that may follow is
     /// not a reopen. With none open, nothing.
     pub fn focus_lost(&mut self, now: Duration) -> TrayAction {
-        if self.open.take().is_some() {
-            self.focus_closed_at = Some(now);
+        if let Some(surface) = self.open.take() {
+            self.focus_closed = Some((surface, now));
             TrayAction::Close
         } else {
             TrayAction::None
