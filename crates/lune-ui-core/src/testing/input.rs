@@ -423,7 +423,7 @@ mod tests {
         let mut kept: Vec<Event> = Vec::new();
         let repeats = scripted_input_contract(&mut |s: &mut ScriptedInput| {
             let mut f = s.end_frame();
-            kept.extend(f.events.drain(..));
+            kept.append(&mut f.events);
             f.events = kept.clone();
             f
         });
