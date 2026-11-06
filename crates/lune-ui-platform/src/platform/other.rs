@@ -69,7 +69,10 @@ mod tests {
             height: 1,
             rgba: vec![0; 4],
         };
-        assert_eq!(Tray::new(image, "tip").unwrap_err(), TrayError::Unsupported);
+        assert!(matches!(
+            Tray::new(image, "tip"),
+            Err(TrayError::Unsupported)
+        ));
     }
 
     #[test]
@@ -79,6 +82,6 @@ mod tests {
             height: 1,
             rgba: vec![],
         };
-        assert_eq!(Tray::new(image, "tip").unwrap_err(), TrayError::BadImage);
+        assert!(matches!(Tray::new(image, "tip"), Err(TrayError::BadImage)));
     }
 }

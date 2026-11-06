@@ -2,7 +2,7 @@
 
 use tray_icon::{Icon, MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 
-use crate::tray::{ClickPhase, TrayButton, TrayError, TrayEvent, TrayImage, TrayRect, click_event};
+use crate::tray::{TrayButton, TrayError, TrayEvent, TrayImage, TrayRect};
 
 pub(crate) struct TrayItem(TrayIcon);
 
@@ -81,4 +81,48 @@ fn icon(image: TrayImage) -> Result<Icon, TrayError> {
 
 fn os(error: tray_icon::Error) -> TrayError {
     TrayError::Os(error.to_string())
+}
+
+/// Whether a mouse report is the press or the release of its button.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ClickPhase {
+    Press,
+    Release,
+}
+
+/// The tray's click rule: one event per release, none for a press.
+fn click_event(button: TrayButton, phase: ClickPhase, rect: TrayRect) -> Option<TrayEvent> {
+    match phase {
+        ClickPhase::Press => None,
+        ClickPhase::Release => Some(TrayEvent::Click { button, rect }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const RECT: TrayRect = TrayRect {
+        x: 1863.0,
+        y: -1.0,
+        w: 34.0,
+        h: 33.0,
+    };
+
+    #[test]
+    fn a_press_sends_nothing() {
+        for button in [TrayButton::Left, TrayButton::Right, TrayButton::Other] {
+            assert_eq!(click_event(button, ClickPhase::Press, RECT), None);
+        }
+    }
+
+    #[test]
+    fn a_release_sends_one_click_with_the_button_and_the_rect() {
+        for button in [TrayButton::Left, TrayButton::Right, TrayButton::Other] {
+            assert_eq!(
+                click_event(button, ClickPhase::Release, RECT),
+                Some(TrayEvent::Click { button, rect: RECT })
+            );
+        }
+    }
 }

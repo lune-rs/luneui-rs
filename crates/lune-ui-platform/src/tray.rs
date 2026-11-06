@@ -117,25 +117,6 @@ pub fn set_event_handler(f: impl Fn(TrayEvent) + Send + Sync + 'static) {
     platform::set_event_handler(f);
 }
 
-/// Whether a mouse report is the press or the release of its button.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum ClickPhase {
-    Press,
-    Release,
-}
-
-/// The tray's click rule: one event per release, none for a press.
-pub(crate) fn click_event(
-    button: TrayButton,
-    phase: ClickPhase,
-    rect: TrayRect,
-) -> Option<TrayEvent> {
-    match phase {
-        ClickPhase::Press => None,
-        ClickPhase::Release => Some(TrayEvent::Click { button, rect }),
-    }
-}
-
 /// `rect`, if it has an area: an item the OS has not laid out yet has none.
 fn placed(rect: TrayRect) -> Option<TrayRect> {
     (rect.w > 0.0 && rect.h > 0.0).then_some(rect)
@@ -160,23 +141,6 @@ mod tests {
         w: 34.0,
         h: 33.0,
     };
-
-    #[test]
-    fn a_press_sends_nothing() {
-        for button in [TrayButton::Left, TrayButton::Right, TrayButton::Other] {
-            assert_eq!(click_event(button, ClickPhase::Press, RECT), None);
-        }
-    }
-
-    #[test]
-    fn a_release_sends_one_click_with_the_button_and_the_rect() {
-        for button in [TrayButton::Left, TrayButton::Right, TrayButton::Other] {
-            assert_eq!(
-                click_event(button, ClickPhase::Release, RECT),
-                Some(TrayEvent::Click { button, rect: RECT })
-            );
-        }
-    }
 
     #[test]
     fn a_rect_with_no_area_is_not_placed() {
