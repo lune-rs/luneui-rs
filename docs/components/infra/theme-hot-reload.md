@@ -2,9 +2,9 @@
 id: infra.theme-hot-reload
 title: Theme JSON loading and hot reload
 area: infra
-status: in-progress
+status: done
 consumers: lunegit
-source: Lunegit: src/Lunegit.Desktop/Theming/ThemeApplicator.cs
+source: crates/lune-ui-core/src/theme/file.rs, crates/lune-ui-core/src/theme.rs
 owner: —
 summary: Theme files as JSON mapped onto the Theme value, partial overrides over a baseline, acrylic level, swapped at a frame boundary by the app
 ---
@@ -109,12 +109,14 @@ None: theme names and warnings are the app's text.
 - Acrylic level: 0.7 gives 0.35 (less), 0.85 (more), 1.0 (opaque); 0.8 gives 0.4 and 0.9; results stay in [0, 1]; Default returns the input [L src/Lunegit.Desktop/Theming/ThemeApplicator.cs:419-425].
 - Hot swap: a toggle drawn under theme A, settled, then under theme B in the next frame, gives the Scene of a solo frame under B and no `Repaint::Now` because of the swap; a colour mid-transition at the swap snaps (`tests/theme_file.rs`).
 - Pixel probes and conformance: through the `theme-*` scenes; the sample files' values differ from the preset, so their dumps are new baselines, not zero delta; the mapped-pair round trip above is the zero-delta check; no transitions.
+- Tests, bullet by bullet. Known answers: `apps/gallery/tests/lunegit_files.rs::the_entrys_known_answers`, `all_five_theme_files_load_and_skip_no_colour_and_no_opacity_as_bad`, `orange_tint_is_rrggbb_so_it_is_opaque`, `dark_modern_material_opacity_reaches_the_window_layer`; `crates/lune-ui-core/tests/theme_file.rs::argb_goes_to_rgba_and_rgb_is_opaque`. Partial overlay: `one_key_changes_one_field_and_nothing_else`, `the_accent_brings_its_derived_tokens`, `an_empty_file_returns_the_base_unchanged`. Round trip: `the_preset_written_through_the_table_loads_back_equal`. Skips: `bad_colours_are_skipped_by_key_and_change_nothing`, `each_skip_kind_is_reported_in_file_order`, `the_envelope_is_checked`, `nothing_panics_on_a_damaged_file`. Acrylic level: `acrylic_levels_scale_the_material_opacities_only`. Hot swap: `a_toggle_drawn_under_theme_a_then_b_equals_a_solo_frame_under_b`, `a_swap_snaps_a_colour_that_is_mid_transition_and_one_whose_target_did_not_move`, `a_float_transition_is_not_cut_by_a_swap`, `the_first_frame_needs_no_snap`; the gallery's `pages/theme.rs::the_settled_swap_equals_the_blue_theme_for_the_same_composition`, `the_frame_after_the_swap_has_left_the_old_theme`.
 - Semantic-node test: n/a.
 
 ### Build
 
 - Milestone: M10
 - Depends on: infra.json, core.theme, core.color
+- Done (D47, M11): tests `crates/lune-ui-core/tests/theme_file.rs::one_key_changes_one_field_and_nothing_else, crates/lune-ui-core/tests/theme_file.rs::the_preset_written_through_the_table_loads_back_equal, crates/lune-ui-core/tests/theme_file.rs::bad_colours_are_skipped_by_key_and_change_nothing, crates/lune-ui-core/tests/theme_file.rs::acrylic_levels_scale_the_material_opacities_only, crates/lune-ui-core/tests/theme_file.rs::a_toggle_drawn_under_theme_a_then_b_equals_a_solo_frame_under_b, crates/lune-ui-core/tests/theme_file.rs::a_swap_snaps_a_colour_that_is_mid_transition_and_one_whose_target_did_not_move, apps/gallery/tests/lunegit_files.rs::the_entrys_known_answers, apps/gallery/src/pages/theme.rs::the_settled_swap_equals_the_blue_theme_for_the_same_composition`; page `theme` (scenes `theme-*`); unverified here: none.
 
 ## Open questions
 

@@ -2,10 +2,10 @@
 id: infra.shortcut-routing
 title: Keyboard shortcut routing
 area: infra
-status: in-progress
+status: done
 consumers: any
 source: crates/lune-ui-core/src/shortcuts.rs
-owner: orch/toolkit-v1
+owner: —
 summary: A scoped chord registry resolved in three phases (preempt, focused widget, bubble); Lunegit has no central one
 ---
 
@@ -113,11 +113,13 @@ None: chords are formatted with fixed ASCII names (Cmd, Ctrl, Alt, Shift, then t
 - `CtrlOrLogo+Enter` fires for Ctrl+Enter and for Logo+Enter [L src/Lunegit.Desktop/Views/SidePanels/CommitPanelView.axaml.cs:36-38].
 - Repeat: a binding without `repeat` fires once for a held key.
 - Hint helper: known answers "Cmd+N", "Ctrl+N", "Cmd+," for the primary flag on and off.
+- Tests, bullet by bullet (`crates/lune-ui-core/tests/shortcuts.rs`). `the_primary_flag_picks_command_or_control_both_ways`, `a_disabled_binding_never_fires_and_consumes_nothing`; preempt: `escape_with_a_dialog_fires_the_overlay_binding_and_the_field_never_sees_it`, `escape_with_no_dialog_reaches_the_field_first`; bubble: `bubble_fires_when_the_focused_widget_declines_and_not_when_it_consumed`, `within_the_focused_widget_itself_and_not_an_unrelated_scope`; scopes: `the_innermost_scope_wins_and_a_press_fires_one_binding`, `a_modal_hides_page_and_global_bindings_that_do_not_preempt`, `an_overlay_binding_fires_for_a_press_the_dialog_declined`; consumed, unbound and printable keys: `a_press_the_field_took_is_not_offered_to_another_scope` (also an unbound chord reaching the field and a plain letter never reaching an unmodified binding); `ctrl_or_logo_enter_fires_for_both`; repeat: `a_binding_without_repeat_fires_once_for_a_held_key`; hints: `hints_use_the_fixed_order_and_the_keymap`; also `nothing_fires_while_the_focused_widget_composes`, `a_fired_command_makes_the_frame_repaint_now`.
 
 ### Build
 
-- Milestone: M5 (the registry is core, no platform code; `overlay.command-palette` of M7 binds through it; `core.ui`'s key phase and `core.focus` of M4 have an empty registry until then). M5 built the registry (steps 3 and 6; the page is `shortcuts`, the `shortcut-hints` scene). `overlay.command-palette` of M7 binds through it. Platform mapping done in M10 step 4: `lune_ui::input::keymap()` picks `Keymap::MAC` or `Keymap::PC` per platform (D212), so an app no longer branches on the OS itself. Open for `done` (D47): M11 re-checks the whole bar on every entry; the Windows and Linux run time is unverified (the Linux and Windows lint is `scripts/check-targets.sh`).
+- Milestone: M5 (the registry is core, no platform code; `overlay.command-palette` of M7 binds through it; `core.ui`'s key phase and `core.focus` of M4 have an empty registry until then). M5 built the registry (steps 3 and 6; the page is `shortcuts`, the `shortcut-hints` scene). `overlay.command-palette` of M7 binds through it. Platform mapping done in M10 step 4: `lune_ui::input::keymap()` picks `Keymap::MAC` or `Keymap::PC` per platform (D212), so an app no longer branches on the OS itself. M11 audited it against D47 (the `Done` line). Unverified here: the Windows and Linux run time (the lint for both is `scripts/check-targets.sh`).
 - Depends on: core.input, core.focus, core.ui.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/shortcuts.rs::the_primary_flag_picks_command_or_control_both_ways, crates/lune-ui-core/tests/shortcuts.rs::escape_with_a_dialog_fires_the_overlay_binding_and_the_field_never_sees_it, crates/lune-ui-core/tests/shortcuts.rs::bubble_fires_when_the_focused_widget_declines_and_not_when_it_consumed, crates/lune-ui-core/tests/shortcuts.rs::a_press_the_field_took_is_not_offered_to_another_scope, crates/lune-ui-core/tests/shortcuts.rs::ctrl_or_logo_enter_fires_for_both, crates/lune-ui-core/tests/shortcuts.rs::a_binding_without_repeat_fires_once_for_a_held_key, crates/lune-ui-core/tests/shortcuts.rs::hints_use_the_fixed_order_and_the_keymap`; page `shortcuts` (scene `shortcut-hints`); unverified here: Windows and Linux run time.
 
 ## Open questions
 

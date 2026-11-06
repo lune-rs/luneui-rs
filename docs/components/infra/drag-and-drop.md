@@ -2,10 +2,10 @@
 id: infra.drag-and-drop
 title: In-window drag and drop
 area: infra
-status: in-progress
+status: done
 consumers: lunegit
 source: crates/lune-ui-core/src/drag.rs
-owner: orch/toolkit-v1
+owner: —
 summary: In-window drag state machine (press, threshold, drag, release or cancel), nearest-slot target, edge auto-scroll; no OS drag
 ---
 
@@ -140,11 +140,13 @@ None: the gesture has no text.
 - Pixel probes at scale 2: kanban drop line 4 device px high, source card at alpha 0.4.
 - Conformance: slide and settle pass `motion::conformance` at 60 Hz (monotonic, exact end, settled within 180 ms plus one frame); Reduced and Off snap [motion].
 - Semantic node: the item node reports `pressed` during the gesture [infra.accessibility].
+- Tests, bullet by bullet (`crates/lune-ui-core/tests/drag.rs`). State machine: `threshold_3_9_stays_armed_and_4_0_starts_a_drag_and_vertical_travel_never_does`, `releasing_on_the_original_slot_reports_click_not_commit`, `below_the_threshold_stays_a_click_above_it_becomes_a_drag`, `before_any_press_nothing_is_dragging_and_every_offset_is_zero`; through the `Ui`: `a_press_arms_travel_3_9_stays_armed_and_4_0_starts_the_drag`, `dragging_reports_the_offsets_and_a_release_commits`, `a_release_where_it_started_is_a_click`. Nearest slot: `nearest_slot_numbers_for_widths_100_200_100`. Auto-scroll: `auto_scroll_numbers_at_viewport_500`, `auto_scroll_is_zero_in_the_middle_and_only_runs_where_there_is_room`. Totality: `non_finite_coordinates_and_metrics_never_throw_and_never_move`, `degenerate_structural_inputs_never_throw`, `free_drag_release_cancel_and_totality`. Cancel: `cancel_zeroes_everything_and_is_idempotent`, `escape_cancels_a_drag_and_is_taken_only_then`, `escape_with_nothing_in_flight_is_not_consumed`, `losing_the_capture_cancels`, `a_change_of_the_item_count_cancels`. Conformance: `slide_and_settle_pass_the_60_hz_conformance_harness` (the dim over `fast`, linear, is `the_dimmed_source_card_is_drawn_at_alpha_0_4`). Pixel probes at scale 2: `the_drop_line_is_2_px_accent_4_device_px_at_scale_2`, `the_dimmed_source_card_is_drawn_at_alpha_0_4`. The free two-axis form: `free_drag_targets_the_column_under_the_pointer_and_none_outside_every_column`, `drop_index_counts_the_midpoints_above_the_pointer`.
 
 ### Build
 
-- Milestone: M5. Built in M5 (steps 14 and 15; the page is `drag-and-drop`, 10 scenes). Known look limit: text draws above fills, so tab labels show through a sliding or settling tab during `dnd-slide` and `dnd-settle`. Open for `done` (D47): M11 re-checks the whole bar on every entry; the Windows and Linux run time is unverified (the Linux and Windows lint is `scripts/check-targets.sh`).
+- Milestone: M5. Built in M5 (steps 14 and 15; the page is `drag-and-drop`, 10 scenes). Known look limit: text draws above fills, so tab labels show through a sliding or settling tab during `dnd-slide` and `dnd-settle`. M11 audited it against D47 (the `Done` line). Unverified here: the Windows and Linux run time (the lint for both is `scripts/check-targets.sh`).
 - Depends on: core.ui, core.input, layout.scroll-area, motion.transitions
+- Done (D47, M11): tests `crates/lune-ui-core/tests/drag.rs::threshold_3_9_stays_armed_and_4_0_starts_a_drag_and_vertical_travel_never_does, crates/lune-ui-core/tests/drag.rs::nearest_slot_numbers_for_widths_100_200_100, crates/lune-ui-core/tests/drag.rs::auto_scroll_numbers_at_viewport_500, crates/lune-ui-core/tests/drag.rs::non_finite_coordinates_and_metrics_never_throw_and_never_move, crates/lune-ui-core/tests/drag.rs::cancel_zeroes_everything_and_is_idempotent, crates/lune-ui-core/tests/drag.rs::escape_with_nothing_in_flight_is_not_consumed, crates/lune-ui-core/tests/drag.rs::slide_and_settle_pass_the_60_hz_conformance_harness, crates/lune-ui-core/tests/drag.rs::free_drag_targets_the_column_under_the_pointer_and_none_outside_every_column, crates/lune-ui-core/tests/drag.rs::dragging_reports_the_offsets_and_a_release_commits`; page `drag-and-drop`; unverified here: Windows and Linux run time.
 
 ## Open questions
 

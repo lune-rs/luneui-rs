@@ -2,10 +2,10 @@
 id: infra.accessibility
 title: Semantic tree and accessibility
 area: infra
-status: in-progress
+status: done
 consumers: any
-source: crates/lune-ui-core/src/access.rs
-owner: orch/toolkit-v1
+source: crates/lune-ui-core/src/access.rs, crates/lune-ui-winit/src/access.rs
+owner: —
 summary: One semantic node per interactive widget per frame (role, name, value, states, actions), AccessAction routing, AccessKit bridge in M10
 ---
 
@@ -27,8 +27,8 @@ that bridge is a platform layer and needs its own DECISIONS row with its size me
 
 ## Existing code
 
-None. The model rides on `RawInput`/`FrameOutput` (`crates/lune-ui-core/src/input.rs:16-27,155-164`), whose
-`Event` enum is `#[non_exhaustive]` (`crates/lune-ui-core/src/input.rs:31`), so adding an access event is a non-breaking
+Built in M4 and M10: the model is `crates/lune-ui-core/src/access.rs` (`Role`, `State`, `Action`, `Node`, `SemanticTree`) and `Ui::node`; the AccessKit bridge is `crates/lune-ui-winit/src/access.rs`. The model rides on `RawInput`/`FrameOutput` (`crates/lune-ui-core/src/input.rs:21,282`), whose
+`Event` enum is `#[non_exhaustive]` (`crates/lune-ui-core/src/input.rs:37`), so adding an access event was a non-breaking
 extension (DECISIONS D35). Lunegit names a few icon-only buttons through `AutomationProperties.Name`
 (`src/Lunegit.Desktop/Views/AiProjectDetailView.axaml:94,111`) and has one test that reads the name back
 (`src/Lunegit.Tests/Desktop/AiProjectDetailViewInteractionTests.cs:317-323`).
@@ -127,12 +127,14 @@ None: node names come from each widget's visible text or from keys in that widge
 - A modal overlay's node is `modal`; nodes under it are not reachable by `AccessAction` while it is open [core.ui].
 - A toast node has live politeness `polite` and an error toast `assertive` [derived: C4 live regions].
 - `set-value` on a slider clamps to `min` and `max` and snaps to `step`; an out-of-range value never panics.
+- Tests, bullet by bullet (`crates/lune-ui-core/tests/ui_access.rs` unless named). Contract: `c4.rs` `a_frame_of_every_m6_widget_yields_the_expected_roles_names_and_states` (and the m7, m8, m9 frames), `default_clicks_a_checkbox_and_sets_changed`, `focus_focuses_without_a_ring`, `increment_and_decrement_reach_the_target_as_up_and_down`, `set_value_arrives_in_the_response`, `expand_clicks_only_when_collapsed_and_collapse_only_when_expanded`, `an_action_for_a_node_missing_last_frame_is_dropped`. Enums: `crates/lune-ui-core/src/access.rs::the_closed_sets_have_the_documented_counts` (37, 15, 10) and `every_role_state_and_action_round_trips_through_a_node`. Bounds: `node_bounds_follow_the_transform_stack` (scale 0.97). Order and focus: `tree_order_and_parent_links`, `the_focused_output_is_the_node_with_the_focused_state`. Modal: `dismiss_dismisses_the_top_overlay_and_actions_under_a_modal_are_dropped`. Toast politeness: `c4.rs::a_frame_of_every_m7_widget_yields_the_expected_roles_names_and_states` (an error toast is assertive, an info polite). Slider `set-value`: `widget_slider.rs::set_value_settles_on_a_stop_and_snaps` (clamps at the ends, infinity and NaN never panic). Disabled scope: `a_node_in_a_disabled_scope_is_disabled_whatever_it_asked_for`.
 - M10: the bridge feature builds with and without the AccessKit dependency; its size change is in the commit message (hard rule 5). Done in M10 step 6: `crates/lune-ui-winit/tests/access.rs` and the handler tests in `src/access.rs`; the gate runs `lune-ui-winit` both ways.
 
 ### Build
 
 - Milestone: M4 (model, tree, routing, contract test) and M10 (AccessKit bridge).
 - Depends on: core.ui, core.focus, core.input, infra.localization.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/ui_access.rs::default_clicks_a_checkbox_and_sets_changed, crates/lune-ui-core/tests/ui_access.rs::node_bounds_follow_the_transform_stack, crates/lune-ui-core/tests/ui_access.rs::tree_order_and_parent_links, crates/lune-ui-core/tests/ui_access.rs::the_focused_output_is_the_node_with_the_focused_state, crates/lune-ui-core/tests/ui_access.rs::dismiss_dismisses_the_top_overlay_and_actions_under_a_modal_are_dropped, crates/lune-ui-core/src/access.rs::the_closed_sets_have_the_documented_counts, crates/lune-ui-core/src/access.rs::every_role_state_and_action_round_trips_through_a_node, crates/lune-ui-core/tests/widget_slider.rs::set_value_settles_on_a_stop_and_snaps, crates/lune-ui-core/tests/c4.rs::a_frame_of_every_m7_widget_yields_the_expected_roles_names_and_states, crates/lune-ui-winit/tests/access.rs::the_frame_gives_the_expected_nodes`; page `a11y` (scene `a11y-nodes`); unverified here: a real screen reader (VoiceOver, Narrator, Orca) reading the AccessKit tree; Wane's and Luneterm's hands-on runs cover it (D15).
 
 ## Open questions
 

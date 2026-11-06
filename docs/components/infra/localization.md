@@ -2,10 +2,10 @@
 id: infra.localization
 title: Localization
 area: infra
-status: in-progress
+status: done
 consumers: any
 source: crates/lune-ui-core/src/strings.rs
-owner: orch/toolkit-v1
+owner: —
 summary: One string table of flat dotted keys in core, luneui. keys with English defaults, positional formatting; locale JSON loaded in M10
 ---
 
@@ -112,11 +112,13 @@ n/a — no drawing.
 - M10: `Catalog::from_json` loads a copy of Lunegit's real `en.json` (1019 strings) and each sample language file; non-object `strings`, a missing `code`, a depth bomb, an oversize input and invalid UTF-8 each return an error and never panic [D44], [L src/Lunegit.Core/Localization/LanguageFile.cs:12-20].
 - M10: a placeholder audit over the real `en.json` reports the 119 placeholder-bearing keys, 111 plain and 8 with a format specifier ([D52]); all 119 parse, and it fails on any form `tr_fmt` does not parse (`audit_template`; the gallery test also audits the nine languages: 0 malformed).
 - No file, clock or environment access in library source (boundary rules stay green; R-nfr-1).
+- Tests, bullet by bullet. Defaults: `crates/lune-ui-core/tests/strings.rs::defaults_cover_every_key_literal_in_src`, `the_m7_defaults_hold_their_text`. Fallback chain: `table_lookup_and_fallbacks`, `never_panics_on_odd_keys`, `insert_rules`, and through the frame `ui_access.rs::tr_falls_back_from_the_table_to_the_default_to_the_key`. `tr_fmt`: `real_world_string_with_escaped_braces`, `missing_extra_and_escapes`, `spec_goes_to_the_hook`, `totality_short_strings`; with the real strings `apps/gallery/tests/lunegit_files.rs::the_entrys_tr_fmt_known_answers_through_the_real_strings`. The locale switch: `strings.rs::switching_the_table_between_frames_changes_the_shaped_text_and_nothing_else` (same fills, one text item, a different key) and the gallery's `locale-pseudo` scene (`apps/gallery/src/pages/locale.rs::the_pseudo_table_covers_every_default_and_wraps_it`). `Catalog`: `crates/lune-ui-core/tests/catalog.rs` (`a_catalog_carries_its_header_and_its_strings`, `each_entry_m10_error_is_an_error`, `a_depth_bomb_an_oversize_input_and_invalid_utf8_are_the_readers_errors`, `a_key_a_catalog_omits_falls_back_through_tr_to_english`) and `lunegit_files.rs::en_json_gives_1019_strings`, `the_nine_languages_load_with_1019_strings_each`. The placeholder audit: `lunegit_files.rs::the_placeholder_audit_over_en_json` (119 keys, 111 plain, 8 with a spec), `no_language_file_has_a_malformed_template`, and `catalog.rs::the_audit_and_format_agree_on_every_short_template`.
 
 ### Build
 
 - Milestone: M4 (table, `tr`, `tr_fmt`, defaults, tests) and M10 (`Catalog::from_json`, fixtures, audit).
 - Depends on: core.ui, text.shaping, infra.json.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/strings.rs::defaults_cover_every_key_literal_in_src, crates/lune-ui-core/tests/strings.rs::table_lookup_and_fallbacks, crates/lune-ui-core/tests/strings.rs::real_world_string_with_escaped_braces, crates/lune-ui-core/tests/strings.rs::spec_goes_to_the_hook, crates/lune-ui-core/tests/strings.rs::switching_the_table_between_frames_changes_the_shaped_text_and_nothing_else, crates/lune-ui-core/tests/catalog.rs::a_catalog_carries_its_header_and_its_strings, crates/lune-ui-core/tests/catalog.rs::the_audit_and_format_agree_on_every_short_template, apps/gallery/tests/lunegit_files.rs::the_placeholder_audit_over_en_json, apps/gallery/tests/lunegit_files.rs::the_nine_languages_load_with_1019_strings_each`; page `locale` (scene `locale-pseudo`); unverified here: none.
 
 ## Open questions
 

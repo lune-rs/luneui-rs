@@ -12,8 +12,8 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | in-luneterm | 0 |
 | planned | 0 |
 | stub | 0 |
-| in-progress | 68 |
-| done | 25 |
+| in-progress | 62 |
+| done | 31 |
 | external | 4 |
 | **total** | **97** |
 
@@ -153,12 +153,12 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
-| [infra.accessibility](infra/accessibility.md) | Semantic tree and accessibility | in-progress | any | One semantic node per interactive widget per frame (role, name, value, states, actions), AccessAction routing, AccessKit bridge in M10 |
-| [infra.drag-and-drop](infra/drag-and-drop.md) | In-window drag and drop | in-progress | lunegit | In-window drag state machine (press, threshold, drag, release or cancel), nearest-slot target, edge auto-scroll; no OS drag |
-| [infra.json](infra/json.md) | Bounded JSON reader | in-progress | any | Small JSON reader in core with input, depth and string limits, fail-closed errors and no panics; backs theme and locale loading |
-| [infra.localization](infra/localization.md) | Localization | in-progress | any | One string table of flat dotted keys in core, luneui. keys with English defaults, positional formatting; locale JSON loaded in M10 |
-| [infra.shortcut-routing](infra/shortcut-routing.md) | Keyboard shortcut routing | in-progress | any | A scoped chord registry resolved in three phases (preempt, focused widget, bubble); Lunegit has no central one |
-| [infra.theme-hot-reload](infra/theme-hot-reload.md) | Theme JSON loading and hot reload | in-progress | lunegit | Theme files as JSON mapped onto the Theme value, partial overrides over a baseline, acrylic level, swapped at a frame boundary by the app |
+| [infra.accessibility](infra/accessibility.md) | Semantic tree and accessibility | done | any | One semantic node per interactive widget per frame (role, name, value, states, actions), AccessAction routing, AccessKit bridge in M10 |
+| [infra.drag-and-drop](infra/drag-and-drop.md) | In-window drag and drop | done | lunegit | In-window drag state machine (press, threshold, drag, release or cancel), nearest-slot target, edge auto-scroll; no OS drag |
+| [infra.json](infra/json.md) | Bounded JSON reader | done | any | Small JSON reader in core with input, depth and string limits, fail-closed errors and no panics; backs theme and locale loading |
+| [infra.localization](infra/localization.md) | Localization | done | any | One string table of flat dotted keys in core, luneui. keys with English defaults, positional formatting; locale JSON loaded in M10 |
+| [infra.shortcut-routing](infra/shortcut-routing.md) | Keyboard shortcut routing | done | any | A scoped chord registry resolved in three phases (preempt, focused widget, bubble); Lunegit has no central one |
+| [infra.theme-hot-reload](infra/theme-hot-reload.md) | Theme JSON loading and hot reload | done | lunegit | Theme files as JSON mapped onto the Theme value, partial overrides over a baseline, acrylic level, swapped at a frame boundary by the app |
 
 ## lunegit
 
