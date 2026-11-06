@@ -19,7 +19,7 @@ use lune_ui::tray::{
 use lune_ui::ui::Ui;
 use lune_ui::widgets::button::{ButtonKind, button_width};
 use lune_ui::widgets::flyout::{Flyout, flyout_size};
-use lune_ui::widgets::menu::{MenuRow, menu_size};
+use lune_ui::widgets::menu::{MenuItem, MenuRow, menu_size};
 use lune_ui::widgets::popover::{PlaceAlign, Side};
 
 use super::flyout::{ROUTES, rows, state_text, state_tone, stats};
@@ -285,23 +285,62 @@ impl PageState for PlacementWindows {
     }
 }
 
-/// A menu's rows for the tray: the state header, a separator, then the flyout's action rows.
-pub(crate) fn menu_rows(state: TrayState) -> Vec<MenuRow<'static>> {
-    let (name, status) = match state {
-        TrayState::Serving => ("Serving on :4646", "RM 48.20 today, 14.6% saved"),
-        TrayState::Degraded => ("anthropic degraded", "falling back to local"),
-        TrayState::Paused => ("Paused", "compression is off"),
+/// One menu row, no glyph; `hint` is the text at the row's right end.
+fn entry(text: &'static str, hint: &'static str, chevron: bool, danger: bool) -> MenuRow<'static> {
+    MenuRow::Entry(MenuItem {
+        glyph: None,
+        text,
+        shortcut: hint,
+        disabled: false,
+        danger,
+        chevron,
+    })
+}
+
+/// A tray menu's rows, as the mock has them per surface (`D227`). `MenuUnderBar` is macOS's: the
+/// state header, then the actions with their key hints (`Cmd+O`: no bundled font has the command
+/// symbol). `MenuOverBar` is Windows': no header, `Unload local model` with the memory it frees,
+/// and the quit row in the error colour. The flyout's own rows are the `flyout` page's.
+pub(crate) fn menu_rows(surface: TraySurface, state: TrayState) -> Vec<MenuRow<'static>> {
+    let pause = if state == TrayState::Paused {
+        "Resume compression"
+    } else {
+        "Pause compression"
     };
-    let mut out = vec![
+    if surface == TraySurface::MenuOverBar {
+        return vec![
+            entry("Open Wane", "", false, false),
+            entry("Profile", "Work", true, false),
+            entry(pause, "", false, false),
+            entry("Unload local model", "frees 19.3 GB", false, false),
+            MenuRow::Separator,
+            entry("Quit Wane (stops proxy)", "", false, true),
+        ];
+    }
+    let (name, status) = match state {
+        TrayState::Serving => (
+            "Wane is serving on :4646",
+            "RM 48.20 today \u{b7} 14.6% saved",
+        ),
+        TrayState::Degraded => ("Wane \u{b7} anthropic degraded", "falling back to local"),
+        TrayState::Paused => ("Wane \u{b7} paused", "compression is off"),
+    };
+    vec![
         MenuRow::Header {
             name,
             status,
             tone: state_tone(state),
         },
         MenuRow::Separator,
-    ];
-    out.extend(rows(state));
-    out
+        entry("Open Wane", "Cmd+O", false, false),
+        entry("Profile", "Work", true, false),
+        entry(pause, "", false, false),
+        MenuRow::Separator,
+        entry("Live sessions", "3", true, false),
+        entry("Unload local model", "", false, false),
+        MenuRow::Separator,
+        entry("Quit Wane", "Cmd+Q", false, false),
+    ]
 }
 
 /// What a tray surface's frame reports.
@@ -311,8 +350,8 @@ pub(crate) struct SurfaceFrame {
     pub(crate) picked: Option<usize>,
 }
 
-/// The surface `surface` fills the window with, in the state `state`. A stand-in app: the rows
-/// are the ones of the `flyout` page.
+/// The surface `surface` fills the window with, in the state `state`. A stand-in app: the
+/// flyout's rows are the ones of the `flyout` page, the menus' are [`menu_rows`].
 pub(crate) fn draw_surface(
     ui: &mut Ui<'_>,
     surface: TraySurface,
@@ -340,7 +379,7 @@ pub(crate) fn draw_surface(
             picked: r.picked,
         }
     } else {
-        let r = ui.menu_window("tray-menu", &menu_rows(state));
+        let r = ui.menu_window("tray-menu", &menu_rows(surface, state));
         SurfaceFrame {
             dismissed: r.dismissed,
             picked: r.picked,
@@ -372,7 +411,7 @@ pub(crate) fn surface_size<H: Copy + PartialEq>(
         };
         flyout_size(p, &flyout)
     } else {
-        menu_size(p, &menu_rows(state))
+        menu_size(p, &menu_rows(surface, state))
     }
 }
 
@@ -574,12 +613,67 @@ mod tests {
     }
 
     #[test]
-    fn the_menu_rows_start_with_the_state_header() {
+    fn the_macos_menu_starts_with_the_state_header_and_the_windows_one_has_none() {
         for s in STATES {
-            let rows = menu_rows(s);
-            assert!(matches!(rows[0], MenuRow::Header { .. }));
-            assert!(matches!(rows[1], MenuRow::Separator));
-            assert_eq!(rows.len(), 7);
+            let mac = menu_rows(TraySurface::MenuUnderBar, s);
+            assert!(matches!(mac[0], MenuRow::Header { .. }));
+            assert!(matches!(mac[1], MenuRow::Separator));
+            assert_eq!(mac.len(), 10);
+            assert!(
+                mac.iter()
+                    .skip(1)
+                    .all(|r| !matches!(r, MenuRow::Header { .. }))
+            );
+            let win = menu_rows(TraySurface::MenuOverBar, s);
+            assert!(!win.iter().any(|r| matches!(r, MenuRow::Header { .. })));
+            assert_eq!(win.len(), 6);
         }
+    }
+
+    fn text(r: &MenuRow<'static>) -> Option<(&'static str, &'static str, bool, bool)> {
+        match r {
+            MenuRow::Entry(i) => Some((i.text, i.shortcut, i.chevron, i.danger)),
+            _ => None,
+        }
+    }
+
+    #[test]
+    fn the_rows_follow_the_surface_and_the_state() {
+        let mac = menu_rows(TraySurface::MenuUnderBar, TrayState::Serving);
+        assert_eq!(text(&mac[2]), Some(("Open Wane", "Cmd+O", false, false)));
+        assert_eq!(text(&mac[3]), Some(("Profile", "Work", true, false)));
+        assert_eq!(text(&mac[6]), Some(("Live sessions", "3", true, false)));
+        assert_eq!(text(&mac[9]), Some(("Quit Wane", "Cmd+Q", false, false)));
+        assert!(
+            mac.iter()
+                .all(|r| text(r).is_none_or(|(_, _, _, danger)| !danger))
+        );
+        let win = menu_rows(TraySurface::MenuOverBar, TrayState::Serving);
+        assert_eq!(
+            text(&win[3]),
+            Some(("Unload local model", "frees 19.3 GB", false, false))
+        );
+        assert_eq!(
+            text(&win[5]),
+            Some(("Quit Wane (stops proxy)", "", false, true))
+        );
+        for surface in [TraySurface::MenuUnderBar, TraySurface::MenuOverBar] {
+            let rows = menu_rows(surface, TrayState::Paused);
+            assert!(
+                rows.iter()
+                    .any(|r| text(r).is_some_and(|t| t.0 == "Resume compression"))
+            );
+            let rows = menu_rows(surface, TrayState::Serving);
+            assert!(
+                rows.iter()
+                    .any(|r| text(r).is_some_and(|t| t.0 == "Pause compression"))
+            );
+        }
+        let MenuRow::Header { name, .. } =
+            menu_rows(TraySurface::MenuUnderBar, TrayState::Paused)[0]
+        else {
+            panic!("no header")
+        };
+        assert_eq!(name, "Wane \u{b7} paused");
     }
 }

@@ -27,10 +27,15 @@ fn px(b: &TrayBitmap, x: u32, y: u32) -> [u8; 4] {
     [b.rgba[i], b.rgba[i + 1], b.rgba[i + 2], b.rgba[i + 3]]
 }
 
-/// A pixel centre's distance from the dot's centre, in bitmap pixels (the dot's centre is
-/// `13.5 * scale`, its outer circle flush with the 18 px side).
+/// The dot's centre in bitmap pixels: 14 at scale 1 (on a pixel corner, so the dot covers whole
+/// pixels), 27 at scale 2.
+fn dot_centre(scale: u32) -> f32 {
+    if scale == 1 { 14.0 } else { 27.0 }
+}
+
+/// A pixel centre's distance from the dot's centre, in bitmap pixels.
 fn dist(x: u32, y: u32, scale: u32) -> f32 {
-    let c = 13.5 * scale as f32;
+    let c = dot_centre(scale);
     let (dx, dy) = (x as f32 + 0.5 - c, y as f32 + 0.5 - c);
     (dx * dx + dy * dy).sqrt()
 }
@@ -62,8 +67,8 @@ fn the_dots_centre_is_exactly_the_state_colour() {
         for tone in [GlyphTone::Light, GlyphTone::Dark] {
             for state in STATES {
                 let b = bitmap(state, tone, scale);
-                // The four pixels round the centre (13.5 * scale), all inside the dot.
-                let c = (13.5 * scale as f32) as u32;
+                // The four pixels round the centre, all inside the dot.
+                let c = dot_centre(scale) as u32;
                 for (x, y) in [(c, c), (c - 1, c - 1), (c, c - 1), (c - 1, c)] {
                     assert_eq!(px(&b, x, y), dot_of(state), "{state:?} {tone:?} x{scale}");
                 }
@@ -72,6 +77,32 @@ fn the_dots_centre_is_exactly_the_state_colour() {
     }
     assert_ne!(DARK.ok, DARK.warn);
     assert_ne!(DARK.warn, DARK.paused);
+}
+
+#[test]
+fn the_1x_dot_covers_whole_pixels_11_to_16_and_nothing_beside() {
+    for state in STATES {
+        for tone in [GlyphTone::Light, GlyphTone::Dark] {
+            let b = bitmap(state, tone, 1);
+            let want = dot_of(state);
+            // On the two rows and the two columns through the centre, the six pixels the dot
+            // spans hold its colour, and the pixels just outside hold nothing.
+            for line in [13_u32, 14] {
+                for at in 11..=16_u32 {
+                    for (x, y) in [(at, line), (line, at)] {
+                        let p = px(&b, x, y);
+                        assert_eq!(p[..3], want[..3], "{state:?} {tone:?} ({x}, {y})");
+                        assert!(p[3] >= 230, "{state:?} {tone:?} ({x}, {y}) alpha {}", p[3]);
+                    }
+                }
+                for at in [10_u32, 17] {
+                    for (x, y) in [(at, line), (line, at)] {
+                        assert_eq!(px(&b, x, y)[3], 0, "{state:?} {tone:?} ({x}, {y})");
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[test]

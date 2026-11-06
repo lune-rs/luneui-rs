@@ -50,9 +50,11 @@ const BOX: f32 = 16.0;
 const STROKE: f32 = 1.5;
 const DOT_R: f32 = 3.0;
 const RING_R: f32 = 4.5;
-/// The dot's centre, from the top left, at scale 1: its outer circle ends flush at the bitmap's
-/// edge (`right: -2px; bottom: -2px` of the glyph box).
-const DOT_AT: f32 = SIDE as f32 - RING_R;
+/// The dot's centre, from the top left, at scale 1 and at scale 2 (`right: -2px; bottom: -2px` of
+/// the glyph box, `-4px` at 2x). At scale 1 it is on a pixel corner, so the 6 px dot covers whole
+/// pixels (11 to 16) and not a soft 7 px disc; its ring's outer circle then runs half a pixel past
+/// the bitmap's edge, which cuts nothing. At scale 2 it is the same 27 as the mock's `--2x`.
+const DOT_AT: [f32; 2] = [14.0, 27.0];
 /// The crescent's view box.
 const VIEW: f32 = 24.0;
 /// The longest straight piece of a flattened arc, in pixels (`chrome.rs` uses the same step).
@@ -140,8 +142,8 @@ fn distance_to(pts: &[[f32; 2]], p: (f32, f32)) -> f32 {
 
 /// The tray icon for `state` as an RGBA bitmap, 18 px square at `scale` 1 and 36 at 2 (any other
 /// scale, 0 included, is 2). The crescent sits in a 16 px (32) glyph box at the top left; the
-/// status dot is 6 px (12) with a 1.5 px (3) ring cut round it, its outer circle ending flush
-/// at the bottom right corner. Drawn in this order: the glyph in `tone`, every pixel inside the
+/// status dot is 6 px (12) with a 1.5 px (3) ring cut round it, its centre at (14, 14) ((27, 27)) so
+/// the dot sits on the pixel grid. Drawn in this order: the glyph in `tone`, every pixel inside the
 /// ring's outer circle made transparent (the ring is alpha 0, not a colour), then the dot in
 /// `theme.ok`, `warn` or `paused`. Edges are anti-aliased from coverage; a pixel wholly inside
 /// the dot is exactly its colour. Pure and deterministic.
@@ -161,7 +163,8 @@ pub fn icon_bitmap(state: TrayState, tone: GlyphTone, scale: u32, theme: &Theme)
     let dot_a = f32::from(dot[3]) / 255.0;
     let outline = crescent(kf);
     let half = STROKE * kf / 2.0;
-    let centre = (DOT_AT * kf, DOT_AT * kf);
+    let at = DOT_AT[(k - 1) as usize];
+    let centre = (at, at);
     let mut rgba = Vec::with_capacity((side * side * 4) as usize);
     for y in 0..side {
         for x in 0..side {

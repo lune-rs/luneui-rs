@@ -47,7 +47,7 @@ Conflict: none between sources. D20 against the mock: the mock draws the surface
 - Dot: 6 px diameter, a 1.5 px cut-out ring around it in the surface colour, so the outer circle is 9 px; positioned `right: -2px; bottom: -2px` from the 16 px box; the fill is clipped to the inner circle so no tone bleeds into the ring [W docs/ui/mocks/css/components.css:691-697].
 - Dot colours, the tokens of [D58]: serving `ok` `#73C991` and degraded `warn` `#E2B93D` (Lunegit's tones, which win over Wane's `--ok` #6fd39a and `--warn` #f2a65a), paused `paused` `#8a9099` [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:116,115]; the ring defaults to `--tray-ring`, falling back to `--glass-inactive` `#0b0b0b` [W docs/ui/mocks/css/tokens.css:49,52,62,97], [W docs/ui/mocks/css/components.css:696-699].
 - High-DPI variant `--2x`: 32 px glyph, 12 px dot, 3 px ring, dot at `right: -4px; bottom: -4px` [W docs/ui/mocks/css/components.css:700-701]. Both sizes are produced from the same vector at 1x and 2x.
-- Overhang: the dot's outer circle (9 px at 1x, 18 px at 2x) reaches 2 px (4 px at 2x) past the 16 px glyph box on the right and bottom, since the dot sits at -2 px [derived: 9 = 6 + 2 * 1.5; `right: -2px` puts the outer edge 2 px outside]. A real bitmap holds the dot inside its bounds; the bitmap size or the glyph scale is an Open question.
+- Overhang: the dot's outer circle (9 px at 1x, 18 px at 2x) reaches 2 px (4 px at 2x) past the 16 px glyph box on the right and bottom, since the dot sits at -2 px [derived: 9 = 6 + 2 * 1.5; `right: -2px` puts the outer edge 2 px outside]. A real bitmap holds the dot inside its bounds; the bitmap size or the glyph scale is an Open question. Built: the bitmap is 18 px (36 at 2x) and the dot's centre is (14, 14) at 1x and (27, 27) at 2x, so the 6 px dot covers whole pixels 11 to 16 at 1x and the 1x ring's outer circle runs 0.5 px past the bitmap's edge, cutting nothing (D226).
 - Rendering: the icon is drawn by the painter into an offscreen RGBA target at 16 and 32 px and handed to the OS as a bitmap; the OS draws the slot [W docs/ui/components.md:218]. On macOS D20 leaves the form to M10: a template glyph with the dot drawn separately, or a non-template image matched to the menu-bar appearance, because a coloured dot cannot survive a template image [D20].
 - The ring colour: the mock's ring is the taskbar or menu-bar colour, which a real icon cannot know, so the dot needs a ring that works on light and dark trays [W docs/ui/components.md:218].
 - Tooltip: the app passes a string that names the state in words ("Wane · serving on :4646", "Wane · anthropic degraded", "Wane · paused", from the fixtures); it is the second channel for colour vision, since ok and warn are close in lightness; the native tooltip itself is OS chrome [W docs/ui/components.md:213,756,758].
@@ -94,7 +94,7 @@ None: the tooltip texts are app strings [W docs/ui/components.md:758].
 - `tray-icon-serving`, `tray-icon-degraded`, `tray-icon-paused`: the `icon_bitmap` of the scale through `images()`, drawn 1:1 on a dark bar, and a nearest-neighbour copy 144 px across beside it so the pixels can be judged, settled (the dump writes `<id>@1x.png` and `<id>@2x.png`).
 - `tray-icon-light-tray`: the paused icon with the dark glyph on a light bar, to check the ring (Open questions), settled.
 - `tray-icon-placement`: a screen rectangle with the menu bar, the macOS menu 4 px under it flush right and a status item near the right edge, settled; and `tray-icon-placement-windows`: the taskbar with the flyout 12 px above it and the menu 8 px above, settled. Both place with `bar_from_tray` and `place_surface` and print the rects.
-- `tray-flyout-window`, `tray-menu-window`: `Ui::flyout_window` and `Ui::menu_window` filling the window from its corner, over a flat stand-in for the desktop (a dump has no OS material), settled.
+- `tray-flyout-window`, `tray-menu-window`: `Ui::flyout_window` and `Ui::menu_window` filling the window from its corner, over a flat stand-in for the desktop (a dump has no OS material), settled. The menu's rows follow the mock per surface: the macOS menu with the state header and key hints (`Cmd+O`, `Cmd+Q`), the Windows one without a header (D227).
 
 ### Painter primitives
 
@@ -130,7 +130,7 @@ Measured on this Mac only, by a scratch harness over the real crates (D223): the
 
 ## Open questions
 
-- Bitmap size, the ring and the macOS image form are decided (D218): an 18 px bitmap (36 at 2x) with the dot's outer circle flush at the corner, a transparent ring, a non-template image with a white or black glyph.
+- Bitmap size, the ring and the macOS image form are decided (D218): an 18 px bitmap (36 at 2x) with the dot centred at 14 (27 at 2x), on the pixel grid at 1x (D226), a transparent ring, a non-template image with a white or black glyph.
 - The final glyph (the user's call) [W docs/ui/components.md:752].
 - Which upstream states turn the tray amber is a product rule, not the toolkit's [W docs/ui/components.md:755].
 
