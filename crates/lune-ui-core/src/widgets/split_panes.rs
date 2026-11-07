@@ -289,7 +289,9 @@ impl Ui<'_> {
         // The release frame counts: the event carries the pointer's last move.
         let following = r.pressed || r.press_started || r.clicked || r.drag_stopped;
         if let Some(mut grab) = self.transient::<Hold>(hold).0.filter(|_| r.enabled) {
-            if r.pressed && !grab.cancelled && self.consume_key_while_pressed(id, NamedKey::Escape)
+            // An Escape that came before the release of this frame counts: the key keeps the
+            // press it arrived under (`consume_key_while_pressed`).
+            if following && !grab.cancelled && self.consume_key_while_pressed(id, NamedKey::Escape)
             {
                 grab.cancelled = true;
                 restore = Some(grab.stored);

@@ -1059,6 +1059,28 @@ fn escape_during_a_drag_restores_the_press_size_and_is_consumed_and_a_release_en
     clock.release(&mut h, &c);
 }
 
+/// An Escape that arrives before the release in the same frame is the strip's: the size goes back
+/// to the press size, the key is consumed and the release does not keep the dragged size.
+#[test]
+fn an_escape_before_the_release_in_one_frame_restores_the_press_size() {
+    let (mut h, mut clock) = start();
+    let c = cfg();
+    h.shortcuts.add(Binding::new(
+        Scope::Global,
+        Chord::key(Key::Named(NamedKey::Escape)),
+        "esc",
+    ));
+    clock.settle(&mut h, &c);
+    let from = strip_at(&c, 200.0);
+    let out = clock.drag(&mut h, &c, from, moved(&c, from, 80.0));
+    near(out.size(), 280.0);
+    h.input.key_down(Key::Named(NamedKey::Escape), None);
+    let out = clock.release(&mut h, &c);
+    assert!(out.out.fired.is_empty(), "consumed");
+    near(out.size(), 200.0);
+    assert_eq!(out.stored, Some(None), "back to never stored");
+}
+
 #[test]
 fn in_a_dialog_the_first_escape_restores_the_size_and_only_the_second_closes_the_dialog() {
     let (mut h, mut clock) = start();

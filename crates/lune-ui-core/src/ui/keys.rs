@@ -16,6 +16,9 @@ pub(crate) struct KeyPress {
     /// `Some` for a synthetic key from an accessibility action: only that id may take it.
     pub(crate) target: Option<WidgetId>,
     pub(crate) consumed: bool,
+    /// The widget the pointer held the capture of when the key arrived, in the frame's event
+    /// order: a release later in the same frame does not change it.
+    pub(crate) held: Option<WidgetId>,
 }
 
 impl KeyPress {
@@ -25,6 +28,15 @@ impl KeyPress {
             event,
             target: None,
             consumed: false,
+            held: None,
+        }
+    }
+
+    /// A key that arrived while the pointer held `held`.
+    pub(crate) fn real_while(event: FocusEvent, held: Option<WidgetId>) -> Self {
+        Self {
+            held,
+            ..Self::real(event)
         }
     }
 
@@ -38,6 +50,7 @@ impl KeyPress {
             },
             target: Some(target),
             consumed: false,
+            held: None,
         }
     }
 
@@ -118,16 +131,18 @@ impl Ui<'_> {
     }
 
     /// Like [`Self::consume_key`], but for the widget that holds the pointer capture, whatever the
-    /// focus (a drag that Escape cancels).
+    /// focus (a drag that Escape cancels). A key counts when `id` holds the capture now, or held it
+    /// where the key arrived in the frame's events: an Escape that came before the release of the
+    /// same frame is the gesture's, though the release has ended the press by the time the
+    /// widget asks.
     pub fn consume_key_while_pressed(&mut self, id: WidgetId, key: NamedKey) -> bool {
-        if self.pointer.pressed != Some(id) {
-            return false;
-        }
-        let Some(k) = self
-            .keys
-            .iter_mut()
-            .find(|k| !k.consumed && k.target.is_none() && k.named() == Some(key))
-        else {
+        let held_now = self.pointer.pressed == Some(id);
+        let Some(k) = self.keys.iter_mut().find(|k| {
+            !k.consumed
+                && k.target.is_none()
+                && k.named() == Some(key)
+                && (held_now || k.held == Some(id))
+        }) else {
             return false;
         };
         k.consumed = true;

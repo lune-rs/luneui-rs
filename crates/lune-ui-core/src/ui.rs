@@ -441,13 +441,14 @@ impl<'a> Ui<'a> {
                                 }
                                 store.focus.visible = true;
                             }
-                            Key::Named(_) | Key::Character(_) => {
-                                keys.push(KeyPress::real(FocusEvent::Key {
+                            Key::Named(_) | Key::Character(_) => keys.push(KeyPress::real_while(
+                                FocusEvent::Key {
                                     key: key.clone(),
                                     modifiers: *modifiers,
                                     repeat: *repeat,
-                                }))
-                            }
+                                },
+                                store.pointer.held(),
+                            )),
                             Key::Unidentified => {}
                         }
                     }

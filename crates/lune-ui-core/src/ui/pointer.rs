@@ -317,7 +317,12 @@ impl PointerState {
 
     /// Whether a press holds a widget's capture now, at this point in the frame's event batch.
     pub(crate) fn captured(&self) -> bool {
-        self.press.is_some_and(|p| p.id.is_some())
+        self.held().is_some()
+    }
+
+    /// The widget a press holds the capture of now, at this point in the frame's event batch.
+    pub(crate) fn held(&self) -> Option<WidgetId> {
+        self.press.and_then(|p| p.id)
     }
 
     /// Releases a capture whose id `lost` says can no longer hold it (it fell under a modal).
