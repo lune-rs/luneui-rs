@@ -1854,8 +1854,8 @@ fn the_triangle_records_a_fill_and_no_glyph_and_sits_on_the_label_line() {
     let (l, top, r, b) = bounds(&t);
     assert_eq!(
         (r - l, b - top),
-        (6.0, 8.0),
-        "closed: 6 wide, 8 tall, pointing right"
+        (5.5, 7.5),
+        "closed: 5.5 wide, 7.5 tall, pointing right"
     );
     let slot_centre = TREE.x + PAD_LEFT + CHEVRON / 2.0;
     assert_eq!((l + r) / 2.0, slot_centre);
@@ -1884,7 +1884,7 @@ fn the_mark_turns_to_the_block_and_reaches_its_end_in_full_and_snaps_in_reduced_
     let t = first_triangle(&f.scene);
     let (l, top, r, b) = bounds(&t);
     assert_eq!(turn_degrees(t), 90.0, "ends pointing down");
-    assert_eq!((r - l, b - top), (8.0, 6.0));
+    assert_eq!((r - l, b - top), (7.5, 5.5));
 
     // Closing runs it back.
     h.at_ms(2000);
@@ -1912,7 +1912,7 @@ fn the_mark_turns_to_the_block_and_reaches_its_end_in_full_and_snaps_in_reduced_
         let t = first_triangle(&f.scene);
         assert_eq!(turn_degrees(t), 90.0, "{tier:?}");
         let (l, top, r, b) = bounds(&t);
-        assert_eq!((r - l, b - top), (8.0, 6.0), "{tier:?}");
+        assert_eq!((r - l, b - top), (7.5, 5.5), "{tier:?}");
     }
 }
 

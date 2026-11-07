@@ -483,4 +483,38 @@ mod tests {
         let (_, out) = run("tree-view-focus", 2);
         assert!(out.focused.is_some(), "the tree holds the focus");
     }
+
+    /// The turn in degrees of the first row's mark (the first triangle with a corner in the top
+    /// row, at 2x; a block's rows draw before it): from the middle of its longest edge to the
+    /// opposite corner, clockwise from pointing right.
+    fn turn(scene: &Scene) -> f32 {
+        let top_row = TREE.y * 2.0..(TREE.y + ROW) * 2.0;
+        let t: Vec<[f32; 2]> = scene
+            .in_order()
+            .into_iter()
+            .flat_map(|l| l.geometry.fills.iter().map(|v| v.pos))
+            .filter(|p| top_row.contains(&p[1]))
+            .take(3)
+            .collect();
+        let d = |a: [f32; 2], b: [f32; 2]| (a[0] - b[0]).hypot(a[1] - b[1]);
+        let (a, b, apex) = [(0, 1, 2), (1, 2, 0), (2, 0, 1)]
+            .into_iter()
+            .max_by(|x, y| d(t[x.0], t[x.1]).total_cmp(&d(t[y.0], t[y.1])))
+            .expect("three edges");
+        let mid = [(t[a][0] + t[b][0]) / 2.0, (t[a][1] + t[b][1]) / 2.0];
+        (t[apex][1] - mid[1])
+            .atan2(t[apex][0] - mid[0])
+            .to_degrees()
+    }
+
+    #[test]
+    fn the_expand_scene_catches_the_mark_half_way_round() {
+        // 125 ms into a 250 ms sine-in-out: half of 90 degrees.
+        let (scene, _) = run("tree-view-expand-mid", 2);
+        let angle = turn(&scene);
+        println!("tree-view-expand-mid mark: {angle:.2} deg");
+        assert!((angle - 45.0).abs() < 3.0, "{angle}");
+        let (scene, _) = run("tree-view-expanded", 2);
+        assert_eq!(turn(&scene), 90.0, "an open row points down, no transform");
+    }
 }

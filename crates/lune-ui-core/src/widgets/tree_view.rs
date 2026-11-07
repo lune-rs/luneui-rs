@@ -66,7 +66,7 @@ pub const GUIDE_WIDTH: f32 = 1.0;
 /// The elbow's corner radius.
 pub const ELBOW_RADIUS: f32 = 3.5;
 /// The triangle's ink box when closed (pointing right): width, height.
-pub const TRIANGLE: (f32, f32) = (6.0, 8.0);
+pub const TRIANGLE: (f32, f32) = (5.5, 7.5);
 /// The chevron's arm when closed: half its width and half its height, to the stroke's centre line.
 pub const CHEVRON_ARM: (f32, f32) = (2.5, 4.0);
 /// The chevron's stroke width.
