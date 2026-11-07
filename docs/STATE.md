@@ -1,13 +1,13 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-07 (program toolkit-v1 closed: M11 merged at 10f503e)
+Last updated: 2026-11-07 (gallery showcase task closed)
 
 ## Now
 
 Program toolkit-v1 is closed: M11, the last milestone, merged at 10f503e. The toolkit is five crates (`lune-ui-core`, the adapters
-`lune-ui-wgpu`, `lune-ui-winit`, `lune-ui-platform`, and the facade `lune-ui`), workspace version 0.2.0 (D238). `apps/gallery` has 74 pages and
-431 scene names in `--list`. The catalogue holds 97 entries: 91 `done`, 2 `in-progress`, 4 `external`. Milestone merges to main: M4 d9fe71f,
+`lune-ui-wgpu`, `lune-ui-winit`, `lune-ui-platform`, and the facade `lune-ui`), workspace version 0.2.0 (D238). `apps/gallery` had 74 pages and
+431 scene names at M11's close; the showcase task added seven labs and the shell page (82 pages, 436 scene names). The catalogue holds 98 entries: 92 `done`, 2 `in-progress`, 4 `external`. Milestone merges to main: M4 d9fe71f,
 M5 1aeaf1b, M6 a75a708, M7 662d310, M8 2474248, M9 8f499d0, M10 55cfaaf, M11 10f503e (M1 to M3: the extraction, the seams and the catalogue).
 `docs/architecture.md` has the module map, the pages and "API changes since M1"; `docs/consuming.md` how an app vendors the toolkit.
 
@@ -20,6 +20,18 @@ gallery and catalogue agree; `scripts/export-snapshot.sh`, `docs/consuming.md` a
 Class B (D234): `platform.material` and `render.surface` stay `in-progress` by their own text. The first needs Luneterm's runs of the OS materials
 on real machines (`owner: Luneterm M9 to M11 runs`); the second needs a pixel gate on a presented frame (`owner: consumer's window run`).
 `catalogue.rs` holds the list and a test that no other entry is `in-progress`.
+
+## The gallery showcase
+
+`cargo run -p gallery` opens the showcase: a 1600 x 900 glass window with a searchable sidebar (groups, pages, scenes), the chosen page live in the
+middle, and on the right that page's knobs and the global settings (theme, motion tier, speed, zoom, glass layers, blur, noise, OS material, durations).
+Seven labs (glass, blur, effects, motion, tokens, clipboard, JSON) cover what no component page shows. Keys: Cmd or Ctrl `]` and `[` walk the pages,
+Cmd or Ctrl `Q` quits. `--list`, `--dump <dir>` and `--bench` are unchanged; the shell's own scenes are the five `showcase-*`. `docs/components/infra/showcase.md`
+is the entry (what it shows, the four pages with no knob and why, what is unverified); decisions D246 to D254; the code is `apps/gallery/src/showcase/`.
+The task changed nothing under `crates/` (D246).
+
+Gallery work is checked by eye, not by the pixel gate: the gate runs when a component's design changes (D254). A hands-on run in a real window is what
+proves clicks, the OS material swap and the feel of speed and zoom; the tests only drive the shell with scripted pointer events.
 
 ## Readings (M11; each run once; nothing acts on them)
 
@@ -88,6 +100,7 @@ the disabled-key readers and the chord takers, F11, the audit's 33 unreached col
   The panel rests on AppKit behaviour Apple does not document and is proved only on this macOS version (D223); run the smoke again after a macOS update.
 - The OS clipboard beyond the one guarded `real_round_trip` (macOS, plain text; `#[ignore]`, writes the user's clipboard, not re-run in M11); a real file dragged over a window.
 - A real GPU loss (a driver reset, an unplugged adapter): the tests stand in with `Device::destroy`.
+- The showcase in a real window: clicks on the sidebar, the knobs and the settings, a live swap of the OS material, the feel of speed and zoom, Copy and Paste against the OS clipboard (`docs/components/infra/showcase.md`).
 
 ## Next
 
@@ -97,6 +110,22 @@ the disabled-key readers and the chord takers, F11, the audit's 33 unreached col
 3. The user's calls, all reversible and taken at the recommended option: the final tray glyph (`platform.tray-icon`), column resize and reorder in the table (D163, Q15), and three taken calls to
    confirm: the Windows popover activates (D224, Q17), the tray icon is a CPU raster (D218, Q18), the Lunegit fixtures stay bundled (Q19).
 4. CI stays out (D15): the repo has no remote.
+5. The library follow-ups above, starting with the noise and luminosity plan (D246), once the user has reviewed the showcase.
+
+## Library follow-ups (found by the gallery showcase; nothing under `crates/` changed, D246)
+
+For the next milestone, library and API. The first is the plan the user asked for after reviewing the showcase.
+
+- Noise strength and luminosity constants are fixed: expose them (D246; its own plan, after the user's review). The blur kernel cap (48 px, so sigma 16) is fixed too; the
+  gallery's noise control is on/off by post-processing the scene's acrylic params (`params[3]`), which covers library widgets but not a strength.
+- Tray surfaces cannot sit in a content area: the library places those overlays at the window corner, and an `Xform` does not move overlay content.
+- `Ui::caption_buttons` places from x = 0, y = 0 and ignores its area's origin.
+- A gallery test cannot list hit regions: `UiStore::prev_hits` is `pub(crate)`.
+- Scene scripts cannot address a widget by a numeric key (`Ev::PointerOver` takes `&'static [&'static str]`; a tree row's id is `id(u64)`): the `showcase-table` scene aims at a computed point instead.
+- Tab order is registration order with no way to scope it: a hosted page's scripted Tab needs its widgets registered before the shell's, so the shell draws its content pane before its sidebar.
+- `OutputState::apply` sends the IME area in the window's own scale: under the gallery's zoom the candidate window sits off by the zoom factor.
+- A scrolled host's pane clip has to be rebuilt in the content space (pane + offset) and re-applied by every page that calls `Painter::on`: `on` drops the clip. A stack-preserving layer switch in the toolkit would remove the need.
+- `Painter::on` also clears the clip stack, so the `pop_clip` of a scroll area that a hosted page switched layers in restores nothing and the pane's clip stays on for everything drawn after (found with the glass lab: the sidebar and settings vanished). The showcase resets with `on(Base)` after its content pane; a stack-preserving layer switch in the toolkit would remove the trap.
 
 ## Blockers / open questions
 

@@ -24,7 +24,8 @@ for the extraction; Luneterm's `docs/architecture.md` sections "lune-ui modules"
 - Catalogue index (regenerate after adding or editing a component file): `scripts/gen-component-index.sh`
 - Acceptance bench (milestone acceptance only; a recorded reading that no gate, merge or fix waits on, and is not re-run to settle load noise, D235; runnable on a busy machine, D85: each run judged on its own p99 <= 16.6 ms and worst frame <= 33 ms, a page OVER only in at least half its runs, the self-test spread and load printed beside every verdict; exit 0): `cargo run --release -p gallery -- --bench` (`--runs 5` is the default; `--size 3456x2234` is report-only)
 - Gate (before every commit; must be green): `cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && cargo clippy -p lune-ui-winit --all-targets -- -D warnings && cargo test -p lune-ui-winit && scripts/check-boundaries.sh && scripts/gen-component-index.sh --check`
-- Pixel gate (any drawing change): `scripts/pixel-gate.sh [--base <rev>] [--allow <id>…]` dumps
+- Showcase (the gallery's window; Cmd or Ctrl `]` and `[` walk the pages, Cmd or Ctrl `Q` quits): `cargo run -p gallery`
+- Pixel gate (a change to a component's drawing; gallery-only work is checked by eye, D254): `scripts/pixel-gate.sh [--base <rev>] [--allow <id>…]` dumps
   every scene `gallery --list` prints (431 at M11's close; the first 15 are the legacy Painter-API scenes) for `<rev>`
   (default `HEAD`) and for the working tree and compares them
   (`dump-compare`); zero delta unless the look change is intended: name its scenes with `--allow <id>`
@@ -98,8 +99,8 @@ Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, r
    `THIRD_PARTY_NOTICES.md`.
 7. Every manifest inherits `license = "MIT OR Apache-2.0"` from the workspace; `publish = false` until
    the user decides otherwise.
-8. A drawing change passes the pixel gate (see Commands). Look values follow Lunegit; a deliberate
-   deviation is a DECISIONS.md row.
+8. A change to a component's drawing passes the pixel gate (see Commands; gallery-only work is checked by
+   eye, D254). Look values follow Lunegit; a deliberate deviation is a DECISIONS.md row.
 9. Library API: `unreachable_pub`, `missing_debug_implementations` warn; `unwrap_used`, `dbg_macro`,
    `todo` warn (workspace lints in the root manifest).
 10. Every component has one catalogue file `docs/components/<area>/<id>.md` with front matter; the id

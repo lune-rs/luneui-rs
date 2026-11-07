@@ -10,10 +10,10 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | status | count |
 | --- | --- |
 | in-luneterm | 0 |
-| planned | 1 |
+| planned | 0 |
 | stub | 0 |
 | in-progress | 2 |
-| done | 91 |
+| done | 92 |
 | external | 4 |
 | **total** | **98** |
 
@@ -158,7 +158,7 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | [infra.json](infra/json.md) | Bounded JSON reader | done | any | Small JSON reader in core with input, depth and string limits, fail-closed errors and no panics; backs theme and locale loading |
 | [infra.localization](infra/localization.md) | Localization | done | any | One string table of flat dotted keys in core, luneui. keys with English defaults, positional formatting; locale JSON loaded in M10 |
 | [infra.shortcut-routing](infra/shortcut-routing.md) | Keyboard shortcut routing | done | any | A scoped chord registry resolved in three phases (preempt, focused widget, bubble); Lunegit has no central one |
-| [infra.showcase](infra/showcase.md) | Gallery showcase | planned | any | The gallery's shell, one Ui page that hosts every other page behind a searchable sidebar; the live place to see and try the whole toolkit |
+| [infra.showcase](infra/showcase.md) | Gallery showcase | done | any | The gallery's window, one Ui page that hosts every other page behind a searchable sidebar, with global settings, per-component knobs and labs; the live place to see and try the whole toolkit |
 | [infra.theme-hot-reload](infra/theme-hot-reload.md) | Theme JSON loading and hot reload | done | lunegit | Theme files as JSON mapped onto the Theme value, partial overrides over a baseline, acrylic level, swapped at a frame boundary by the app |
 
 ## lunegit
