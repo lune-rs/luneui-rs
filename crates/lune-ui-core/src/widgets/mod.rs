@@ -41,6 +41,7 @@ pub mod scrollbar;
 pub mod search_picker;
 pub mod selectable;
 pub mod settings_page;
+pub mod shine;
 pub mod side_panel;
 pub mod sidebar;
 pub mod slider;

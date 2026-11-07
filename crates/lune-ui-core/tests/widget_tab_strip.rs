@@ -18,6 +18,7 @@ use lune_ui_core::text::{Spec, Style};
 use lune_ui_core::theme::DARK;
 use lune_ui_core::ui::{Ui, WidgetId};
 use lune_ui_core::widgets::progress::breath_opacity;
+use lune_ui_core::widgets::shine;
 use lune_ui_core::widgets::tab_strip::{
     BRUSH, BusyCue, CONTENT_SWAP, FOCUS, GAP, HOVER, MAX_WIDTH, MIN_WIDTH, Tab, TabEvent, TabKey,
     TabStripOptions,
@@ -1142,47 +1143,255 @@ fn the_cue_tints_are_the_light_status_brushes() {
     }
 }
 
-// Progress.
+// Progress: the title shines.
+
+/// One tab `long('a')` (165 px in the fake text), active, shining in `tone`, at `ms` under `tier`.
+fn shining(tier: MotionTier, tone: Tone, ms: u64) -> Run {
+    let mut app = App::new(&[&long('a')], Some(0));
+    app.tabs[0].3 = Some(tone);
+    let mut h = UiHarness::new(WIN);
+    h.tier = tier;
+    h.at_ms(ms);
+    run(&mut h, &mut app)
+}
+
+/// The title's text items: the ones drawn where the first text is, left to right by clip.
+fn title_texts(scene: &Scene) -> Vec<&lune_ui_core::scene::TextItem> {
+    let at = scene.layers[0].texts.first().expect("a title");
+    let mut items: Vec<_> = scene.layers[0]
+        .texts
+        .iter()
+        .filter(|t| t.x == at.x && t.y == at.y)
+        .collect();
+    items.sort_by(|a, b| a.clip.x.total_cmp(&b.clip.x));
+    items
+}
+
+/// The light a tone gives a shining title.
+fn light(tone: Tone) -> [u8; 4] {
+    match tone {
+        Tone::Neutral => DARK.fg_bright,
+        Tone::Warn => DARK.status_warning_light,
+        _ => DARK.status_error_light,
+    }
+}
+
+fn title_key(color: [u8; 4]) -> u64 {
+    Spec::plain(long('a'), Style::ui(DARK.font_s, color)).cache_key(1.0)
+}
 
 #[test]
-fn the_spinner_turns_under_full_only_and_takes_the_tone() {
-    let spinner = |tier, tone: Tone, ms| {
-        let mut app = App::of(2, Some(0));
-        app.tabs[1].3 = Some(tone);
-        let mut h = UiHarness::new(WIN);
-        h.tier = tier;
-        h.at_ms(ms);
-        let r = run(&mut h, &mut app);
-        let image = r.scene.layers[0].images.first().copied().expect("spinner");
-        (image.rotation, r.out.repaint)
-    };
-    let (rot, repaint) = spinner(MotionTier::Full, Tone::Err, 300);
-    assert!((rot - std::f32::consts::FRAC_PI_2).abs() < 1e-3, "{rot}");
-    assert_eq!(repaint, Repaint::Now);
-    for tier in [MotionTier::Reduced, MotionTier::Off] {
-        let (rot, repaint) = spinner(tier, Tone::Err, 300);
-        assert_eq!(rot, 0.0);
-        assert_eq!(repaint, Repaint::Idle);
+fn the_band_sits_where_the_formula_says() {
+    // Off both ends the title is drawn whole, as it is.
+    assert_eq!(
+        title_texts(&shining(MotionTier::Full, Tone::Neutral, 0).scene).len(),
+        1
+    );
+    // Fully on the title: the pieces other than the outer two are the strips and span the band.
+    for ms in [450u64, 900, 1350] {
+        let r = shining(MotionTier::Full, Tone::Neutral, ms);
+        let items = title_texts(&r.scene);
+        let x = items[0].x;
+        let centre = shine::band_center(Duration::from_millis(ms), x, 165.0);
+        let inner = &items[1..items.len() - 1];
+        let left = inner.first().expect("strips").clip.x;
+        let right = inner.last().map(|t| t.clip.x + t.clip.w).expect("strips");
+        assert!(
+            (left - (centre - shine::BAND_WIDTH / 2.0)).abs() <= 0.5
+                && (right - (centre + shine::BAND_WIDTH / 2.0)).abs() <= 0.5,
+            "{ms} ms: {left}..{right} around {centre}"
+        );
     }
 }
 
 #[test]
-fn a_spinning_tab_is_a_little_wider_and_marked_busy() {
-    let mut app = App::new(&[&long('a'), &long('b')], Some(0));
-    app.tabs[1].3 = Some(Tone::Neutral);
-    let mut h = bench(&mut app);
-    let r = run(&mut h, &mut app);
-    let s = slots(&r.out.tree);
-    assert_eq!(s[1].2, 18.0 + 14.0 + 165.0);
-    assert!(
-        tab_node(&r.out.tree, &long('b'))
-            .states
-            .contains(State::Busy)
+fn the_band_starts_off_the_left_end_and_leaves_off_the_right() {
+    let x = 30.0;
+    let at = |ms| shine::band_center(Duration::from_millis(ms), x, 165.0);
+    assert_eq!(at(0) + shine::BAND_WIDTH / 2.0, x);
+    assert!((at(900) - (x + 82.5)).abs() < 1e-3);
+    assert!(at(1799) - shine::BAND_WIDTH / 2.0 < x + 165.0);
+    assert!(at(1799) - shine::BAND_WIDTH / 2.0 > x + 160.0);
+    assert_eq!(at(1800), at(0));
+}
+
+#[test]
+fn the_strips_partition_the_band_with_no_overlap_or_gap() {
+    for scale in [1.0_f32, 1.5, 2.0, 3.0] {
+        let band = shine::Band {
+            left: 31.3,
+            width: shine::BAND_WIDTH,
+            light: DARK.fg_bright,
+        };
+        let strips = shine::strips(&band, scale);
+        assert!(strips.len() >= 2, "scale {scale}");
+        for pair in strips.windows(2) {
+            assert_eq!(pair[0].1, pair[1].0, "scale {scale}: a seam");
+        }
+        for (a, b, _) in &strips {
+            assert!(b > a);
+            // On a whole device pixel.
+            assert!(
+                (a * scale - (a * scale).round()).abs() < 1e-3,
+                "{a} at {scale}"
+            );
+        }
+        let (first, last) = (strips[0].0, strips[strips.len() - 1].1);
+        assert!((first - band.left).abs() <= 0.5 / scale + 1e-3);
+        assert!((last - (band.left + band.width)).abs() <= 0.5 / scale + 1e-3);
+    }
+}
+
+#[test]
+fn the_bell_is_soft_at_both_edges_and_full_at_the_centre() {
+    assert_eq!(shine::bell(0.0), 0.0);
+    assert_eq!(shine::bell(1.0), 0.0);
+    assert!((shine::bell(0.5) - 1.0).abs() < 1e-6);
+    for f in [0.1_f32, 0.3, 0.45] {
+        assert!((shine::bell(f) - shine::bell(1.0 - f)).abs() < 1e-5);
+        assert!(shine::bell(f) < shine::bell(f + 0.05));
+    }
+    // Zero slope at the edge: the first step is far under the average one.
+    assert!(shine::bell(0.01) < 0.002);
+}
+
+#[test]
+fn no_strip_is_a_step_from_its_neighbour_for_any_tone() {
+    for tone in [Tone::Neutral, Tone::Warn, Tone::Err] {
+        for base in [DARK.fg_primary, DARK.fg_muted] {
+            let band = shine::Band {
+                left: 0.0,
+                width: shine::BAND_WIDTH,
+                light: light(tone),
+            };
+            let colours: Vec<[u8; 4]> = shine::strips(&band, 1.0)
+                .iter()
+                .map(|s| shine::mix(base, band.light, s.2))
+                .chain([base])
+                .collect();
+            let first = [base, colours[0]];
+            for pair in colours.windows(2).chain([&first[..]]) {
+                let step = (0..4)
+                    .map(|i| pair[0][i].abs_diff(pair[1][i]))
+                    .max()
+                    .unwrap_or(0);
+                assert!(step <= 12, "{tone:?}: a step of {step}");
+            }
+        }
+    }
+}
+
+#[test]
+fn the_strips_are_the_title_cut_not_a_second_title() {
+    // Every piece is the one title at the one place; only the colour and the clip differ.
+    let r = shining(MotionTier::Full, Tone::Err, 900);
+    let items = title_texts(&r.scene);
+    assert!(items.len() > shine::STRIPS / 2, "{}", items.len());
+    for pair in items.windows(2) {
+        assert_eq!(
+            pair[0].clip.x + pair[0].clip.w,
+            pair[1].clip.x,
+            "overlap or gap"
+        );
+    }
+    // Both outer pieces are the title's own colour.
+    let own = title_key(DARK.fg_primary);
+    assert_eq!(items[0].key.0, own);
+    assert_eq!(items[items.len() - 1].key.0, own);
+}
+
+#[test]
+fn the_tone_picks_the_light() {
+    for tone in [Tone::Neutral, Tone::Warn, Tone::Err] {
+        // The centre strip of the band at the title's middle.
+        let r = shining(MotionTier::Full, tone, 900);
+        let band = shine::Band {
+            left: shine::band_center(Duration::from_millis(900), 30.0, 165.0)
+                - shine::BAND_WIDTH / 2.0,
+            width: shine::BAND_WIDTH,
+            light: light(tone),
+        };
+        let top = shine::strips(&band, 1.0)
+            .into_iter()
+            .max_by(|a, b| a.2.total_cmp(&b.2))
+            .expect("strips");
+        let want = title_key(shine::mix(DARK.fg_primary, light(tone), top.2));
+        assert!(
+            title_texts(&r.scene).iter().any(|t| t.key.0 == want),
+            "{tone:?}"
+        );
+        // Off is the fixed mix of the same light.
+        let r = shining(MotionTier::Off, tone, 300);
+        let want = title_key(shine::mix(DARK.fg_primary, light(tone), shine::STATIC_MIX));
+        assert_eq!(title_texts(&r.scene)[0].key.0, want, "{tone:?} under Off");
+    }
+}
+
+#[test]
+fn reduced_breathes_in_one_piece_and_off_is_static_and_idle() {
+    let at = |tier, ms| shining(tier, Tone::Err, ms);
+    // Reduced: one text, one clip, the colour moving with the breath.
+    let (a, b) = (at(MotionTier::Reduced, 0), at(MotionTier::Reduced, 900));
+    assert_eq!(title_texts(&a.scene).len(), 1);
+    assert_eq!(title_texts(&b.scene).len(), 1);
+    assert_eq!(title_texts(&a.scene)[0].clip, title_texts(&b.scene)[0].clip);
+    assert_ne!(title_texts(&a.scene)[0].key, title_texts(&b.scene)[0].key);
+    let want = |ms| {
+        title_key(shine::mix(
+            DARK.fg_primary,
+            DARK.status_error_light,
+            shine::breath_mix(Duration::from_millis(ms)),
+        ))
+    };
+    assert_eq!(title_texts(&a.scene)[0].key.0, want(0));
+    assert_eq!(title_texts(&b.scene)[0].key.0, want(900));
+    assert_eq!(a.out.repaint, Repaint::Now);
+    // Off: the same at any time, and nothing to repaint.
+    let (a, b) = (at(MotionTier::Off, 0), at(MotionTier::Off, 900));
+    assert_eq!(title_texts(&a.scene).len(), 1);
+    assert_eq!(title_texts(&a.scene)[0], title_texts(&b.scene)[0]);
+    assert_eq!(a.out.repaint, Repaint::Idle);
+    assert_eq!(b.out.repaint, Repaint::Idle);
+}
+
+#[test]
+fn only_a_shining_tab_asks_for_frames() {
+    assert_eq!(
+        shining(MotionTier::Full, Tone::Neutral, 300).out.repaint,
+        Repaint::Now
     );
-    assert!(
-        !tab_node(&r.out.tree, &long('a'))
-            .states
-            .contains(State::Busy)
+    let mut app = App::of(2, Some(0));
+    let mut h = UiHarness::new(WIN);
+    h.at_ms(300);
+    assert_eq!(run(&mut h, &mut app).out.repaint, Repaint::Idle);
+}
+
+#[test]
+fn a_tab_in_progress_is_as_wide_as_one_not_and_marked_busy() {
+    let widths = |progress: Option<Tone>| {
+        let mut app = App::new(&[&long('a'), &long('b')], Some(0));
+        app.tabs[1].3 = progress;
+        let mut h = bench(&mut app);
+        let r = run(&mut h, &mut app);
+        (slots(&r.out.tree), r.out.tree)
+    };
+    let (still, _) = widths(None);
+    let (shone, tree) = widths(Some(Tone::Neutral));
+    assert_eq!(still, shone);
+    assert!(tab_node(&tree, &long('b')).states.contains(State::Busy));
+    assert!(!tab_node(&tree, &long('a')).states.contains(State::Busy));
+}
+
+#[test]
+fn the_title_starts_where_a_still_one_starts() {
+    let still = shining(MotionTier::Off, Tone::Neutral, 0);
+    let mut app = App::new(&[&long('a')], Some(0));
+    let mut h = UiHarness::new(WIN);
+    h.at_ms(0);
+    let plain = run(&mut h, &mut app);
+    assert_eq!(
+        title_texts(&still.scene)[0].x,
+        title_texts(&plain.scene)[0].x
     );
 }
 

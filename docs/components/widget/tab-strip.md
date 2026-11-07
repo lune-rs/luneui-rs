@@ -48,7 +48,7 @@ Conflict: a comment in Lunegit's tab template says the tab "is capped at MaxWidt
 
 - Header strip 32 px high; tabs stretch to the full 32 px (no vertical centring) [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:218,240-243]. Tabs sit in a horizontal stack with gap 5, between tabs only, so the first tab is flush in the card's top-left corner [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:252-256].
 - Tab: min width 108, max width 270, corner radius 8 8 0 0 (equal to the card radius), transparent fill and no border of its own [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:54-60]. Content is two columns: the activate area (`*`) and the close column (`Auto`) [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:303].
-- Activate area: padding 10, 0, 4, 0, filling the whole tab so the padded edge activates too [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:61-62,306-311]; progress spinner icon 10 x 10 with margin right 4, shown only while progress is reported [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:317-325]; title 11 px (`FontSizeS`), ellipsis trimming, margin right 4 [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:329-334], [L src/Lunegit.Desktop/App.axaml:158].
+- Activate area: padding 10, 0, 4, 0, filling the whole tab so the padded edge activates too [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:61-62,306-311]; title 11 px (`FontSizeS`), ellipsis trimming, margin right 4 [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:329-334], [L src/Lunegit.Desktop/App.axaml:158].
 - Close button: 20 x 20, icon 10 x 10 in `fg_tertiary`, margin right 8, vertically centred; hidden (no reserved gap) unless the tab is active or hovered [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:338-356,78-93].
 - New-tab button: 20 x 20, plus icon 14 x 14 in ForegroundMuted, hover fill `surface_hover`, right of the scrolling strip [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:111-122,365-373].
 - Overflow: the strip scrolls horizontally with the bar hidden (wheel and trackpad scroll) to keep the 32 px header clean [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:240-247].
@@ -70,7 +70,7 @@ Conflict: a comment in Lunegit's tab template says the tab "is capped at MaxWidt
 | panel focused | outline brush `border` | [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:31-33] |
 | panel unfocused | outline brush `border_subtle` | [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:28-30] |
 | focus-visible (tab) | outline ring per the toolkit's focus ring on the activate area | [core.focus] |
-| progress | spinner icon in the tab, tinted `accent`, `status_error_light` #EF9A9A or `status_warning_light` #FFD666 ([D132]) | [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:123-125,317-325] |
+| progress | the title shines: a 48 px band of light passes through it left to right every 1800 ms, in `fg_bright`, `status_warning_light` #FFD666 or `status_error_light` #EF9A9A ([D132], D270); no icon, no reserved gap, the tab is no wider. Deviates from Lunegit's spinner icon on the user's request (R3). Reduced: the whole title breathes between its colour and the light, on the breath curve; Off: a fixed half mix, no repaint | [derived: user review R3, D270] |
 | busy (command running) | outline sweep, comet or breath (Reduced: breath; Off: static) | [L src/Lunegit.Desktop/Controls/Terminal/TerminalTabChrome.cs:246-272], [L src/Lunegit.Core/Settings/TerminalOutlineAnimationResolver.cs:17-28] |
 | dragging | dragged tab tracks the pointer, neighbours shifted; a neighbour's title shows through the dragged tab's translucent fill, as in Lunegit (no ZIndex or opacity on the drag) | [infra.drag-and-drop], [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:54-69] |
 | overflow | strip scrolled; a partially visible tab has its notch dropped under 12 px | [L src/Lunegit.Desktop/Controls/Terminal/TerminalChromeGeometry.cs:54-58] |
@@ -89,8 +89,8 @@ Conflict: a comment in Lunegit's tab template says the tab "is capped at MaxWidt
 | outline brush focus change | outline colour | focus | instant | linear | keep | [L src/Lunegit.Desktop/Themes/Animations.axaml:182-186] |
 
 The content swap is the card body's job (the app composes the strip with its content); the strip only reports the activation. In Reduced the crossfade runs at Fast (180) and in Off it is zero [L src/Lunegit.Desktop/ViewModels/TerminalPanelViewModel.cs:829-834], [L src/Lunegit.Desktop/Themes/AnimationsReduced.axaml:144-147].
-The busy cue is the documented long-loop exception, not a duration token: the sweep and comet run 2400 ms, the breath 1800 ms, only while a command runs, and stop when it ends; it is one of the two accepted motions beside the terminal, drawn as a sibling overlay with at most three stroke passes [L .claude/docs/animation-rules.md:147,172], [L src/Lunegit.Desktop/Controls/Terminal/TerminalChromeAnimation.cs:16-20]. The global tier wins: Off gives a static outline, Reduced forces breath (opacity only), Full follows the user's choice [L src/Lunegit.Core/Settings/TerminalOutlineAnimationResolver.cs:7-31].
-Never animated: the strip's layout, tab widths changing as the close button shows (the button has no reserved gap and a width shift is not tweened), the content itself.
+The busy cue is the documented long-loop exception, not a duration token: the sweep and comet run 2400 ms, the breath 1800 ms, only while a command runs, and stop when it ends; it is one of the two accepted motions beside the terminal, drawn as a sibling overlay with at most three stroke passes [L .claude/docs/animation-rules.md:147,172], [L src/Lunegit.Desktop/Controls/Terminal/TerminalChromeAnimation.cs:16-20]. The progress shine is the same kind of state indicator (a 1800 ms loop while a tab's work runs, `docs/motion.md`). The global tier wins: Off gives a static outline, Reduced forces breath (opacity only), Full follows the user's choice [L src/Lunegit.Core/Settings/TerminalOutlineAnimationResolver.cs:7-31].
+Never animated: the strip's layout, tab widths changing as the close button shows (the button has no reserved gap and a width shift is not tweened), the content itself. A shining title shifts nothing: the shine draws the same glyphs where they sit, cut into strips (`widgets::shine`).
 
 ### Input and focus
 
@@ -135,7 +135,8 @@ The confirm and rename dialog texts, "Duplicate Tab" and "Copy Working Directory
 - `tab-strip-rest`: three tabs, the second active, settled.
 - `tab-strip-hover`: tab 3 hovered, close visible, the hover settled and the tooltip's delay still running (`Waiting`).
 - `tab-strip-unfocused`: the same strip with the panel unfocused (outline `border_subtle`), settled.
-- `tab-strip-progress`: tab 1 with the spinner, tinted accent, then error and warning in two more tabs, moving.
+- `tab-strip-progress`: tab 1 shining in `fg_bright`, then error and warning in two more tabs, at phase 1/6 (t = 300 ms): the band entering each title from the left, moving.
+- `tab-strip-shine-mid`: the same tabs at phase 1/2 (t = 900 ms): the band's centre on each title's centre, moving.
 - `tab-strip-busy-sweep`: active tab with the conic sweep at phase 0.25 (t = 600 ms), moving.
 - `tab-strip-busy-comet`: comet at phase 0.25 (t = 600 ms).
 - `tab-strip-busy-breath`: breath at its brightest (t = 900 ms).

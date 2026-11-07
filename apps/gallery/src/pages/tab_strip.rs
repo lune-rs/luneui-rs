@@ -336,7 +336,7 @@ const SCENES: &[UiScene] = &[
         capture_ms: 0,
         expect: Expect::Settled,
     },
-    // Each spinner turned a quarter.
+    // Phase 1/6 of the 1800 ms shine: the band is entering each title from the left.
     UiScene {
         id: "tab-strip-progress",
         scale: 2.0,
@@ -344,6 +344,16 @@ const SCENES: &[UiScene] = &[
         state: progress,
         script: &[],
         capture_ms: 300,
+        expect: Expect::Moving,
+    },
+    // Phase 1/2: the band's centre is on each title's centre.
+    UiScene {
+        id: "tab-strip-shine-mid",
+        scale: 2.0,
+        tier: MotionTier::Full,
+        state: progress,
+        script: &[],
+        capture_ms: 900,
         expect: Expect::Moving,
     },
     // Phase 0.25 of the 2400 ms loop.

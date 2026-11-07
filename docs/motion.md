@@ -32,7 +32,8 @@ it does not depend on the frame rate [motion.transitions]. Five tokens, no inter
 Not on the scale, by design: the flash highlight (3000 ms, `CubicEaseOut`, an attention cue)
 [L .claude/docs/animation-rules.md:28], the busy-outline loops (2400 ms sweep, 1800 ms breath), and the
 indeterminate progress loop (a 2400 ms trip of the segment under Full, the same 1800 ms breath of the fill
-under Reduced, a static fill under Off [D118]), which are state indicators, not feedback on a user action
+under Reduced, a static fill under Off [D118]), and a shining tab title (an 1800 ms trip of a 48 px band of light
+under Full, the title's breath under Reduced, a fixed mix under Off [D270]), which are state indicators, not feedback on a user action
 [L .claude/docs/animation-rules.md:30-38]. Nothing longer than `slow` animates except those and the spinner
 [L .claude/docs/animation-rules.md:150].
 

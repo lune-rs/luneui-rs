@@ -18,7 +18,7 @@ use super::button::{self, ButtonKind, ButtonLook, ButtonState, IconButton};
 use super::focus_ring::{self, RingKind};
 use super::progress::{breath_opacity, travel_phase};
 use super::scroll_area::{Bars, Extent, Reveal, ScrollOptions, ScrollView, Target};
-use super::spinner;
+use super::shine;
 use super::tone::Tone;
 use crate::access::{Action, Node, Role, State};
 use crate::chrome::{self, TabSpan};
@@ -26,7 +26,7 @@ use crate::color::Rgba;
 use crate::drag::{DropResult, Metrics, ReorderDrag, Strip};
 use crate::icon;
 use crate::input::NamedKey;
-use crate::motion::{Easing, Kind, Motion, MotionTier, Reduce, Time, Token, spin_angle};
+use crate::motion::{Easing, Kind, Motion, MotionTier, Reduce, Time, Token};
 use crate::paint::{Painter, Rect, StrokeStyle, Xform};
 use crate::text::{Spec, Style};
 use crate::ui::{Response, RoveAxis, Sense, Ui, WidgetId};
@@ -47,8 +47,6 @@ pub const CLOSE_GLYPH: f32 = 10.0;
 /// The new-tab button and its glyph.
 pub const NEW_SIZE: f32 = 20.0;
 pub const NEW_GLYPH: f32 = 14.0;
-/// The progress spinner.
-pub const SPINNER_SIZE: f32 = 10.0;
 /// The dash of [`BusyCue::Comet`], as a fraction of the contour.
 pub const COMET_FRACTION: f32 = 0.14;
 /// The sweep's two passes, widest first: width and opacity.
@@ -58,7 +56,6 @@ pub const MIN_NOTCH: f32 = 12.0;
 
 const PAD_LEFT: f32 = 10.0;
 const PAD_RIGHT: f32 = 4.0;
-const SPINNER_MARGIN: f32 = 4.0;
 const TITLE_MARGIN: f32 = 4.0;
 const CLOSE_MARGIN: f32 = 8.0;
 const BUTTON_RADIUS: f32 = 4.0;
@@ -94,7 +91,8 @@ pub struct Tab<'a> {
     pub title: &'a str,
     /// Shows the close button and the menu's Close row.
     pub closable: bool,
-    /// Shows the spinner, tinted by the tone (`Neutral` is `accent`).
+    /// The title shines while the work runs: a band of light passes through it, in the tone's
+    /// light (`Neutral` is `fg_bright`). The tab is no wider for it.
     pub progress: Option<Tone>,
 }
 
@@ -165,32 +163,38 @@ pub fn busy_treatment(cue: BusyCue, tier: MotionTier) -> Option<BusyCue> {
     }
 }
 
-/// A tab's width with a title `title` wide: the padding, the spinner and the close button it
-/// shows, within [`MIN_WIDTH`] and [`MAX_WIDTH`]. Rounded up, so a title that fits is not elided.
-fn tab_width(title: f32, spinner: bool, close: bool) -> f32 {
-    (chrome_width(spinner, close) + title.ceil()).clamp(MIN_WIDTH, MAX_WIDTH)
+/// A tab's width with a title `title` wide: the padding and the close button it shows, within
+/// [`MIN_WIDTH`] and [`MAX_WIDTH`]. Rounded up, so a title that fits is not elided.
+fn tab_width(title: f32, close: bool) -> f32 {
+    (chrome_width(close) + title.ceil()).clamp(MIN_WIDTH, MAX_WIDTH)
 }
 
 /// What a tab holds besides its title.
-fn chrome_width(spinner: bool, close: bool) -> f32 {
-    let spin = if spinner {
-        SPINNER_SIZE + SPINNER_MARGIN
-    } else {
-        0.0
-    };
+fn chrome_width(close: bool) -> f32 {
     let close = if close {
         CLOSE_SIZE + CLOSE_MARGIN
     } else {
         0.0
     };
-    PAD_LEFT + spin + TITLE_MARGIN + PAD_RIGHT + close
+    PAD_LEFT + TITLE_MARGIN + PAD_RIGHT + close
 }
 
-/// `tone`'s colour for a progress cue: `Neutral` is `accent`, `Warn` and `Err` are the light
-/// status brushes the source names for the cue and the spinner (D132).
+/// `tone`'s colour for the busy cue: `Neutral` is `accent`, `Warn` and `Err` are the light
+/// status brushes the source names for the cue (D132).
 fn cue_color(p: &Painter<'_, WidgetId>, tone: Tone) -> Rgba {
     match tone {
         Tone::Neutral => p.theme.accent,
+        Tone::Warn => p.theme.status_warning_light,
+        Tone::Err => p.theme.status_error_light,
+        _ => tone.color(&p.theme),
+    }
+}
+
+/// The light a shining title takes: `Neutral` is `fg_bright`, `Warn` and `Err` the light status
+/// brushes (D132).
+fn shine_light(p: &Painter<'_, WidgetId>, tone: Tone) -> Rgba {
+    match tone {
+        Tone::Neutral => p.theme.fg_bright,
         Tone::Warn => p.theme.status_warning_light,
         Tone::Err => p.theme.status_error_light,
         _ => tone.color(&p.theme),
@@ -479,7 +483,7 @@ impl Ui<'_> {
             .map(|(tab, item)| {
                 let spec = title_spec(self, tab.title, false);
                 let title = self.painter().measure(&spec).0;
-                f64::from(tab_width(title, tab.progress.is_some(), item.close))
+                f64::from(tab_width(title, item.close))
             })
             .collect()
     }
@@ -680,7 +684,8 @@ impl Ui<'_> {
         let ring = if look.resp.focus_visible { 1.0 } else { 0.0 };
         let ring = self.animate_f32(item.id.with("ring"), ring, &FOCUS);
         let (tier, now) = (self.tier(), self.time());
-        if tab.progress.is_some() && tier == MotionTier::Full {
+        // The shine moves under Full and breathes under Reduced; under Off it is a fixed mix.
+        if tab.progress.is_some() && tier != MotionTier::Off {
             self.mark_moving();
         }
         let close_state = look.close.map_or(ButtonState::default(), |c| ButtonState {
@@ -697,19 +702,7 @@ impl Ui<'_> {
         if fill[3] > 0 {
             p.fill_radii(rect, [RADIUS, RADIUS, 0.0, 0.0], fill);
         }
-        let mut x = rect.x + PAD_LEFT;
-        let mid = rect.y + rect.h / 2.0;
-        if let Some(tone) = tab.progress {
-            let degrees = if tier == MotionTier::Full {
-                spin_angle(now)
-            } else {
-                0.0
-            };
-            let color = cue_color(p, tone);
-            let center = (x + SPINNER_SIZE / 2.0, mid);
-            spinner::paint(p, center, SPINNER_SIZE, color, degrees);
-            x += SPINNER_SIZE + SPINNER_MARGIN;
-        }
+        let x = rect.x + PAD_LEFT;
         let room = rect.right()
             - x
             - TITLE_MARGIN
@@ -720,7 +713,15 @@ impl Ui<'_> {
                 0.0
             };
         let elided = p.elide(&title_spec, room.max(0.0));
-        p.text_in(&elided, Rect::new(x, rect.y, 0.0, rect.h), 0.0);
+        match tab.progress {
+            Some(tone) => {
+                let light = shine_light(p, tone);
+                shine::paint_at(p, &elided, x, (rect.y, rect.h), light, tier, now);
+            }
+            None => {
+                p.text_in(&elided, Rect::new(x, rect.y, 0.0, rect.h), 0.0);
+            }
+        }
         if close_alpha > 0.0 {
             p.push_xform(Xform {
                 alpha: close_alpha,
