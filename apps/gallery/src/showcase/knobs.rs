@@ -427,9 +427,11 @@ mod tests {
         /// A press that makes something the page draws outside the content pane (a toast at the
         /// window's corner): the semantic tree gets a node of this role and name.
         Spawns(Role, &'static str, Role, &'static str),
+        /// Events fed to the page first (a file dropped on it), then the press that is measured.
+        Fed(&'static [Ev], Role, &'static str),
     }
 
-    use Turn::{Press, Slide, Spawns, Still, Type};
+    use Turn::{Fed, Press, Slide, Spawns, Still, Type};
 
     /// Every widget page of this batch: turning the knob changes what the page draws.
     const WIDGET_TURNS: &[(&str, Turn)] = &[
@@ -509,6 +511,19 @@ mod tests {
         ("code-editor-view", Press(Role::Switch, "Line numbers")),
         ("markdown-preview", Press(Role::Radio, "Rule")),
         ("diff-view", Press(Role::Switch, "Enabled")),
+        // Core, platform and infra.
+        ("a11y", Press(Role::Switch, "Node outlines")),
+        ("drag-and-drop", Slide("Tabs", 0.0)),
+        ("tray", Press(Role::Radio, "degraded")),
+        (
+            "file-drop",
+            Fed(
+                &[Ev::FileDrop("/tmp/example.txt")],
+                Role::Button,
+                "Clear the list",
+            ),
+        ),
+        ("window", Press(Role::Switch, "Maximized")),
     ];
 
     #[test]
@@ -518,6 +533,10 @@ mod tests {
             let mut shell = Shell::open(page);
             if let Still(role, name, ..) = turn {
                 shell.turn(*role, name);
+            }
+            if let Fed(events, ..) = turn {
+                shell.frame(events);
+                shell.settle();
             }
             let rest = shell.page();
             assert!(!rest.is_empty(), "{page} draws");
@@ -534,6 +553,7 @@ mod tests {
                     );
                     continue;
                 }
+                Fed(_, role, name) => assert!(shell.press(*role, name), "{page}: no {name}"),
                 Press(role, name) => assert!(shell.press(*role, name), "{page}: no {name}"),
                 Slide(name, at) => {
                     assert!(

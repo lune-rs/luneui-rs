@@ -26,6 +26,7 @@ use super::flyout::{ROUTES, rows, state_text, state_tone, stats};
 use super::{caption, card, heading};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "tray",
@@ -489,6 +490,15 @@ impl PageState for Live {
             "This platform has no tray in the toolkit (Unsupported); the icons below are drawn anyway."
         };
         caption(ui, note, x, y + 20.0);
+        if stage.rect().is_some() {
+            // Only on the showcase's stage: the scenes' pictures stay as they are.
+            caption(
+                ui,
+                "Real: the tray item and the clicks on it. Scripted: the scenes' pointer, and the surface they draw.",
+                x,
+                y + 38.0,
+            );
+        }
         let mut bx = x;
         for s in STATES {
             let label = state_name(s);
@@ -534,6 +544,14 @@ impl PageState for Live {
 
     fn tray_state(&self) -> Option<TrayState> {
         Some(self.state)
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let names: Vec<&str> = STATES.iter().map(|s| state_name(*s)).collect();
+        let mut at = STATES.iter().position(|s| *s == self.state).unwrap_or(0);
+        if panel.choice(ui, "Tray state", &names, &mut at) {
+            self.state = STATES[at];
+        }
     }
 }
 

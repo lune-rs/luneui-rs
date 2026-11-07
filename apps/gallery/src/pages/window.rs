@@ -17,6 +17,7 @@ use lune_ui::window::{EDGE_BORDER, ResizeEdge, edge_at};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 use crate::scenes::TITLE_BAND;
+use crate::showcase::knobs::Knobs;
 
 use super::{caption, card};
 
@@ -88,6 +89,10 @@ impl PageState for Caption {
         if caption_in(ui, win, opts) == Some(CaptionButton::Maximize) {
             self.maximized = !self.maximized;
         }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.toggle(ui, "Maximized", &mut self.maximized);
     }
 }
 

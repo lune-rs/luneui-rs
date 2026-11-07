@@ -15,6 +15,7 @@ use lune_ui::ui::Ui;
 use super::{caption, card, heading};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "file-drop",
@@ -26,14 +27,25 @@ pub(crate) static PAGE: Page = Page {
     }),
 };
 
-/// How many dropped paths the page lists.
+/// How many dropped paths the page lists, unless a knob says otherwise.
 const KEPT: usize = 8;
 
 /// The files dropped so far and the one being dragged over the window.
-#[derive(Default)]
 struct Drops {
     hover: Option<PathBuf>,
     dropped: Vec<PathBuf>,
+    /// How many of the dropped paths are kept.
+    kept: usize,
+}
+
+impl Default for Drops {
+    fn default() -> Self {
+        Self {
+            hover: None,
+            dropped: Vec::new(),
+            kept: KEPT,
+        }
+    }
 }
 
 impl Drops {
@@ -46,7 +58,7 @@ impl Drops {
                 Event::FileDrop { path, .. } => {
                     self.hover = None;
                     self.dropped.push(path.clone());
-                    if self.dropped.len() > KEPT {
+                    while self.dropped.len() > self.kept {
                         self.dropped.remove(0);
                     }
                 }
@@ -63,6 +75,15 @@ impl PageState for Drops {
         let area = card(ui, stage, "File drop");
         let (x, y) = (area.x + 24.0, area.y + 24.0);
         heading(ui, "DROP ZONE", x, y);
+        if stage.rect().is_some() {
+            // Only on the showcase's stage: the scenes' pictures stay as they are.
+            caption(
+                ui,
+                "Real: files dragged in from the Finder or Explorer. Scripted: the scenes' hover and drop events.",
+                x + 560.0,
+                y,
+            );
+        }
         caption(
             ui,
             "Drag a file over the window and let go. The toolkit hands the page the path and opens nothing.",
@@ -104,6 +125,19 @@ impl PageState for Drops {
             let spec = ui.painter().elide(&spec, area.w - 48.0);
             ui.painter()
                 .text(&spec, x, zone.bottom() + 46.0 + i as f32 * 22.0);
+        }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let mut kept = self.kept as f32;
+        if panel.number(ui, "Paths kept", &mut kept, (1.0, 16.0, 1.0)) {
+            self.kept = kept.round() as usize;
+            while self.dropped.len() > self.kept {
+                self.dropped.remove(0);
+            }
+        }
+        if panel.button(ui, "Clear the list") {
+            self.dropped.clear();
         }
     }
 }

@@ -12,6 +12,7 @@ use super::card;
 use super::controls_ui::Controls;
 use crate::page::Stage;
 use crate::page::{Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "a11y",
@@ -23,13 +24,18 @@ pub(crate) static PAGE: Page = Page {
     }),
 };
 
+/// The controls with the semantic tree drawn over them. The knobs say which parts of it show.
 struct Nodes {
     controls: Controls,
+    outlines: bool,
+    labels: bool,
 }
 
 fn nodes() -> Box<dyn PageState> {
     Box::new(Nodes {
         controls: Controls::new(),
+        outlines: true,
+        labels: true,
     })
 }
 
@@ -49,7 +55,12 @@ impl PageState for Nodes {
         let outline = [accent[0], accent[1], accent[2], 160];
         for (bounds, role, text) in found {
             let p = ui.painter();
-            p.ring(bounds, 0.0, 1.0, outline, true);
+            if self.outlines {
+                p.ring(bounds, 0.0, 1.0, outline, true);
+            }
+            if !self.labels {
+                continue;
+            }
             let spec = Spec::plain(&text, Style::ui(9.0, theme.fg_secondary));
             // Beside the node where the space below is taken by the next row.
             let (x, y) = match role {
@@ -60,6 +71,11 @@ impl PageState for Nodes {
             };
             p.text(&spec, x, y);
         }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.toggle(ui, "Node outlines", &mut self.outlines);
+        panel.toggle(ui, "Role labels", &mut self.labels);
     }
 }
 

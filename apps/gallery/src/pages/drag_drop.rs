@@ -21,6 +21,7 @@ use lune_ui::ui::{Sense, Ui};
 use super::{card, card_shift, heading};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "drag-and-drop",
@@ -185,6 +186,18 @@ impl PageState for Tabs {
         }
         if scroll != 0.0 {
             self.offset = (self.offset + scroll).clamp(0.0, (extent - VIEWPORT).max(0.0));
+        }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let mut n = self.keys.len() as f32;
+        if panel.number(ui, "Tabs", &mut n, (1.0, 8.0, 1.0)) {
+            let n = n.round() as u32;
+            self.keys = (0..n).collect();
+            self.widths = (0..n)
+                .map(|i| [100.0, 200.0, 100.0][i as usize % 3])
+                .collect();
+            self.offset = 0.0;
         }
     }
 }
