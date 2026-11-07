@@ -2,7 +2,7 @@
 # Pixel gate for a drawing change: dumps the gallery's reference scenes for a base revision and
 # for the working tree, then compares them. Zero delta unless a scene is named with --allow.
 #
-#   scripts/pixel-gate.sh [--base <rev>] [--allow <scene-id>]...
+#   scripts/pixel-gate.sh [--base <rev>] [--allow <scene-id>]... [--removed <scene-id>]...
 #
 #   --base   revision to compare against (default HEAD), resolved once to a commit sha. Built
 #            from `git archive <sha>` in a base source dir outside the repo,
@@ -15,12 +15,16 @@
 #            nothing to compare is not a pass.
 #   --allow  a scene id (the part of a `gallery --list` name before `@`, for example `chrome`)
 #            whose frames may differ: its files move aside and are compared report-only.
+#   --removed  a scene id whose subject is gone: it must be in the base's dump and must not be in the
+#            candidate's `gallery --list` (D26). Its base files move aside before the compare and
+#            the run reports them, so the compare does not count them missing. An id still listed,
+#            or one the base lacks, is a usage error (exit 2).
 #
 # The candidate is the working tree (committed or not).
 # Exit 0: zero delta on every common non-allowed scene and no scene missing from the candidate.
 # Exit 1: a pixel delta or a scene missing from the candidate.
 # Exit 2: usage or setup error (bad rev, no gallery in the base, a cargo config above the base
-# source, unknown --allow id, a build or dump failure, a dump dir with no PNGs, no compare summary).
+# source, unknown --allow id, a bad --removed id, a build or dump failure, a dump dir with no PNGs, no compare summary).
 # Writes only under target/pixel-gate/ and the base source dir above (plus cargo's own caches);
 # never prints the environment.
 # The working tree dumps on a headless device (no window); a base from before M2 step 4 (52b11d6 and
@@ -30,6 +34,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 REV="HEAD"
 ALLOW=()
+REMOVED=()
 
 die() {
   echo "pixel-gate: $*" >&2
@@ -43,6 +48,12 @@ while [ "$#" -gt 0 ]; do
       [ "$#" -ge 2 ] || die "--allow needs a value"
       case "$2" in '' | *[!A-Za-z0-9-]*) die "bad scene id: $2" ;; esac
       ALLOW+=("$2")
+      shift 2
+      ;;
+    --removed)
+      [ "$#" -ge 2 ] || die "--removed needs a value"
+      case "$2" in '' | *[!A-Za-z0-9-]*) die "bad scene id: $2" ;; esac
+      REMOVED+=("$2")
       shift 2
       ;;
     -h | --help) sed -n '2,/^set -euo pipefail$/p' "${BASH_SOURCE[0]}" | sed '$d'; exit 0 ;;
@@ -94,6 +105,12 @@ for id in ${ALLOW[@]+"${ALLOW[@]}"}; do
   printf '%s\n' "$LIST" | grep -q -x -E -- "$id@[0-9]+x" || die "--allow $id: not a scene of the candidate's gallery --list"
 done
 
+for id in ${REMOVED[@]+"${REMOVED[@]}"}; do
+  if printf '%s\n' "$LIST" | grep -q -E -- "^$id@[0-9]+x"; then
+    die "--removed $id: still a scene of the candidate's gallery --list"
+  fi
+done
+
 # --- dumps --------------------------------------------------------------------------------------
 # count_pngs <dir>: number of PNG files directly in the dir.
 count_pngs() {
@@ -109,6 +126,22 @@ echo "pixel-gate: dumping the working tree"
 (cd "$ROOT" && cargo run -q --locked -p gallery -- --dump "$OUT_CAND") || die "candidate build or dump failed"
 [ "$(count_pngs "$OUT_BASE")" -gt 0 ] || die "base dump holds no PNGs"
 [ "$(count_pngs "$OUT_CAND")" -gt 0 ] || die "candidate dump holds no PNGs"
+
+# --removed: each id must be in the base's dump; its base files move aside, reported.
+if [ "${#REMOVED[@]}" -gt 0 ]; then
+  rm -rf "$S/removed"
+  mkdir -p "$S/removed"
+  for id in "${REMOVED[@]}"; do
+    n=0
+    for f in "$OUT_BASE/$id@"*.png; do
+      [ -e "$f" ] || continue
+      mv "$f" "$S/removed/"
+      n=$((n + 1))
+    done
+    [ "$n" -gt 0 ] || die "--removed $id: the base's dump has no such scene"
+    echo "pixel-gate: removed scene $id: $n base file(s) set aside"
+  done
+fi
 
 # compare <base dir> <candidate dir>: runs the working tree's dump-compare with --allow-new;
 # prints its output and sets CMP_RC (0 ok, 1 delta or missing). Exit 2 when there is no summary.
