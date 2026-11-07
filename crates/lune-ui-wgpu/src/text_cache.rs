@@ -318,9 +318,13 @@ fn glyph_range(glyphs: &[glyphon::LayoutGlyph]) -> (usize, usize) {
 /// a right-to-left glyph). `Buffer::hit` halves each glyph on its own, and the glyphs of one
 /// cluster all carry the whole cluster's bytes, so the answer jumps to the end in the first glyph's
 /// right half and back to the start in the second glyph's left half. `None` when `x` is in no such
-/// cluster.
+/// cluster. Only a glyph under `x` looks for its siblings, so a row of `n` glyphs costs `O(n)` a
+/// call, not `O(n^2)`; an `x` in a gap between two glyphs of one cluster is left to `Buffer::hit`.
 fn cluster_hit(run: &glyphon::LayoutRun, x: f32) -> Option<usize> {
     run.glyphs.iter().find_map(|g| {
+        if x < g.x || x > g.x + g.w {
+            return None;
+        }
         let mut edges = run
             .glyphs
             .iter()
