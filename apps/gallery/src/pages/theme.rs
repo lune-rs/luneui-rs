@@ -83,8 +83,6 @@ struct Themed {
     theme: Theme,
     info: String,
     level: AcrylicLevel,
-    /// A press outside or a pick closed the menu.
-    menu_closed: bool,
     /// The window's pickers; the scenes draw without them.
     pickers: bool,
     /// The file the theme came from (an index into [`FILES`]).
@@ -99,7 +97,6 @@ impl Themed {
             info: describe(&file),
             theme: file.theme,
             level: AcrylicLevel::Default,
-            menu_closed: false,
             pickers,
             file: FILES
                 .iter()
@@ -224,10 +221,15 @@ fn swapping() -> Box<dyn PageState> {
 /// panel.
 struct Acrylic {
     level: AcrylicLevel,
+    /// A press outside or a pick closed the menu.
+    menu_closed: bool,
 }
 
 fn acrylic(level: AcrylicLevel) -> Box<dyn PageState> {
-    Box::new(Acrylic { level })
+    Box::new(Acrylic {
+        level,
+        menu_closed: false,
+    })
 }
 
 fn acrylic_less() -> Box<dyn PageState> {
