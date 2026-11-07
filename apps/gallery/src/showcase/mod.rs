@@ -16,12 +16,14 @@
 //! time comes from the caller).
 
 mod nav;
+mod settings;
 
 use std::collections::BTreeSet;
 use std::time::Duration;
 
 use lune_ui::image::{ImageData, ImageId};
 use lune_ui::input::{Modifiers, RawInput};
+use lune_ui::material::Material;
 use lune_ui::motion::MotionTier;
 use lune_ui::paint::Rect;
 use lune_ui::strings::StringTable;
@@ -35,11 +37,12 @@ use lune_ui::widgets::scroll_area::{Extent, ScrollOptions};
 use lune_ui::widgets::tree_view::{ROW, TreeOptions, TreeRow};
 
 use crate::page::{
-    Ev, Expect, Page, PageKind, PageState, Scope, Stage, Step, UiPage, UiScene, apply_event,
-    page_images,
+    Ev, Expect, FrameTweaks, Page, PageKind, PageState, Scope, Stage, Step, UiPage, UiScene,
+    apply_event, page_images,
 };
 use crate::pages::{PAGES, card, card_shift};
 use nav::{HOST, Target};
+use settings::Settings;
 
 pub(crate) static PAGE: Page = Page {
     id: HOST,
@@ -55,10 +58,22 @@ fn home() -> Box<dyn PageState> {
     Box::new(Showcase::new())
 }
 
+/// The shell with settings other than the defaults, for the `showcase-settings` scene.
+fn changed_settings() -> Box<dyn PageState> {
+    let mut shell = Showcase::new();
+    shell.settings.set_theme(2);
+    shell.settings.tier = MotionTier::Reduced;
+    shell.settings.speed = 0.5;
+    shell.settings.sigma = 12.0;
+    shell.settings.noise = false;
+    Box::new(shell)
+}
+
 /// The gap around and between the panes.
 const PAD: f32 = 12.0;
-/// The sidebar's width.
-const SIDE_W: f32 = 272.0;
+/// The sidebar's width, and the settings pane's.
+const SIDE_W: f32 = 240.0;
+const SETTINGS_W: f32 = 300.0;
 /// The search field's height, and the gap under it.
 const FIELD_H: f32 = 32.0;
 const FIELD_GAP: f32 = 8.0;
@@ -75,13 +90,14 @@ struct Layout {
     tree: Rect,
     head: Rect,
     pane: Rect,
+    settings: Rect,
 }
 
 impl Layout {
     const fn of(card: Rect) -> Layout {
         let side_h = card.h - 2.0 * PAD;
         let x0 = card.x + PAD + SIDE_W + PAD;
-        let w = card.w - (2.0 * PAD + SIDE_W + PAD);
+        let w = card.w - (PAD + SIDE_W + PAD + PAD + SETTINGS_W + PAD);
         Layout {
             search: Rect::new(card.x + PAD, card.y + PAD, SIDE_W, FIELD_H),
             tree: Rect::new(
@@ -92,6 +108,12 @@ impl Layout {
             ),
             head: Rect::new(x0, card.y + PAD, w, HEAD_H),
             pane: Rect::new(x0, card.y + PAD + HEAD_H + 8.0, w, side_h - HEAD_H - 8.0),
+            settings: Rect::new(
+                card.x + card.w - PAD - SETTINGS_W,
+                card.y + PAD,
+                SETTINGS_W,
+                side_h,
+            ),
         }
     }
 
@@ -141,6 +163,16 @@ const SCENES: &[UiScene] = &[
             },
         ],
         capture_ms: 300,
+        expect: Expect::Settled,
+    },
+    // The settings pane under a changed theme, tier, speed, blur and noise.
+    UiScene {
+        id: "showcase-settings",
+        scale: 1.0,
+        tier: MotionTier::Full,
+        state: changed_settings,
+        script: &[],
+        capture_ms: 0,
         expect: Expect::Settled,
     },
     // Search for the table, then press the page's row: it takes the content pane.
@@ -225,6 +257,8 @@ struct Showcase {
     child_root: WidgetId,
     canvas: Rect,
     order: Vec<usize>,
+    /// The global settings; they outlast a change of page.
+    settings: Settings,
 }
 
 impl Showcase {
@@ -244,6 +278,7 @@ impl Showcase {
             child_root: WidgetId::ROOT,
             canvas: Rect::new(0.0, 0.0, CANVAS.0, CANVAS.1),
             order,
+            settings: Settings::default(),
         };
         me.select(page, None);
         me.epoch = 0;
@@ -430,6 +465,7 @@ impl PageState for Showcase {
         // (a Tab at its start) expects. The panes do not overlap, so the order draws the same.
         self.content(ui, &lay);
         self.sidebar(ui, &lay);
+        self.settings.pane(ui, lay.settings);
         if self.replay.is_none() && self.scene.is_some() {
             let t = *ui.theme();
             let spec = Spec::plain("live", Style::ui(t.font_s, t.fg_tertiary));
@@ -457,8 +493,36 @@ impl PageState for Showcase {
         out
     }
 
+    /// The chosen theme under the settings, or the hosted page's own under them.
     fn theme(&self) -> Option<Theme> {
-        self.child.theme()
+        Some(match self.child.theme() {
+            Some(page) => self.settings.compose(page),
+            None => self.settings.theme(),
+        })
+    }
+
+    fn tier(&self) -> Option<MotionTier> {
+        Some(self.settings.tier)
+    }
+
+    fn frame_params(&self) -> Option<FrameTweaks> {
+        Some(self.settings.tweaks())
+    }
+
+    fn material(&self) -> Option<Material> {
+        Some(self.settings.material)
+    }
+
+    fn material_applied(&mut self, result: Result<(), String>) {
+        self.settings.material_note = result.err().map(|e| format!("not applied: {e}"));
+    }
+
+    fn time_scale(&self) -> f32 {
+        self.settings.speed
+    }
+
+    fn zoom(&self) -> f32 {
+        self.settings.zoom
     }
 
     fn cue(&mut self, name: &str) {
@@ -552,6 +616,8 @@ mod tests {
     use lune_ui::strings::DisplayFormat;
     use lune_ui::testing::FakeText;
     use lune_ui::ui::FrameConfig;
+    use std::cell::Cell;
+    use std::rc::Rc;
     use winit::dpi::PhysicalSize;
     use winit::event::{ElementState, MouseButton};
 
@@ -703,7 +769,12 @@ mod tests {
 
     impl Rig {
         fn new() -> Self {
-            let mut translator = Translator::new(PhysicalSize::new(1040, 660), 1.0);
+            Self::sized(1040, 660)
+        }
+
+        /// A window of `w` x `h` physical pixels at scale 1.
+        fn sized(w: u32, h: u32) -> Self {
+            let mut translator = Translator::new(PhysicalSize::new(w, h), 1.0);
             translator.focused(true);
             Rig {
                 store: UiStore::default(),
@@ -771,6 +842,158 @@ mod tests {
         assert_eq!(PAGES[rig.shell.page].id, "button");
         let out = rig.frame();
         assert!(named(&out, "Button").is_some_and(|n| n.states.contains(State::Selected)));
+    }
+
+    /// The centre of the node of `role` named `name`, as the last frame left it.
+    fn centre(out: &FrameOutput, role: lune_ui::access::Role, name: &str) -> (f32, f32) {
+        let n = out
+            .tree
+            .nodes
+            .iter()
+            .find(|n| n.role == role && n.name == name)
+            .unwrap_or_else(|| panic!("no {role:?} named {name}"));
+        (n.bounds.x + n.bounds.w / 2.0, n.bounds.y + n.bounds.h / 2.0)
+    }
+
+    /// A tall window, so the whole settings pane is on screen.
+    fn tall() -> Rig {
+        let mut rig = Rig::sized(1600, 2600);
+        rig.frame();
+        rig
+    }
+
+    #[test]
+    fn a_click_on_a_setting_changes_it_and_a_page_change_keeps_it() {
+        use lune_ui::access::Role;
+        let mut rig = tall();
+        let out = rig.frame();
+        rig.click_at(centre(&out, Role::Radio, "2x"));
+        let out = rig.frame();
+        assert!((rig.shell.settings.zoom - 2.0).abs() < f32::EPSILON);
+        assert!(
+            (rig.shell.zoom() - 2.0).abs() < f32::EPSILON,
+            "the hook says it"
+        );
+        rig.click_at(centre(&out, Role::Radio, "Reduced"));
+        let out = rig.frame();
+        assert_eq!(rig.shell.settings.tier, MotionTier::Reduced);
+        assert_eq!(rig.shell.tier(), Some(MotionTier::Reduced));
+        rig.click_at(centre(&out, Role::Radio, "Blue"));
+        assert_eq!(rig.shell.settings.theme, 2);
+        // A change of page leaves them be.
+        rig.shell.cue("next-page");
+        rig.frame();
+        assert!((rig.shell.settings.zoom - 2.0).abs() < f32::EPSILON);
+        assert_eq!(rig.shell.settings.theme, 2);
+        // Reset is the only way back.
+        let out = rig.frame();
+        rig.click_at(centre(&out, Role::Button, "Reset all settings"));
+        assert_eq!(rig.shell.settings, Settings::default());
+    }
+
+    #[test]
+    fn the_hooks_say_what_the_settings_say() {
+        let mut s = Showcase::new();
+        s.settings.speed = 0.5;
+        s.settings.zoom = 1.5;
+        s.settings.sigma = 12.0;
+        s.settings.saturation = 2.5;
+        s.settings.noise = false;
+        s.settings.material = Material::Opaque;
+        assert!((s.time_scale() - 0.5).abs() < f32::EPSILON);
+        assert!((s.zoom() - 1.5).abs() < f32::EPSILON);
+        assert_eq!(s.material(), Some(Material::Opaque));
+        let tweaks = s.frame_params().expect("tweaks");
+        let params = tweaks.params((200, 100), 2.0);
+        assert_eq!((params.size, params.scale), ((200, 100), 2.0));
+        assert!((params.blur_sigma - 12.0).abs() < f32::EPSILON);
+        assert!((params.saturation - 2.5).abs() < f32::EPSILON);
+        // The noise flag of every acrylic goes off.
+        let mut scene = lune_ui::scene::Scene::default();
+        for layer in &mut scene.layers {
+            layer.geometry.acrylic.push(lune_ui::scene::Acrylic {
+                shape: lune_ui::scene::Shape {
+                    params: [0.0, 0.0, 1.0, 1.0],
+                    ..Default::default()
+                },
+                opacity: 1.0,
+            });
+        }
+        tweaks.apply_noise(&mut scene);
+        assert!(
+            scene
+                .layers
+                .iter()
+                .all(|l| l.geometry.acrylic[0].shape.params[3] == 0.0)
+        );
+        assert_eq!(scene.layers[0].geometry.acrylic[0].shape.params[2], 1.0);
+        // The material result lands in the pane's note.
+        s.material_applied(Err("no compositor".to_owned()));
+        assert!(
+            s.settings
+                .material_note
+                .as_deref()
+                .is_some_and(|n| n.contains("no compositor"))
+        );
+        s.material_applied(Ok(()));
+        assert_eq!(s.settings.material_note, None);
+    }
+
+    /// Draws the hosted page's tier and theme.
+    struct Probe {
+        tier: Rc<Cell<Option<MotionTier>>>,
+        window_fill: Rc<Cell<Option<[u8; 4]>>>,
+    }
+
+    impl PageState for Probe {
+        fn draw(&mut self, ui: &mut Ui<'_>, _stage: &Stage) {
+            self.tier.set(Some(ui.tier()));
+            self.window_fill.set(Some(ui.theme().glass.panel.tint));
+        }
+    }
+
+    #[test]
+    fn the_tier_and_the_theme_reach_the_hosted_page() {
+        let tier = Rc::new(Cell::new(None));
+        let fill = Rc::new(Cell::new(None));
+        let mut shell = Showcase::new();
+        shell.child = Box::new(Probe {
+            tier: tier.clone(),
+            window_fill: fill.clone(),
+        });
+        shell.settings.tier = MotionTier::Off;
+        shell.settings.layers[1].tint = Some([9, 8, 7, 255]);
+        let mut p = Player::new(
+            HOST,
+            Box::new(shell),
+            (1040.0, 660.0),
+            1.0,
+            MotionTier::Full,
+        );
+        p.frame(&mut FakeText, 0, &[]).expect("frame");
+        assert_eq!(tier.get(), Some(MotionTier::Off), "FrameConfig.tier");
+        assert_eq!(fill.get(), Some([9, 8, 7, 255]), "FrameConfig.theme");
+        // A page with no hook of its own runs under the scene's tier.
+        let tier = Rc::new(Cell::new(None));
+        let plain = Probe {
+            tier: tier.clone(),
+            window_fill: Rc::new(Cell::new(None)),
+        };
+        struct NoHooks(Probe);
+        impl PageState for NoHooks {
+            fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+                self.0.draw(ui, stage);
+            }
+        }
+        let mut p = Player::new(
+            "p",
+            Box::new(NoHooks(plain)),
+            (100.0, 100.0),
+            1.0,
+            MotionTier::Reduced,
+        );
+        p.frame(&mut FakeText, 0, &[]).expect("frame");
+        assert_eq!(tier.get(), Some(MotionTier::Reduced));
     }
 
     #[test]

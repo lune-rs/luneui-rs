@@ -20,7 +20,7 @@ use winit::window::{Window, WindowId};
 use lune_ui::access::{AccessBridge, RootInfo};
 use lune_ui::clipboard::Clipboard;
 use lune_ui::gpu::{self, Gpu};
-use lune_ui::input::{ClipboardRequest, OutputState, Translator, control_flow, keymap};
+use lune_ui::input::{ClipboardRequest, OutputState, Repaint, Translator, control_flow, keymap};
 use lune_ui::lunegit_dark::THEME;
 use lune_ui::material::{self, Material};
 use lune_ui::motion::MotionTier;
@@ -31,10 +31,10 @@ use lune_ui::tray::TrayState;
 use lune_ui::ui::{FrameConfig, Ui, UiStore};
 use lune_ui::window::glass_attributes;
 
-use crate::page::{Page, PageKind, PageState, Stage, register_images};
+use crate::page::{FrameTweaks, Page, PageKind, PageState, Stage, register_images};
 use crate::popover::{AppEvent, TrayHost, event_loop, route_tray_events};
 use crate::showcase;
-use crate::{Renderer, custom, draw_scene, text_cache};
+use crate::{Renderer, custom, draw_with, text_cache};
 use lune_ui::image::ImageId;
 
 /// Window mode: the window, its surface and the renderer drawing into it.
@@ -71,6 +71,38 @@ fn shortcut(key: &Key, mods: ModifiersState) -> Option<Shortcut> {
 /// the margins around them.
 const WINDOW: (f64, f64) = (1600.0, 900.0);
 
+/// The page's clock: the real time that has passed, scaled by the speed the page asks for. It
+/// adds up scaled slices, so changing the speed changes how fast time runs from now on and never
+/// moves it.
+#[derive(Debug, Default, Clone, Copy)]
+struct Clock {
+    /// The real time of the last frame, since the app's start.
+    real: Duration,
+    /// The page's time at that frame.
+    scaled: Duration,
+}
+
+impl Clock {
+    /// Moves the clock to the real time `now` at `speed` and returns the page's time.
+    fn advance(&mut self, now: Duration, speed: f32) -> Duration {
+        let slice = now.saturating_sub(self.real);
+        self.real = now.max(self.real);
+        self.scaled += slice.mul_f64(f64::from(speed.max(0.0)));
+        self.scaled
+    }
+
+    /// A repaint asked for at a page time, as the real time it comes due at.
+    fn to_real(&self, repaint: Repaint, speed: f32) -> Repaint {
+        match repaint {
+            Repaint::At(t) => {
+                let ahead = t.saturating_sub(self.scaled);
+                Repaint::At(self.real + ahead.div_f64(f64::from(speed.max(0.01))))
+            }
+            other => other,
+        }
+    }
+}
+
 struct App {
     shown: Option<Shown>,
     /// Lets the accessibility handlers, on their own thread, reach the event loop.
@@ -95,8 +127,12 @@ struct App {
     /// The control flow the main window's last frame asked for, and the tray surface's.
     main_flow: ControlFlow,
     pop_flow: ControlFlow,
-    /// The app's time origin: the frame time is the time since it.
+    /// The app's time origin: the real time the clock runs from.
     start: Instant,
+    /// The page's clock: real time scaled by the page's speed.
+    clock: Clock,
+    /// The OS material last put on the window, and the zoom the translator reads at.
+    material: Material,
     /// Process exit status (non-zero when setup or a frame failed).
     exit_code: u8,
 }
@@ -127,6 +163,8 @@ pub(crate) fn run() -> ExitCode {
         main_flow: ControlFlow::Wait,
         pop_flow: ControlFlow::Wait,
         start: Instant::now(),
+        clock: Clock::default(),
+        material: Material::Vibrancy,
         exit_code: 0,
     };
     if let Err(e) = event_loop.run_app(&mut app) {
@@ -243,14 +281,23 @@ impl App {
         };
         let view = frame.texture.create_view(&Default::default());
         let size = surface.size();
-        let s = window.scale_factor() as f32;
         bridge.drain(translator);
-        let mut input = translator.take(self.start.elapsed());
+        // The page's zoom multiplies the display's scale; the translator divides the pointer by
+        // the same number, so the hits stay exact.
+        let (zoom, speed) = self
+            .state
+            .as_ref()
+            .map_or((1.0, 1.0), |st| (st.zoom(), st.time_scale()));
+        let scale = window.scale_factor() * f64::from(zoom);
+        translator.scale_factor(scale);
+        let s = scale as f32;
+        let now = self.clock.advance(self.start.elapsed(), speed);
+        let mut input = translator.take(now);
         // The status item learns what bar it is on a few turns after it is made: ask again soon.
         let mut poll_tray = false;
         let root = RootInfo {
             title: window_title(page),
-            scale: window.scale_factor(),
+            scale,
         };
         let PageKind::Ui(ui_page) = page.kind else {
             return Ok(());
@@ -273,7 +320,7 @@ impl App {
         }
         let config = FrameConfig {
             theme: state.theme().unwrap_or(THEME),
-            tier: MotionTier::Full,
+            tier: state.tier().unwrap_or(MotionTier::Full),
             strings: &self.strings,
             arg_format: &DisplayFormat,
             keymap: keymap(),
@@ -315,11 +362,25 @@ impl App {
         }
         bridge.update(&out, &root);
         let repaint = out.repaint;
-        draw_scene(r, &display, s, &view, size)?;
+        let tweaks = state.frame_params().unwrap_or(FrameTweaks::DEFAULT);
+        let mut display = display;
+        tweaks.apply_noise(&mut display);
+        draw_with(r, &display, &view, tweaks.params(size, s))?;
+        // The material is the page's to ask for; whether it took is the page's to hear.
+        if let Some(wanted) = state.material().filter(|m| *m != self.material) {
+            self.material = wanted;
+            let result = material::apply(window, wanted);
+            if let Err(e) = &result {
+                eprintln!("material: {e}");
+            }
+            state.material_applied(result);
+            window.request_redraw();
+        }
+        let speed = state.time_scale();
         window.pre_present_notify();
         surface.present(&r.gpu, frame);
         r.gpu.end_frame(&mut r.text);
-        let (mut flow, redraw) = control_flow(repaint, self.start);
+        let (mut flow, redraw) = control_flow(self.clock.to_real(repaint, speed), self.start);
         if poll_tray && flow == ControlFlow::Wait {
             flow = ControlFlow::WaitUntil(Instant::now() + Duration::from_millis(50));
         }
@@ -519,6 +580,60 @@ mod tests {
         let none = ModifiersState::empty();
         assert_eq!(shortcut(&Key::Named(NamedKey::ArrowDown), none), None);
         assert_eq!(shortcut(&Key::Named(NamedKey::ArrowUp), none), None);
+    }
+
+    #[test]
+    fn half_speed_halves_the_time_that_passes_and_a_change_never_jumps_it() {
+        let ms = Duration::from_millis;
+        let mut c = Clock::default();
+        assert_eq!(c.advance(ms(100), 1.0), ms(100));
+        assert_eq!(c.advance(ms(300), 0.5), ms(200));
+        // Back to full speed: from where it was, not from the real time.
+        assert_eq!(c.advance(ms(400), 1.0), ms(300));
+        // Twice: 100 ms of real time is 200 ms of the page's.
+        assert_eq!(c.advance(ms(500), 2.0), ms(500));
+        // A frame at the same real time adds nothing, and the clock never runs back.
+        assert_eq!(c.advance(ms(500), 0.1), ms(500));
+        assert_eq!(c.advance(ms(400), 1.0), ms(500));
+    }
+
+    #[test]
+    fn a_repaint_at_a_page_time_comes_due_at_the_real_time_it_maps_to() {
+        let ms = Duration::from_millis;
+        let mut c = Clock::default();
+        c.advance(ms(1000), 0.5);
+        // The page is at 500 ms; 100 ms later on its clock is 200 ms later on the real one.
+        assert_eq!(c.to_real(Repaint::At(ms(600)), 0.5), Repaint::At(ms(1200)));
+        assert_eq!(c.to_real(Repaint::Now, 0.5), Repaint::Now);
+        assert_eq!(c.to_real(Repaint::Idle, 0.5), Repaint::Idle);
+        // Already due: due now.
+        assert_eq!(c.to_real(Repaint::At(ms(400)), 0.5), Repaint::At(ms(1000)));
+    }
+
+    /// Zoom is the translator's scale times the zoom: a point of the pointer in physical pixels
+    /// lands on the logical pixel the page drew at, exactly, and the window is that much smaller
+    /// in logical pixels.
+    #[test]
+    fn zoom_keeps_the_pointer_on_the_pixel_it_is_over() {
+        use lune_ui::input::Event;
+        use winit::dpi::PhysicalSize;
+        let mut t = Translator::new(PhysicalSize::new(3200, 1800), 2.0);
+        for zoom in [1.0_f64, 1.5, 2.0] {
+            let scale = 2.0 * zoom;
+            t.scale_factor(scale);
+            // The physical pixel under which a logical point (100.5, 40) is drawn.
+            t.cursor_moved(100.5 * scale, 40.0 * scale);
+            let input = t.take(Duration::ZERO);
+            assert_eq!(input.size, (3200.0 / scale as f32, 1800.0 / scale as f32));
+            assert!((input.scale - scale as f32).abs() < f32::EPSILON);
+            let Some(Event::PointerMoved { pos }) = input.events.first() else {
+                panic!("a pointer move");
+            };
+            assert!(
+                (pos.0 - 100.5).abs() < 1e-3 && (pos.1 - 40.0).abs() < 1e-3,
+                "zoom {zoom}: {pos:?}"
+            );
+        }
     }
 
     #[test]

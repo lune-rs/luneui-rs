@@ -15,9 +15,10 @@ use lune_ui::input::{
     FrameOutput, ImeEvent, Key, Keymap, Modifiers, NamedKey, PointerButton, RawInput, Repaint,
 };
 use lune_ui::lunegit_dark::THEME;
+use lune_ui::material::Material;
 use lune_ui::motion::MotionTier;
 use lune_ui::paint::Rect;
-use lune_ui::scene::Scene;
+use lune_ui::scene::{FrameParams, Scene};
 use lune_ui::shortcuts::Shortcuts;
 use lune_ui::strings::{DisplayFormat, StringTable};
 use lune_ui::testing::ScriptedInput;
@@ -133,6 +134,81 @@ pub(crate) trait PageState {
     /// again when it does. The default never changes.
     fn epoch(&self) -> u64 {
         0
+    }
+
+    /// The motion tier the page runs under, read at the start of every frame; `None` keeps the
+    /// runner's own (a scene's tier, or Full in the window).
+    fn tier(&self) -> Option<MotionTier> {
+        None
+    }
+
+    /// How the frame is drawn: the backdrop blur and whether acrylic carries noise. `None`
+    /// keeps the gallery's own values.
+    fn frame_params(&self) -> Option<FrameTweaks> {
+        None
+    }
+
+    /// The OS material the window should have, when the page chooses one. `None` leaves it.
+    fn material(&self) -> Option<Material> {
+        None
+    }
+
+    /// The window told the page whether its last `material` took.
+    fn material_applied(&mut self, _result: Result<(), String>) {}
+
+    /// How fast the page's clock runs against the real one (1.0 is real time). Window mode only:
+    /// the app passes time in, so slow motion needs nothing of the toolkit.
+    fn time_scale(&self) -> f32 {
+        1.0
+    }
+
+    /// The page's zoom: the window draws and reads the pointer at this multiple of the
+    /// display's scale. Window mode only.
+    fn zoom(&self) -> f32 {
+        1.0
+    }
+}
+
+/// What the page asks of the draw of a frame, besides the display list it makes.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct FrameTweaks {
+    /// Gaussian sigma of the backdrop blur, in physical pixels.
+    pub(crate) blur_sigma: f32,
+    /// Saturation boost on the blurred backdrop.
+    pub(crate) saturation: f32,
+    /// Acrylic carries the noise texture.
+    pub(crate) noise: bool,
+}
+
+impl FrameTweaks {
+    /// The gallery's own values: the ones every scene and the pixel gate draw with.
+    pub(crate) const DEFAULT: FrameTweaks = FrameTweaks {
+        blur_sigma: crate::scenes::BLUR_SIGMA,
+        saturation: crate::scenes::BLUR_SATURATION,
+        noise: true,
+    };
+
+    /// The renderer's frame parameters for a target of `size` physical pixels at scale `scale`.
+    pub(crate) fn params(&self, size: (u32, u32), scale: f32) -> FrameParams {
+        FrameParams {
+            size,
+            scale,
+            blur_sigma: self.blur_sigma,
+            saturation: self.saturation,
+        }
+    }
+
+    /// Takes the noise off every acrylic of `scene` when it is off here. The flag is the last of
+    /// a shape's parameters, as `Painter::acrylic` wrote it.
+    pub(crate) fn apply_noise(&self, scene: &mut Scene) {
+        if self.noise {
+            return;
+        }
+        for layer in &mut scene.layers {
+            for acrylic in &mut layer.geometry.acrylic {
+                acrylic.shape.params[3] = 0.0;
+            }
+        }
     }
 }
 
@@ -525,7 +601,7 @@ impl Player {
         let config = FrameConfig {
             // Read after the events, so a cue's change shows in the frame it comes with.
             theme: self.state.theme().unwrap_or(THEME),
-            tier: self.tier,
+            tier: self.state.tier().unwrap_or(self.tier),
             strings: &self.strings,
             arg_format: &DisplayFormat,
             // Scripted scenes run the same on every host.
