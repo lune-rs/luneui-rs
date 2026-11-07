@@ -441,6 +441,7 @@ fn every_layer(p: &mut P<'_>) {
         LayerId::Popup,
         LayerId::Modal,
         LayerId::Raised,
+        LayerId::Outside,
         LayerId::Toast,
     ];
     for l in layers {
@@ -458,10 +459,11 @@ fn the_recording_renderer_puts_a_backdrop_before_its_layer_and_no_lower_than_the
             p.backdrop(LOW, 4.0);
         }))
     };
-    assert_eq!(at(LayerId::Base), (vec![0, 1], vec![2, 3, 4, 5]));
-    assert_eq!(at(LayerId::Popup), (vec![0, 1], vec![2, 3, 4, 5]));
-    assert_eq!(at(LayerId::Modal), (vec![0, 1, 2], vec![3, 4, 5]));
-    assert_eq!(at(LayerId::Raised), (vec![0, 1, 2, 3], vec![4, 5]));
+    assert_eq!(at(LayerId::Base), (vec![0, 1], vec![2, 3, 4, 5, 6]));
+    assert_eq!(at(LayerId::Popup), (vec![0, 1], vec![2, 3, 4, 5, 6]));
+    assert_eq!(at(LayerId::Modal), (vec![0, 1, 2], vec![3, 4, 5, 6]));
+    assert_eq!(at(LayerId::Raised), (vec![0, 1, 2, 3], vec![4, 5, 6]));
+    assert_eq!(at(LayerId::Outside), (vec![0, 1, 2, 3, 4], vec![5, 6]));
 }
 
 #[test]
