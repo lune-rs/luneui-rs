@@ -490,6 +490,9 @@ impl PageState for Showcase {
         // The page first: its widgets then come first in the tab order, as a scene's script
         // (a Tab at its start) expects. The panes do not overlap, so the order draws the same.
         self.content(ui, &lay);
+        // The panes sit above the page's modals: a hit above a modal's layer stays live, so a
+        // hosted dialog that never closes cannot take the way out with it.
+        ui.painter().on(LayerId::Raised);
         self.sidebar(ui, &lay);
         // The settings pane has a fill of its own and is drawn after the page.
         let fill = ui.theme().surface_input;
@@ -503,6 +506,7 @@ impl PageState for Showcase {
             ui.painter()
                 .text(&spec, lay.head.right() - w, lay.head.y + 6.0);
         }
+        ui.painter().on(LayerId::Base);
     }
 
     fn strings(&self) -> StringTable {
@@ -1135,7 +1139,7 @@ mod tests {
             let mut p = Player::new(HOST, Box::new(shell), window, 1.0, MotionTier::Full);
             p.frame(&mut FakeText, 0, &[]).expect("frame");
             let scene = p.frame(&mut FakeText, 16, &[]).expect("frame").0;
-            let texts = &scene.layers[lune_ui::scene::LayerId::Base as usize].texts;
+            let texts = &scene.layers[lune_ui::scene::LayerId::Raised as usize].texts;
             let inside: Vec<_> = texts
                 .iter()
                 .filter(|t| region.contains((t.x + 2.0, t.y + 2.0)))
@@ -1170,6 +1174,26 @@ mod tests {
         assert!(
             named(&out, "Off").is_some_and(|n| n.states.contains(State::Checked)),
             "the hosted switch took the click"
+        );
+    }
+
+    /// A hosted page's modal must not take the shell with it: `locale` opens one that never
+    /// closes, so the sidebar has to stay the way out.
+    #[test]
+    fn a_hosted_modal_leaves_the_sidebar_live() {
+        let mut rig = Rig::new();
+        rig.shell.cue("page locale");
+        rig.frame();
+        rig.settle();
+        let lay = SCENE_LAYOUT;
+        let widgets = 7;
+        rig.click_at(lay.tree_row(widgets));
+        rig.settle();
+        rig.click_at(lay.tree_row(widgets + 1));
+        rig.settle();
+        assert_ne!(
+            PAGES[rig.shell.page].id, "locale",
+            "the sidebar took the click"
         );
     }
 }
