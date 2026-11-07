@@ -290,7 +290,6 @@ impl<'a> Ui<'a> {
         let ring = match opts.trigger {
             Trigger::Field => RingKind::Edge {
                 radius: self.theme().item_radius,
-                on_accent: false,
             },
             Trigger::Link => RingKind::Button,
         };

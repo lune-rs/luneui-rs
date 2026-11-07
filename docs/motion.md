@@ -68,7 +68,7 @@ interaction table; the last six are D40 additions.
 | kind | property | default duration | default easing | magnitude | cite |
 |---|---|---|---|---|---|
 | hover | background, foreground, opacity | instant | linear | colour only; no lift or scale (Wane A11) | [L .claude/docs/animation-rules.md:102], [W docs/ui/README.md:92] |
-| press | scale back to 1 on release | fast | quad-out | scale 0.98 | [L .claude/docs/animation-rules.md:95,103], [L src/Lunegit.Desktop/Themes/Animations.axaml:49-60] |
+| press | scale back to 1 on release; the ghost button only (the dialog buttons have none, R4) | fast | quad-out | scale 0.98 | [L .claude/docs/animation-rules.md:95,103], [L src/Lunegit.Desktop/Themes/Animations.axaml:49-60] |
 | focus | border or glow opacity | fast | linear | none | [L .claude/docs/animation-rules.md:104] |
 | appear | opacity 0 to 1 and translateY 6-8 px to 0 | base | quad-out | slide 6-8 px | [L .claude/docs/animation-rules.md:94,105] |
 | dismiss | opacity 1 to 0, optionally a small translate | fast or base | quad-in | slide 6-8 px at most | [L .claude/docs/animation-rules.md:94,106] |

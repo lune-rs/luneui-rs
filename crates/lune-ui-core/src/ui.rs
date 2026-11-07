@@ -978,7 +978,7 @@ impl<'a> Ui<'a> {
     /// Runs `f`; the regions it registers with [`Self::interact`] carry the Tab order `order`
     /// (0 outside any scope; a nested scope replaces the outer one). Tab visits the stops of a
     /// scope (an overlay's own, or the page's) in ascending order, and in registration order
-    /// among stops of one order, so a shell can draw its panes in the order it needs and still
+    /// among stops of one order, so a host can draw its panes in the order it needs and still
     /// Tab through them in the order the user reads them. Roving groups and modal traps are
     /// unchanged: an overlay's stops are its own, whatever their order.
     pub fn tab_scope<R>(&mut self, order: i32, f: impl FnOnce(&mut Self) -> R) -> R {

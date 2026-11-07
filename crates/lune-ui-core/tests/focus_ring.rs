@@ -33,10 +33,6 @@ fn a_button_ring_sits_on_the_rects_own_edge_in_fg_secondary() {
     assert_eq!(s.rect, [20.0, 20.0, 200.0, 60.0]);
     assert_eq!(s.radii, [DARK.item_radius * 2.0; 4]);
     assert_eq!(s.color, premul(DARK.fg_secondary));
-    assert_eq!(
-        one(RingKind::PrimaryButton).color,
-        premul(DARK.on_accent_text)
-    );
 }
 
 #[test]
@@ -56,16 +52,8 @@ fn a_border_ring_is_the_accent_and_an_edge_ring_keeps_its_own_radius() {
         (b.rect, b.color),
         ([20.0, 20.0, 200.0, 60.0], premul(DARK.accent))
     );
-    let e = one(RingKind::Edge {
-        radius: 4.0,
-        on_accent: false,
-    });
+    let e = one(RingKind::Edge { radius: 4.0 });
     assert_eq!((e.radii, e.color), ([8.0; 4], premul(DARK.fg_secondary)));
-    let e = one(RingKind::Edge {
-        radius: 4.0,
-        on_accent: true,
-    });
-    assert_eq!(e.color, premul(DARK.on_accent_text));
 }
 
 #[test]

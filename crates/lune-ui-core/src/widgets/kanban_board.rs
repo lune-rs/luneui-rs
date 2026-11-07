@@ -302,7 +302,6 @@ pub fn paint_card<H: Copy + PartialEq>(
         rect,
         RingKind::Edge {
             radius: CARD_RADIUS,
-            on_accent: false,
         },
         look.focus,
     );

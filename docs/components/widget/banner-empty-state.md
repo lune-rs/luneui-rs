@@ -41,7 +41,7 @@ Empty-repository view:
 - Icon: app icon, 100 x 100, uniform stretch [L src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:17-21], [L src/Lunegit.Desktop/App.axaml:213].
 - Title: 18 px `FontSizeL` [L src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:24-27], [L src/Lunegit.Desktop/App.axaml:162], `ForegroundPrimary`.
 - Subtitle: 13 px, centred, wrapped, `ForegroundSecondary` [L src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:30-35].
-- Actions: row of `Button.empty-state-action`, spacing 12 [L src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:38-39]; each at least 140 wide, 51 high (padding 16 above and below, a 17 px line, a 1 px `border` ring that scales with the press), radius `item_radius`, the Secondary button's fill [L src/Lunegit.Desktop/App.axaml:440-450], [D136].
+- Actions: row of `Button.empty-state-action`, spacing 12 [L src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:38-39]; each at least 140 wide, 51 high (padding 16 above and below, a 17 px line, a 1 px `border` ring that scales with the press), radius `item_radius`, the ghost button's look (the Secondary's clear rest, and the press scale that `empty-state-action` keeps and the dialog buttons lost, D269) [L src/Lunegit.Desktop/App.axaml:440-450], [D136].
 
 ### States
 

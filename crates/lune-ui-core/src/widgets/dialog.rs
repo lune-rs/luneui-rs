@@ -14,6 +14,10 @@ use std::rc::Rc;
 
 use super::button::{self, ButtonKind, ButtonLook, ButtonState};
 use super::{button as button_fn, button_width};
+
+/// The least width of a footer button (the source look's `MinWidth`, R4), so a two-letter confirm
+/// is not a stub.
+const BUTTON_MIN_WIDTH: f32 = 80.0;
 use crate::access::{Action, Node, Role, State};
 use crate::color::premul;
 use crate::motion::{Easing, Kind, Motion, Reduce, Token};
@@ -127,10 +131,10 @@ impl Layout {
             body_h + footer_h,
         );
         let footer = Rect::new(card.x, card.bottom() - footer_h, card_w, footer_h);
-        let cw = button_width(p, spec.confirm);
+        let cw = button_width(p, spec.confirm).max(BUTTON_MIN_WIDTH);
         let confirm = Rect::new(footer.right() - 24.0 - cw, footer.y + 18.0, cw, 32.0);
         let cancel = spec.cancel.map(|label| {
-            let xw = button_width(p, label);
+            let xw = button_width(p, label).max(BUTTON_MIN_WIDTH);
             Rect::new(confirm.x - 8.0 - xw, confirm.y, xw, 32.0)
         });
         // The same association as the moved code: `y += th + 10.0`, then `y += mh`.

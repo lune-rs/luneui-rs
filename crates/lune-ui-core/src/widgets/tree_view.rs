@@ -1086,10 +1086,7 @@ impl Ui<'_> {
             };
             self.node_container(node, |ui| ui.scope(row.key, |ui| cells(ui, &ctx)));
             if b.cursor && ring {
-                let kind = RingKind::Edge {
-                    radius: ROW_RADIUS,
-                    on_accent: false,
-                };
+                let kind = RingKind::Edge { radius: ROW_RADIUS };
                 focus_ring::paint(self.painter(), b.slot, kind, 1.0);
             }
         }

@@ -113,15 +113,7 @@ pub fn paint<H: Copy + PartialEq>(p: &mut Painter<'_, H>, r: Rect, look: &StarLo
         icon::STAR_EMPTY
     };
     p.text_centered(&icon::glyph(glyph, GLYPH, look.glyph), r);
-    focus_ring::paint(
-        p,
-        r,
-        RingKind::Edge {
-            radius: RADIUS,
-            on_accent: false,
-        },
-        look.focus,
-    );
+    focus_ring::paint(p, r, RingKind::Edge { radius: RADIUS }, look.focus);
 }
 
 impl Ui<'_> {

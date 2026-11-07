@@ -28,7 +28,6 @@ pub struct Theme {
     pub border: Rgba,
     pub border_subtle: Rgba,
     pub accent: Rgba,
-    pub accent_hover: Rgba,
     /// The scrollbar thumb: `accent` at alpha 0x8C (Wane's `--scroll-thumb`).
     pub scroll_thumb: Rgba,
     /// The thumb while hovered or held: `accent` at alpha 0xE6.
@@ -37,8 +36,6 @@ pub struct Theme {
     pub text_selection: Rgba,
     /// Knob and check mark on an accent fill.
     pub on_accent: Rgba,
-    /// Label on a primary button.
-    pub on_accent_text: Rgba,
     pub dialog_backdrop: Rgba,
     pub dialog_footer: Rgba,
     pub menu_text_primary: Rgba,
@@ -300,12 +297,10 @@ pub mod lunegit_dark {
         border: [0xFF, 0xFF, 0xFF, 0x30],
         border_subtle: [0xFF, 0xFF, 0xFF, 0x1A],
         accent: [0x76, 0x7D, 0x85, 0xFF],
-        accent_hover: [0x86, 0x8D, 0x95, 0xFF],
         scroll_thumb: [0x76, 0x7D, 0x85, 0x8C],
         scroll_thumb_hover: [0x76, 0x7D, 0x85, 0xE6],
         text_selection: [0x76, 0x7D, 0x85, 0x66],
         on_accent: [0xFF, 0xFF, 0xFF, 0xFF],
-        on_accent_text: [0xFF, 0xFF, 0xFF, 0xF0],
         dialog_backdrop: [0x00, 0x00, 0x00, 0x80],
         dialog_footer: [0x00, 0x00, 0x00, 0x24],
         // Luneium browser context-menu tokens (`tokens.css`, `ContextMenu.css`).
@@ -720,8 +715,6 @@ mod tests {
             THEME.text_selection,
             [accent[0], accent[1], accent[2], 0x66]
         );
-        // `accent_hover`: each channel plus 0x10, saturating (D208).
-        assert_eq!(THEME.accent_hover, [0x86, 0x8D, 0x95, 0xFF]);
         // The diff intra-line marks: the line fill's hue at alpha 0x40 (D14, D208).
         assert_eq!(THEME.diff_added_mark, [0x73, 0xC9, 0x91, 0x40]);
         assert_eq!(THEME.diff_removed_mark, [0xE0, 0x6C, 0x75, 0x40]);

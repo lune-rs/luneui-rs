@@ -537,7 +537,6 @@ impl Ui<'_> {
         if response.is_some_and(|r| r.focus_visible) {
             let ring = RingKind::Edge {
                 radius: theme.item_radius,
-                on_accent: false,
             };
             focus_ring::paint(p, cell.inset(1.0, 2.0), ring, 1.0);
         }

@@ -441,7 +441,7 @@ mod tests {
     fn the_partial_file_sets_the_accent_and_what_follows_it() {
         let file = load(PARTIAL);
         assert_eq!(file.theme.accent, [0xE5, 0x48, 0x4D, 0xFF]);
-        assert_ne!(file.theme.accent_hover, DARK.accent_hover);
+        assert_ne!(file.theme.scroll_thumb, DARK.scroll_thumb);
         assert_eq!(file.theme.fg_primary, DARK.fg_primary);
         assert!(file.skipped.is_empty(), "{:?}", file.skipped);
     }

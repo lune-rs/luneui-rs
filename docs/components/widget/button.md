@@ -40,19 +40,18 @@ Conflicts: (1) Wane lists no rest fill for secondary; the moved code fills rest 
 - Rect supplied by the caller; corner radius `item_radius` 6 [R crates/lune-ui-core/src/widgets/button.rs:93-143], [R crates/lune-ui-core/src/theme.rs:85]. Height 32 (`--control-h`) [W docs/ui/components.md:296]; the gallery passes 32 [R apps/gallery/src/scenes.rs:240].
 - Label: 13 px UI text at `font_base`, centred in the rect [R crates/lune-ui-core/src/widgets/button.rs:93-143] [R crates/lune-ui-core/src/widgets/label.rs:15], [R crates/lune-ui-core/src/theme.rs:83].
 - Width: `button_width` = measured label width + 32 [R crates/lune-ui-core/src/widgets/button.rs:141]; Wane states the same (text + 32) [W docs/ui/components.md:296].
-- Primary label colour `on_accent_text` [R crates/lune-ui-core/src/widgets/button.rs:93-143], value #FFFFFFF0 [R crates/lune-ui-core/src/theme.rs:67].
+- Primary label colour `fg_primary`, secondary and ghost `fg_secondary` (Lunegit's `dialog-action`, `App.axaml:539-586`, R4, D269).
 - Wane variants not in the moved code (M4 adds them): sm 24 high, radius 4, padding 0 12; icon 28 x 28 (sm 24 x 24) with 16 px glyph and 8 gap; ghost transparent with secondary text; fill = container width [W docs/ui/components.md:294,296]. Lunegit's ghost is the toolbar action: transparent at rest [L src/Lunegit.Desktop/App.axaml:460-464].
 
 ### States
 
 | state | look | cite |
 |---|---|---|
-| rest, secondary | fill `surface_hover`, label `fg_primary` | [R crates/lune-ui-core/src/widgets/button.rs:93-143] |
-| hover, secondary | fill `surface_selected` | [R crates/lune-ui-core/src/widgets/button.rs:93-143], [W docs/ui/components.md:295] |
-| rest, primary | fill `accent`, label `on_accent_text` | [R crates/lune-ui-core/src/widgets/button.rs:93-143] |
-| hover, primary | fill `accent_hover` | [R crates/lune-ui-core/src/widgets/button.rs:93-143] |
-| pressed | fill `surface_active` (#20FFFFFF); not drawn by the moved code | [W docs/ui/components.md:295], [L src/Lunegit.Desktop/App.axaml:473-476], [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:29] |
-| focus-visible | 1 px ring `fg_secondary`, inset; not drawn by the moved code | [W docs/ui/components.md:295], [R crates/lune-ui-core/src/widgets/toggle.rs:103-147] (ring colour mapping) |
+| rest, primary | fill `surface_input` (#0AFFFFFF), label `fg_primary` | [L src/Lunegit.Desktop/App.axaml:539-586] |
+| rest, secondary and ghost | no fill (clear, in the hover colour), label `fg_secondary` | [L src/Lunegit.Desktop/App.axaml:539-586] |
+| hover, any kind | fill `surface_hover` (#10FFFFFF) | [L src/Lunegit.Desktop/App.axaml:539-586] |
+| pressed, any kind | fill `surface_active` (#20FFFFFF); the ghost also scales by 0.98, the others do not | [L src/Lunegit.Desktop/App.axaml:539-586], [L src/Lunegit.Desktop/Themes/Animations.axaml:49-60] |
+| focus-visible | the 1 px ring `fg_secondary`, inset, and nothing else changes | [R crates/lune-ui-core/src/widgets/focus_ring.rs] |
 | disabled | opacity 0.4, inert | [W docs/ui/components.md:295], [L src/Lunegit.Desktop/App.axaml:481-483] |
 
 ### Transitions
@@ -60,7 +59,7 @@ Conflicts: (1) Wane lists no rest fill for secondary; the moved code fills rest 
 | change | property | kind | duration | easing | reduced | cite |
 |---|---|---|---|---|---|---|
 | rest ↔ hover | fill | hover | instant | linear | keep | [L .claude/docs/animation-rules.md:102], [L src/Lunegit.Desktop/Themes/Animations.axaml:39-47], [W docs/ui/components.md:297] |
-| press ↔ release | scale 0.98 | press | fast | quad-out | snap | [L .claude/docs/animation-rules.md:95,103], [L src/Lunegit.Desktop/Themes/Animations.axaml:49-61], [L src/Lunegit.Desktop/Themes/AnimationsReduced.axaml:16]; generic Button has no selector [D40] |
+| press ↔ release | scale 0.98, ghost only | press | fast | quad-out | snap | [L .claude/docs/animation-rules.md:95,103], [L src/Lunegit.Desktop/Themes/Animations.axaml:49-61], [L src/Lunegit.Desktop/Themes/AnimationsReduced.axaml:16]; generic Button has no selector [D40] |
 | focus-visible on/off | ring opacity | focus | fast | linear | keep | [L .claude/docs/animation-rules.md:104], [D40] |
 
 Lunegit animates classed buttons only (`toolbar-action`, `commit-primary`, `empty-state-action`); the generic button gets the same rows under [D40]. Never animated: virtualized rows on scroll, high-frequency content, layout of large surfaces [L .claude/docs/animation-rules.md:145-149].

@@ -76,10 +76,16 @@ fn at_rest_no_shape_is_transparent_and_no_transform_is_pushed() {
         let scene = settled_scene(kind, false);
         let g = &scene.layers[0].geometry;
         let shapes: Vec<_> = g.under.iter().chain(&g.over).collect();
-        assert_eq!(shapes.len(), 1, "{kind:?}: one fill, no ring");
         assert!(shapes.iter().all(|s| s.color[3] > 0.0));
-        // The fill is the full rect: an untransformed fill (a pushed scale would shrink it).
-        assert_eq!(shapes[0].rect, [20.0, 20.0, 120.0, 32.0]);
+        match kind {
+            ButtonKind::Primary => {
+                assert_eq!(shapes.len(), 1, "{kind:?}: one fill, no ring");
+                // The fill is the full rect: an untransformed fill (a pushed scale would shrink it).
+                assert_eq!(shapes[0].rect, [20.0, 20.0, 120.0, 32.0]);
+            }
+            // A secondary rests clear: nothing is drawn behind its label.
+            _ => assert!(shapes.is_empty(), "{kind:?}: no fill, no ring"),
+        }
     }
 }
 
@@ -172,13 +178,20 @@ fn a_disabled_button_reports_no_activation_and_is_marked_disabled() {
 #[test]
 fn pixel_probes_at_scale_two() {
     for (scale, radius) in [(1.0, 6.0), (2.0, 12.0)] {
-        for (kind, fill) in [
-            (ButtonKind::Primary, DARK.accent),
-            (ButtonKind::Secondary, DARK.surface_hover),
+        // Both rest states a button has a fill in: the primary at rest, the secondary under the
+        // pointer.
+        for (kind, fill, over) in [
+            (ButtonKind::Primary, DARK.surface_input, false),
+            (ButtonKind::Secondary, DARK.surface_hover, true),
         ] {
             let mut h = UiHarness::new(WIN);
             h.input.set_scale(scale);
             frame(&mut h, kind);
+            if over {
+                h.input.pointer_to(80.0, 36.0);
+                h.at_ms(10);
+                frame(&mut h, kind);
+            }
             h.at_ms(1000);
             let (scene, _, _) = frame(&mut h, kind);
             let shape = scene.layers[0].geometry.under[0];
@@ -193,24 +206,128 @@ fn pixel_probes_at_scale_two() {
 }
 
 #[test]
-fn pressed_scales_about_the_centre_and_the_ring_follows_focus_visible() {
-    let mut h = UiHarness::new(WIN);
-    frame(&mut h, ButtonKind::Secondary);
-    h.input.pointer_to(80.0, 36.0).press(PointerButton::Primary);
-    h.at_ms(10);
-    frame(&mut h, ButtonKind::Secondary);
-    h.at_ms(1000);
-    let (scene, r, repaint) = frame(&mut h, ButtonKind::Secondary);
-    assert!(r.pressed && repaint == Repaint::Idle);
-    let fill = scene.layers[0].geometry.under[0];
-    let (w, hh) = (120.0 * 0.98, 32.0 * 0.98);
-    assert_eq!(fill.rect, [80.0 - w / 2.0, 36.0 - hh / 2.0, w, hh]);
-    assert_eq!(fill.color, premul(DARK.surface_active));
-    // Focus-visible adds the ring: a second under shape.
+fn a_pressed_ghost_scales_about_the_centre_and_a_primary_or_secondary_does_not() {
+    // The ghost keeps the press scale (`toolbar-action`); the dialog buttons have none (R4).
+    for kind in [
+        ButtonKind::Primary,
+        ButtonKind::Secondary,
+        ButtonKind::Ghost,
+    ] {
+        let mut h = UiHarness::new(WIN);
+        frame(&mut h, kind);
+        h.input.pointer_to(80.0, 36.0).press(PointerButton::Primary);
+        h.at_ms(10);
+        frame(&mut h, kind);
+        h.at_ms(1000);
+        let (scene, r, repaint) = frame(&mut h, kind);
+        assert!(r.pressed && repaint == Repaint::Idle, "{kind:?}");
+        let fill = scene.layers[0].geometry.under[0];
+        let (w, hh) = if kind == ButtonKind::Ghost {
+            (120.0 * 0.98, 32.0 * 0.98)
+        } else {
+            (120.0, 32.0)
+        };
+        assert_eq!(
+            fill.rect,
+            [80.0 - w / 2.0, 36.0 - hh / 2.0, w, hh],
+            "{kind:?}"
+        );
+        assert_eq!(fill.color, premul(DARK.surface_active), "{kind:?}");
+    }
+}
+
+#[test]
+fn focus_visible_adds_the_ring_and_changes_nothing_else() {
+    for kind in [
+        ButtonKind::Primary,
+        ButtonKind::Secondary,
+        ButtonKind::Ghost,
+    ] {
+        let rest = ButtonState::default();
+        let focus = ButtonState {
+            focus_visible: true,
+            ..rest
+        };
+        let (a, b) = (
+            ButtonLook::of(&DARK, kind, rest),
+            ButtonLook::of(&DARK, kind, focus),
+        );
+        assert_eq!((a.ring, b.ring), (0.0, 1.0), "{kind:?}");
+        assert_eq!(
+            (a.fill, a.label, a.scale),
+            (b.fill, b.label, b.scale),
+            "{kind:?}"
+        );
+    }
+    // In the scene: the ring is the one extra shape, at rest, a secondary's only shape.
     let mut h = focused(ButtonKind::Secondary);
     h.at_ms(1000);
     let (scene, _, _) = frame(&mut h, ButtonKind::Secondary);
-    assert_eq!(scene.layers[0].geometry.under.len(), 2);
+    let g = &scene.layers[0].geometry;
+    let shapes: Vec<_> = g.under.iter().chain(&g.over).collect();
+    assert_eq!(shapes.len(), 1, "the ring alone");
+    assert_eq!(shapes[0].params[0], 1.0, "a ring shape");
+    let mut h = focused(ButtonKind::Primary);
+    h.at_ms(1000);
+    let (scene, _, _) = frame(&mut h, ButtonKind::Primary);
+    assert_eq!(scene.layers[0].geometry.under.len(), 2, "fill and ring");
+}
+
+#[test]
+fn the_look_is_the_dialog_buttons_of_the_source_state_by_state() {
+    let st = |hovered, pressed| ButtonState {
+        hovered,
+        pressed,
+        focus_visible: false,
+    };
+    let [r, g, b, _] = DARK.surface_hover;
+    let clear = [r, g, b, 0];
+    // (kind, rest, hover, pressed, label, scale when pressed)
+    let table = [
+        (
+            ButtonKind::Primary,
+            DARK.surface_input,
+            DARK.surface_hover,
+            DARK.surface_active,
+            DARK.fg_primary,
+            1.0,
+        ),
+        (
+            ButtonKind::Secondary,
+            clear,
+            DARK.surface_hover,
+            DARK.surface_active,
+            DARK.fg_secondary,
+            1.0,
+        ),
+        (
+            ButtonKind::Ghost,
+            clear,
+            DARK.surface_hover,
+            DARK.surface_active,
+            DARK.fg_secondary,
+            0.98,
+        ),
+    ];
+    for (kind, rest, hover, pressed, label, scale) in table {
+        let look = |s| ButtonLook::of(&DARK, kind, s);
+        assert_eq!(look(st(false, false)).fill, rest, "{kind:?} rest");
+        assert_eq!(look(st(true, false)).fill, hover, "{kind:?} hover");
+        assert_eq!(look(st(true, true)).fill, pressed, "{kind:?} pressed");
+        assert_eq!(look(st(false, true)).fill, pressed, "{kind:?} pressed");
+        assert_eq!(look(st(true, true)).scale, scale, "{kind:?} press scale");
+        assert_eq!(look(st(true, false)).scale, 1.0, "{kind:?}");
+        for s in [st(false, false), st(true, false), st(true, true)] {
+            assert_eq!(look(s).label, label, "{kind:?}");
+        }
+    }
+    // A hovered Primary equals a hovered Secondary in fill, and pressed likewise.
+    for (hovered, pressed) in [(true, false), (true, true)] {
+        assert_eq!(
+            ButtonLook::of(&DARK, ButtonKind::Primary, st(hovered, pressed)).fill,
+            ButtonLook::of(&DARK, ButtonKind::Secondary, st(hovered, pressed)).fill
+        );
+    }
 }
 
 #[test]
@@ -364,22 +481,32 @@ fn a_small_button_is_24_high_with_radius_4_and_keeps_the_top() {
         small: true,
         ..ButtonOptions::default()
     };
+    let small_primary = ButtonOptions {
+        kind: ButtonKind::Primary,
+        ..small
+    };
     let (scene, r) = settle(UiHarness::new(WIN), |ui| {
-        ui.button_with("b", RECT, "Label", &small)
+        ui.button_with("b", RECT, "Label", &small_primary)
     });
     assert_eq!(r.rect.h, SMALL_HEIGHT);
     let fill = scene.layers[0].geometry.under[0];
     assert_eq!(fill.rect, [20.0, 20.0, 120.0, 24.0]);
     assert_eq!(fill.radii, [SMALL_RADIUS; 4]);
-    assert_eq!(fill.color, premul(DARK.surface_hover));
+    assert_eq!(fill.color, premul(DARK.surface_input));
     // The focus ring follows the corner radius.
     let mut h = UiHarness::new(WIN);
-    with(&mut h, |ui| ui.button_with("b", RECT, "Label", &small));
+    with(&mut h, |ui| {
+        ui.button_with("b", RECT, "Label", &small_primary)
+    });
     h.input.key_down(Key::Named(NamedKey::Tab), None);
     h.at_ms(10);
-    with(&mut h, |ui| ui.button_with("b", RECT, "Label", &small));
+    with(&mut h, |ui| {
+        ui.button_with("b", RECT, "Label", &small_primary)
+    });
     h.at_ms(1000);
-    let (scene, _) = with(&mut h, |ui| ui.button_with("b", RECT, "Label", &small));
+    let (scene, _) = with(&mut h, |ui| {
+        ui.button_with("b", RECT, "Label", &small_primary)
+    });
     let under = &scene.layers[0].geometry.under;
     assert_eq!(under.len(), 2);
     assert_eq!(under[1].radii, [SMALL_RADIUS; 4], "the ring");

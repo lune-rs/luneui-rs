@@ -55,14 +55,10 @@ fn the_accent_brings_its_derived_tokens() {
     let f = load(&with_colors(r##""AccentPrimaryColor":"#FF71B0F7""##));
     let mut want = DARK;
     want.accent = [0x71, 0xB0, 0xF7, 0xFF];
-    want.accent_hover = [0x81, 0xC0, 0xFF, 0xFF];
     want.scroll_thumb = [0x71, 0xB0, 0xF7, 0x8C];
     want.scroll_thumb_hover = [0x71, 0xB0, 0xF7, 0xE6];
     want.text_selection = [0x71, 0xB0, 0xF7, 0x66];
     assert_eq!(f.theme, want);
-    // Saturating, per channel.
-    let f = load(&with_colors(r##""AccentPrimaryColor":"#F0FFF8EF""##));
-    assert_eq!(f.theme.accent_hover, [0xFF; 4]);
 }
 
 #[test]
@@ -151,7 +147,6 @@ fn the_preset_written_through_the_table_loads_back_equal() {
         base = f.map(|f| f.theme).unwrap_or(base);
     }
     for field in [
-        &mut base.accent_hover,
         &mut base.scroll_thumb,
         &mut base.scroll_thumb_hover,
         &mut base.text_selection,

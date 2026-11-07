@@ -741,15 +741,7 @@ impl Ui<'_> {
             button::paint_icon(p, close_rect(rect), &button, &close_look);
             p.pop_xform();
         }
-        focus_ring::paint(
-            p,
-            rect,
-            RingKind::Edge {
-                radius: RADIUS,
-                on_accent: false,
-            },
-            ring,
-        );
+        focus_ring::paint(p, rect, RingKind::Edge { radius: RADIUS }, ring);
     }
 
     /// The header tint, the loop and the busy cue. `active` is the tab's drawn left and width.

@@ -190,10 +190,11 @@ impl PageState for Dialogs {
         heading(ui, "A DIALOG OVER THE PAGE", x, y);
         let by = y + 20.0;
         let mut bx = x;
+        // Secondaries on the left, the primary on their right.
         for (key, text, kind) in [
-            ("open", "Open dialog", ButtonKind::Primary),
             ("other", "Page action", ButtonKind::Secondary),
             ("more", "Another", ButtonKind::Secondary),
+            ("open", "Open dialog", ButtonKind::Primary),
         ] {
             let w = button_width(ui.painter(), text);
             let r = ui.button(key, Rect::new(bx, by, w, 32.0), text, kind);

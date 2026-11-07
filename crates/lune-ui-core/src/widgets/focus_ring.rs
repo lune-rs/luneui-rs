@@ -10,16 +10,14 @@ use crate::paint::{Painter, Rect};
 pub enum RingKind {
     /// Button: 1 px `fg_secondary` outline on the rect's own edge (offset -1: inside the border box).
     Button,
-    /// Primary button: as [`RingKind::Button`] in `on_accent_text`.
-    PrimaryButton,
     /// Toggle, checkbox, radio: 1 px `fg_secondary` outline 2 px outside the control, which has
     /// corner radius `radius`.
     Offset { radius: f32 },
     /// Field, stepper, open combo: the `accent` border over the box's own border.
     Border,
     /// A button's ring on the rect's own edge at its own corner `radius` (the small button, the
-    /// icon button, the star): `fg_secondary`, or `on_accent_text` with `on_accent`.
-    Edge { radius: f32, on_accent: bool },
+    /// icon button, the star): `fg_secondary`.
+    Edge { radius: f32 },
 }
 
 /// `color` with its alpha scaled by `opacity` (0 to 1).
@@ -47,15 +45,6 @@ pub fn paint<H: Copy + PartialEq>(
             faded(t.fg_secondary, opacity),
             false,
         ),
-        RingKind::PrimaryButton => {
-            p.ring(
-                rect,
-                t.item_radius,
-                1.0,
-                faded(t.on_accent_text, opacity),
-                false,
-            );
-        }
         RingKind::Offset { radius } => {
             // Outline offset 2: a 2 px gap, then the 1 px line.
             p.ring(
@@ -67,13 +56,8 @@ pub fn paint<H: Copy + PartialEq>(
             );
         }
         RingKind::Border => p.ring(rect, t.item_radius, 1.0, faded(t.accent, opacity), false),
-        RingKind::Edge { radius, on_accent } => {
-            let color = if on_accent {
-                t.on_accent_text
-            } else {
-                t.fg_secondary
-            };
-            p.ring(rect, radius, 1.0, faded(color, opacity), false);
+        RingKind::Edge { radius } => {
+            p.ring(rect, radius, 1.0, faded(t.fg_secondary, opacity), false);
         }
     }
 }

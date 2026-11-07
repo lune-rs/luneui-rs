@@ -46,23 +46,18 @@ pub const FOCUS: Motion = Motion::of(Kind::Focus);
 pub enum ButtonKind {
     Primary,
     Secondary,
-    /// No fill at rest, `surface_hover` on hover, `surface_active` pressed; secondary text.
+    /// As [`ButtonKind::Secondary`], and the only kind that scales down when pressed
+    /// ([`PRESS_SCALE`]).
     Ghost,
 }
 
-impl ButtonKind {
-    /// The ring at corner `radius`: the original look at the theme's radius, else on the edge.
-    fn ring(self, theme: &Theme, radius: f32) -> RingKind {
-        let on_accent = self == ButtonKind::Primary;
-        if radius == theme.item_radius {
-            if on_accent {
-                RingKind::PrimaryButton
-            } else {
-                RingKind::Button
-            }
-        } else {
-            RingKind::Edge { radius, on_accent }
-        }
+/// The ring at corner `radius`: the button ring at the theme's radius, else on the edge. The same
+/// for every kind: focus-visible adds the outline and nothing else (R4).
+fn ring(theme: &Theme, radius: f32) -> RingKind {
+    if radius == theme.item_radius {
+        RingKind::Button
+    } else {
+        RingKind::Edge { radius }
     }
 }
 
@@ -118,30 +113,33 @@ pub struct ButtonLook {
 }
 
 impl ButtonLook {
-    /// The look `state` settles to.
+    /// The look `state` settles to. The look of the source's dialog buttons (R4, D269): a
+    /// primary rests on `surface_input` with a `fg_primary` label, a secondary rests clear (in the
+    /// hover colour, so the fade has no dark middle) with a `fg_secondary` label; both take
+    /// `surface_hover` on hover and `surface_active` pressed, with no press scale. A ghost looks
+    /// as a secondary and also scales by [`PRESS_SCALE`] when pressed.
     pub fn of(theme: &Theme, kind: ButtonKind, state: ButtonState) -> ButtonLook {
+        let clear = {
+            let [r, g, b, _] = theme.surface_hover;
+            [r, g, b, 0]
+        };
         let fill = match (kind, state.pressed, state.hovered) {
-            (ButtonKind::Primary, false, false) => theme.accent,
-            (ButtonKind::Primary, _, _) => theme.accent_hover,
-            (ButtonKind::Secondary, true, _) => theme.surface_active,
-            (ButtonKind::Secondary, false, true) => theme.surface_selected,
-            (ButtonKind::Secondary, false, false) => theme.surface_hover,
-            (ButtonKind::Ghost, true, _) => theme.surface_active,
-            (ButtonKind::Ghost, false, true) => theme.surface_hover,
-            // Transparent, in the hover colour so the fade has no dark middle.
-            (ButtonKind::Ghost, false, false) => {
-                let [r, g, b, _] = theme.surface_hover;
-                [r, g, b, 0]
-            }
+            (_, true, _) => theme.surface_active,
+            (_, false, true) => theme.surface_hover,
+            (ButtonKind::Primary, false, false) => theme.surface_input,
+            (ButtonKind::Secondary | ButtonKind::Ghost, false, false) => clear,
         };
         ButtonLook {
             fill,
             label: match kind {
-                ButtonKind::Primary => theme.on_accent_text,
-                ButtonKind::Secondary => theme.fg_primary,
-                ButtonKind::Ghost => theme.fg_secondary,
+                ButtonKind::Primary => theme.fg_primary,
+                ButtonKind::Secondary | ButtonKind::Ghost => theme.fg_secondary,
             },
-            scale: if state.pressed { PRESS_SCALE } else { 1.0 },
+            scale: if state.pressed && kind == ButtonKind::Ghost {
+                PRESS_SCALE
+            } else {
+                1.0
+            },
             ring: if state.focus_visible { 1.0 } else { 0.0 },
         }
     }
@@ -160,23 +158,17 @@ enum Content<'a> {
     },
 }
 
-/// Draws a button in `r` with `look`.
+/// Draws a button in `r` with `look`. `kind` is the look's own: [`ButtonLook::of`] already took it
+/// into account, and the drawing is the same for every kind (R4).
 pub fn paint<H: Copy + PartialEq>(
     p: &mut Painter<'_, H>,
     r: Rect,
     text: &str,
-    kind: ButtonKind,
+    _kind: ButtonKind,
     look: &ButtonLook,
 ) {
     let radius = p.theme.item_radius;
-    paint_content(
-        p,
-        r,
-        radius,
-        Content::Label { text, icon: None },
-        kind,
-        look,
-    );
+    paint_content(p, r, radius, Content::Label { text, icon: None }, look);
 }
 
 /// [`paint`] for [`Ui::button_with`]'s variants: `r` is cut to 24 high when `options.small`, the
@@ -203,7 +195,7 @@ pub fn paint_with<H: Copy + PartialEq>(
         text,
         icon: options.icon,
     };
-    paint_content(p, r, radius, content, options.kind, look);
+    paint_content(p, r, radius, content, look);
 }
 
 /// [`paint`] for [`Ui::icon_button`]: the ghost look of `button` over the caller's rect.
@@ -221,7 +213,7 @@ pub fn paint_icon<H: Copy + PartialEq>(
         label: button.color.unwrap_or(look.label),
         ..*look
     };
-    paint_content(p, r, button.radius, content, ButtonKind::Ghost, &look);
+    paint_content(p, r, button.radius, content, &look);
 }
 
 fn paint_content<H: Copy + PartialEq>(
@@ -229,7 +221,6 @@ fn paint_content<H: Copy + PartialEq>(
     r: Rect,
     radius: f32,
     content: Content<'_>,
-    kind: ButtonKind,
     look: &ButtonLook,
 ) {
     let t = p.theme;
@@ -243,7 +234,7 @@ fn paint_content<H: Copy + PartialEq>(
             alpha: 1.0,
         });
     }
-    // A ghost at rest has no fill to draw.
+    // A button clear at rest has no fill to draw.
     if look.fill[3] > 0 {
         p.fill(r, radius, look.fill);
     }
@@ -266,7 +257,7 @@ fn paint_content<H: Copy + PartialEq>(
             p.text_centered(&icon::glyph(glyph, size, look.label), r);
         }
     }
-    focus_ring::paint(p, r, kind.ring(&t, radius), look.ring);
+    focus_ring::paint(p, r, ring(&t, radius), look.ring);
     if scaled {
         p.pop_xform();
     }
@@ -454,7 +445,7 @@ impl Ui<'_> {
             scale: self.animate_f32(id.with("press"), target.scale, &PRESS),
             ring: self.animate_f32(id.with("ring"), target.ring, &FOCUS),
         };
-        paint_content(self.painter(), rect, radius, content, kind, &look);
+        paint_content(self.painter(), rect, radius, content, &look);
 
         let mut node = Node::new(id, Role::Button, name, rect);
         if r.enabled {

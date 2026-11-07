@@ -416,15 +416,58 @@ fn pixel_probes_at_scale_two() {
         .expect("footer");
     assert_eq!(footer.rect[3], 136.0);
     assert_eq!(footer.rect[2], 896.0);
-    // Two buttons, 64 high.
+    // The confirm button's fill, 64 high; the cancel button rests clear and draws no fill (R4).
     let buttons: Vec<_> = modal
         .geometry
         .under
         .iter()
         .filter(|s| s.radii == [12.0; 4])
         .collect();
-    assert_eq!(buttons.len(), 2);
+    assert_eq!(buttons.len(), 1);
     assert!(buttons.iter().all(|s| s.rect[3] == 64.0));
+    assert_eq!(buttons[0].color, premul(DARK.surface_input));
+}
+
+#[test]
+fn a_footer_button_is_at_least_80_wide_primary_right_and_secondary_left() {
+    let two_letters = Dialog {
+        title: "Quit",
+        message: "Really?",
+        extra_h: 0.0,
+        confirm: "OK",
+        cancel: Cancel::Label("No"),
+    };
+    let mut h = opened(&two_letters);
+    let (_, out) = run(&mut h, &two_letters, 1200, 1);
+    let bounds = |name: &str| {
+        out.tree
+            .nodes
+            .iter()
+            .find(|n| n.role == Role::Button && n.name == name)
+            .unwrap_or_else(|| panic!("no button {name}"))
+            .bounds
+    };
+    let (ok, no) = (bounds("OK"), bounds("No"));
+    assert_eq!(
+        (ok.w, no.w),
+        (80.0, 80.0),
+        "two letters are an 80 px button"
+    );
+    assert!(no.right() < ok.x, "the secondary is left of the primary");
+    assert_eq!(ok.x - no.right(), 8.0, "spacing 8");
+    // The card's right padding is 24, whatever the width.
+    assert_eq!(card_bounds(&out).right() - ok.right(), 24.0);
+    // A label wider than 80 keeps its own width: "Discard" plus 16 each side.
+    let d = the_dialog(Cancel::Default, 0.0);
+    let mut h = opened(&d);
+    let (_, out) = run(&mut h, &d, 1200, 1);
+    let discard = out
+        .tree
+        .nodes
+        .iter()
+        .find(|n| n.role == Role::Button && n.name == "Discard")
+        .expect("the confirm");
+    assert!(discard.bounds.w >= 80.0);
 }
 
 /// The sampler of a dialog's visibility on the 60 Hz grid: the scrim's alpha as a fraction of its

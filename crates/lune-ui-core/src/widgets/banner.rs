@@ -223,7 +223,8 @@ impl Ui<'_> {
             for (i, (label, w)) in state.actions.iter().zip(&widths).enumerate() {
                 let r = Rect::new(bx, y, *w, EMPTY_ACTION_HEIGHT);
                 let key = format!("action-{i}");
-                let resp = ui.button(&key, r, label, ButtonKind::Secondary);
+                // A ghost: the empty-state action keeps the press scale the dialog buttons lost (R4).
+                let resp = ui.button(&key, r, label, ButtonKind::Ghost);
                 // The border follows the button's press scale (the same animation, read again).
                 let bid = ui.id(&key);
                 let scale = ui.animate_f32(

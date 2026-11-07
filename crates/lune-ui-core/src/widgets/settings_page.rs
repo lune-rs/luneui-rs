@@ -259,7 +259,6 @@ impl Ui<'_> {
             at,
             RingKind::Edge {
                 radius: ACTION_RADIUS,
-                on_accent: false,
             },
             ring,
         );
