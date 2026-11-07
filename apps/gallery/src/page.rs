@@ -706,6 +706,8 @@ mod tests {
         assert_eq!(clicks.get(), 2);
         assert_eq!(path_id("p", &["a"]), WidgetId::ROOT.with("p").with("a"));
     }
+    type StateFn = fn() -> Box<dyn PageState>;
+
     /// Nodes of overlays that centre themselves in the window, not in the stage (a modal dialog):
     /// the test cannot tell an overlay's node from a page's, so it names these `(page, name)`
     /// pairs, the name being a substring of the node's.
@@ -725,8 +727,7 @@ mod tests {
         let PageKind::Ui(ui_page) = page.kind else {
             return Vec::new();
         };
-        let mut states: Vec<(String, fn() -> Box<dyn PageState>)> =
-            vec![("live".to_owned(), ui_page.state)];
+        let mut states: Vec<(String, StateFn)> = vec![("live".to_owned(), ui_page.state)];
         states.extend(ui_page.scenes.iter().map(|s| (s.id.to_owned(), s.state)));
         let mut out = BTreeSet::new();
         for (which, state) in states {
