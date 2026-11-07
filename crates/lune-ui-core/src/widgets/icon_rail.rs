@@ -47,8 +47,8 @@ pub const DOT_Y: f32 = 7.0;
 /// the top this far from the button's top; its text is 9 px, padded [`BADGE_PAD`] each side.
 pub const BADGE_MIN_W: f32 = 16.0;
 pub const BADGE_H: f32 = 16.0;
-pub const BADGE_RIGHT: f32 = 34.0;
-pub const BADGE_TOP: f32 = 10.0;
+pub const BADGE_RIGHT: f32 = 38.0;
+pub const BADGE_TOP: f32 = 2.0;
 pub const BADGE_PAD: f32 = 2.0;
 pub const BADGE_FONT: f32 = 9.0;
 /// The badge shows this many and "99+" above it.

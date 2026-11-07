@@ -129,6 +129,7 @@ fn compact<'a>(cells: &[StatOptions<'a>]) -> Vec<StatOptions<'a>> {
 const ROUTES: KvOptions = KvOptions {
     mode: KvMode::Default,
     mono: true,
+    copy: false,
 };
 
 /// The card's size: 340 wide, and as tall as its padding, header, blocks, separator and rows.

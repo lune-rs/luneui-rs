@@ -99,8 +99,8 @@ const ANCHORS: [(&str, Rect); 3] = [
 ];
 
 /// The rich tooltip's content size (before padding): a bold line, a secondary line, a separator
-/// and a row of three icons.
-const RICH: (f32, f32) = (190.0, 76.0);
+/// and a line of text. A tooltip is inert (D102), so nothing in it is clickable.
+const RICH: (f32, f32) = (190.0, 70.0);
 
 impl PageState for Live {
     fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
@@ -140,10 +140,11 @@ impl PageState for Live {
                 p.text(&bold, at.x, at.y);
                 p.text(&note, at.x, at.y + 20.0);
                 p.fill(Rect::new(at.x, at.y + 42.0, at.w, 1.0), 0.0, THEME.border);
-                for (i, glyph) in [icon::EDIT, icon::COPY, icon::INFO].into_iter().enumerate() {
-                    let cell = Rect::new(at.x + i as f32 * 28.0, at.y + 50.0, 24.0, 24.0);
-                    p.text_centered(&icon::glyph(glyph, 14.0, THEME.fg_secondary), cell);
-                }
+                let hint = Spec::plain(
+                    "Links belong in a popover.",
+                    Style::ui(THEME.font_s, THEME.fg_secondary),
+                );
+                p.text(&hint, at.x, at.y + 50.0);
             }),
         }
     }

@@ -54,7 +54,7 @@ n/a — static (Wane: "Static"); a value change follows the app's data without m
 
 - Pointer: values accept selection for copy [W docs/ui/components.md:613-626]; a press focuses the value and places the caret, a drag, a double press and Shift extend it. The rows, the keys and the space beside a value take no input: the hit region is the drawn text. An elided value selects as a whole: any press selects all of it and Copy writes all of the full text [D125].
 - Keyboard: the platform's copy and select-all on the focused value; the caret keys move the selection of a value shown in full; an elided value ignores them, so a partial selection of it cannot exist.
-- Tab stop: no; the values are not controls [derived: static text, W docs/ui/components.md:613-626].
+- Tab stop: no; the values are not controls [derived: static text, W docs/ui/components.md:613-626]. With `KvOptions::copy` each row has one: its copy control, a button of 21 px at the row's right end, shown while the pointer is on the row or focus is on the row's value or on the control, and a Tab stop even while hidden. A click, Enter or Space puts that row's value on the clipboard ([D275]); the value's room narrows by the control and a 4 px gap.
 - Layer: whatever layer the owner draws it on [derived: a container].
 - Focus scope: none.
 - Pointer capture while pressed: none.
@@ -62,7 +62,7 @@ n/a — static (Wane: "Static"); a value change follows the app's data without m
 ### Retained state
 
 - Transient: the text selection (while a value is selected).
-- Persistent: none.
+- Persistent: with `copy`, per row, when the check mark began and the value it copied (1,500 ms, `COPY_FEEDBACK_MS`); none otherwise.
 - App-owned: the keys, the values, the column mode (default, stacked, mono, wrap) [W docs/ui/components.md:613-626].
 - Exit retention: no.
 
@@ -70,11 +70,11 @@ n/a — static (Wane: "Static"); a value change follows the app's data without m
 
 - Each pair is a `group` named by its key with a `static-text` key and a `static-text` value [infra.accessibility]; the list itself has no node of its own.
 - Values are selectable text: name = key, value = the full text, with the selection [infra.accessibility].
-- Live region: none.
+- Live region: none, except a polite `status` "Copied" while a row's check mark shows (`KvOptions::copy`). The control is a `button` named `Copy <key>`.
 
 ### Strings
 
-None: keys and values are app text.
+`luneui.kv-list.copy` ("Copy {0}", the key as the argument) and `luneui.kv-list.copied` ("Copied"), used only with `KvOptions::copy`. Keys and values are app text.
 
 ### Gallery scenes
 
@@ -82,6 +82,7 @@ None: keys and values are app text.
 - `kv-list-stacked` (new): stacked two-column variant, settled.
 - `kv-list-wrap` (new): a wrapped value over two lines, settled.
 - `kv-list-selected` (new): the commit value selected whole, focused by a press, settled.
+- `kv-list-copy` (new, [D275]): `KvOptions::copy` on, the pointer on the second row, whose copy control shows at its right end; the others stay hidden.
 
 ### Painter primitives
 
@@ -96,6 +97,8 @@ None: keys and values are app text.
 - Semantic node: `group` per pair; key and value `static-text`.
 - Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_kv_list.rs`: behaviour `a_drag_across_a_value_then_copy_writes_the_substring`, `a_press_on_an_elided_value_selects_it_whole_and_copy_writes_all_of_it`, `a_value_is_not_a_tab_stop`, `a_press_outside_a_value_does_nothing`, `the_selection_draws_while_focused_and_a_focus_loss_clears_it`; pixel probes `at_scale_2_the_row_is_48_px_and_the_gap_32_px`, `the_key_column_is_the_longest_keys_measured_width_and_the_gap_is_16`, `rows_are_24_high_with_the_text_on_a_20_px_line_2_px_down`, `key_and_value_colours_and_the_mono_option`; `a_long_value_is_elided_to_the_value_column_and_a_key_never_is`; node `each_pair_is_a_group_over_a_key_and_a_selectable_value`; no motion `the_list_is_static_and_settles`; disabled `a_value_focused_then_disabled_takes_its_keys_and_changes_nothing`.
 
+- Copy control ([D275]), tests in `widget_kv_list.rs`: `copy_off_draws_and_registers_what_it_did`, `a_hover_shows_one_control_on_its_own_row`, `a_click_writes_that_rows_value_and_no_other`, `the_name_carries_the_key_and_the_control_is_a_button`, `tab_reaches_a_hidden_control_and_shows_it`, `disabled_the_controls_are_inert`, `the_value_gives_up_the_controls_room`.
+
 ### Build
 
 - Milestone: M6.
@@ -104,7 +107,7 @@ None: keys and values are app text.
 
 ## Open questions
 
-- None. The selection look (`text_selection`), no copy button and a toolkit component are settled by [D125]. Column sizing measures the longest key with `Painter::measure`.
+- None. The selection look (`text_selection`) and a toolkit component are settled by [D125]. The copy control is an option, off by default ([D275]). Column sizing measures the longest key with `Painter::measure`.
 
 ## Notes for the planner
 

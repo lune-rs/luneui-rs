@@ -1,5 +1,5 @@
-//! The `kv-list` page: the default list, a mono list, the stacked and wrap modes, and a value
-//! selected for copy (D125).
+//! The `kv-list` page: the default list, a mono list, the stacked and wrap modes, a value
+//! selected for copy (D125), and the optional copy control on each row.
 
 use lune_ui::input::Modifiers;
 use lune_ui::motion::MotionTier;
@@ -63,6 +63,8 @@ struct Sections {
     /// Show a sample the knobs shape, under the sections.
     show: bool,
     mono: bool,
+    /// The copy control on each row of the sample.
+    copy: bool,
     /// An index into [`MODES`].
     mode: usize,
 }
@@ -73,6 +75,7 @@ impl Sections {
             list,
             show: false,
             mono: false,
+            copy: false,
             mode: 0,
         }
     }
@@ -89,6 +92,7 @@ impl PageState for Sections {
             let opts = KvOptions {
                 mono: self.mono,
                 mode: MODES[self.mode.min(MODES.len() - 1)].1,
+                copy: self.copy,
             };
             ui.kv_list("sample", Rect::new(x, y, 560.0, 0.0), &SHORT, &opts);
         }
@@ -97,6 +101,7 @@ impl PageState for Sections {
     fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
         panel.toggle(ui, "Show a sample", &mut self.show);
         panel.toggle(ui, "Mono values", &mut self.mono);
+        panel.toggle(ui, "Copy control", &mut self.copy);
         let names: Vec<&str> = MODES.iter().map(|(n, _)| *n).collect();
         panel.choice(ui, "Mode", &names, &mut self.mode);
     }
@@ -139,6 +144,15 @@ fn wrap_section(ui: &mut Ui<'_>, x: f32, y: f32) -> f32 {
     20.0 + ui.kv_list("wrap", Rect::new(x, y + 20.0, 440.0, 0.0), &NOTES, &opts)
 }
 
+fn copy_section(ui: &mut Ui<'_>, x: f32, y: f32) -> f32 {
+    heading(ui, "COPY CONTROL: ON THE ROW UNDER THE POINTER", x, y);
+    let opts = KvOptions {
+        copy: true,
+        ..KvOptions::default()
+    };
+    20.0 + ui.kv_list("copy", Rect::new(x, y + 20.0, 560.0, 0.0), &SHORT, &opts)
+}
+
 fn all() -> Box<dyn PageState> {
     Box::new(Sections::new(&[
         default_section,
@@ -150,6 +164,10 @@ fn all() -> Box<dyn PageState> {
 
 fn default() -> Box<dyn PageState> {
     Box::new(Sections::new(&[default_section]))
+}
+
+fn copying() -> Box<dyn PageState> {
+    Box::new(Sections::new(&[copy_section]))
 }
 
 fn stacked() -> Box<dyn PageState> {
@@ -194,6 +212,20 @@ const SCENES: &[UiScene] = &[
         state: wrap,
         script: &[],
         capture_ms: 0,
+        expect: Expect::Settled,
+    },
+    // The pointer rests on the second row: its copy control shows at the row's right end, the
+    // others stay hidden.
+    UiScene {
+        id: "kv-list-copy",
+        scale: 2.0,
+        tier: MotionTier::Full,
+        state: copying,
+        script: &[Step {
+            at_ms: 0,
+            events: &[Ev::PointerOver(&["copy", "1", "value"])],
+        }],
+        capture_ms: 400,
         expect: Expect::Settled,
     },
     // A press on the commit focuses it (a value is no tab stop, so Tab cannot); Command-A then
