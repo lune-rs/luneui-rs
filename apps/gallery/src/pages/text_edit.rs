@@ -12,6 +12,7 @@ use lune_ui::widgets::text_area::AreaOptions;
 use super::{caption, card, heading};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "text-edit",
@@ -44,6 +45,8 @@ enum Kind {
 struct Edit {
     text: String,
     kind: Kind,
+    /// The plain field's placeholder.
+    placeholder: String,
     /// The second field of the password scene.
     other: String,
 }
@@ -52,6 +55,7 @@ fn edit(text: &str, kind: Kind) -> Box<dyn PageState> {
     Box::new(Edit {
         text: text.to_owned(),
         kind,
+        placeholder: "Type here".to_owned(),
         other: "a much longer sample phrase".to_owned(),
     })
 }
@@ -101,7 +105,7 @@ impl PageState for Edit {
         heading(ui, "TEXT EDIT", x, y);
         let rect = Rect::new(x, y + 20.0, 260.0, 32.0);
         let field = FieldOptions {
-            placeholder: "Type here",
+            placeholder: &self.placeholder,
             ..FieldOptions::default()
         };
         match self.kind {
@@ -142,6 +146,26 @@ impl PageState for Edit {
                 ui.text_area("field", area, &mut self.text, &opts);
             }
         }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let kinds = [
+            ("Plain", Kind::Plain),
+            ("Error", Kind::Error),
+            ("Disabled", Kind::Disabled),
+            ("Password", Kind::Password),
+            ("Area", Kind::Area),
+            ("Read-only area", Kind::ReadOnlyArea),
+        ];
+        let names: Vec<&str> = kinds.iter().map(|(n, _)| *n).collect();
+        let mut at = kinds
+            .iter()
+            .position(|(_, k)| std::mem::discriminant(k) == std::mem::discriminant(&self.kind))
+            .unwrap_or(0);
+        if panel.choice(ui, "Widget", &names, &mut at) {
+            self.kind = kinds[at].1;
+        }
+        panel.text(ui, "Placeholder", &mut self.placeholder);
     }
 }
 

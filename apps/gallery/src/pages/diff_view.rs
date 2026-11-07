@@ -19,6 +19,7 @@ use lune_ui::widgets::menu::{MenuOptions, MenuPlace, MenuRow};
 use super::{caption, card, heading, on_card};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "diff-view",
@@ -310,6 +311,16 @@ impl PageState for Live {
                 self.menu = None;
             }
         }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.toggle(ui, "Side by side", &mut self.split);
+        panel.toggle(ui, "Wrap long lines", &mut self.wrap);
+        let mut actions = self.actions as f32;
+        if panel.number(ui, "Hunk actions", &mut actions, (0.0, 2.0, 1.0)) {
+            self.actions = actions.round() as usize;
+        }
+        panel.toggle(ui, "Enabled", &mut self.enabled);
     }
 }
 

@@ -15,6 +15,7 @@ use lune_ui::widgets::text_lines::HighlightSpan;
 use super::{card, heading, on_card};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "code-block",
@@ -226,6 +227,31 @@ impl PageState for Live {
             self.text,
             &opts,
         );
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let samples: [(&str, &'static str, Colors); 6] = [
+            ("Wide line", WIDE, Colors::Plain),
+            ("Commands", PLAIN, Colors::Plain),
+            ("Highlighted code", CODE, Colors::Syntax),
+            ("Environment block", ENV, Colors::Env),
+            (
+                "Spans past the text",
+                "0123456789\nsecond line\nthird",
+                Colors::Bad,
+            ),
+            ("Empty", "", Colors::Plain),
+        ];
+        let names: Vec<&str> = samples.iter().map(|(n, ..)| *n).collect();
+        let mut at = samples
+            .iter()
+            .position(|(_, t, c)| *t == self.text && *c == self.colors)
+            .unwrap_or(0);
+        if panel.choice(ui, "Text", &names, &mut at) {
+            self.text = samples[at].1;
+            self.colors = samples[at].2;
+        }
+        panel.toggle(ui, "Compact look", &mut self.wane);
     }
 }
 

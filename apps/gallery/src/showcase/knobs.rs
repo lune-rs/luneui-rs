@@ -502,6 +502,13 @@ mod tests {
         ("pie-chart", Press(Role::Radio, "Half")),
         ("kanban-board", Press(Role::Switch, "Error view")),
         ("lane-graph", Slide("Commits", 0.0)),
+        // Text.
+        ("text-edit", Press(Role::Radio, "Error")),
+        ("ime", Press(Role::Radio, "Area")),
+        ("code-block", Press(Role::Radio, "Empty")),
+        ("code-editor-view", Press(Role::Switch, "Line numbers")),
+        ("markdown-preview", Press(Role::Radio, "Rule")),
+        ("diff-view", Press(Role::Switch, "Enabled")),
     ];
 
     #[test]

@@ -19,6 +19,7 @@ use lune_ui::widgets::text_lines::{HighlightSpan, Highlighter, PlainHighlighter}
 use super::{card, heading, on_card};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "code-editor-view",
@@ -324,6 +325,29 @@ impl PageState for Live {
             Shape::One => self.one(ui, card),
             Shape::Synced => self.synced(ui, card),
             Shape::Anchored => self.anchored(ui, card),
+        }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.toggle(ui, "Read only", &mut self.read_only);
+        panel.toggle(ui, "Wrap long lines", &mut self.wrap);
+        panel.toggle(ui, "Line numbers", &mut self.gutter);
+        let mut enabled = !self.disabled;
+        if panel.toggle(ui, "Enabled", &mut enabled) {
+            self.disabled = !enabled;
+        }
+        let modes = [
+            ("Plain", Colors::Plain),
+            ("Syntax", Colors::Syntax),
+            ("Spans past the text", Colors::Bad),
+        ];
+        let names: Vec<&str> = modes.iter().map(|(n, _)| *n).collect();
+        let mut at = modes
+            .iter()
+            .position(|(_, c)| *c == self.colors)
+            .unwrap_or(0);
+        if panel.choice(ui, "Highlighting", &names, &mut at) {
+            self.colors = modes[at].1;
         }
     }
 }
