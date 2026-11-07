@@ -1348,8 +1348,8 @@ fn a_cancel_clears_the_offsets_at_once() {
 
 fn shapes(scene: &Scene) -> Vec<Shape> {
     scene
-        .layers
-        .iter()
+        .in_order()
+        .into_iter()
         .flat_map(|l| l.geometry.under.iter().chain(&l.geometry.over))
         .copied()
         .collect()

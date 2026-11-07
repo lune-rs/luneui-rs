@@ -283,13 +283,17 @@ fn copy(h: &mut UiHarness, lines: &[DiffLine<'_>], s: &Setup) -> Vec<String> {
 }
 
 fn texts(scene: &Scene) -> Vec<lune_ui_core::scene::TextItem> {
-    scene.layers.iter().flat_map(|l| l.texts.clone()).collect()
+    scene
+        .in_order()
+        .into_iter()
+        .flat_map(|l| l.texts.clone())
+        .collect()
 }
 
 fn under(scene: &Scene) -> Vec<Shape> {
     scene
-        .layers
-        .iter()
+        .in_order()
+        .into_iter()
         .flat_map(|l| l.geometry.under.clone())
         .collect()
 }

@@ -187,7 +187,7 @@ mod tests {
     #[test]
     fn the_three_layers_are_drawn_over_content() {
         let scene = scene_under(THEME);
-        let page = &scene.layers[LayerId::Popup as usize].geometry.acrylic;
+        let page = &scene.merged(LayerId::Popup).geometry.acrylic;
         let colours: Vec<[f32; 4]> = page.iter().map(|a| a.shape.color).collect();
         assert_eq!(colours.len(), 6);
         for (i, layer) in [THEME.glass.window, THEME.glass.panel, THEME.glass.card]
@@ -212,7 +212,7 @@ mod tests {
         theme.glass.panel.tint = [9, 80, 200, 255];
         theme.glass.panel.material_opacity = 0.2;
         let scene = scene_under(theme);
-        let page = &scene.layers[LayerId::Popup as usize].geometry.acrylic;
+        let page = &scene.merged(LayerId::Popup).geometry.acrylic;
         assert_eq!(page[1].shape.color, theme.glass.panel.premultiplied());
         assert_ne!(page[1].shape.color, THEME.glass.panel.premultiplied());
     }

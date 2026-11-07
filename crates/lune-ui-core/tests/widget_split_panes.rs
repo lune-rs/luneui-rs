@@ -1543,7 +1543,7 @@ fn the_split_draws_only_on_the_layer_it_is_called_on() {
     let c = cfg();
     clock.focus(&mut h, &c);
     let out = clock.settle(&mut h, &c);
-    for (i, l) in out.scene.layers.iter().enumerate() {
+    for (i, l) in out.scene.in_order().into_iter().enumerate() {
         if i != LayerId::Base as usize {
             assert!(
                 l.texts.is_empty() && l.geometry.under.is_empty(),

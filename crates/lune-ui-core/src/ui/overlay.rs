@@ -3,7 +3,7 @@
 //! after the app stops calling them (D8). The Ui never closes an overlay; the app stops calling it.
 
 use crate::motion::{Motion, MotionTier, MotionTokens, Resolved, Time};
-use crate::paint::{LayerId, Painter};
+use crate::paint::{LayerId, Painter, SUPPRESSED};
 
 use super::{Ui, WidgetId};
 
@@ -54,9 +54,6 @@ pub struct OverlayFrame {
     /// False when the resolved motion drops transforms (the Reduced fade): opacity only.
     pub transforms: bool,
 }
-
-/// The hit tag of exit painters: their hits are dropped.
-pub(crate) const SUPPRESSED: u32 = u32::MAX;
 
 /// An overlay's retained phase.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -428,7 +425,7 @@ impl<'a> Ui<'a> {
             if let (Some((p, transforms)), Some(exit)) =
                 (rec.closing(now, tokens, tier), rec.exit.as_ref())
             {
-                painter.enter(rec.opts.layer, SUPPRESSED);
+                painter.enter_closing(rec.opts.layer, rec.tag);
                 exit(painter, p, transforms);
             }
         }

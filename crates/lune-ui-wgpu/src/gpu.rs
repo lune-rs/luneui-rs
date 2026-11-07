@@ -13,7 +13,7 @@ use crate::images::{GpuImageInstance, ImageResources};
 use crate::platform;
 use crate::text_cache::TextCache;
 use lune_ui_core::image::{ImageData, ImageError, ImageId, ImageStore};
-use lune_ui_core::scene::{ImageSource, Scene, Shape, StrokeVertex};
+use lune_ui_core::scene::{ImageSource, Layer, Shape, StrokeVertex};
 
 /// The uniform block of the shape and stroke pipelines: the target size in physical px and the
 /// scale.
@@ -520,10 +520,10 @@ impl Gpu {
         self.images.texts.len()
     }
 
-    /// Rasterises and uploads every text of `scene`'s image items that has no raster yet.
-    pub(crate) fn ensure_text_images(&mut self, scene: &Scene, text: &mut TextCache) {
+    /// Rasterises and uploads every text of `layers`' image items that has no raster yet.
+    pub(crate) fn ensure_text_images(&mut self, layers: &[&Layer], text: &mut TextCache) {
         let limit = self.device.limits().max_texture_dimension_2d;
-        for layer in &scene.layers {
+        for layer in layers {
             for item in &layer.images {
                 let ImageSource::Text(key, _) = item.source else {
                     continue;
@@ -549,13 +549,15 @@ impl Gpu {
         }
     }
 
-    /// Copies every layer's shapes and stroke vertices of `scene` into fresh vertex buffers,
-    /// created for this draw.
-    pub(crate) fn upload(&self, scene: &Scene) -> Uploaded {
+    /// Copies the shapes and stroke vertices of `layers`, a frame's [`Scene::in_order`] list, into
+    /// fresh vertex buffers, created for this draw. The result's ranges index that list.
+    ///
+    /// [`Scene::in_order`]: lune_ui_core::scene::Scene::in_order
+    pub(crate) fn upload(&self, layers: &[&Layer]) -> Uploaded {
         let mut shapes: Vec<GpuShape> = Vec::new();
         let mut strokes: Vec<GpuStrokeVertex> = Vec::new();
-        let mut ranges = Vec::with_capacity(scene.layers.len());
-        for layer in scene.layers.iter().map(|l| &l.geometry) {
+        let mut ranges = Vec::with_capacity(layers.len());
+        for layer in layers.iter().map(|l| &l.geometry) {
             let mut push = |items: &[Shape]| {
                 let start = shapes.len() as u32;
                 shapes.extend(items.iter().map(GpuShape::from));
@@ -585,8 +587,7 @@ impl Gpu {
             });
         }
         let mut instances: Vec<GpuImageInstance> = Vec::new();
-        let image_draws: Vec<Vec<(u32, wgpu::BindGroup)>> = scene
-            .layers
+        let image_draws: Vec<Vec<(u32, wgpu::BindGroup)>> = layers
             .iter()
             .map(|layer| {
                 layer

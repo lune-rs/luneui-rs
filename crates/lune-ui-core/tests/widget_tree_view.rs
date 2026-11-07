@@ -171,8 +171,8 @@ fn segments(scene: &Scene) -> Vec<([f32; 2], [f32; 2])> {
         [(a.pos[0] + b.pos[0]) / 2.0, (a.pos[1] + b.pos[1]) / 2.0]
     };
     scene
-        .layers
-        .iter()
+        .in_order()
+        .into_iter()
         .flat_map(|l| l.geometry.strokes.chunks(6))
         .map(|c| (mid(&c[0], &c[1]), mid(&c[2], &c[4])))
         .collect()
@@ -465,8 +465,8 @@ fn the_probes_at_scale_two() {
     });
     let geometry = &f
         .scene
-        .layers
-        .iter()
+        .in_order()
+        .into_iter()
         .find(|l| !l.geometry.strokes.is_empty());
     let geometry = &geometry.expect("guides").geometry;
 
@@ -482,8 +482,8 @@ fn the_probes_at_scale_two() {
     // One depth moves the content 32 device px: the chevrons of a and a1 (depths 0, 1).
     let chevrons: Vec<f32> = f
         .scene
-        .layers
-        .iter()
+        .in_order()
+        .into_iter()
         .flat_map(|l| l.texts.iter().map(|t| t.x))
         .collect();
     let x = |n: usize| chevrons[n];
@@ -529,8 +529,8 @@ fn the_chevron_slot_is_on_every_row_when_any_row_has_children() {
         let mut h = UiHarness::new(WIN);
         let f = run(&mut h, rows);
         f.scene
-            .layers
-            .iter()
+            .in_order()
+            .into_iter()
             .flat_map(|l| l.texts.iter().map(|t| t.x))
             .next()
             .expect("the first row's text")
@@ -921,8 +921,8 @@ fn block_rows_draw_under_the_clip_with_no_hits() {
     // The block's guide strokes carry its clip: one row high at half of two rows.
     let clipped = f
         .scene
-        .layers
-        .iter()
+        .in_order()
+        .into_iter()
         .flat_map(|l| l.geometry.strokes.iter())
         .find(|v| v.clip[3] < TREE.h - 1.0)
         .expect("a block stroke");
@@ -1146,8 +1146,8 @@ fn a_block_taller_than_the_viewport_builds_only_what_the_clip_shows() {
     assert_eq!(built(&f.out), ["open"], "the viewport is all block");
     let strokes = f
         .scene
-        .layers
-        .iter()
+        .in_order()
+        .into_iter()
         .map(|l| l.geometry.strokes.len())
         .sum::<usize>();
     // Nine rows of block at most reach into the viewport, each a bounded guide.
@@ -1344,8 +1344,8 @@ fn a_secondary_click_reports_the_row() {
 fn a_hovered_row_fills_and_a_selected_one_keeps_its_own_hover() {
     let fills = |f: &Run| -> Vec<[f32; 4]> {
         f.scene
-            .layers
-            .iter()
+            .in_order()
+            .into_iter()
             .flat_map(|l| l.geometry.under.iter())
             .map(|s| s.color)
             .collect()
@@ -1378,8 +1378,8 @@ fn row_fills_tween_while_still_and_snap_while_the_content_scrolls() {
     let selected = premul(DARK.surface_selected);
     let has = |f: &Run| {
         f.scene
-            .layers
-            .iter()
+            .in_order()
+            .into_iter()
             .flat_map(|l| l.geometry.under.iter())
             .any(|s| s.color == selected)
     };
@@ -1501,8 +1501,8 @@ fn focus_rests_on_the_selected_row_when_it_shows_and_rings_only_the_cursor() {
     assert_eq!(f.st.cursor, Some(B));
     let ring = f
         .scene
-        .layers
-        .iter()
+        .in_order()
+        .into_iter()
         .flat_map(|l| l.geometry.over.iter().chain(l.geometry.under.iter()))
         .filter(|s| s.params != [0.0; 4])
         .count();

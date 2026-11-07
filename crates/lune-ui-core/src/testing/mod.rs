@@ -24,6 +24,6 @@ mod ui;
 pub use backdrop::{NullMaterial, backdrop_contract};
 pub use images::{FakeImages, image_store_contract};
 pub use input::{ScriptedInput, scripted_input_contract};
-pub use recording::{DrawCall, RecordedFrame, RecordingRenderer};
+pub use recording::{DrawCall, RecordedFrame, RecordingRenderer, flattened};
 pub use text::{FakeText, SEGMENT_TABLE, SegmentCase, spec_line_contract, text_system_contract};
 pub use ui::{UiHarness, disabled_violations};

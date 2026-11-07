@@ -944,7 +944,13 @@ mod tests {
         assert!((params.saturation - 2.5).abs() < f32::EPSILON);
         // The noise flag of every acrylic goes off.
         let mut scene = lune_ui::scene::Scene::default();
-        for layer in &mut scene.layers {
+        scene.overlays.push(lune_ui::scene::OverlayLayer {
+            on: LayerId::Modal,
+            tag: 1,
+            layer: lune_ui::scene::Layer::default(),
+        });
+        let overlays = scene.overlays.iter_mut().map(|o| &mut o.layer);
+        for layer in scene.layers.iter_mut().chain(overlays) {
             layer.geometry.acrylic.push(lune_ui::scene::Acrylic {
                 shape: lune_ui::scene::Shape {
                     params: [0.0, 0.0, 1.0, 1.0],
@@ -956,8 +962,8 @@ mod tests {
         tweaks.apply_noise(&mut scene);
         assert!(
             scene
-                .layers
-                .iter()
+                .in_order()
+                .into_iter()
                 .all(|l| l.geometry.acrylic[0].shape.params[3] == 0.0)
         );
         assert_eq!(scene.layers[0].geometry.acrylic[0].shape.params[2], 1.0);
@@ -1139,7 +1145,7 @@ mod tests {
             let mut p = Player::new(HOST, Box::new(shell), window, 1.0, MotionTier::Full);
             p.frame(&mut FakeText, 0, &[]).expect("frame");
             let scene = p.frame(&mut FakeText, 16, &[]).expect("frame").0;
-            let texts = &scene.layers[lune_ui::scene::LayerId::Raised as usize].texts;
+            let texts = &scene.merged(lune_ui::scene::LayerId::Raised).texts;
             let inside: Vec<_> = texts
                 .iter()
                 .filter(|t| region.contains((t.x + 2.0, t.y + 2.0)))
@@ -1177,7 +1183,7 @@ mod tests {
                 }
             }
             let scene = p.frame(&mut FakeText, ms, &[]).expect("frame").0;
-            let n = |l: LayerId| scene.layers[l as usize].texts.len();
+            let n = |l: LayerId| scene.merged(l).texts.len();
             (n(LayerId::Modal), n(LayerId::Raised))
         };
         let replaced = counts(&["scene dialog-combo-open@2x", "scene dialog-popover@2x"]);

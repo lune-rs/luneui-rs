@@ -55,7 +55,11 @@ fn draw(o: &StatOptions<'_>) -> Drawn {
 }
 
 fn texts(scene: &Scene) -> Vec<TextItem> {
-    scene.layers.iter().flat_map(|l| l.texts.clone()).collect()
+    scene
+        .in_order()
+        .into_iter()
+        .flat_map(|l| l.texts.clone())
+        .collect()
 }
 
 fn under(scene: &Scene) -> Vec<Shape> {

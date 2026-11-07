@@ -498,7 +498,7 @@ fn the_menu_card_fills_the_window() {
     assert!(w >= 190.0 && h > 100.0);
     let mut ui = opened();
     let (scene, ..) = draw(&mut ui, 600, true);
-    let card = scene.layers[LayerId::Popup as usize].geometry.under[0].rect;
+    let card = scene.merged(LayerId::Popup).geometry.under[0].rect;
     assert_eq!(card, [0.0, 0.0, w, h]);
     assert!(scene.backdrop.is_some(), "a glass card asks for the blur");
 }
@@ -608,12 +608,12 @@ fn the_window_menu_opens_and_closes_with_the_menus_motion_and_goes_idle() {
         let mut r = UiHarness::new(size());
         draw(&mut r, 0, true);
         let (scene, ..) = draw(&mut r, 400, true);
-        scene.layers[LayerId::Popup as usize].geometry.under[0].color[3]
+        scene.merged(LayerId::Popup).geometry.under[0].color[3]
     };
     for k in 0..=15_u64 {
         let dt = (k * 1000 + 30) / 60;
         let (scene, _, out) = draw(&mut h, dt, true);
-        let a = scene.layers[LayerId::Popup as usize].geometry.under[0].color[3];
+        let a = scene.merged(LayerId::Popup).geometry.under[0].color[3];
         assert!(a >= last && a.is_finite(), "{dt}: {a} after {last}");
         last = a;
         if dt >= 180 + 17 {
@@ -626,7 +626,7 @@ fn the_window_menu_opens_and_closes_with_the_menus_motion_and_goes_idle() {
     let mut alphas = Vec::new();
     loop {
         let (scene, _, out) = draw(&mut h, t, false);
-        if let Some(s) = scene.layers[LayerId::Popup as usize].geometry.under.first() {
+        if let Some(s) = scene.merged(LayerId::Popup).geometry.under.first() {
             alphas.push(s.color[3]);
             assert!(scene.backdrop.is_some(), "the blur goes with the fade");
         }

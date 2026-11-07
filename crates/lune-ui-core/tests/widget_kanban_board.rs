@@ -269,7 +269,7 @@ fn drawn(scene: &Scene, key: u64, scale: f32) -> Vec<(usize, f32, f32, u8)> {
         keys.insert(spec.cache_key(scale), a);
     }
     let mut found = Vec::new();
-    for (l, layer) in scene.layers.iter().enumerate() {
+    for (l, layer) in scene.in_order().into_iter().enumerate() {
         for t in &layer.texts {
             if let Some(a) = keys.get(&t.key.0) {
                 found.push((l, t.x, t.y, *a));
@@ -281,7 +281,8 @@ fn drawn(scene: &Scene, key: u64, scale: f32) -> Vec<(usize, f32, f32, u8)> {
 
 /// The under shapes of `layer` with the colour `c`, as drawn.
 fn fills(scene: &Scene, layer: LayerId, c: Rgba) -> Vec<Shape> {
-    scene.layers[layer as usize]
+    scene
+        .merged(layer)
         .geometry
         .under
         .iter()
@@ -1622,10 +1623,8 @@ fn the_ghost_is_above_the_board_cut_by_no_clip_and_hits_nothing() {
     let g = ghost(&r.scene).expect("a ghost");
     assert_eq!(g.clip[2], 0.0, "no clip");
     assert!(ghost_on(&r.scene, LayerId::Page).is_none());
-    let text = r.scene.layers[LayerId::Popup as usize]
-        .texts
-        .first()
-        .expect("the ghost's title");
+    let layer = r.scene.merged(LayerId::Popup);
+    let text = layer.texts.first().expect("the ghost's title");
     assert_eq!((text.clip.x, text.clip.y), (0.0, 0.0));
     assert_eq!((text.clip.w, text.clip.h), WIN);
 
@@ -1675,7 +1674,7 @@ fn inside_a_dialog_the_ghost_is_raised_and_a_close_replays_none() {
     assert!(ghost_on(&r.scene, LayerId::Modal).is_none());
     assert!(ghost_on(&r.scene, LayerId::Popup).is_none());
     assert_eq!(
-        r.scene.layers[LayerId::Raised as usize].geometry.under[0].rect[0],
+        r.scene.merged(LayerId::Raised).geometry.under[0].rect[0],
         b.x + 40.0
     );
 
@@ -2274,7 +2273,9 @@ fn the_ghost_of_a_focused_card_carries_the_focus_ring() {
     for ms in [1032, 1048, 1064, 1080] {
         let r = run(&mut h, &m, ms);
         assert!(ghost(&r.scene).is_some(), "landing at {ms}");
-        let rings: Vec<f32> = r.scene.layers[LayerId::Popup as usize]
+        let rings: Vec<f32> = r
+            .scene
+            .merged(LayerId::Popup)
             .geometry
             .under
             .iter()

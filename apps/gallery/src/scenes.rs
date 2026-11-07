@@ -678,8 +678,8 @@ mod tests {
 
     fn acrylics(scene: &Scene) -> Vec<Acrylic> {
         scene
-            .layers
-            .iter()
+            .in_order()
+            .into_iter()
             .flat_map(|l| l.geometry.acrylic.iter().copied())
             .collect()
     }

@@ -533,10 +533,7 @@ mod tests {
             "the pointer is on the destructive row and the tooltip shows"
         );
         assert!(
-            !scene.layers[LayerId::Raised as usize]
-                .geometry
-                .under
-                .is_empty(),
+            !scene.merged(LayerId::Raised).geometry.under.is_empty(),
             "above the card"
         );
         let (_, out) = run("command-palette-date-error");

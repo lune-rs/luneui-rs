@@ -367,8 +367,8 @@ mod tests {
         let (scene, _) = run("tree-view-hover", 2);
         let hover = lune_ui::color::premul(THEME.surface_hover);
         let filled = |s: &Scene| {
-            s.layers
-                .iter()
+            s.in_order()
+                .into_iter()
                 .flat_map(|l| l.geometry.under.iter())
                 .any(|f| f.color == hover)
         };

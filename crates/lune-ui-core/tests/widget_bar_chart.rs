@@ -561,7 +561,7 @@ fn hovered_reports_the_slot_under_the_pointer() {
 }
 
 fn popup_texts(scene: &Scene) -> Vec<TextItem> {
-    scene.layers[LayerId::Popup as usize].texts.clone()
+    scene.merged(LayerId::Popup).texts.clone()
 }
 
 #[test]

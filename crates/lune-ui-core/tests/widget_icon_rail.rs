@@ -707,10 +707,7 @@ fn a_tooltip_names_the_button_after_the_delay_and_the_description_stays_the_note
     clock.0 += 1200;
     h.at_ms(clock.0);
     let out = frame(&mut h, &c);
-    let shown = !out.scene.layers[LayerId::Popup as usize]
-        .geometry
-        .under
-        .is_empty();
+    let shown = !out.scene.merged(LayerId::Popup).geometry.under.is_empty();
     assert!(shown, "the tooltip is up");
     assert_eq!(
         out.out
@@ -728,12 +725,7 @@ fn a_tooltip_names_the_button_after_the_delay_and_the_description_stays_the_note
     clock.0 += 1200;
     h.at_ms(clock.0);
     let out = frame(&mut h, &c);
-    assert!(
-        !out.scene.layers[LayerId::Popup as usize]
-            .geometry
-            .under
-            .is_empty()
-    );
+    assert!(!out.scene.merged(LayerId::Popup).geometry.under.is_empty());
     assert_eq!(
         out.out.tree.get(item_id(4)).expect("present").description,
         None
@@ -804,7 +796,7 @@ fn the_rail_draws_only_on_the_layer_it_is_called_on() {
         ..cfg()
     };
     let out = clock.settle(&mut h, &c);
-    for (i, l) in out.scene.layers.iter().enumerate() {
+    for (i, l) in out.scene.in_order().into_iter().enumerate() {
         if i != LayerId::Base as usize {
             assert!(
                 l.texts.is_empty() && l.geometry.under.is_empty(),

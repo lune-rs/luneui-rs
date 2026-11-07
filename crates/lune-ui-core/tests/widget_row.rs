@@ -20,7 +20,11 @@ const RECT: Rect = Rect::new(20.0, 30.0, 400.0, 0.0);
 const TOGGLE: (f32, f32) = (388.0, 58.0);
 
 fn texts(scene: &Scene) -> Vec<TextItem> {
-    scene.layers.iter().flat_map(|l| l.texts.clone()).collect()
+    scene
+        .in_order()
+        .into_iter()
+        .flat_map(|l| l.texts.clone())
+        .collect()
 }
 
 fn under(scene: &Scene) -> Vec<Shape> {

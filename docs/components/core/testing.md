@@ -32,7 +32,7 @@ Conflicts: none.
 
 - Backdrop: `NullMaterial`, `backdrop_contract` [R crates/lune-ui-core/src/testing/mod.rs:18].
 - Input: `ScriptedInput` [R crates/lune-ui-core/src/testing/mod.rs:19].
-- Recording: `DrawCall`, `RecordedFrame`, `RecordingRenderer` [R crates/lune-ui-core/src/testing/mod.rs:20].
+- Recording: `DrawCall`, `RecordedFrame`, `RecordingRenderer`, and `flattened` (a scene with its overlays folded into the fixed layers, to compare with the Painter API) [R crates/lune-ui-core/src/testing/mod.rs:20].
 - Text: `FakeText`, `text_system_contract` [R crates/lune-ui-core/src/testing/mod.rs:21].
 
 ### States

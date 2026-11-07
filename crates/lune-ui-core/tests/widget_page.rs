@@ -905,7 +905,7 @@ fn the_layer_is_the_one_the_app_draws_on() {
     // The page draws nowhere but the layer it is called on.
     let mut h = UiHarness::new(WIN);
     let out = settled(&mut h, &Cfg::new());
-    for (i, l) in out.scene.layers.iter().enumerate() {
+    for (i, l) in out.scene.in_order().into_iter().enumerate() {
         if i != LayerId::Base as usize {
             assert!(
                 l.texts.is_empty() && l.geometry.under.is_empty(),

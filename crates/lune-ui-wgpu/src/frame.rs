@@ -27,7 +27,8 @@ pub struct FrameRenderer {
     /// Globals, the shared noise texture and sampler (the shape and stroke pipelines' group 0).
     bind_group: wgpu::BindGroup,
     viewport: Viewport,
-    /// One text renderer per paint layer, so text interleaves correctly with shapes.
+    /// One text renderer per layer of [`Scene::in_order`], so text interleaves correctly with
+    /// shapes; grows to the longest list a frame has had.
     layers: Vec<TextRenderer>,
     /// Offscreen scene + blur for glass menus.
     blur: Blur,
@@ -132,7 +133,7 @@ impl FrameRenderer {
         {
             return Err("frame renderer used with a Gpu that did not make it".into());
         }
-        let layers = &scene.layers;
+        let layers = scene.in_order();
         let backdrop = scene.backdrop;
         let split = scene.split();
         if let Some(bad) = layers
@@ -150,7 +151,7 @@ impl FrameRenderer {
         for c in customs.iter_mut() {
             c.prepare(&gpu.device, &gpu.queue, &custom_frame);
         }
-        gpu.ensure_text_images(scene, text);
+        gpu.ensure_text_images(&layers, text);
         let customs: &[&mut dyn CustomDraw] = customs;
         let FrameParams {
             size,
@@ -171,6 +172,11 @@ impl FrameRenderer {
             ..
         } = gpu;
         let atlas = &mut formats[self.format_index].atlas;
+        while self.layers.len() < layers.len() {
+            let multisample = wgpu::MultisampleState::default();
+            let renderer = TextRenderer::new(atlas, device, multisample, None);
+            self.layers.push(renderer);
+        }
         self.viewport.update(
             queue,
             Resolution {
@@ -214,7 +220,7 @@ impl FrameRenderer {
         );
         let gpu: &Gpu = gpu;
         let fs = &gpu.formats[self.format_index];
-        let uploaded = gpu.upload(scene);
+        let uploaded = gpu.upload(&layers);
         self.blur
             .prepare(&gpu.device, &gpu.queue, &gpu.blur, size, s, sigma);
         let mut encoder = gpu.device.create_command_encoder(&Default::default());

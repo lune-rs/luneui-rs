@@ -812,11 +812,7 @@ fn rows_show_selection_and_hover_at_radius_4() {
     let at = row_at(2);
     h.input.pointer_to(at.0, at.1);
     let s = settle(&mut h, &mut app, &mut ms);
-    let layer = s
-        .scene
-        .layers
-        .get(LayerId::Popup as usize)
-        .expect("a popup layer");
+    let layer = s.scene.merged(LayerId::Popup);
     let g = &layer.geometry;
     let fill = |color| {
         *g.under
@@ -836,11 +832,7 @@ fn rows_show_selection_and_hover_at_radius_4() {
 // Size and place.
 
 fn popup_panel(s: &Scene) -> [f32; 4] {
-    let layer = s
-        .layers
-        .get(LayerId::Popup as usize)
-        .expect("a popup layer");
-    layer
+    s.merged(LayerId::Popup)
         .geometry
         .under
         .iter()
@@ -1105,7 +1097,9 @@ fn at_scale_2_the_popup_radius_is_16_the_search_bar_8_and_the_dash_is_1_px_in_a_
     click(&mut h, ON_TRIGGER);
     let s = settle(&mut h, &mut app, &mut ms);
     assert!(s.expanded());
-    let radii: Vec<f32> = s.scene.layers[LayerId::Popup as usize]
+    let radii: Vec<f32> = s
+        .scene
+        .merged(LayerId::Popup)
         .geometry
         .under
         .iter()

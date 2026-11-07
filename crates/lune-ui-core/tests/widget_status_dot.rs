@@ -33,7 +33,7 @@ fn every_tone_is_a_16_px_circle_at_scale_2_in_the_tone_colour() {
         assert_eq!(s.rect, [32.0, 52.0, 16.0, 16.0], "{tone:?}");
         assert_eq!(s.radii, [8.0; 4], "{tone:?}: a circle");
         assert_eq!(s.color, premul(tone.color(&DARK)), "{tone:?}");
-        assert!(scene.layers.iter().all(|l| l.texts.is_empty()));
+        assert!(scene.in_order().into_iter().all(|l| l.texts.is_empty()));
     }
 }
 
@@ -62,7 +62,11 @@ fn the_ui_dot_draws_the_circle_then_its_word_and_settles() {
     // The dot is centred on the word's line.
     assert_eq!(g.under[0].rect[1], 10.0 + (style.line - 8.0) / 2.0);
     assert_eq!(g.under[0].rect[0], 10.0);
-    let texts: Vec<_> = scene.layers.iter().flat_map(|l| &l.texts).collect();
+    let texts: Vec<_> = scene
+        .in_order()
+        .into_iter()
+        .flat_map(|l| &l.texts)
+        .collect();
     assert_eq!(texts.len(), 1);
     assert_eq!(texts[0].x, 10.0 + 8.0 + 8.0);
     assert_eq!(texts[0].key.0, Spec::plain("Healthy", style).cache_key(1.0));

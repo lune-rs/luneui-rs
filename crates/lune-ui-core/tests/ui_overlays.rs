@@ -11,7 +11,7 @@ use lune_ui_core::access::{Node, Role};
 use lune_ui_core::input::{FrameOutput, Key, NamedKey, PointerButton, Repaint};
 use lune_ui_core::motion::{Easing, Kind, Motion, MotionTier, Reduce, Token};
 use lune_ui_core::paint::{LayerId, Rect};
-use lune_ui_core::scene::Scene;
+use lune_ui_core::scene::{Layer, OverlayLayer, Scene};
 use lune_ui_core::testing::UiHarness;
 use lune_ui_core::ui::{
     Dismissal, OverlayFrame, OverlayOptions, OverlayPhase, Response, Sense, Ui, WidgetId,
@@ -299,7 +299,7 @@ fn close_run(tier: MotionTier) -> (Vec<f32>, Vec<Repaint>, u64, Scene) {
             return (ps, repaints, t - t0, scene);
         }
         repaints.push(out.repaint);
-        let modal_layer = &scene.layers[LayerId::Modal as usize];
+        let modal_layer = &scene.merged(LayerId::Modal);
         assert_eq!(
             modal_layer.geometry.under.len(),
             1,
@@ -330,7 +330,7 @@ fn an_overlay_the_app_stops_calling_keeps_drawing_until_its_close_ends() {
         }
         assert!(ps.windows(2).all(|w| w[1] > w[0]), "{tier:?}: rising p");
         assert!(ps.iter().all(|p| *p < 1.0));
-        let modal_layer = &scene.layers[LayerId::Modal as usize];
+        let modal_layer = &scene.merged(LayerId::Modal);
         assert!(
             modal_layer.geometry.under.is_empty(),
             "{tier:?}: nothing on its layer"
@@ -421,8 +421,8 @@ fn recorded_content_replays_in_the_exit_painter() {
     let (closing, _) = h.at_ms(1000).frame(|_| {});
     let open_scene = open_scene.expect("ran");
     assert_eq!(
-        closing.layers[LayerId::Modal as usize],
-        open_scene.layers[LayerId::Modal as usize],
+        closing.merged(LayerId::Modal),
+        open_scene.merged(LayerId::Modal),
         "the first exit frame replays the content as drawn"
     );
 }
@@ -679,13 +679,13 @@ fn open_child(kind: Child) -> (UiHarness, Bed, FrameOutput) {
 }
 
 fn has_content(scene: &Scene, layer: LayerId) -> bool {
-    let l = &scene.layers[layer as usize];
+    let l = &scene.merged(layer);
     !(l.texts.is_empty() && l.geometry.under.is_empty() && l.geometry.acrylic.is_empty())
 }
 
 /// How much each kind of draw `layer` holds.
 fn counts(scene: &Scene, layer: LayerId) -> (usize, usize, usize, usize) {
-    let l = &scene.layers[layer as usize];
+    let l = &scene.merged(layer);
     let g = &l.geometry;
     (g.acrylic.len(), g.under.len(), g.over.len(), l.texts.len())
 }
@@ -850,7 +850,8 @@ fn marked(ui: &mut Ui<'_>, key: &str, opts: &OverlayOptions) -> Response {
 }
 
 fn fills(scene: &Scene, layer: LayerId) -> usize {
-    scene.layers[layer as usize]
+    scene
+        .merged(layer)
         .geometry
         .under
         .iter()
@@ -1023,7 +1024,8 @@ fn a_parent_closing_first_leaves_the_child_raised_until_the_parent_is_gone() {
 const CHILD_R: Rect = Rect::new(300.0, 10.0, 50.0, 40.0);
 
 fn fills_at(scene: &Scene, layer: LayerId, r: Rect) -> usize {
-    scene.layers[layer as usize]
+    scene
+        .merged(layer)
         .geometry
         .under
         .iter()
@@ -1441,13 +1443,163 @@ fn a_tooltip_inside_a_popover_is_not_in_the_popover_exit() {
     run(&mut h, true);
     h.at_ms(3_000);
     let open = run(&mut h, true);
-    let drawn = open.layers[LayerId::Popup as usize].texts.len();
+    let drawn = open.merged(LayerId::Popup).texts.len();
     assert_eq!(drawn, 2, "the button's label and the tooltip's text");
     h.at_ms(3_010);
     let closing = run(&mut h, false);
     assert_eq!(
-        closing.layers[LayerId::Popup as usize].texts.len(),
+        closing.merged(LayerId::Popup).texts.len(),
         drawn,
         "each exit draws its own, once"
+    );
+}
+
+// A layer per overlay: everything of an older overlay draws before anything of a newer one.
+
+/// The overlays of `scene` in their draw order, which `Scene::in_order` gives.
+fn drawn<'s>(scene: &'s Scene) -> Vec<&'s OverlayLayer> {
+    let order = scene.in_order();
+    let place = |l: &Layer| order.iter().position(|o| std::ptr::eq(*o, l));
+    let mut out: Vec<&'s OverlayLayer> = scene.overlays.iter().collect();
+    out.sort_by_key(|o| place(&o.layer).expect("every overlay is in the order"));
+    out
+}
+
+/// A dialog, a popover in it, a list in the popover and a tooltip on the popover's button; `inner`
+/// adds a second popover between the popover and the list, a fifth level.
+fn stack_frame(h: &mut UiHarness, ms: u64, inner: bool) -> (Scene, FrameOutput) {
+    h.at_ms(ms);
+    h.frame(|ui| {
+        ui.dialog("dialog", &DIALOG, &GLASS, |ui, x, y, _| {
+            let at = Rect::new(x, y, 120.0, 24.0);
+            ui.popover(
+                "pop",
+                &PopoverOptions::new(at, (200.0, 60.0)),
+                |ui, rect| {
+                    let button = Rect::new(rect.x + 8.0, rect.y + 8.0, 100.0, 24.0);
+                    let r = ui.button("anchor", button, "anchor", ButtonKind::Secondary);
+                    let aside = Rect::new(600.0, 20.0, 120.0, 24.0);
+                    if inner {
+                        ui.popover(
+                            "inner",
+                            &PopoverOptions::new(aside, (100.0, 40.0)),
+                            |_, _| {},
+                        );
+                    }
+                    let list = Rect::new(600.0, 300.0, 120.0, 24.0);
+                    ui.dropdown("list", list, r.id, &[("one", true), ("two", true)], 0);
+                    ui.tooltip(&r, "hint");
+                },
+            );
+        });
+    })
+}
+
+/// Opens the stack, then holds the pointer on the button until the tooltip is up.
+fn stacked_with_tooltip(inner: bool) -> Scene {
+    let mut h = UiHarness::new((800.0, 600.0));
+    stack_frame(&mut h, 0, inner);
+    let (_, out) = stack_frame(&mut h, 1_000, inner);
+    let (x, y) = centre(&out, "anchor");
+    h.input.pointer_to(x, y);
+    stack_frame(&mut h, 2_000, inner);
+    stack_frame(&mut h, 2_016, inner);
+    stack_frame(&mut h, 4_000, inner).0
+}
+
+#[test]
+fn a_dialog_popover_list_and_tooltip_are_four_layers_in_open_order() {
+    let scene = stacked_with_tooltip(false);
+    let layers = drawn(&scene);
+    let on: Vec<LayerId> = layers.iter().map(|o| o.on).collect();
+    assert_eq!(
+        on,
+        [
+            LayerId::Modal,
+            LayerId::Raised,
+            LayerId::Raised,
+            LayerId::Raised
+        ]
+    );
+    assert!(layers.windows(2).all(|w| w[0].tag < w[1].tag));
+    // Each drew its own text: the dialog's, the button, the two rows and the selected mark, the hint.
+    let texts: Vec<usize> = layers.iter().map(|o| o.layer.texts.len()).collect();
+    assert!(texts[0] >= 3, "{texts:?}");
+    assert_eq!(texts[1..], [1, 3, 1]);
+    assert!(!layers[0].layer.geometry.acrylic.is_empty(), "the card");
+}
+
+#[test]
+fn a_fifth_level_is_a_layer_of_its_own_too() {
+    let scene = stacked_with_tooltip(true);
+    let layers = drawn(&scene);
+    assert_eq!(layers.len(), 5);
+    assert!(layers.windows(2).all(|w| w[0].tag < w[1].tag));
+    let texts: Vec<usize> = layers.iter().map(|o| o.layer.texts.len()).collect();
+    assert_eq!(texts[1..], [1, 0, 3, 1]);
+}
+
+#[test]
+fn an_exit_under_a_newer_overlay_draws_in_its_open_order() {
+    let frame = |h: &mut UiHarness, ms: u64, pop: bool, menu: bool| {
+        h.at_ms(ms);
+        h.frame(|ui| {
+            if pop {
+                let options = PopoverOptions::new(PAGE_BTN, (120.0, 60.0));
+                ui.popover("pop", &options, |_, _| {});
+            }
+            if menu {
+                let row = MenuRow::Item {
+                    glyph: None,
+                    text: "one",
+                    shortcut: "",
+                };
+                ui.menu("menu", &[row], (200.0, 100.0));
+            }
+        })
+        .0
+    };
+    let mut h = harness();
+    frame(&mut h, 0, true, false);
+    frame(&mut h, 300, true, true);
+    frame(&mut h, 1_000, false, true);
+    let scene = frame(&mut h, 1_060, false, true);
+    // The exit runs at the frame's end, after the menu, and its tag still puts it first.
+    let [menu, exit] = scene.overlays.as_slice() else {
+        panic!("the menu and the exit: {:?}", scene.overlays.len());
+    };
+    assert!(exit.tag < menu.tag);
+    assert!(!exit.layer.geometry.under.is_empty(), "the exit drew");
+    assert!(!menu.layer.geometry.under.is_empty(), "the menu drew");
+    let layers = drawn(&scene);
+    assert_eq!(layers[0].tag, exit.tag);
+    assert_eq!(layers[1].tag, menu.tag);
+}
+
+#[test]
+fn what_an_overlay_draws_after_a_child_stays_on_its_own_layer() {
+    let mut h = harness();
+    let fill = |ui: &mut Ui<'_>| ui.painter().fill(MENU, 0.0, [1, 2, 3, 255]);
+    let (scene, _) = h.frame(|ui| {
+        ui.overlay(
+            "parent",
+            &popup(),
+            |_, _, _| {},
+            |ui, _| {
+                fill(ui);
+                ui.overlay("child", &popup(), |_, _, _| {}, |ui, _| fill(ui));
+                fill(ui);
+            },
+        );
+    });
+    let layers = drawn(&scene);
+    assert_eq!(layers.len(), 2);
+    assert_eq!(layers[0].layer.geometry.under.len(), 2, "the parent");
+    assert_eq!(layers[1].layer.geometry.under.len(), 1, "the child");
+    assert!(
+        scene.layers[LayerId::Popup as usize]
+            .geometry
+            .under
+            .is_empty()
     );
 }

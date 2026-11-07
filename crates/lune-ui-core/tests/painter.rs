@@ -494,7 +494,7 @@ fn image_lands_on_the_current_layer_under_the_clip_and_xform() {
         );
     });
     // Only the Popup layer holds it.
-    for (i, l) in scene.layers.iter().enumerate() {
+    for (i, l) in scene.in_order().into_iter().enumerate() {
         assert_eq!(l.images.len(), usize::from(i == POPUP), "layer {i}");
     }
     let it = scene.layers[POPUP].images[0];
@@ -525,7 +525,7 @@ fn text_rotated_lands_on_the_current_layer_under_the_clip_and_xform() {
         popup_under_clip_and_xform(p);
         p.text_rotated(&spec, (50.0, 40.0), 0.5);
     });
-    for (i, l) in scene.layers.iter().enumerate() {
+    for (i, l) in scene.in_order().into_iter().enumerate() {
         assert_eq!(l.images.len(), usize::from(i == POPUP), "layer {i}");
         assert!(
             l.texts.is_empty(),
@@ -562,7 +562,7 @@ fn fills_rings_and_backdrops_take_the_layer_clip_scale_and_alpha_of_the_xform() 
         p.ring(MOVED, 1.0, 1.0, WHITE, true);
         p.backdrop(MOVED, 1.0);
     });
-    for (i, l) in scene.layers.iter().enumerate() {
+    for (i, l) in scene.in_order().into_iter().enumerate() {
         let n = usize::from(i == POPUP) * 2;
         assert_eq!(
             (l.geometry.under.len(), l.geometry.over.len()),
@@ -599,7 +599,7 @@ fn strokes_fans_and_polygons_take_the_layer_clip_scale_and_alpha_of_the_xform() 
         p.fill_path(&[[20.0, 30.0], [30.0, 30.0], [30.0, 38.0]], WHITE);
         p.sector([20.0, 30.0], 5.0, 0.0, std::f32::consts::FRAC_PI_2, WHITE);
     });
-    for (i, l) in scene.layers.iter().enumerate() {
+    for (i, l) in scene.in_order().into_iter().enumerate() {
         let on = i == POPUP;
         assert_eq!(!l.geometry.strokes.is_empty(), on, "strokes, layer {i}");
         assert_eq!(!l.geometry.fills.is_empty(), on, "fills, layer {i}");
@@ -640,7 +640,7 @@ fn text_takes_the_layer_clip_scale_and_alpha_of_the_xform() {
         popup_under_clip_and_xform(p);
         p.text(&spec, 20.0, 30.0);
     });
-    for (i, l) in scene.layers.iter().enumerate() {
+    for (i, l) in scene.in_order().into_iter().enumerate() {
         assert_eq!(l.texts.len(), usize::from(i == POPUP), "layer {i}");
     }
     let it = scene.layers[POPUP].texts[0];

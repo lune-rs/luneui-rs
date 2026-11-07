@@ -57,7 +57,7 @@ app passes time, sizes, fonts, theme, scale and hit values in), so frames are de
 | `tray` (`tray.rs`) | The tray's pure half (D218 to D221, D226): the icon rastered on the CPU by signed distance (a transparent ring, a coloured dot), where the flyout and the menu go from the icon's rect, and the click rules | `icon_bitmap`, `TrayBitmap`, `TrayState`, `GlyphTone`, `bar_from_tray`, `place_surface`, `TraySurface`, `TrayToggle`, `TrayAction`, `tray_surface`, `TrayPlatform` |
 | `acrylic` (`acrylic.rs`) | Avalonia acrylic colour math and the noise opacity | `AcrylicColors`, `NOISE_OPACITY` |
 | `paint` (`paint.rs`, `paint/path.rs`) | Immediate-mode painter: six layers, clip and rounded clip (`push_clip_rounded`), a transform stack (D66) and `push_translate`, the seven M5 primitives (image, rotate, dash, rounded clip, sector, path fill, arc; D105), hit regions generic over the app's hit type `H` and tagged with the overlay they belong to, an op recorder (`start_recording`, `take_recording`, replayed by exit painters), faded acrylic, `acrylic_radii` (one radius per corner) and `backdrop_with` (the glass's own layer, sigma and saturation; D137, D138), `stroke_sweep` and `stroke_comet` over `StrokeStyle.mode` (the busy cue's conic arc and dash, D122), `Painter::elide` (see `text`); builds a `Scene`; holds `&mut dyn TextSystem` | `Painter<H>`, `Rect`, `StrokeStyle`, `Xform`, `Ops` |
-| `scene` (`scene.rs`) | The display list: plain data plus the draw-order contract | `Scene`, `Layer`, `LayerGeometry`, `Shape`, `Acrylic` (a shape and its opacity, D61), `StrokeVertex`, `TextItem`, `CustomItem`, `BackdropRequest` (rect, radius, alpha, `layer`, `sigma`, `saturation`), `ImageItem`, `RoundClip`, `LayerId` (Base, Page, Popup, Modal, Raised, Toast; D54, D137), `LAYER_COUNT` (6), `SCENE_LAYERS`, `Scene::split`, `FrameParams` |
+| `scene` (`scene.rs`) | The display list: plain data plus the draw-order contract | `Scene`, `Layer`, `LayerGeometry`, `Shape`, `Acrylic` (a shape and its opacity, D61), `StrokeVertex`, `TextItem`, `CustomItem`, `BackdropRequest` (rect, radius, alpha, `layer`, `tag`, `sigma`, `saturation`), `ImageItem`, `RoundClip`, `LayerId` (Base, Page, Popup, Modal, Raised, Toast; D54, D137), `OverlayLayer` (an overlay's own layer, D256), `LAYER_COUNT` (6), `SCENE_LAYERS`, `Scene::in_order`, `Scene::merged`, `Scene::split`, `FrameParams` |
 | `text` (`text.rs`) | Text specs and the text seam, with the caret, hit, line and segment queries (D86, D94) | `TextSystem` (`prepare`, `measure`, `caret`, `hit`, `lines`, `segments`), `TextKey`, `Spec`, `Style`, `Font`, `CaretPos`, `LineSpan`, `Unit`, `elide` (D114: one line cut on a grapheme boundary, U+2026 in the last kept run's style, found by binary search over `caret`; a spec that fits comes back unchanged) |
 | `input` (`input.rs`) | The input seam: what the app hands in, what the toolkit asks back | `RawInput`, `Event` (with `Access`, `ClipboardText`, `ClipboardUnavailable` and, since M10, `FileHover`, `FileHoverCancelled`, `FileDrop`: a `PathBuf` and the last pointer position, nothing opens the path; D211), `Key`, `NamedKey`, `Modifiers`, `ImeEvent`, `FocusEvent`, `Keymap` (`MAC`, `PC`; D92), `FrameOutput` (with `repaint`, `clipboard`, `tree`, `focused`, `cursor`, `ime_area`, `fired`), `Repaint`, `ClipboardRequest`, `WindowCommand`, `CursorIcon` (with `ALL`), `printable` |
 | `image` (`image.rs`) | The picture seam: the app decodes, registers by id, releases explicitly; fit geometry | `ImageStore`, `ImageData`, `ImageId`, `ImageError`, `Fit`, `ImageAlign`, `image_rect` |
@@ -115,9 +115,8 @@ tree, focused widget and the shortcut commands that fired. `FrameConfig` also ca
 - The `Raised` layer (D137): `Ui::overlay` chooses an overlay's layer once, when it opens or reopens, and holds it to
   its close. A `Popup` or `Modal` overlay that opens while a modal is active is promoted to `LayerId::Raised`
   (between `Modal` and `Toast`), so a popover, tooltip, combo list, search picker, menu or nested dialog over a dialog
-  draws and takes input on top; no widget asks for it. The rule is one level deep: overlays stacked further share
-  `Raised`, and a layer draws by kind, so a third level that overlaps its parent interleaves with it (fills under
-  text). A toast is not an overlay record: `Ui::toasts` draws on `Toast` directly and a press on a `Toast` hit is
+  draws and takes input on top; no widget asks for it. Overlays stacked further share `Raised`, each on a draw layer
+  of its own in open order, so a third level hides what it covers (D256). A toast is not an overlay record: `Ui::toasts` draws on `Toast` directly and a press on a `Toast` hit is
   never an outside press, moves no focus, and an accessibility action on one dismisses no overlay and takes no focus
   out of a modal (D146). `Ui::overlay` also pauses any enclosing `record`, so a dialog's exit replay does not
   draw the overlays opened in its body (D139).
@@ -279,11 +278,17 @@ Not checked, from reading only:
 Inside one layer, back to front (the contract in `scene.rs`): the acrylic shapes, the under shapes, the
 path fills (their own list, `LayerGeometry::fills`, drawn with the stroke pipeline so the order is
 explicit, D105), the custom items in record order, the images in record order (`Layer::images`), the
-text, the over shapes and the strokes. Layers run back to front, six of them (`Base`, `Page`, `Popup`, `Modal`,
-`Raised`, `Toast`); those below `Scene::split` render into the offscreen scene a backdrop blurs. The split moves: it
-is `SCENE_LAYERS` (2), or the backdrop request's own layer when that is higher, so a glass surface blurs everything
-under it (a glass menu in a dialog blurs the dialog; D138). A frame has one blur: of two requests the lower layer
-keeps it, and on one layer the last wins, so a glass menu over a dialog whose scrim is blurred has none of its own. Consequences a widget author meets: text draws above every fill
+text, the over shapes and the strokes. `Scene::in_order` is the order of the layers, and the one list every renderer
+walks: the six fixed layers back to front (`Base`, `Page`, `Popup`, `Modal`, `Raised`, `Toast`), each followed by the
+overlays on it in tag order, which is open order (D256). `scene.layers[id as usize]` is what was drawn on `id` outside
+any overlay (`Painter::on`, a toast, a ghost dragged from outside one); `Scene::overlays` holds each overlay's own
+`Layer`, keyed by fixed layer and tag, and `Scene::merged` folds a fixed layer and its overlays into one for tests.
+Everything of an older overlay draws before anything of a newer one on its fixed layer, however their calls fell in
+the frame, and an exit keeps its overlay's tag, so it draws under an overlay opened after it. Layers before
+`Scene::split` in that list render into the offscreen scene a backdrop blurs. The split moves: it is at the fixed
+layer `SCENE_LAYERS` (2), or at the backdrop request's own layer when that is later, so a glass surface blurs
+everything drawn before it (a glass menu in a dialog blurs the dialog; D138). A frame has one blur: of two requests
+the lower fixed layer keeps it, and on one the last wins, so a glass menu over a dialog whose scrim is blurred has none of its own. Consequences a widget author meets: text draws above every fill
 of its layer (a label shows through a fill drawn "over" it on the same layer), and a rounded clip
 (`push_clip_rounded`) cuts shapes, strokes, fills and images but gives text and custom items only its
 bounding rect.
@@ -515,8 +520,7 @@ seam, in `platform/` or `material/` files, so the Windows DX12 choice is in
 The two M1 deviations are resolved: the inline `cfg(target_os)` in `gpu.rs` and `window.rs` moved
 into `platform/` files (step 8), and `Gpu::new` takes an optional compatible surface, so a headless
 device needs no window (steps 3 and 4). The limits that remain are choices with a row or an entry,
-not missing parts (D237, D245): an overlay above a modal goes one level (D137) and a frame has one
-blur (D138); text cannot be cut by a rounded clip (it gets the bounding rect) and draws above the
+not missing parts (D237, D245): a frame has one blur (D138); text cannot be cut by a rounded clip (it gets the bounding rect) and draws above the
 fills of its layer, so overlapping labels show through during a drag; the bundled fonts have no bold,
 CJK or italic face; a ring's width follows the device scale only; the tab strip closes its menu when
 disabled; the API gaps marked in the entries. `docs/STATE.md`, "Carried limits", lists them with

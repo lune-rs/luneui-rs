@@ -558,14 +558,14 @@ mod tests {
     /// dialog's own layer (logical px; the scenes run at scale 2): the overlay's surface is above
     /// the dialog's text.
     fn covers_dialog_text(scene: &Scene, layer: LayerId) -> bool {
-        let over = &scene.layers[layer as usize];
+        let over = &scene.merged(layer);
         let shapes = over
             .geometry
             .under
             .iter()
             .map(|s| s.rect)
             .chain(over.geometry.acrylic.iter().map(|a| a.shape.rect));
-        let texts = &scene.layers[LayerId::Modal as usize].texts;
+        let texts = &scene.merged(LayerId::Modal).texts;
         shapes.into_iter().any(|r| {
             texts.iter().any(|t| {
                 let (x, y) = (t.x * 2.0, t.y * 2.0);
@@ -593,10 +593,7 @@ mod tests {
                 "{id}: fill above the text"
             );
             assert!(
-                scene.layers[LayerId::Popup as usize]
-                    .geometry
-                    .under
-                    .is_empty(),
+                scene.merged(LayerId::Popup).geometry.under.is_empty(),
                 "{id}: nothing on Popup"
             );
             match role {

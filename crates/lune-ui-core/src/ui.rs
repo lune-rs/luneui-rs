@@ -38,7 +38,7 @@ use crate::input::{
     RawInput, Repaint, ScrollDelta,
 };
 use crate::motion::{MotionTier, Time};
-use crate::paint::{Painter, Rect, Xform};
+use crate::paint::{Painter, Rect, SUPPRESSED, Xform};
 use crate::scene::{LayerId, Scene};
 use crate::shortcuts::{CommandId, Scope, Shortcuts};
 use crate::strings::{ArgFormat, StringTable};
@@ -47,7 +47,7 @@ use crate::theme::Theme;
 
 use access::Routed;
 use keys::KeyPress;
-use overlay::{Dismissal as D, SUPPRESSED};
+use overlay::Dismissal as D;
 use pointer::{Ctx, HitRecord, PointerFrame, topmost};
 
 /// The opacity of a disabled subtree.

@@ -433,7 +433,7 @@ mod tests {
             .find(|n| n.name == "Sketch the release notes");
         assert!(source.expect("a card").states.contains(State::Dragging));
         assert_eq!(items(&out), 6);
-        let ghost = &scene.layers[LayerId::Popup as usize].geometry.under;
+        let ghost = &scene.merged(LayerId::Popup).geometry.under;
         assert!(!ghost.is_empty(), "the ghost is above the board");
         let line = scene.layers[LayerId::Base as usize].geometry.under.iter();
         let accent = premul(THEME.accent);
@@ -469,7 +469,7 @@ mod tests {
             "the model moved"
         );
         // Device px at scale 2; it left at the pointer's place, the grab point behind it.
-        let ghost = scene.layers[LayerId::Popup as usize].geometry.under[0].rect[0] / 2.0;
+        let ghost = scene.merged(LayerId::Popup).geometry.under[0].rect[0] / 2.0;
         let left_at = SECOND.0 - (FIRST.0 - 45.0);
         assert!(ghost > second && ghost < left_at, "half way: {ghost}");
     }

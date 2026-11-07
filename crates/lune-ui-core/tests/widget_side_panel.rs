@@ -556,7 +556,7 @@ fn a_disabled_host_is_disabled_all_the_way_down_and_consumes_no_key() {
 fn the_host_draws_only_on_the_layer_it_is_called_on() {
     let mut h = UiHarness::new(WIN);
     let out = settled(&mut h, &Cfg::new(2));
-    for (i, l) in out.scene.layers.iter().enumerate() {
+    for (i, l) in out.scene.in_order().into_iter().enumerate() {
         if i != LayerId::Base as usize {
             assert!(
                 l.texts.is_empty() && l.geometry.under.is_empty(),

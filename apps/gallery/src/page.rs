@@ -246,7 +246,8 @@ impl FrameTweaks {
         if self.noise {
             return;
         }
-        for layer in &mut scene.layers {
+        let overlays = scene.overlays.iter_mut().map(|o| &mut o.layer);
+        for layer in scene.layers.iter_mut().chain(overlays) {
             for acrylic in &mut layer.geometry.acrylic {
                 acrylic.shape.params[3] = 0.0;
             }

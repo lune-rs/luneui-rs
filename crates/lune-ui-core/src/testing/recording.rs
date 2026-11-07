@@ -4,8 +4,20 @@ use crate::scene::{
     BackdropRequest, CustomItem, FrameParams, ImageItem, Scene, Shape, StrokeVertex, TextItem,
 };
 
-/// One draw call, in the order a renderer issues it. `layer` is the index into
-/// [`Scene::layers`].
+/// `scene` with every overlay folded into its fixed layer ([`Scene::merged`]) and the backdrop's
+/// tag cleared: the scene [`Painter::on`](crate::paint::Painter::on) would have built from the same
+/// draws, to compare what an overlay draws with what the Painter API draws.
+pub fn flattened(scene: &Scene) -> Scene {
+    use crate::scene::LayerId::{Base, Modal, Page, Popup, Raised, Toast};
+    Scene {
+        layers: [Base, Page, Popup, Modal, Raised, Toast].map(|id| scene.merged(id)),
+        overlays: Vec::new(),
+        backdrop: scene.backdrop.map(|b| BackdropRequest { tag: 0, ..b }),
+    }
+}
+
+/// One draw call, in the order a renderer issues it. `layer` is the index into the
+/// list of [`Scene::in_order`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum DrawCall {
     /// One acrylic shape, blended in at `opacity` (1.0 replaces what is below).
@@ -39,7 +51,8 @@ pub enum DrawCall {
 }
 
 impl DrawCall {
-    /// The layer the call belongs to; `None` for the backdrop.
+    /// The layer the call belongs to, by its place in [`Scene::in_order`] (with no overlay, the
+    /// [`LayerId`](crate::scene::LayerId)'s index); `None` for the backdrop.
     pub fn layer(&self) -> Option<usize> {
         match self {
             Self::Acrylic { layer, .. }
@@ -80,7 +93,7 @@ impl RecordingRenderer {
     /// Records one frame of `scene` drawn at `params`.
     pub fn render(&mut self, scene: &Scene, params: &FrameParams) {
         let mut calls = Vec::new();
-        for (i, layer) in scene.layers.iter().enumerate() {
+        for (i, layer) in scene.in_order().into_iter().enumerate() {
             if i == scene.split()
                 && let Some(b) = scene.backdrop
             {

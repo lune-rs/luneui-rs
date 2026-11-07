@@ -766,7 +766,11 @@ fn an_access_default_action_sorts_on_a_header_and_selects_on_a_row() {
 // Cells.
 
 fn texts(scene: &Scene) -> Vec<TextItem> {
-    scene.layers.iter().flat_map(|l| l.texts.clone()).collect()
+    scene
+        .in_order()
+        .into_iter()
+        .flat_map(|l| l.texts.clone())
+        .collect()
 }
 
 fn under(scene: &Scene) -> Vec<Shape> {

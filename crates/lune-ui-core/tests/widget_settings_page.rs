@@ -984,7 +984,7 @@ fn a_combos_list_draws_above_the_page() {
     let _ = out;
     let beta = Spec::plain("Beta", Style::ui(DARK.font_base, DARK.fg_primary));
     let _ = beta;
-    let popup = &out2.scene.layers[LayerId::Popup as usize];
+    let popup = &out2.scene.merged(LayerId::Popup);
     assert!(
         !popup.texts.is_empty() || !popup.geometry.under.is_empty(),
         "the list is on the popup layer"
@@ -992,7 +992,7 @@ fn a_combos_list_draws_above_the_page() {
     // The page itself drew nothing there before the list.
     let mut h = UiHarness::new(WIN);
     let closed = frame_with(&mut h, &c, &mut App::default(), true);
-    let popup = &closed.scene.layers[LayerId::Popup as usize];
+    let popup = &closed.scene.merged(LayerId::Popup);
     assert!(popup.texts.is_empty() && popup.geometry.under.is_empty());
 }
 
@@ -1006,7 +1006,7 @@ fn the_page_draws_on_the_layer_it_is_called_on() {
             ..Cfg::new()
         },
     );
-    for (i, l) in out.scene.layers.iter().enumerate() {
+    for (i, l) in out.scene.in_order().into_iter().enumerate() {
         if i != LayerId::Base as usize {
             assert!(
                 l.texts.is_empty() && l.geometry.under.is_empty(),

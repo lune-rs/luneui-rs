@@ -1051,8 +1051,8 @@ mod tests {
 
     fn shapes(scene: &Scene) -> usize {
         scene
-            .layers
-            .iter()
+            .in_order()
+            .into_iter()
             .map(|l| l.geometry.under.len() + l.geometry.over.len())
             .sum()
     }
@@ -1060,8 +1060,8 @@ mod tests {
     fn fills_of(scene: &Scene, colors: &[Rgba]) -> usize {
         let cs: Vec<_> = colors.iter().map(|c| premul(*c)).collect();
         scene
-            .layers
-            .iter()
+            .in_order()
+            .into_iter()
             .flat_map(|l| l.geometry.under.iter())
             .filter(|s| cs.contains(&s.color))
             .count()
@@ -1127,7 +1127,11 @@ mod tests {
             let selected = s.rows.iter().find(|r| r.selected).expect("a selected row");
             assert_ne!(selected.fill[3], 0, "the row is still given its fill");
             assert!(s.rows.iter().any(|r| r.focus_visible), "the ring shows");
-            let strokes: usize = scene.layers.iter().map(|l| l.geometry.over.len()).sum();
+            let strokes: usize = scene
+                .in_order()
+                .into_iter()
+                .map(|l| l.geometry.over.len())
+                .sum();
             result.push((fills_of(&scene, &tones), strokes));
         }
         assert!(result[0].0 > 0, "the instrument sees the fill: {result:?}");

@@ -173,7 +173,12 @@ fn empty_draws_nothing_the_highlight_included() {
         slices(&[1e308, 1e308]),
     ] {
         let scene = draw(&s);
-        assert!(scene.layers.iter().all(|l| l.geometry.fills.is_empty()));
+        assert!(
+            scene
+                .in_order()
+                .into_iter()
+                .all(|l| l.geometry.fills.is_empty())
+        );
     }
 }
 

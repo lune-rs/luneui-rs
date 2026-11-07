@@ -194,7 +194,7 @@ fn centre(r: Rect) -> (f32, f32) {
 }
 
 fn modal_is_empty(scene: &Scene) -> bool {
-    let layer = &scene.layers[LayerId::Modal as usize];
+    let layer = &scene.merged(LayerId::Modal);
     layer.geometry.under.is_empty()
         && layer.geometry.over.is_empty()
         && layer.geometry.acrylic.is_empty()
@@ -588,10 +588,7 @@ fn a_settled_dropdown_reports_idle_the_frame_after_the_change() {
         assert_eq!(out.repaint, Repaint::Now, "{tier:?} dismissal frame");
         let (scene, out) = dropdown_frame(&mut h, &mut app, 3016);
         assert!(
-            scene.layers[LayerId::Popup as usize]
-                .geometry
-                .under
-                .is_empty(),
+            scene.merged(LayerId::Popup).geometry.under.is_empty(),
             "{tier:?} the list is gone at once (D80)"
         );
         assert_eq!(
@@ -787,19 +784,13 @@ fn a_dropdown_pick_frame_asks_for_the_frame_that_drops_the_list() {
         let (scene, out) = at(&mut h, &mut app, 2100);
         assert!(!app.combo_open, "{tier:?}: picked");
         assert!(
-            !scene.layers[LayerId::Popup as usize]
-                .geometry
-                .under
-                .is_empty(),
+            !scene.merged(LayerId::Popup).geometry.under.is_empty(),
             "{tier:?}: the pick frame still drew the list"
         );
         assert_eq!(out.repaint, Repaint::Now, "{tier:?}: pick frame");
         let (scene, _) = at(&mut h, &mut app, 2116);
         assert!(
-            scene.layers[LayerId::Popup as usize]
-                .geometry
-                .under
-                .is_empty(),
+            scene.merged(LayerId::Popup).geometry.under.is_empty(),
             "{tier:?}: the list is gone"
         );
         // Then it settles (Full: once the combo's closed look has faded in).
@@ -2194,7 +2185,7 @@ mod m7 {
             last = bed_frame(&mut h, &mut b, at);
         }
         assert!(b.combo_open, "the click opened the list");
-        let raised = &last.0.layers[LayerId::Raised as usize];
+        let raised = &last.0.merged(LayerId::Raised);
         assert!(
             !raised.geometry.under.is_empty() || !raised.texts.is_empty(),
             "the list is drawn on the raised layer, over the dialog"
@@ -4219,7 +4210,7 @@ mod m10 {
     impl Seen {
         fn take(&mut self, scene: &Scene, rec: &Rec) {
             let mut colours = Vec::new();
-            for layer in &scene.layers {
+            for layer in scene.in_order() {
                 let g = &layer.geometry;
                 colours.extend(g.under.iter().map(|s| s.color));
                 colours.extend(g.over.iter().map(|s| s.color));
@@ -4229,8 +4220,8 @@ mod m10 {
             }
             self.acrylics.extend(
                 scene
-                    .layers
-                    .iter()
+                    .in_order()
+                    .into_iter()
                     .flat_map(|l| l.geometry.acrylic.iter().map(|a| a.shape.color)),
             );
             self.fills.extend(colours.into_iter().filter_map(straight));

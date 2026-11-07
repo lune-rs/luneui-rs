@@ -172,7 +172,7 @@ fn opened(f: &Flyout<'_>) -> UiHarness {
 
 /// The card: the first shape on the popup layer.
 fn card(scene: &Scene) -> [f32; 4] {
-    scene.layers[LayerId::Popup as usize].geometry.under[0].rect
+    scene.merged(LayerId::Popup).geometry.under[0].rect
 }
 
 fn key(h: &mut UiHarness, k: NamedKey) {
@@ -340,7 +340,7 @@ fn pixel_probes_at_scale_2() {
     h.input.set_scale(2.0);
     draw(&mut h, 0, Some(&f));
     let (scene, _, _) = draw(&mut h, 400, Some(&f));
-    let fill = scene.layers[LayerId::Popup as usize].geometry.under[0];
+    let fill = scene.merged(LayerId::Popup).geometry.under[0];
     assert_eq!(fill.rect[2], 680.0, "340 logical px wide");
     assert_eq!(fill.radii, [18.0; 4], "radius 9");
     assert_eq!(fill.color, premul(DARK.menu_glass));
@@ -350,7 +350,8 @@ fn pixel_probes_at_scale_2() {
         ..Style::ui(DARK.font_m, DARK.gold).bold()
     };
     let key = FakeText.prepare(&Spec::plain("Atlas", style), 2.0).0;
-    let name = scene.layers[LayerId::Popup as usize]
+    let layer = scene.merged(LayerId::Popup);
+    let name = layer
         .texts
         .iter()
         .find(|t| t.key == key)
@@ -384,7 +385,7 @@ fn no_text_is_closer_than_9_px_to_the_card() {
     let mut h = opened(&f);
     let (scene, ..) = draw(&mut h, 600, Some(&f));
     let c = card(&scene);
-    for t in &scene.layers[LayerId::Popup as usize].texts {
+    for t in &scene.merged(LayerId::Popup).texts {
         assert!(t.x >= c[0] + 9.0, "{t:?} against {c:?}");
     }
     // The state ends 14 px from the right edge: 6 inset and 8 padding.
@@ -394,7 +395,8 @@ fn no_text_is_closer_than_9_px_to_the_card() {
     };
     let spec = Spec::plain("Serving", style);
     let (key, (w, _)) = FakeText.prepare(&spec, 1.0);
-    let state = scene.layers[LayerId::Popup as usize]
+    let layer = scene.merged(LayerId::Popup);
+    let state = layer
         .texts
         .iter()
         .find(|t| t.key == key)
@@ -414,7 +416,7 @@ fn close_run(tier: MotionTier) -> (u64, Vec<f32>) {
     let mut t = 1000;
     loop {
         let (scene, _, out) = draw(&mut h, t, None);
-        if let Some(s) = scene.layers[LayerId::Popup as usize].geometry.under.first() {
+        if let Some(s) = scene.merged(LayerId::Popup).geometry.under.first() {
             alphas.push(s.color[3]);
         }
         if out.repaint == Repaint::Idle {
@@ -451,13 +453,13 @@ fn the_curves_are_the_menus_under_every_tier() {
         let mut r = UiHarness::new(WIN);
         draw(&mut r, 0, Some(&f));
         let (scene, ..) = draw(&mut r, 400, Some(&f));
-        scene.layers[LayerId::Popup as usize].geometry.under[0].color[3]
+        scene.merged(LayerId::Popup).geometry.under[0].color[3]
     };
     let mut last = 0.0;
     for k in 1..=15_u64 {
         let dt = (k * 1000 + 30) / 60;
         let (scene, _, out) = draw(&mut h, dt, Some(&f));
-        let a = scene.layers[LayerId::Popup as usize].geometry.under[0].color[3];
+        let a = scene.merged(LayerId::Popup).geometry.under[0].color[3];
         assert!(a >= last && a.is_finite(), "{dt}: {a} after {last}");
         last = a;
         if dt >= 180 + 17 {
@@ -596,7 +598,7 @@ fn the_routes_keys_are_small_and_the_strip_has_its_outline() {
         line: 20.0,
         ..Style::ui(DARK.font_s, DARK.fg_tertiary)
     };
-    let layer = &scene.layers[LayerId::Popup as usize];
+    let layer = &scene.merged(LayerId::Popup);
     let want = lune_ui_core::text::TextKey(Spec::plain("Sonnet", key_style).cache_key(1.0));
     assert!(layer.texts.iter().any(|t| t.key == want), "key at font_s");
     let strip = out
@@ -755,7 +757,7 @@ fn win_close_run(tier: MotionTier) -> (u64, Vec<f32>, bool) {
     let mut t = 1000;
     loop {
         let (scene, _, out) = win_draw(&mut h, t, None);
-        if let Some(s) = scene.layers[LayerId::Popup as usize].geometry.under.first() {
+        if let Some(s) = scene.merged(LayerId::Popup).geometry.under.first() {
             alphas.push(s.color[3]);
             blurred &= scene.backdrop.is_some();
         }
@@ -787,13 +789,13 @@ fn a_window_flyout_opens_and_closes_with_the_menus_curves_and_goes_idle() {
         let mut r = UiHarness::new(size_of(&f));
         win_draw(&mut r, 0, Some(&f));
         let (scene, ..) = win_draw(&mut r, 400, Some(&f));
-        scene.layers[LayerId::Popup as usize].geometry.under[0].color[3]
+        scene.merged(LayerId::Popup).geometry.under[0].color[3]
     };
     let mut last = 0.0;
     for k in 1..=15_u64 {
         let dt = (k * 1000 + 30) / 60;
         let (scene, _, out) = win_draw(&mut h, dt, Some(&f));
-        let a = scene.layers[LayerId::Popup as usize].geometry.under[0].color[3];
+        let a = scene.merged(LayerId::Popup).geometry.under[0].color[3];
         assert!(a >= last && a.is_finite(), "{dt}: {a} after {last}");
         last = a;
         if dt >= 180 + 17 {

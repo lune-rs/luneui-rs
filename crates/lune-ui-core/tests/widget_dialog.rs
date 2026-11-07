@@ -11,7 +11,7 @@ use lune_ui_core::motion::{FRAME, MotionTier, Time, conformance, conformance_of}
 use lune_ui_core::paint::{LayerId, Painter, Rect};
 use lune_ui_core::scene::Scene;
 use lune_ui_core::shortcuts::{Binding, Chord, Scope};
-use lune_ui_core::testing::{FakeText, UiHarness, disabled_violations};
+use lune_ui_core::testing::{FakeText, UiHarness, disabled_violations, flattened};
 use lune_ui_core::theme::DARK;
 use lune_ui_core::ui::{Response, Ui, WidgetId};
 use lune_ui_core::widgets::button::{ButtonKind, button};
@@ -149,7 +149,7 @@ fn at_rest_the_ui_dialog_draws_exactly_what_the_painter_dialog_does() {
         let (scene, out, _, _) = frame(&mut h, Some(&d));
         assert_eq!(out.repaint, Repaint::Idle);
         assert_eq!(
-            scene,
+            flattened(&scene),
             old_scene(old_cancel, extra),
             "{cancel:?} extra {extra}"
         );
@@ -162,7 +162,7 @@ fn at_rest_nothing_is_transparent_and_no_transform_is_pushed() {
     let mut h = opened(&d);
     h.at_ms(2000);
     let (scene, _, _, _) = frame(&mut h, Some(&d));
-    let modal = &scene.layers[LayerId::Modal as usize];
+    let modal = &scene.merged(LayerId::Modal);
     assert!(modal.geometry.acrylic.iter().all(|a| a.opacity == 1.0));
     let g = &modal.geometry;
     assert!(g.under.iter().chain(&g.over).all(|s| s.color[3] > 0.0));
@@ -395,7 +395,7 @@ fn pixel_probes_at_scale_two() {
     frame(&mut h, Some(&d));
     h.at_ms(1000);
     let (scene, _, _, _) = frame(&mut h, Some(&d));
-    let modal = &scene.layers[LayerId::Modal as usize];
+    let modal = &scene.merged(LayerId::Modal);
     // Scrim: the window, #00000080.
     let scrim = modal.geometry.under[0];
     assert_eq!(scrim.rect, [0.0, 0.0, WIN.0 * 2.0, WIN.1 * 2.0]);
@@ -430,7 +430,7 @@ fn pixel_probes_at_scale_two() {
 /// rest alpha (0 when nothing is drawn) and the card's scale (the title text's glyph scale; 0.96
 /// when nothing is drawn yet).
 fn measure(scene: &Scene) -> (f32, f32) {
-    let modal = &scene.layers[LayerId::Modal as usize];
+    let modal = &scene.merged(LayerId::Modal);
     let rest = premul(DARK.dialog_backdrop)[3];
     let opacity = modal
         .geometry
@@ -563,7 +563,8 @@ fn a_closing_dialog_draws_the_apps_body_and_fades_it_with_the_card() {
     let mut h = opened(&d);
     // The body is the only shape of the Modal layer with radius 4 (at most; the card scales it).
     let find = |scene: &Scene| {
-        scene.layers[LayerId::Modal as usize]
+        scene
+            .merged(LayerId::Modal)
             .geometry
             .under
             .iter()
@@ -589,12 +590,7 @@ fn a_closing_dialog_draws_the_apps_body_and_fades_it_with_the_card() {
     h.at_ms(3180);
     let (end, out, _, _) = frame(&mut h, None);
     assert_eq!(out.repaint, Repaint::Idle);
-    assert!(
-        end.layers[LayerId::Modal as usize]
-            .geometry
-            .under
-            .is_empty()
-    );
+    assert!(end.merged(LayerId::Modal).geometry.under.is_empty());
 }
 
 #[test]
@@ -738,7 +734,7 @@ fn the_form_card_is_600_wide_and_centred_and_holds_two_columns() {
         "the body is the card less 24 each side"
     );
     // The footer is as wide as the card and the buttons stay right-aligned in it.
-    let modal = &scene.layers[LayerId::Modal as usize];
+    let modal = &scene.merged(LayerId::Modal);
     let footer = modal
         .geometry
         .under
@@ -765,7 +761,7 @@ fn the_form_scale_two_probes() {
     frame_with(&mut h, Some((&d, &FORM)));
     h.at_ms(1000);
     let (scene, _, _, _) = frame_with(&mut h, Some((&d, &FORM)));
-    let modal = &scene.layers[LayerId::Modal as usize];
+    let modal = &scene.merged(LayerId::Modal);
     assert_eq!(modal.geometry.acrylic[0].shape.rect[2], 1200.0);
     assert_eq!(modal.geometry.acrylic[0].shape.radii, [16.0; 4]);
 }
@@ -820,9 +816,10 @@ fn the_scrim_blur_asks_for_the_window_at_sigma_eight_on_the_modal_layer() {
     assert_eq!(b.radius, 0.0);
     assert_eq!(b.alpha, 1.0);
     // The scrim keeps its colour over the blur.
-    let scrim = scene.layers[LayerId::Modal as usize].geometry.under[0];
+    let scrim = scene.merged(LayerId::Modal).geometry.under[0];
     assert_eq!(scrim.color, premul(DARK.dialog_backdrop));
-    assert_eq!(scene.split(), LayerId::Modal as usize);
+    // The dialog's own layer comes right after the fixed `Modal` layer in the draw order.
+    assert_eq!(scene.split(), LayerId::Modal as usize + 1);
 }
 
 #[test]
@@ -831,7 +828,7 @@ fn the_blur_fades_with_the_scrim_opening_and_closing() {
     let rest = premul(DARK.dialog_backdrop)[3];
     let fade_of = |scene: &Scene| {
         let b = blur_of(scene).expect("blur asked for").alpha;
-        let s = scene.layers[LayerId::Modal as usize].geometry.under[0].color[3] / rest;
+        let s = scene.merged(LayerId::Modal).geometry.under[0].color[3] / rest;
         (b, s)
     };
     // Opening, 125 ms in (half way).
@@ -899,7 +896,8 @@ fn menu_frame(h: &mut UiHarness, o: &DialogOptions) -> Scene {
 /// Whether the Raised layer holds the menu's glass fill (radius 9, `menu_glass`).
 fn raised_menu_fill(scene: &Scene) -> bool {
     let want = premul(DARK.menu_glass);
-    scene.layers[LayerId::Raised as usize]
+    scene
+        .merged(LayerId::Raised)
         .geometry
         .under
         .iter()
@@ -960,7 +958,8 @@ fn a_disabled_confirm_draws_at_the_disabled_opacity_open_and_closing() {
     let d = the_dialog(Cancel::Default, 0.0);
     let confirm_fill = |scene: &Scene, out: &FrameOutput| {
         let r = button_node(out, "Discard").bounds;
-        scene.layers[LayerId::Modal as usize]
+        scene
+            .merged(LayerId::Modal)
             .geometry
             .under
             .iter()
@@ -980,7 +979,8 @@ fn a_disabled_confirm_draws_at_the_disabled_opacity_open_and_closing() {
     h.at_ms(3000);
     let (scene, _, _, _) = frame_with(&mut h, None);
     let r = button_node(&out, "Discard").bounds;
-    let closing = scene.layers[LayerId::Modal as usize]
+    let closing = scene
+        .merged(LayerId::Modal)
         .geometry
         .under
         .iter()
@@ -1150,17 +1150,12 @@ fn a_nested_dialog_draws_on_raised_over_the_dialog() {
     nest_frame(&mut h, false, &mut t);
     h.at_ms(500);
     let (rest, _) = nest_frame(&mut h, false, &mut t);
-    assert!(
-        rest.layers[LayerId::Raised as usize]
-            .geometry
-            .under
-            .is_empty()
-    );
+    assert!(rest.merged(LayerId::Raised).geometry.under.is_empty());
     nest_frame(&mut h, true, &mut t);
     h.at_ms(1500);
     nest_frame(&mut h, true, &mut t);
     let (scene, _) = nest_frame(&mut h, true, &mut t);
-    let raised = &scene.layers[LayerId::Raised as usize];
+    let raised = &scene.merged(LayerId::Raised);
     assert!(
         !raised.geometry.acrylic.is_empty(),
         "the inner card is on Raised"

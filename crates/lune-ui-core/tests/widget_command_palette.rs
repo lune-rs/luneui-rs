@@ -884,8 +884,8 @@ fn the_error_line_is_a_polite_status_in_the_footer_above_its_text() {
     let key = TextKey(line.cache_key(1.0));
     assert!(
         scene2
-            .layers
-            .iter()
+            .in_order()
+            .into_iter()
             .any(|l| l.texts.iter().any(|t| t.key == key))
     );
     let status = out2
@@ -934,7 +934,8 @@ fn the_destructive_row_describes_itself_shows_a_tooltip_above_the_card_and_still
     let n = node(&out, row_id(11));
     // The mark is a 6 px dot in `status_error` at the row's right edge, centred in the row
     // (`GlobalSearchDialogView.axaml:489-496`).
-    let dot = scene.layers[LayerId::Modal as usize]
+    let layer = scene.merged(LayerId::Modal);
+    let dot = layer
         .geometry
         .under
         .iter()
@@ -959,14 +960,9 @@ fn the_destructive_row_describes_itself_shows_a_tooltip_above_the_card_and_still
         "the tooltip shows after the dwell"
     );
     // Above the modal: on the Raised layer, not the Popup layer.
-    let raised = &scene.layers[LayerId::Raised as usize];
+    let raised = &scene.merged(LayerId::Raised);
     assert!(!raised.geometry.acrylic.is_empty() || !raised.geometry.under.is_empty());
-    assert!(
-        scene.layers[LayerId::Popup as usize]
-            .geometry
-            .under
-            .is_empty()
-    );
+    assert!(scene.merged(LayerId::Popup).geometry.under.is_empty());
     // It still reports the activation.
     h.input.press(P);
     h.at_ms(2120);
@@ -1019,7 +1015,7 @@ fn the_card_is_640_wide_and_the_results_stop_at_560_at_scale_two() {
     frame(&mut h, &mut q, &secs);
     h.at_ms(1000);
     let (scene, out, _) = frame(&mut h, &mut q, &secs);
-    let modal = &scene.layers[LayerId::Modal as usize];
+    let modal = &scene.merged(LayerId::Modal);
     let acrylic = modal.geometry.acrylic[0];
     assert_eq!(acrylic.shape.rect[2], 1280.0, "640 px wide");
     assert!(acrylic.shape.rect[3] <= 1440.0, "at most 720 px high");
@@ -1077,7 +1073,7 @@ fn a_short_window_keeps_the_card_inside_it() {
 
 /// The scrim's opacity as a fraction of rest, and the card's scale (the first text's glyph scale).
 fn measure(scene: &Scene) -> (f32, f32) {
-    let modal = &scene.layers[LayerId::Modal as usize];
+    let modal = &scene.merged(LayerId::Modal);
     let rest = premul(DARK.dialog_backdrop)[3];
     let opacity = modal
         .geometry
@@ -1152,22 +1148,22 @@ fn a_closing_palette_keeps_drawing_its_rows_then_vanishes() {
     let (mut h, mut q) = opened(&secs);
     h.at_ms(2000);
     let (open_scene, _, _) = frame(&mut h, &mut q, &secs);
-    let open_texts = open_scene.layers[LayerId::Modal as usize].texts.len();
+    let open_texts = open_scene.merged(LayerId::Modal).texts.len();
     assert!(open_texts > 8, "{open_texts}");
     h.at_ms(3000);
     let (first, out, _) = frame_with(&mut h, None, &secs, None);
     assert_eq!(out.repaint, Repaint::Now);
     assert_eq!(
-        first.layers[LayerId::Modal as usize].texts.len(),
+        first.merged(LayerId::Modal).texts.len(),
         open_texts,
         "the rows and the footer draw in the first closing frame"
     );
     h.at_ms(3090);
     let (mid, out, _) = frame_with(&mut h, None, &secs, None);
     assert_eq!(out.repaint, Repaint::Now);
-    assert_eq!(mid.layers[LayerId::Modal as usize].texts.len(), open_texts);
+    assert_eq!(mid.merged(LayerId::Modal).texts.len(), open_texts);
     assert!(
-        mid.layers[LayerId::Modal as usize]
+        mid.merged(LayerId::Modal)
             .texts
             .iter()
             .all(|t| t.scale < 1.0),
@@ -1176,12 +1172,7 @@ fn a_closing_palette_keeps_drawing_its_rows_then_vanishes() {
     h.at_ms(3180);
     let (end, out, _) = frame_with(&mut h, None, &secs, None);
     assert_eq!(out.repaint, Repaint::Idle);
-    assert!(
-        end.layers[LayerId::Modal as usize]
-            .geometry
-            .under
-            .is_empty()
-    );
+    assert!(end.merged(LayerId::Modal).geometry.under.is_empty());
 }
 
 // The disabled scope and a dialog from an activation.
@@ -1301,7 +1292,7 @@ fn a_dialog_opened_from_an_activation_draws_above_and_takes_the_keys() {
             .count(),
         2
     );
-    let raised = &scene.layers[LayerId::Raised as usize];
+    let raised = &scene.merged(LayerId::Raised);
     assert!(
         !raised.geometry.acrylic.is_empty(),
         "the dialog's card is on Raised"

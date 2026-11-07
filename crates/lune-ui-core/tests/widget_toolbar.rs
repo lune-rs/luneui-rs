@@ -196,10 +196,7 @@ fn a_disabled_action_does_not_run_and_is_marked_disabled() {
 }
 
 fn shown(scene: &Scene) -> bool {
-    !scene.layers[LayerId::Popup as usize]
-        .geometry
-        .under
-        .is_empty()
+    !scene.merged(LayerId::Popup).geometry.under.is_empty()
 }
 
 #[test]

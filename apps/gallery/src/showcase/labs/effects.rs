@@ -195,9 +195,9 @@ mod tests {
         let mut p = player("lab-effects", Box::new(Themed(live(), THEME)));
         p.frame(&mut FakeText, 0, &[]).expect("frame");
         let (scene, _) = p.frame(&mut FakeText, 16, &[]).expect("frame");
-        let customs: usize = scene.layers.iter().map(|l| l.customs.len()).sum();
+        let customs: usize = scene.in_order().into_iter().map(|l| l.customs.len()).sum();
         assert_eq!(customs, 1, "the custom-draw slot");
-        let windows = &scene.layers[LayerId::Popup as usize].geometry.acrylic;
+        let windows = &scene.merged(LayerId::Popup).geometry.acrylic;
         assert_eq!(windows.len(), 3);
         // Glass on shows the glass layer; glass off is opaque; unfocused is the solid fallback
         // without noise.
@@ -220,8 +220,8 @@ mod tests {
     fn a_tab_moves_the_outline() {
         let strokes = |scene: &lune_ui::scene::Scene| {
             scene
-                .layers
-                .iter()
+                .in_order()
+                .into_iter()
                 .flat_map(|l| l.geometry.strokes.clone())
                 .collect::<Vec<_>>()
         };
