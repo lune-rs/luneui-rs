@@ -90,6 +90,7 @@ None: the control draws no text; the row's text is the owner's.
 - `lane-graph-linear`: one lane, a node per row, lane lines above and below, settled.
 - `lane-graph-merge`: a node on lane 1 whose edge goes straight down and bends into the trunk, settled.
 - `lane-graph-branch`: a branch leaving a node for lane 1, settled.
+- `lane-graph-advanced` (new): a hand-built graph of four lanes in two columns: a fork to three lanes, an octopus merge of three, one lane forking twice over time, and a lane reused by a later branch; the many-edge dot is a solid disc over its joined edges, settled. The page's "Graph" knob puts the same rows in the list. There is no helper that assigns lanes: the app owns the lane layout (library-pass plan D16; Lunegit's own assigner is one lane per branch, so it would not be a port).
 - `lane-graph-list`: the graph beside a text column in a 100,000-row `virtual_list`, row 2 selected and row 4 hovered (the owner's look), settled.
 
 ### Painter primitives
@@ -104,6 +105,7 @@ None: the control draws no text; the row's text is the owner's.
 - Conformance: none (no motion; never animated).
 - Semantic node: none (decorative); the owner's list-item carries the row.
 - Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_lane_graph.rs`: behaviour `the_dot_is_in_lane_2_at_x_70_on_the_centre_line`, `a_line_continuing_above_starts_at_the_row_top_and_one_not_at_the_centre`, `edge_points_start_at_the_child_and_end_at_the_parent`, `a_branch_out_goes_across_first_then_down_and_a_merge_goes_down_first`, `the_passes_draw_in_order_edges_then_lane_lines_then_the_dot`, `huge_empty_and_far_input_never_panics_and_never_makes_a_nan`; pixel probes `probes_at_scale_2_row_90_dot_20_at_40_plus_lane_times_50_and_an_edge_5_wide`, `the_flattened_corner_stays_within_a_quarter_device_pixel_at_scale_2`; node `the_row_is_decorative_no_node_no_region`. Also the dot over a line in real pixels: `crates/lune-ui-wgpu/tests/primitives.rs::a_lane_graph_dot_is_a_disc_of_diameter_10_over_a_line_of_another_colour`.
+- Many edges at one dot (`lane-graph-advanced`), tests in `widget_lane_graph.rs`: `a_row_with_three_edges_records_one_stroke_per_edge_and_draws_the_dot_after_them`, `edges_that_cross_lanes_take_the_clip_the_owner_set`; the dump's many-edge dot read as a solid disc over the joined edges.
 
 ### Build
 

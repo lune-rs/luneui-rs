@@ -390,3 +390,83 @@ fn the_row_is_decorative_no_node_no_region() {
     assert!(out.tree.nodes.is_empty());
     assert_eq!(ROW_H, 45.0);
 }
+
+// ---- many edges at one dot (R17) ----
+
+const SECOND: Rgba = [220, 150, 20, 255];
+const THIRD: Rgba = [20, 180, 220, 255];
+
+/// An octopus: one dot on lane 0, an edge to each of the lanes 0, 1 and 2 (rows 1, 2, 3), each in
+/// its own colour.
+fn octopus() -> [LaneEdge; 3] {
+    let at = |lane: u16, rows: i32, color: Rgba| LaneEdge {
+        child_lane: 0,
+        child_row: 0,
+        parent_lane: lane,
+        parent_row: rows,
+        color,
+    };
+    [at(0, 1, EDGE), at(1, 2, SECOND), at(2, 3, THIRD)]
+}
+
+#[test]
+fn a_row_with_three_edges_records_one_stroke_per_edge_and_draws_the_dot_after_them() {
+    let edges = octopus();
+    let all = scene(1.0, &base_row(&[], &edges, 0));
+    // Each edge is the same strokes it is alone: nothing joins, drops or doubles one.
+    for e in &edges {
+        let alone = scene(1.0, &base_row(&[], std::slice::from_ref(e), 0));
+        assert_eq!(of(&all, e.color), of(&alone, e.color), "{:?}", e.color);
+        assert!(!of(&all, e.color).is_empty());
+    }
+    // Their colours never mix: every vertex is an edge's or the dot's.
+    let known = [EDGE, SECOND, THIRD, DOT].map(premul);
+    assert!(strokes(&all).iter().all(|v| known.contains(&v.color)));
+    let last_edge = strokes(&all)
+        .iter()
+        .rposition(|v| v.color != premul(DOT))
+        .expect("edges");
+    let first_dot = strokes(&all)
+        .iter()
+        .position(|v| v.color == premul(DOT))
+        .expect("dot");
+    assert!(first_dot > last_edge, "the dot is drawn after every edge");
+    // The dot is where all three start, and a disc: its box is 10 px plus the fringe.
+    let dot = bbox(&of(&all, DOT));
+    assert!(((dot[0] + dot[2]) / 2.0 - 30.0).abs() < 0.5, "{dot:?}");
+    assert!(((dot[1] + dot[3]) / 2.0 - 42.5).abs() < 0.5, "{dot:?}");
+    // The three edges leave that centre: each one's first vertices lie near it.
+    for e in &edges {
+        let b = bbox(&of(&all, e.color));
+        assert!(b[0] <= 30.0 + 0.1 && b[1] <= 42.5 + 0.1, "{b:?}");
+    }
+}
+
+#[test]
+fn edges_that_cross_lanes_take_the_clip_the_owner_set() {
+    let edges = octopus();
+    let row = Rect::new(10.0, 20.0, 140.0, ROW_H);
+    let mut t = FakeText;
+    let mut p: Painter<'_, u8> =
+        Painter::new(2.0, Rect::new(0.0, 0.0, 400.0, 300.0), &mut t, None, DARK);
+    p.push_clip(row);
+    paint(&mut p, (10.0, 20.0), &base_row(&[], &edges, 0));
+    p.pop_clip();
+    let s = p.scene;
+    let clip = strokes(&s)[0].clip;
+    assert_eq!(
+        clip,
+        [20.0, 40.0, 280.0, 90.0],
+        "the row's rect in device px: x, y, w, h"
+    );
+    assert!(
+        strokes(&s).iter().all(|v| v.clip == clip),
+        "the dot and every edge, whichever lane it crosses to, carry the row's clip"
+    );
+    // An edge reaches past the row; only the clip stops it.
+    let b = bbox(&of(&s, THIRD));
+    assert!(
+        b[3] > clip[1] + clip[3],
+        "the third edge runs below the row: {b:?}"
+    );
+}
