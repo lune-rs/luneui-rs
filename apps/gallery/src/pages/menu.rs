@@ -117,19 +117,31 @@ fn live() -> Box<dyn PageState> {
 }
 
 fn variants() -> Box<dyn PageState> {
-    Box::new(Pinned { rows: &VARIANTS })
+    Box::new(Pinned {
+        rows: &VARIANTS,
+        closed: false,
+    })
 }
 
 fn pinned() -> Box<dyn PageState> {
-    Box::new(Pinned { rows: &ROWS })
+    Box::new(Pinned {
+        rows: &ROWS,
+        closed: false,
+    })
 }
 
 fn anchored() -> Box<dyn PageState> {
-    Box::new(Anchored { low: false })
+    Box::new(Anchored {
+        low: false,
+        closed: false,
+    })
 }
 
 fn anchored_low() -> Box<dyn PageState> {
-    Box::new(Anchored { low: true })
+    Box::new(Anchored {
+        low: true,
+        closed: false,
+    })
 }
 
 /// A page whose menu stops being called at 300 ms of app time (closing starts there).
@@ -259,6 +271,8 @@ fn options_at(
 /// `rows` in a menu that stays open.
 struct Pinned {
     rows: &'static [MenuRow<'static>],
+    /// A press outside or a pick closed it: a menu kept open eats every press outside.
+    closed: bool,
 }
 
 impl PageState for Pinned {
@@ -266,7 +280,10 @@ impl PageState for Pinned {
         let card = card(ui, stage, "Menu");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "MENU", x, y);
-        ui.menu("menu", self.rows, (x, y + 60.0));
+        if !self.closed {
+            let m = ui.menu("menu", self.rows, (x, y + 60.0));
+            self.closed = m.picked.is_some() || m.dismissed;
+        }
     }
 }
 
@@ -274,6 +291,8 @@ impl PageState for Pinned {
 /// room below and flips above.
 struct Anchored {
     low: bool,
+    /// A press outside or a pick closed it: a menu kept open eats every press outside.
+    closed: bool,
 }
 
 impl PageState for Anchored {
@@ -290,7 +309,10 @@ impl PageState for Anchored {
         let rect = Rect::new(x, top, w, 32.0);
         let r = ui.button("actions", rect, "Actions", ButtonKind::Secondary);
         let anchor_id = Some(ui.id("actions"));
-        ui.menu_with("menu", &ROWS, &options_below(r.rect, anchor_id));
+        if !self.closed {
+            let m = ui.menu_with("menu", &ROWS, &options_below(r.rect, anchor_id));
+            self.closed = m.picked.is_some() || m.dismissed;
+        }
     }
 }
 

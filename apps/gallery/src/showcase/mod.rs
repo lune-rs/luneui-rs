@@ -1241,4 +1241,41 @@ mod tests {
             );
         }
     }
+
+    /// No page or scene can trap the shell: whatever it leaves open, the settings pane still
+    /// takes a click (a press may only close a menu).
+    #[test]
+    fn no_scene_traps_the_shell() {
+        let mid = |n: &lune_ui::access::Node| {
+            (n.bounds.x + n.bounds.w / 2.0, n.bounds.y + n.bounds.h / 2.0)
+        };
+        let mut stuck = Vec::new();
+        for page in PAGES.iter().filter(|p| p.id != HOST) {
+            for scene in nav::scenes(page) {
+                let mut rig = Rig::sized(1600, 900);
+                rig.shell.cue(&format!("scene {}", scene.name()));
+                for _ in 0..(scene.capture_ms / 16 + 20) {
+                    rig.frame();
+                }
+                let mut took = false;
+                // Up to one press per open menu, then the one that lands.
+                for _ in 0..3 {
+                    let out = rig.frame();
+                    // Two targets: a page with its own theme or tier knob hides one of them.
+                    for name in ["Purple", "Reduced"] {
+                        if let Some(n) = named(&out, name) {
+                            rig.click_at(mid(n));
+                        }
+                    }
+                    rig.settle();
+                    took |= rig.shell.settings.theme != 0
+                        || rig.shell.settings.tier == MotionTier::Reduced;
+                }
+                if !took {
+                    stuck.push(scene.name());
+                }
+            }
+        }
+        assert!(stuck.is_empty(), "scenes that trap the shell: {stuck:#?}");
+    }
 }
