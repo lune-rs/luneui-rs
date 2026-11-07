@@ -20,6 +20,7 @@ use lune_ui::widgets::tone::Tone;
 use super::card;
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::{Knobs, TONES, tone_names};
 
 pub(crate) static PAGE: Page = Page {
     id: "tab-strip",
@@ -76,6 +77,9 @@ struct Demo {
     panel_focused: bool,
     busy: Option<BusyCue>,
     tone: Tone,
+    /// The header's darker band, and the menu's extra entry.
+    tint: bool,
+    extra: bool,
 }
 
 fn numbered(n: u64) -> Vec<Item> {
@@ -92,6 +96,8 @@ impl Demo {
             panel_focused: true,
             busy: None,
             tone: Tone::Neutral,
+            tint: true,
+            extra: true,
         }
     }
 
@@ -173,9 +179,9 @@ impl PageState for Demo {
             busy: self.busy,
             busy_tone: self.tone,
             card: inner,
-            menu_extra: &["Duplicate Tab"],
+            menu_extra: if self.extra { &["Duplicate Tab"] } else { &[] },
             name: "Sessions",
-            header_tint: Some(HEADER_TINT),
+            header_tint: self.tint.then_some(HEADER_TINT),
         };
         let events = ui.tab_strip("strip", strip, &tabs, &opts).events;
         for event in events {
@@ -183,6 +189,27 @@ impl PageState for Demo {
         }
         let body = Rect::new(inner.x, inner.y + HEIGHT, inner.w, inner.h - HEIGHT);
         self.body(ui, body);
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.toggle(ui, "Panel focused", &mut self.panel_focused);
+        panel.toggle(ui, "Header tint", &mut self.tint);
+        panel.toggle(ui, "Extra menu entry", &mut self.extra);
+        let cues = [
+            ("None", None),
+            ("Sweep", Some(BusyCue::Sweep)),
+            ("Comet", Some(BusyCue::Comet)),
+            ("Breath", Some(BusyCue::Breath)),
+        ];
+        let names: Vec<&str> = cues.iter().map(|(n, _)| *n).collect();
+        let mut at = cues.iter().position(|(_, c)| *c == self.busy).unwrap_or(0);
+        if panel.choice(ui, "Busy cue", &names, &mut at) {
+            self.busy = cues[at].1;
+        }
+        let mut tone = TONES.iter().position(|(_, t)| *t == self.tone).unwrap_or(0);
+        if panel.choice(ui, "Busy tone", &tone_names(), &mut tone) {
+            self.tone = TONES[tone].1;
+        }
     }
 }
 

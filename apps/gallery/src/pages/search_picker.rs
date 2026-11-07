@@ -11,6 +11,7 @@ use lune_ui::widgets::search_picker::{PickerOptions, Trigger};
 use super::{caption, card, heading, on_card};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "search-picker",
@@ -32,6 +33,8 @@ fn state(field: bool, link: bool) -> Box<dyn PageState> {
         field: field.then_some(Some(4)),
         link: link.then_some(Some(8)),
         disabled: false,
+        placeholder: "Find a tree".to_owned(),
+        glyph: true,
     })
 }
 
@@ -41,6 +44,8 @@ fn disabled() -> Box<dyn PageState> {
         field: Some(Some(4)),
         link: Some(Some(8)),
         disabled: true,
+        placeholder: "Find a tree".to_owned(),
+        glyph: true,
     })
 }
 
@@ -64,11 +69,14 @@ const LABEL_W: f32 = 140.0;
 const FIELD: Rect = Rect::new(X + LABEL_W, Y + 24.0, 320.0, 36.0);
 const LINK: Rect = Rect::new(X + LABEL_W, Y + 76.0, 160.0, 24.0);
 
-/// Each trigger's selection, for the triggers the page shows.
+/// Each trigger's selection, for the triggers the page shows. The knobs set whether they are
+/// disabled, the search placeholder and the link's glyph.
 struct Live {
     field: Option<Option<usize>>,
     link: Option<Option<usize>>,
     disabled: bool,
+    placeholder: String,
+    glyph: bool,
 }
 
 impl PageState for Live {
@@ -82,7 +90,7 @@ impl PageState for Live {
             let opts = PickerOptions {
                 trigger: Trigger::Field,
                 icon: None,
-                placeholder: "Find a tree",
+                placeholder: &self.placeholder,
                 name: "Tree",
             };
             ui.with_enabled(!self.disabled, |ui| {
@@ -93,14 +101,20 @@ impl PageState for Live {
             caption(ui, "Link", ox, link.y + 5.0);
             let opts = PickerOptions {
                 trigger: Trigger::Link,
-                icon: Some(icon::GEAR),
-                placeholder: "Find a tree",
+                icon: self.glyph.then_some(icon::GEAR),
+                placeholder: &self.placeholder,
                 name: "Other tree",
             };
             ui.with_enabled(!self.disabled, |ui| {
                 ui.search_picker("link", link, &ITEMS, selected, &opts)
             });
         }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.toggle(ui, "Disabled", &mut self.disabled);
+        panel.text(ui, "Placeholder", &mut self.placeholder);
+        panel.toggle(ui, "Link glyph", &mut self.glyph);
     }
 }
 

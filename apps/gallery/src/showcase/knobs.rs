@@ -445,6 +445,12 @@ mod tests {
         ("nav-item", Press(Role::Switch, "Glyphs")),
         ("radio-group", Press(Role::Switch, "Last enabled")),
         ("star-rating", Slide("Value", 1.0)),
+        ("slider", Press(Role::Switch, "First enabled")),
+        ("filter-bar", Type("Placeholder", "Type here")),
+        ("search-picker", Press(Role::Switch, "Disabled")),
+        ("tab-strip", Press(Role::Switch, "Header tint")),
+        ("toolbar", Press(Role::Switch, "Fetch enabled")),
+        ("banner", Press(Role::Switch, "Picture")),
     ];
 
     #[test]

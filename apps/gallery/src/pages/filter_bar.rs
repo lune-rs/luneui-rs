@@ -9,6 +9,7 @@ use lune_ui::widgets::filter_bar::FilterOptions;
 use super::{caption, card, heading, on_card};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "filter-bar",
@@ -25,6 +26,10 @@ fn live() -> Box<dyn PageState> {
         empty: String::new(),
         text: "main.rs".to_owned(),
         focused: "readme".to_owned(),
+        placeholder: "Filter files".to_owned(),
+        label: String::new(),
+        clear_unfocusable: false,
+        enabled: true,
     })
 }
 
@@ -42,16 +47,16 @@ const fn row(i: usize) -> Rect {
     Rect::new(X + LABEL_W, Y + 24.0 + PITCH * i as f32, BAR_W, BAR_H)
 }
 
-const OPTS: FilterOptions<'static> = FilterOptions {
-    placeholder: "Filter files",
-    label: None,
-    clear_unfocusable: false,
-};
-
+/// Four bars. The knobs set the placeholder, the accessible label, whether the clear button is
+/// out of the tab order and whether the first three take input.
 struct Live {
     empty: String,
     text: String,
     focused: String,
+    placeholder: String,
+    label: String,
+    clear_unfocusable: bool,
+    enabled: bool,
 }
 
 impl PageState for Live {
@@ -66,13 +71,28 @@ impl PageState for Live {
         {
             caption(ui, name, ox, row(i).y + 8.0);
         }
-        ui.filter_bar("empty", row(0), &mut self.empty, &OPTS);
-        ui.filter_bar("text", row(1), &mut self.text, &OPTS);
-        ui.filter_bar("focused", row(2), &mut self.focused, &OPTS);
+        let opts = FilterOptions {
+            placeholder: &self.placeholder,
+            label: (!self.label.is_empty()).then_some(self.label.as_str()),
+            clear_unfocusable: self.clear_unfocusable,
+        };
+        let (empty, text, focused) = (&mut self.empty, &mut self.text, &mut self.focused);
+        ui.with_enabled(self.enabled, |ui| {
+            ui.filter_bar("empty", row(0), empty, &opts);
+            ui.filter_bar("text", row(1), text, &opts);
+            ui.filter_bar("focused", row(2), focused, &opts);
+        });
         let mut held = "locked".to_owned();
         ui.with_enabled(false, |ui| {
-            ui.filter_bar("disabled", row(3), &mut held, &OPTS);
+            ui.filter_bar("disabled", row(3), &mut held, &opts);
         });
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.text(ui, "Placeholder", &mut self.placeholder);
+        panel.text(ui, "Accessible label", &mut self.label);
+        panel.toggle(ui, "Clear out of tab order", &mut self.clear_unfocusable);
+        panel.toggle(ui, "Enabled", &mut self.enabled);
     }
 }
 
