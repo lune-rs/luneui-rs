@@ -335,6 +335,10 @@ pub(crate) struct Step {
 pub(crate) enum Ev {
     /// The pointer moves to the centre of the widget's previous-frame rect.
     PointerOver(&'static [&'static str]),
+    /// The pointer moves to the centre of the widget at the path, then the numeric key folded in
+    /// as one more `WidgetId::with` step: a row of a list or tree that keys its rows by number.
+    /// An unknown key is the same error as an unknown path.
+    PointerOverKey(&'static [&'static str], u64),
     PointerAt(f32, f32),
     Press,
     Release,
@@ -402,6 +406,13 @@ impl Scope<'_> {
             .last_rect(self.id(path))
             .ok_or_else(|| format!("{}: no widget at {path:?}", self.name))
     }
+
+    /// The previous frame's rect of the widget `key` under the one at `path`.
+    pub(crate) fn rect_of_key(&self, path: &[&str], key: u64) -> Result<Rect, String> {
+        self.store
+            .last_rect(self.id(path).with(key))
+            .ok_or_else(|| format!("{}: no widget at {path:?} with key {key}", self.name))
+    }
 }
 
 /// Applies one scripted event to `input`. `held` is the modifiers `Ev::Mods` holds; `shift`
@@ -419,6 +430,10 @@ pub(crate) fn apply_event(
     match ev {
         Ev::PointerOver(path) => {
             let r = scope.rect_of(path)?;
+            input.pointer_to(r.x + r.w / 2.0, r.y + r.h / 2.0);
+        }
+        Ev::PointerOverKey(path, key) => {
+            let r = scope.rect_of_key(path, *key)?;
             input.pointer_to(r.x + r.w / 2.0, r.y + r.h / 2.0);
         }
         Ev::PointerAt(x, y) => {
@@ -774,10 +789,13 @@ mod tests {
     struct Probe {
         clicks: Rc<Cell<u32>>,
         enter: Rc<Cell<u32>>,
+        row_hovered: Rc<Cell<bool>>,
     }
 
     const A: Rect = Rect::new(10.0, 10.0, 100.0, 40.0);
     const B: Rect = Rect::new(200.0, 10.0, 100.0, 40.0);
+    /// A row under `a`, keyed by the number 7.
+    const ROW7: Rect = Rect::new(10.0, 100.0, 100.0, 40.0);
 
     impl PageState for Probe {
         fn draw(&mut self, ui: &mut Ui<'_>, _stage: &Stage) {
@@ -785,6 +803,8 @@ mod tests {
             let b = ui.id("b");
             let ra = ui.interact(a, A, Sense::CLICK_FOCUS);
             ui.interact(b, B, Sense::CLICK_FOCUS);
+            let row = ui.interact(a.with(7u64), ROW7, Sense::CLICK);
+            self.row_hovered.set(row.hovered);
             self.clicks.set(self.clicks.get() + u32::from(ra.clicked));
             if ra.focused && ui.consume_key(a, NamedKey::Enter) {
                 self.enter.set(self.enter.get() + 1);
@@ -853,6 +873,28 @@ mod tests {
         }];
         let err = run_scene("p", &probe_scene(BAD, 10, Expect::Settled), &mut FakeText)
             .expect_err("no such widget");
+        assert!(err.contains("nope"), "{err}");
+    }
+
+    #[test]
+    fn a_numeric_key_aims_at_the_row_under_a_path_and_an_unknown_one_is_the_path_error() {
+        let probe = Probe::default();
+        let hovered = probe.row_hovered.clone();
+        let mut player = Player::new("p", Box::new(probe), (400.0, 300.0), 1.0, MotionTier::Full);
+        player.frame(&mut FakeText, 0, &[]).expect("frame");
+        assert!(!hovered.get());
+        player
+            .frame(&mut FakeText, 10, &[Ev::PointerOverKey(&["a"], 7)])
+            .expect("a known key");
+        player.frame(&mut FakeText, 16, &[]).expect("frame");
+        assert!(hovered.get(), "the pointer is over the row keyed 7");
+        let err = player
+            .frame(&mut FakeText, 20, &[Ev::PointerOverKey(&["a"], 8)])
+            .expect_err("no such row");
+        assert!(err.contains("key 8") && err.contains("\"a\""), "{err}");
+        let err = player
+            .frame(&mut FakeText, 30, &[Ev::PointerOverKey(&["nope"], 7)])
+            .expect_err("no such path");
         assert!(err.contains("nope"), "{err}");
     }
 

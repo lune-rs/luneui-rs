@@ -36,7 +36,7 @@ use lune_ui::tray::TrayState;
 use lune_ui::ui::{Ui, UiStore, WidgetId};
 use lune_ui::widgets::field::{FieldOptions, Variant};
 use lune_ui::widgets::scroll_area::{Extent, ScrollOptions};
-use lune_ui::widgets::tree_view::{ROW, TreeOptions, TreeRow};
+use lune_ui::widgets::tree_view::{TreeOptions, TreeRow};
 
 use crate::page::{
     Ev, Expect, FrameTweaks, Page, PageKind, PageState, Scope, Stage, Step, UiPage, UiScene,
@@ -120,19 +120,28 @@ impl Layout {
     }
 
     /// The middle of row `i` of the tree while it is not scrolled.
+    #[cfg(test)]
     const fn tree_row(&self, i: usize) -> (f32, f32) {
-        (self.tree.x + 100.0, self.tree.y + (i as f32 + 0.5) * ROW)
+        (
+            self.tree.x + 100.0,
+            self.tree.y + (i as f32 + 0.5) * lune_ui::widgets::tree_view::ROW,
+        )
     }
 }
 
 /// The scenes' card: the 1600 x 900 window of a `showcase-*` scene, less its margin and title band.
+#[cfg(test)]
 const SCENE_CARD: Rect = Rect::new(10.0, 34.0, 1580.0, 856.0);
+#[cfg(test)]
 const SCENE_LAYOUT: Layout = Layout::of(SCENE_CARD);
 
 const SEARCH: &[&str] = &["search"];
 
-/// A scripted scene's pointer aims at the sidebar's second row, which holds the first match.
-const SECOND_ROW: (f32, f32) = SCENE_LAYOUT.tree_row(1);
+/// The search tree's scope under the sidebar: its rows are the numbers under it.
+const FOUND_ROWS: &[&str] = &["sidebar", "found"];
+/// The row key of the table page in the sidebar: `Target::Page(index of "table").key()`, which
+/// `the_table_scenes_row_key_is_the_first_match_of_the_search` pins.
+const TABLE_ROW: u64 = 100 + 61;
 
 const SCENES: &[UiScene] = &[
     UiScene {
@@ -212,7 +221,7 @@ const SCENES: &[UiScene] = &[
             },
             Step {
                 at_ms: 100,
-                events: &[Ev::PointerAt(SECOND_ROW.0, SECOND_ROW.1)],
+                events: &[Ev::PointerOverKey(FOUND_ROWS, TABLE_ROW)],
             },
             Step {
                 at_ms: 140,
@@ -482,18 +491,20 @@ impl PageState for Showcase {
     fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
         let shell = card(ui, stage, "luneui gallery");
         let lay = Layout::of(shell);
-        // The page first: its widgets then come first in the tab order, as a scene's script
-        // (a Tab at its start) expects. The panes do not overlap, so the order draws the same.
-        self.content(ui, &lay);
+        // Tab visits the hosted page first, as a scene's script (a Tab at its start) expects, then
+        // the sidebar, then the settings: tab scopes say so, whatever the panes' draw order.
+        ui.tab_scope(0, |ui| self.content(ui, &lay));
         // The panes stay outside the page's modals: a hit on `Outside` is above a modal's layer
         // and stays live, so a hosted dialog that never closes cannot take the way out with it.
         ui.outside_modals(|ui| {
-            self.sidebar(ui, &lay);
+            ui.tab_scope(1, |ui| self.sidebar(ui, &lay));
             // The settings pane has a fill of its own and is drawn after the page.
             let fill = ui.theme().surface_input;
             ui.painter().fill(lay.settings, 8.0, fill);
-            self.settings
-                .pane(ui, lay.settings, &mut *self.child, self.generation);
+            ui.tab_scope(2, |ui| {
+                self.settings
+                    .pane(ui, lay.settings, &mut *self.child, self.generation);
+            });
             if self.replay.is_none() && self.scene.is_some() {
                 let t = *ui.theme();
                 let spec = Spec::plain("live", Style::ui(t.font_s, t.fg_tertiary));
@@ -1103,6 +1114,68 @@ mod tests {
                 .collect::<Vec<_>>()
                 .join("\n  ")
         );
+    }
+
+    /// A Tab at the start of a shell scene lands on the hosted page's first stop, not on the
+    /// sidebar's search field, which draws after the page and is scoped after it.
+    #[test]
+    fn the_first_tab_reaches_the_hosted_page_before_the_sidebar_and_the_settings() {
+        let window = (1600.0, 900.0);
+        let lay = Layout::of(Rect::new(10.0, 34.0, window.0 - 20.0, window.1 - 44.0));
+        let mut shell = Showcase::new();
+        shell.cue("page button");
+        let mut p = Player::new(HOST, Box::new(shell), window, 1.0, MotionTier::Full);
+        p.frame(&mut FakeText, 0, &[]).expect("frame");
+        p.frame(&mut FakeText, 16, &[]).expect("frame");
+        let mut ms = 32;
+        let mut at = |p: &mut Player, evs: &[Ev]| {
+            ms += 16;
+            p.frame(&mut FakeText, ms, evs).expect("frame").1
+        };
+        let mut focused_node = |p: &mut Player, evs: &[Ev]| {
+            let out = at(p, evs);
+            let f = out.focused?;
+            out.tree.nodes.iter().find(|n| n.id == f).map(|n| n.bounds)
+        };
+        let first = focused_node(&mut p, &[Ev::Tab]).expect("a stop takes the first Tab");
+        assert!(
+            overlaps(first, lay.pane),
+            "{first:?} is in the hosted page, {:?}",
+            lay.pane
+        );
+        // Walk on: the sidebar's stops come after the page's, the settings' after those.
+        let mut seen_sidebar = false;
+        let mut seen_settings = false;
+        for _ in 0..200 {
+            let Some(b) = focused_node(&mut p, &[Ev::Tab]) else {
+                continue;
+            };
+            if overlaps(b, lay.tree) || overlaps(b, lay.search) {
+                assert!(!seen_settings, "the sidebar comes before the settings");
+                seen_sidebar = true;
+            }
+            if overlaps(b, lay.settings) {
+                seen_settings = true;
+            }
+            if seen_settings {
+                break;
+            }
+        }
+        assert!(
+            seen_sidebar && seen_settings,
+            "{seen_sidebar} {seen_settings}"
+        );
+    }
+
+    /// The `showcase-table` script aims at the first match of "table" by its row key, so the key
+    /// must be the one the sidebar gives that row.
+    #[test]
+    fn the_table_scenes_row_key_is_the_first_match_of_the_search() {
+        let rows = nav::rows("table");
+        let first = rows.get(1).expect("a match");
+        assert_eq!(first.target.key(), TABLE_ROW, "{:?}", first.target);
+        let table = nav::index_of("table").expect("a page");
+        assert_eq!(first.target, Target::Page(table));
     }
 
     /// A hosted page that changes layer (the glass lab does) must not leave its clip on the

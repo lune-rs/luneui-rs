@@ -86,6 +86,8 @@ struct Registration {
     enabled: bool,
     /// The axes a scroll region is live on, `(x, y)` (D178).
     scroll_axes: (bool, bool),
+    /// The [`Ui::tab_scope`] order it was registered in.
+    order: i32,
 }
 
 /// An active overlay as the previous frame left it, for begin's input rules.
@@ -154,6 +156,8 @@ pub struct Ui<'a> {
     watch: Vec<(WidgetId, Rect)>,
     /// The regions registered now are no Tab stops ([`Self::off_tab_order`]).
     off_tab_order: bool,
+    /// The [`Ui::tab_scope`] order of the regions registered now.
+    tab_order: i32,
     tree: SemanticTree,
     /// Indices in `tree` of the open containers.
     containers: Vec<usize>,
@@ -549,6 +553,7 @@ impl<'a> Ui<'a> {
             scroll_into_view: routed.scroll_into_view,
             watch: Vec::new(),
             off_tab_order: false,
+            tab_order: 0,
             tree: SemanticTree::default(),
             containers: Vec::new(),
             node_meta: BTreeMap::new(),
@@ -650,12 +655,13 @@ impl<'a> Ui<'a> {
             if tag == SUPPRESSED {
                 continue;
             }
-            let (sense, enabled, scroll_axes) = match senses.get(i).copied().flatten() {
-                Some(r) => (r.sense, r.enabled, r.scroll_axes),
+            let (sense, enabled, scroll_axes, order) = match senses.get(i).copied().flatten() {
+                Some(r) => (r.sense, r.enabled, r.scroll_axes, r.order),
                 None => (
                     Sense::CLICK,
                     !disabled.iter().any(|d| d.contains(&i)),
                     (true, true),
+                    0,
                 ),
             };
             hits.push(HitRecord {
@@ -666,6 +672,7 @@ impl<'a> Ui<'a> {
                 tag,
                 enabled,
                 scroll_axes,
+                order,
             });
             rects.insert(id, rect);
         }
@@ -914,6 +921,7 @@ impl<'a> Ui<'a> {
             sense,
             enabled: self.enabled,
             scroll_axes: (true, true),
+            order: self.tab_order,
         });
         if !self.enabled {
             return Response::inert(id, rect, false);
@@ -964,6 +972,20 @@ impl<'a> Ui<'a> {
         self.off_tab_order = outer || off;
         let r = f(self);
         self.off_tab_order = outer;
+        r
+    }
+
+    /// Runs `f`; the regions it registers with [`Self::interact`] carry the Tab order `order`
+    /// (0 outside any scope; a nested scope replaces the outer one). Tab visits the stops of a
+    /// scope (an overlay's own, or the page's) in ascending order, and in registration order
+    /// among stops of one order, so a shell can draw its panes in the order it needs and still
+    /// Tab through them in the order the user reads them. Roving groups and modal traps are
+    /// unchanged: an overlay's stops are its own, whatever their order.
+    pub fn tab_scope<R>(&mut self, order: i32, f: impl FnOnce(&mut Self) -> R) -> R {
+        let outer = self.tab_order;
+        self.tab_order = order;
+        let r = f(self);
+        self.tab_order = outer;
         r
     }
 

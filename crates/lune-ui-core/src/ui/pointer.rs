@@ -27,6 +27,9 @@ pub(crate) struct HitRecord {
     /// The axes a scroll region is live on, `(x, y)`: a wheel delta on an axis goes only to a region
     /// live on it (D178). Both for every other region.
     pub(crate) scroll_axes: (bool, bool),
+    /// The [`Ui::tab_scope`](super::Ui::tab_scope) order the region was registered in: 0 outside
+    /// any scope.
+    pub(crate) order: i32,
 }
 
 /// The topmost region of `hits` at `pos` that `eligible` admits: highest layer, then the overlay opened last (tag 0, the base, is below every overlay of a
