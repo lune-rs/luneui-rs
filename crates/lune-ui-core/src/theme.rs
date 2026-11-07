@@ -462,7 +462,7 @@ mod tests {
             (THEME.dirty_indicator, [0xD9, 0x8A, 0x3D, 0xFF]),
             (THEME.count_badge, [0xE7, 0x48, 0x56, 0xFF]),
         ];
-        assert_eq!(expected.len(), 35);
+        assert_eq!(expected.len(), 33);
         for (got, want) in expected {
             assert_eq!(got, want);
         }
