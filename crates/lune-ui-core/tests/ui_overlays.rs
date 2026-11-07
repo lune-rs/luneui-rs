@@ -1,7 +1,7 @@
 //! The overlay stack (C4): modal capture, Escape and outside-press dismissal on the top overlay,
 //! phases, exit retention per tier through the exit painter, reopening a closing overlay,
-//! replaying recorded content, and overlays above a modal: the `Raised` layer, chosen at open and held while an older modal is on
-//! the stack.
+//! replaying recorded content, and overlays above a modal: the `Raised` or `Outside` layer, chosen
+//! at open from the modals under it, and lowered on later frames as those modals leave.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -1828,6 +1828,9 @@ fn scrimmed(ui: &mut Ui<'_>, key: &str, opts: &OverlayOptions, fill: [u8; 4]) ->
     .1
 }
 
+/// The scope half is the proof: the old predicate (`h.tag > tag || h.layer > layer`) read the
+/// scrim's tag 1 as above the scope's tag 0 and failed it. The dialog half is a guard: no hit can
+/// read differently there under the two predicates.
 #[test]
 fn pointer_in_reads_true_in_the_scope_under_a_modal_and_false_for_a_dialog_under_an_outside_hit() {
     let mut h = harness();
@@ -1958,6 +1961,192 @@ fn an_overlay_put_on_outside_for_a_modal_drops_back_when_that_modal_is_gone() {
         scene = run(&mut h, false);
     }
     assert_eq!(on(&scene), LayerId::Popup, "the reason is gone");
+}
+
+/// The overlay drawn with `tag` in `scene`.
+fn tagged(scene: &Scene, tag: u32) -> &OverlayLayer {
+    scene
+        .overlays
+        .iter()
+        .find(|o| o.tag == tag)
+        .unwrap_or_else(|| panic!("overlay tag {tag}"))
+}
+
+/// A modal with a window-wide scrim region; returns the scrim's response.
+fn scrim_only(ui: &mut Ui<'_>, key: &str) -> Response {
+    ui.overlay(
+        key,
+        &modal(),
+        |_, _, _| {},
+        |ui, _| {
+            let scrim = ui.id((key, "scrim"));
+            ui.interact(scrim, Rect::new(0.0, 0.0, 400.0, 300.0), Sense::CLICK)
+        },
+    )
+    .1
+}
+
+#[test]
+fn a_menu_put_on_outside_drops_to_raised_after_the_outside_modal_and_stays_under_a_newer_dialog() {
+    let mut h = harness();
+    // M (tag 1) at top level, S (tag 2) in the scope, the menu P (tag 3) at top level, and later
+    // the dialog D (tag 4) at top level.
+    let run = |h: &mut UiHarness, settings: bool, dialog: bool| {
+        let (mut item, mut scrim) = (None, None);
+        let (scene, _) = h.frame(|ui| {
+            scrim_only(ui, "app");
+            if settings {
+                ui.outside_modals(|ui| {
+                    scrim_only(ui, "settings");
+                });
+            }
+            ui.overlay(
+                "menu",
+                &popup(),
+                |_, _, _| {},
+                |ui, _| {
+                    ui.painter().fill(MENU, 0.0, [20, 20, 20, 255]);
+                    let id = ui.id("item");
+                    item = Some(ui.interact(id, MENU, Sense::CLICK));
+                },
+            );
+            if dialog {
+                scrim = Some(scrim_only(ui, "error"));
+            }
+        });
+        (scene, item.expect("ran"), scrim)
+    };
+    let (scene, _, _) = run(&mut h, true, false);
+    assert_eq!(
+        tagged(&scene, 3).on,
+        LayerId::Outside,
+        "above the Outside modal"
+    );
+    // The frame S is first not called it is still open; its exit (180 ms) starts at that
+    // frame's finish, so the next frame is mid-exit.
+    h.at_ms(50);
+    run(&mut h, false, false);
+    h.at_ms(100);
+    let (scene, _, _) = run(&mut h, false, false);
+    assert_eq!(
+        tagged(&scene, 3).on,
+        LayerId::Outside,
+        "held while the Outside modal's exit runs"
+    );
+    let mut scene = scene;
+    for ms in (150..=3_000).step_by(50) {
+        h.at_ms(ms);
+        scene = run(&mut h, false, false).0;
+    }
+    assert_eq!(
+        tagged(&scene, 3).on,
+        LayerId::Raised,
+        "the Outside modal is gone, the older modal on Modal is not"
+    );
+    let (scene, _, _) = run(&mut h, false, true);
+    assert_eq!(tagged(&scene, 4).on, LayerId::Raised);
+    assert!(
+        place(&scene, &tagged(&scene, 4).layer) > place(&scene, &tagged(&scene, 3).layer),
+        "the newer dialog draws above the older menu"
+    );
+    for ms in (3_050..=6_000).step_by(50) {
+        h.at_ms(ms);
+        run(&mut h, false, true);
+    }
+    h.input.pointer_to(160.0, 20.0);
+    run(&mut h, false, true);
+    h.input.press(P);
+    let (_, item, scrim) = run(&mut h, false, true);
+    let scrim = scrim.expect("the dialog ran");
+    assert!(
+        scrim.pressed && !item.pressed && !item.hovered,
+        "the dialog's scrim takes a press over the menu (scrim {}, menu {} {})",
+        scrim.pressed,
+        item.pressed,
+        item.hovered
+    );
+}
+
+#[test]
+fn the_scope_is_live_under_a_dialog_put_on_outside_once_the_outside_modal_is_gone() {
+    let mut h = harness();
+    // M (tag 1) at top level, S (tag 2) in the scope, the error dialog E (tag 3) at top level with
+    // a child popup C (tag 4) in its body, and the scope's pane.
+    let run = |h: &mut UiHarness, settings: bool| {
+        let mut pane = None;
+        let (scene, _) = h.frame(|ui| {
+            scrim_only(ui, "app");
+            if settings {
+                ui.outside_modals(|ui| {
+                    scrim_only(ui, "settings");
+                });
+            }
+            ui.overlay(
+                "error",
+                &modal(),
+                |_, _, _| {},
+                |ui, _| {
+                    let scrim = ui.id("error-scrim");
+                    ui.interact(scrim, Rect::new(0.0, 0.0, 400.0, 300.0), Sense::CLICK);
+                    ui.overlay(
+                        "child",
+                        &popup(),
+                        |_, _, _| {},
+                        |ui, _| ui.painter().fill(MENU, 0.0, [20, 20, 20, 255]),
+                    );
+                },
+            );
+            ui.outside_modals(|ui| {
+                let id = ui.id("pane");
+                pane = Some((
+                    ui.interact(id, PAGE_BTN, Sense::CLICK),
+                    ui.pointer_in(PAGE_BTN),
+                ));
+            });
+        });
+        let (resp, inside) = pane.expect("ran");
+        (scene, resp, inside)
+    };
+    let (scene, _, _) = run(&mut h, true);
+    assert_eq!(tagged(&scene, 3).on, LayerId::Outside);
+    assert_eq!(tagged(&scene, 4).on, LayerId::Outside);
+    // The frame S is first not called it is still open; its exit (180 ms) starts at that
+    // frame's finish, so the next frame is mid-exit.
+    h.at_ms(50);
+    run(&mut h, false);
+    h.at_ms(100);
+    let (scene, _, _) = run(&mut h, false);
+    assert_eq!(
+        tagged(&scene, 3).on,
+        LayerId::Outside,
+        "held while the Outside modal's exit runs"
+    );
+    for ms in (150..=3_000).step_by(50) {
+        h.at_ms(ms);
+        run(&mut h, false);
+    }
+    h.input.pointer_to(20.0, 20.0);
+    run(&mut h, false);
+    let (scene, pane, inside) = run(&mut h, false);
+    assert_eq!(
+        tagged(&scene, 3).on,
+        LayerId::Raised,
+        "as if opened over M alone"
+    );
+    assert_eq!(
+        tagged(&scene, 4).on,
+        LayerId::Raised,
+        "the child drops with its parent"
+    );
+    assert!(
+        place(&scene, &tagged(&scene, 4).layer) > place(&scene, &tagged(&scene, 3).layer),
+        "the child stays above its parent"
+    );
+    assert!(
+        pane.hovered && inside,
+        "the scope's pane is live (hovered {}, pointer_in {inside})",
+        pane.hovered
+    );
 }
 
 // One glass routine: every popup and list that floats over app content frosts what is behind it.

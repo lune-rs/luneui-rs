@@ -88,11 +88,19 @@ impl std::fmt::Debug for OverlayRec {
     }
 }
 
-/// The layer of an overlay opening with `tag` that asks for `requested`: [`LayerId::Outside`] for a
-/// popup or a modal opened inside [`Ui::outside_modals`] (`outside`); else, for one above an active
-/// modal, the higher of [`LayerId::Raised`] and the layer of the modals under it (`Outside` when
-/// one of them is on it), so it draws and takes input above them all; else `requested`.
-fn open_layer(overlays: &[OverlayRec], requested: LayerId, tag: u32, outside: bool) -> LayerId {
+/// The layer of an overlay with `tag` that asks for `requested`, from the modals under it: the
+/// older modals `under` counts. [`LayerId::Outside`] for a popup or a modal called inside
+/// [`Ui::outside_modals`] (`outside`); else, above at least one such modal, the higher of
+/// [`LayerId::Raised`] and their layers (`Outside` when one of them is on it), so it draws and
+/// takes input above them all; else `requested`. The one rule for open, reopen and the hold, so
+/// the layer is always this function of the modals under the overlay (D263).
+fn layer_over(
+    overlays: &[OverlayRec],
+    requested: LayerId,
+    tag: u32,
+    outside: bool,
+    under: impl Fn(&OverlayRec) -> bool,
+) -> LayerId {
     let popup_or_modal = matches!(requested, LayerId::Popup | LayerId::Modal);
     if !popup_or_modal {
         return requested;
@@ -100,31 +108,47 @@ fn open_layer(overlays: &[OverlayRec], requested: LayerId, tag: u32, outside: bo
     if outside {
         return LayerId::Outside;
     }
-    let under = overlays
+    let top = overlays
         .iter()
-        .filter(|o| o.tag < tag && o.active() && o.opts.modal)
+        .filter(|o| o.tag < tag && o.opts.modal && under(o))
         .map(|o| o.opts.layer as usize)
         .max();
-    match under {
+    match top {
         Some(l) if l >= LayerId::Outside as usize => LayerId::Outside,
         Some(_) => LayerId::Raised,
         None => requested,
     }
 }
 
-/// Whether a modal opened before the overlay with `tag` is still on the stack at `now`: open,
-/// opening, or closing with its exit not yet over. This is the reason a `Raised` overlay stays on
-/// `Raised`; with none left it falls back to the layer it asks for (D137 amended).
-fn modal_below(
+/// The layer of an overlay opening or reopening with `tag`: [`layer_over`] the active modals.
+fn open_layer(overlays: &[OverlayRec], requested: LayerId, tag: u32, outside: bool) -> LayerId {
+    layer_over(overlays, requested, tag, outside, OverlayRec::active)
+}
+
+/// The layer an open overlay held on `held` is on this frame: [`layer_over`] the modals still on
+/// the stack (`on_stack`: open, opening, or closing with the exit not yet over, so it drops only
+/// once the exit is over), when that is lower than `held`. It never rises mid-life. Only an
+/// overlay put above a modal (`Raised`, or `Outside` while not called in the scope) moves,
+/// and only while it asks for `Popup` or `Modal` (D137 amended, D263).
+fn held_layer(
     overlays: &[OverlayRec],
+    held: LayerId,
+    requested: LayerId,
     tag: u32,
-    now: Time,
-    tokens: &MotionTokens,
-    tier: MotionTier,
-) -> bool {
-    overlays.iter().any(|o| {
-        o.tag < tag && o.opts.modal && (o.active() || o.closing(now, tokens, tier).is_some())
-    })
+    outside: bool,
+    on_stack: impl Fn(&OverlayRec) -> bool,
+) -> LayerId {
+    if !matches!(held, LayerId::Raised | LayerId::Outside)
+        || !matches!(requested, LayerId::Popup | LayerId::Modal)
+    {
+        return held;
+    }
+    let target = layer_over(overlays, requested, tag, outside, on_stack);
+    if (target as usize) < (held as usize) {
+        target
+    } else {
+        held
+    }
 }
 
 /// Whether an active modal opened after the overlay with `tag`.
@@ -263,14 +287,16 @@ impl<'a> Ui<'a> {
     /// app stops calling it. `exit` gets the linear close progress and `transforms`.
     ///
     /// A `Popup` or `Modal` overlay opened above an active modal draws on [`LayerId::Raised`]
-    /// instead, or on [`LayerId::Outside`] when the modal under it is on `Outside` (a dialog opened
+    /// instead, or on [`LayerId::Outside`] when a modal under it is on `Outside` (a dialog opened
     /// from [`Self::outside_modals`]), so it is above every modal either way. That is settled at
-    /// open or reopen. It holds while an older modal is on the stack
-    /// (open, opening, or closing with its exit not yet over), whatever later frames pass as
-    /// `layer`; when none is left, the next frame puts the overlay on the layer it asks for
-    /// (a dialog that replaces another in one frame is raised only during the first one's exit).
-    /// An overlay called inside the scope stays on `Outside` for the scope's sake, with or without
-    /// a modal.
+    /// open or reopen. On each later frame the same rule runs again over the older modals still on
+    /// the stack (open, opening, or closing with their exit not yet over), whatever later frames
+    /// pass as `layer`, and the overlay takes the result when it is lower: it drops from `Outside`
+    /// to `Raised` once the last `Outside` modal under it has finished its exit, and to the layer
+    /// it asks for once no older modal is left (a dialog that replaces another in one frame is
+    /// raised only during the first one's exit). It never rises mid-life. An overlay called inside
+    /// the scope stays on `Outside` for the scope's sake, with or without a modal; a child that was
+    /// on `Outside` because its parent was drops with the parent, in the same frame.
     /// Once closing, an overlay keeps the layer it has, so it exits where it drew. A reopen under
     /// a modal that opened during the close is an open above that modal. What `content` draws is
     /// the overlay's alone: a surrounding [`Self::record`] does not get it.
@@ -321,18 +347,14 @@ impl<'a> Ui<'a> {
             open_layer(&self.store.overlays, options.layer, tag, outside)
         } else {
             let rec = &self.store.overlays[index];
-            let held = rec.opts.layer;
-            // The hold on `Raised` lasts while its reason does: once no older modal is on the
-            // stack, the overlay is on the layer it asks for. The same for `Outside` when a modal
-            // put it there; an overlay called inside the scope is on `Outside` for the scope.
-            if (held == LayerId::Raised || (held == LayerId::Outside && !outside))
-                && matches!(options.layer, LayerId::Popup | LayerId::Modal)
-                && !modal_below(&self.store.overlays, rec.tag, now, &tokens, tier)
-            {
-                options.layer
-            } else {
-                held
-            }
+            held_layer(
+                &self.store.overlays,
+                rec.opts.layer,
+                options.layer,
+                rec.tag,
+                outside,
+                |o| o.active() || o.closing(now, &tokens, tier).is_some(),
+            )
         };
         let rec = &mut self.store.overlays[index];
         if reopened {
