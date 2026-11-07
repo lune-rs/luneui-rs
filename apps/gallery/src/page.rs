@@ -67,8 +67,7 @@ pub(crate) struct UiPage {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct Stage {
     rect: Option<Rect>,
-    /// The clip the host holds over the page, in the space the page draws in. `Painter::on`
-    /// drops the clip, so a page that changes layer gets it back through [`Stage::on`].
+    /// The clip the host holds over the page, in the space the page draws in.
     clip: Option<Rect>,
 }
 
@@ -96,19 +95,6 @@ impl Stage {
     pub(crate) const fn clipped(mut self, clip: Rect) -> Self {
         self.clip = Some(clip);
         self
-    }
-
-    /// `Painter::on`, then the host's clip again: a page that draws on more than one layer goes
-    /// through here, or the clip around it would be lost at the first change.
-    pub(crate) fn on<H: Copy + PartialEq>(
-        &self,
-        p: &mut lune_ui::paint::Painter<'_, H>,
-        layer: lune_ui::scene::LayerId,
-    ) {
-        p.on(layer);
-        if let Some(clip) = self.clip {
-            p.set_clip(Some(clip));
-        }
     }
 
     /// `r` cut to the host's clip: what of it shows. A request the clip cannot cut (a backdrop)

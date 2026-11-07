@@ -27,7 +27,7 @@ use lune_ui::image::{ImageData, ImageId};
 use lune_ui::input::{Modifiers, RawInput};
 use lune_ui::material::Material;
 use lune_ui::motion::MotionTier;
-use lune_ui::paint::{LayerId, Rect};
+use lune_ui::paint::Rect;
 use lune_ui::strings::StringTable;
 use lune_ui::testing::ScriptedInput;
 use lune_ui::text::{Spec, Style};
@@ -443,8 +443,7 @@ impl Showcase {
         let (child, generation) = (&mut self.child, self.generation);
         let mut root = self.child_root;
         ui.scroll_area("content", lay.pane, &opts, |ui, view| {
-            // The pane clips the page. A page that changes layer loses the clip (`Painter::on`
-            // drops it) unless it gets it back through the stage, in the space it draws in.
+            // The pane clips the page, whichever layer the page draws on.
             let clip = Rect::new(
                 lay.pane.x + view.offset.0 as f32,
                 lay.pane.y + view.offset.1 as f32,
@@ -460,10 +459,6 @@ impl Showcase {
             ((), Extent::default())
         });
         self.child_root = root;
-        // A page that changed layer through `Painter::on` cleared the clip stack, so the scroll
-        // area's own pop restored nothing and the pane's clip would stay on for the panes drawn
-        // after it: back on the base layer, unclipped.
-        ui.painter().on(LayerId::Base);
         if let Some(replay) = &mut self.replay {
             replay.drawn = true;
             // The next step is due at its time; before the script starts, on the next frame.

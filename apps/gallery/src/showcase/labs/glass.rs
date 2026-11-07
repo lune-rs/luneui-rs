@@ -114,10 +114,10 @@ impl PageState for Glass {
         let under = premul([0x70, 0x70, 0x70, 0xFF]);
         {
             let p = ui.painter();
-            stage.on(p, LayerId::Page);
+            p.on(LayerId::Page);
             stripes(p, stripe_band);
             colours(p, colour_band);
-            stage.on(p, LayerId::Popup);
+            p.on(LayerId::Popup);
             for band in [stripe_band, colour_band] {
                 for (i, (name, layer)) in layers.iter().enumerate() {
                     let r = panel(band, i, self.panel_h);
@@ -127,7 +127,7 @@ impl PageState for Glass {
                 }
             }
             // Back on the layer the card is on, for the text and widgets that follow.
-            stage.on(p, LayerId::Base);
+            p.on(LayerId::Base);
         }
         heading(ui, "THE THREE LAYERS OVER BLACK AND WHITE", x, y);
         heading(ui, "AND OVER COLOUR", x, y + 186.0);

@@ -191,7 +191,8 @@ fn paint_footer<H: Copy + PartialEq>(p: &mut Painter<'_, H>, l: &Layout) {
     p.fill_radii(l.footer, [0.0, 0.0, 8.0, 8.0], t.dialog_footer);
 }
 
-/// Draws a dialog on the modal layer. `body` draws the app's part between the message and the
+/// Draws a dialog on the modal layer with [`Painter::on`], so it inherits the caller's clip and
+/// transforms; call it with none (the `Ui` overlays start with none). `body` draws the app's part between the message and the
 /// footer; it gets the painter, the card's content x, the y just below the message and the
 /// content width.
 pub fn dialog<H: Copy + PartialEq>(

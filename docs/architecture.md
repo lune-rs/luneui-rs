@@ -477,12 +477,12 @@ it visible needs a frame at the due time. Window mode and the bench draw the lis
 Window mode opens one page, the showcase (`apps/gallery/src/showcase/`, D246 to D254), which hosts every other page. `Showcase` is an ordinary Ui page:
 `mod.rs` draws three panes (the sidebar with its search field, the content pane, the settings pane) and holds the hosted page as a child `Box<dyn PageState>`
 under an id scope of its own; a chosen scene's script is replayed into the frame's input through `PageState::inject`. The hosted page draws on a `Stage`
-(`Stage::at(rect)`: its card at the rect, no window glass, the host's clip kept through `Stage::on`) on a fixed 1,020 x 616 canvas that scrolls in the pane.
+(`Stage::at(rect)`: its card at the rect, no window glass, the host's clip kept by the painter's own clip stack) on a fixed 1,020 x 616 canvas that scrolls in the pane.
 `nav.rs` is the sidebar model (groups, rows, search, row keys). `settings.rs` is the global settings, answered to the window through the `PageState` hooks
 `theme`, `tier`, `frame_params`, `material`, `time_scale` and `zoom` (the window keeps an accumulated clock, so a speed change never jumps time, and scales the
 pointer with the zoom). `knobs.rs` is `Knobs` (`toggle`, `choice`, `number`, `text`, `button`), the rows a page declares in `PageState::knobs`. `labs/` holds the
-glass, blur, effects, motion, tokens, clipboard and JSON pages, each an ordinary page in `PAGES`. A page that changes layers inside the pane goes through `Stage::on`
-(`Painter::on` drops the clip); the shell resets to the base layer after the pane. Tests: `showcase::tests` (clicks through `Translator`, the settings, the clip),
+glass, blur, effects, motion, tokens, clipboard and JSON pages, each an ordinary page in `PAGES`. A page that changes layers inside the pane keeps the pane's clip
+(`Painter::on` changes only the layer, D265). Tests: `showcase::tests` (clicks through `Translator`, the settings, the clip),
 `showcase::knobs::tests` (one turned knob per page, and every sidebar page has a knob or a named reason not to).
 
 `gallery --bench [--runs N] [--frames N] [--size WxH]` times offscreen frames: a timeline per page,

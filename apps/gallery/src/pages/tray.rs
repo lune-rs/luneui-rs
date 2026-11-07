@@ -428,7 +428,7 @@ impl PageState for Surface {
         let win = stage.area(ui);
         {
             let p = ui.painter();
-            stage.on(p, lune_ui::paint::LayerId::Base);
+            p.on(lune_ui::paint::LayerId::Base);
             p.fill(win, 0.0, DESKTOP);
         }
         for (i, line) in [

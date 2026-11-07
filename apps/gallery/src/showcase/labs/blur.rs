@@ -146,16 +146,16 @@ impl PageState for Blur {
         let panel = panel_in(area, pointer, self.panel);
         {
             let p = ui.painter();
-            stage.on(p, LayerId::Page);
+            p.on(LayerId::Page);
             content(p, area, self.phase, t.fg_primary, t.font_m);
             // The popup layer is the first above the scene layers: it blurs the page under it.
-            stage.on(p, LayerId::Popup);
+            p.on(LayerId::Popup);
             p.backdrop(stage.visible(panel), 9.0);
             p.fill(panel, 9.0, t.menu_glass);
             p.ring(panel, 9.0, 1.0, t.menu_popup_border, false);
             let label = Spec::plain("Backdrop blur", Style::ui(t.font_m, t.menu_text_primary));
             p.text_centered(&label, panel);
-            stage.on(p, LayerId::Base);
+            p.on(LayerId::Base);
         }
         caption(
             ui,

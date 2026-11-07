@@ -98,7 +98,7 @@ impl PageState for Effects {
         );
         {
             let p = ui.painter();
-            stage.on(p, LayerId::Page);
+            p.on(LayerId::Page);
             let n = (stripes.w / 20.0).ceil() as usize;
             for i in 0..n {
                 let c = if i % 2 == 0 {
@@ -113,7 +113,7 @@ impl PageState for Effects {
                     c,
                 );
             }
-            stage.on(p, LayerId::Popup);
+            p.on(LayerId::Popup);
             for (i, (name, glass)) in WINDOWS.iter().enumerate() {
                 let r = window(x, y, i);
                 card_in(p, &t, *glass, r);
@@ -125,7 +125,7 @@ impl PageState for Effects {
                 );
                 p.text(&note, r.x + 14.0, r.y + 38.0);
             }
-            stage.on(p, LayerId::Base);
+            p.on(LayerId::Base);
         }
 
         heading(ui, "TAB OUTLINE", x, y + 196.0);

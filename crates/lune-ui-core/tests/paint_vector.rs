@@ -540,14 +540,59 @@ fn text_and_customs_take_the_rect_only() {
 }
 
 #[test]
-fn a_new_layer_drops_the_rounded_clip() {
+fn a_new_layer_keeps_the_rounded_clip() {
     let mut t = FakeText;
     let mut p = painter(&mut t, 1.0);
     p.push_clip_rounded(Rect::new(0.0, 0.0, 100.0, 100.0), 10.0);
     p.on(LayerId::Popup);
     p.fill(Rect::new(0.0, 0.0, 10.0, 10.0), 0.0, WHITE);
     let s = p.scene.layers[2].geometry.under[0];
-    assert_eq!((s.round, s.round_radius, s.clip), ([0.0; 4], 0.0, [0.0; 4]));
+    assert_eq!(
+        (s.round, s.round_radius, s.clip),
+        ([0.0, 0.0, 100.0, 100.0], 10.0, [0.0, 0.0, 100.0, 100.0])
+    );
+}
+
+#[test]
+fn a_pop_after_a_layer_change_restores_what_its_push_replaced() {
+    let mut t = FakeText;
+    let mut p = painter(&mut t, 1.0);
+    let outer = Rect::new(0.0, 0.0, 200.0, 200.0);
+    p.push_clip(outer);
+    p.push_clip_rounded(Rect::new(10.0, 10.0, 50.0, 50.0), 4.0);
+    p.on(LayerId::Popup);
+    p.pop_clip();
+    p.fill(Rect::new(0.0, 0.0, 10.0, 10.0), 0.0, WHITE);
+    let s = p.scene.layers[2].geometry.under[0];
+    assert_eq!(
+        (s.clip, s.round, s.round_radius),
+        ([0.0, 0.0, 200.0, 200.0], [0.0; 4], 0.0),
+        "the outer clip is back, on the new layer"
+    );
+    p.pop_clip();
+    p.on(LayerId::Base);
+    p.fill(Rect::new(0.0, 0.0, 10.0, 10.0), 0.0, WHITE);
+    assert_eq!(p.scene.layers[0].geometry.under[0].clip, [0.0; 4]);
+}
+
+#[test]
+fn a_recorded_layer_change_replays_with_the_clip_kept() {
+    let mut t = FakeText;
+    let mut a = painter(&mut t, 1.0);
+    a.start_recording();
+    a.push_clip(Rect::new(0.0, 0.0, 100.0, 100.0));
+    a.on(LayerId::Popup);
+    a.fill(Rect::new(0.0, 0.0, 10.0, 10.0), 0.0, WHITE);
+    a.pop_clip();
+    let ops = a.take_recording();
+    assert_eq!(
+        a.scene.layers[2].geometry.under[0].clip,
+        [0.0, 0.0, 100.0, 100.0]
+    );
+    let mut t2 = FakeText;
+    let mut b = painter(&mut t2, 1.0);
+    b.replay(&ops);
+    assert_eq!(a.scene, b.scene);
 }
 
 #[test]

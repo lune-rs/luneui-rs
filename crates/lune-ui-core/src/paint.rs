@@ -486,7 +486,10 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         }
     }
 
-    /// Draws on `layer` from now on, with no clip. Items of one kind keep the order they were drawn
+    /// Draws on `layer` from now on. The clip stack and the transforms stay as they are: they belong
+    /// to the code that pushed them, so a [`Self::pop_clip`] after a layer change restores what its
+    /// push replaced. (An overlay starts with none, [`Ui::overlay`](crate::ui::Ui::overlay): it is
+    /// not inside its opener's clip.) Items of one kind keep the order they were drawn
     /// in; the kinds draw in the renderer's order (acrylic, under shapes, path fills, customs,
     /// images, text, then over shapes and strokes, see [`crate::scene::Layer`]), so a fill drawn
     /// after a text still draws under it. The layers draw back to front ([`LayerId`]). This is the
@@ -496,9 +499,6 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         self.rec(|| Op::On(layer));
         self.layer = layer as usize;
         self.slot = None;
-        self.clip = None;
-        self.round = None;
-        self.clips.clear();
     }
 
     /// Sets the clip to `clip` (logical px), or removes the rect clip with `None`. [`Self::push_clip`]
