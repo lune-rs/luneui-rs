@@ -15,7 +15,9 @@ use lune_ui::widgets::page::{PageOptions, PageSlot};
 use lune_ui::widgets::stat::StatOptions;
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "page",
@@ -84,8 +86,8 @@ impl Live {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let area = card(ui, "Page card");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let area = card(ui, stage, "Page card");
         heading(ui, "PAGE", area.x + 24.0, area.y + 18.0);
         let rect = Rect::new(area.x + 12.0, area.y + 40.0, area.w - 24.0, area.h - 52.0);
         let opts = PageOptions {
@@ -143,6 +145,15 @@ impl PageState for Live {
         });
         if next {
             self.key += 1;
+        }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.toggle(ui, "Window active", &mut self.active);
+        panel.toggle(ui, "Footer", &mut self.footer);
+        let mut rows = self.rows as f32;
+        if panel.number(ui, "Rows", &mut rows, (0.0, 60.0, 1.0)) {
+            self.rows = rows.round() as u32;
         }
     }
 }

@@ -12,8 +12,10 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::field::FieldOptions;
 use lune_ui::widgets::text_area::AreaOptions;
 
-use super::{card, heading};
+use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "ime",
@@ -61,10 +63,19 @@ fn outlined() -> Box<dyn PageState> {
 }
 
 impl PageState for Ime {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Input method");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Input method");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "INPUT METHOD", x, y);
+        if stage.rect().is_some() {
+            // Only on the showcase's stage: the scenes' pictures stay as they are.
+            caption(
+                ui,
+                "Real here: the system's input method composes into the field. Scripted: the scenes' composition (preedit and commit events).",
+                x,
+                y + 150.0,
+            );
+        }
         let field = FieldOptions {
             placeholder: "Type here",
             ..FieldOptions::default()
@@ -90,6 +101,22 @@ impl PageState for Ime {
                     ui.painter().ring(area, 0.0, 1.0, ok, true);
                 }
             }
+        }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let kinds = [
+            ("Field", Kind::Field),
+            ("Area", Kind::Area),
+            ("Field with its IME area", Kind::Outlined),
+        ];
+        let names: Vec<&str> = kinds.iter().map(|(n, _)| *n).collect();
+        let mut at = kinds
+            .iter()
+            .position(|(_, k)| std::mem::discriminant(k) == std::mem::discriminant(&self.kind))
+            .unwrap_or(0);
+        if panel.choice(ui, "Widget", &names, &mut at) {
+            self.kind = kinds[at].1;
         }
     }
 }

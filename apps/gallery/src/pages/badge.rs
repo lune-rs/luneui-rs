@@ -5,7 +5,9 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::tone::Tone;
 
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Expect, Page, PageKind, PageState, UiPage, UiScene};
+use crate::showcase::knobs::{Knobs, TONES, tone_names};
 
 pub(crate) static PAGE: Page = Page {
     id: "badge",
@@ -18,7 +20,7 @@ pub(crate) static PAGE: Page = Page {
 };
 
 fn tones() -> Box<dyn PageState> {
-    Box::new(Tones)
+    Box::new(Tones::default())
 }
 
 /// The tones and the word each one shows here; the toolkit maps no domain status to a tone.
@@ -30,12 +32,30 @@ const CASES: [(&str, Tone); 5] = [
     ("Info", Tone::Data),
 ];
 
-/// Every tone in a row, then the same row with the leading dot.
-struct Tones;
+/// Every tone in a row, then the same row with the leading dot; under them a sample badge when
+/// the knobs ask for it.
+struct Tones {
+    show: bool,
+    text: String,
+    /// An index into [`TONES`].
+    tone: usize,
+    dot: bool,
+}
+
+impl Default for Tones {
+    fn default() -> Self {
+        Self {
+            show: false,
+            text: "Sample".to_owned(),
+            tone: 0,
+            dot: false,
+        }
+    }
+}
 
 impl PageState for Tones {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Badge");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Badge");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         for (row, (title, dot)) in [("BADGES", false), ("BADGES WITH A DOT", true)]
             .into_iter()
@@ -50,6 +70,19 @@ impl PageState for Tones {
                 bx += r.w.max(64.0) + 24.0;
             }
         }
+        if self.show {
+            let ry = y + 2.0 * 72.0;
+            heading(ui, "SAMPLE", x, ry);
+            let tone = TONES[self.tone.min(TONES.len() - 1)].1;
+            ui.badge("sample", (x, ry + 24.0), &self.text, tone, self.dot);
+        }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.toggle(ui, "Show a sample", &mut self.show);
+        panel.text(ui, "Text", &mut self.text);
+        panel.choice(ui, "Tone", &tone_names(), &mut self.tone);
+        panel.toggle(ui, "Dot", &mut self.dot);
     }
 }
 

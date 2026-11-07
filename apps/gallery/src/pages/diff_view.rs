@@ -16,8 +16,10 @@ use lune_ui::widgets::diff_view::{
 };
 use lune_ui::widgets::menu::{MenuOptions, MenuPlace, MenuRow};
 
-use super::{caption, card, heading};
+use super::{caption, card, heading, on_card};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "diff-view",
@@ -261,10 +263,10 @@ const ACTIONS: [HunkAction<'static>; 2] = [
 ];
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Diff view");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Diff view");
         heading(ui, "DIFF VIEW", card.x + 24.0, card.y + 24.0);
-        self.header(ui);
+        self.header(ui, card);
 
         let mode = if self.split {
             DiffMode::Split(&self.doc.rows)
@@ -280,7 +282,9 @@ impl PageState for Live {
             widest_chars: self.doc.widest,
         };
         let lines = &self.doc.lines;
-        let r = ui.with_enabled(self.enabled, |ui| ui.diff_view("diff", RECT, lines, &opts));
+        let r = ui.with_enabled(self.enabled, |ui| {
+            ui.diff_view("diff", on_card(card, RECT), lines, &opts)
+        });
         if r.hunk.is_some() {
             self.pressed = r.hunk;
         }
@@ -308,12 +312,24 @@ impl PageState for Live {
             }
         }
     }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.toggle(ui, "Side by side", &mut self.split);
+        panel.toggle(ui, "Wrap long lines", &mut self.wrap);
+        let mut actions = self.actions as f32;
+        if panel.number(ui, "Hunk actions", &mut actions, (0.0, 2.0, 1.0)) {
+            self.actions = actions.round() as usize;
+        }
+        panel.toggle(ui, "Enabled", &mut self.enabled);
+    }
 }
 
 impl Live {
     /// The mode switch, the wrap toggle and what the last hunk action was.
-    fn header(&mut self, ui: &mut Ui<'_>) {
-        let mut x = RECT.x;
+    fn header(&mut self, ui: &mut Ui<'_>, card: Rect) {
+        let rect = on_card(card, RECT);
+        let bar_y = on_card(card, Rect::new(0.0, BAR_Y, 0.0, 0.0)).y;
+        let mut x = rect.x;
         for (key, text, split) in [
             ("unified", ui.tr("luneui.diff-view.unified"), false),
             ("split", ui.tr("luneui.diff-view.side-by-side"), true),
@@ -329,7 +345,7 @@ impl Live {
                 icon: None,
             };
             let w = button_width_with(ui.painter(), text, &options);
-            let r = ui.button_with(key, Rect::new(x, BAR_Y, w, BAR_H), text, &options);
+            let r = ui.button_with(key, Rect::new(x, bar_y, w, BAR_H), text, &options);
             if r.clicked {
                 self.split = split;
             }
@@ -338,13 +354,13 @@ impl Live {
         let wrap = ui.tr("luneui.diff-view.word-wrap");
         ui.checkbox(
             "wrap",
-            Rect::new(x + 8.0, BAR_Y, 140.0, BAR_H),
+            Rect::new(x + 8.0, bar_y, 140.0, BAR_H),
             &mut self.wrap,
             wrap,
         );
         if let Some((hunk, action)) = self.pressed {
             let text = format!("{}: hunk {hunk}", ACTIONS[action].label);
-            caption(ui, &text, RECT.x + 560.0, BAR_Y + 6.0);
+            caption(ui, &text, rect.x + 560.0, bar_y + 6.0);
         }
     }
 }

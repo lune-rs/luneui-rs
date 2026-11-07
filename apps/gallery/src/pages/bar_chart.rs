@@ -10,7 +10,9 @@ use lune_ui::widgets::bar_chart::{BarChartOptions, BarColumn, BarSeries};
 use lune_ui::widgets::button::{ButtonKind, button_width};
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "bar-chart",
@@ -95,8 +97,8 @@ fn change() -> Box<dyn PageState> {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Bar chart");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Bar chart");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "HOURLY INPUT TOKENS, TWO SERIES", x, y);
         let label = "Retarget the data";
@@ -169,6 +171,14 @@ impl PageState for Live {
                 live: false,
             },
         );
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let mut at = usize::from(self.shape == Shape::Empty);
+        if panel.choice(ui, "Data", &["Two days", "Empty"], &mut at) {
+            self.shape = if at == 1 { Shape::Empty } else { Shape::Data };
+        }
+        panel.toggle(ui, "Second day", &mut self.second);
     }
 }
 

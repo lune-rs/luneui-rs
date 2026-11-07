@@ -9,8 +9,9 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::dialog::{Cancel, Dialog};
 use lune_ui::widgets::menu::MenuRow;
 
-use super::card;
 use super::controls_ui::{Controls, glass};
+use super::{card, card_shift};
+use crate::page::Stage;
 use crate::page::{Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -72,8 +73,8 @@ fn pseudo() -> Box<dyn PageState> {
 }
 
 impl PageState for Locale {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let area = card(ui, "luneui gallery");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let area = card(ui, stage, "luneui gallery");
         self.controls.draw(ui, area);
         let rows = [
             ("app.menu.new", Some(icon::ADD)),
@@ -99,7 +100,8 @@ impl PageState for Locale {
                 shortcut: "",
             })
             .collect();
-        ui.menu("menu", &menu_rows, (24.0, 350.0));
+        let (dx, dy) = card_shift(area);
+        ui.menu("menu", &menu_rows, (24.0 + dx, 350.0 + dy));
 
         let title = t(ui, "app.dialog.title", "Discard changes");
         let message = t(

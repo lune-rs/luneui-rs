@@ -12,7 +12,9 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::toolbar::{ACTION_SIZE, GROUP_GAP, ToolbarOptions, label_width};
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "toolbar",
@@ -25,25 +27,16 @@ pub(crate) static PAGE: Page = Page {
 };
 
 fn live() -> Box<dyn PageState> {
-    Box::new(Live {
-        active: true,
-        push_enabled: true,
-    })
+    Box::new(Live::of(true, true))
 }
 
 fn inactive() -> Box<dyn PageState> {
-    Box::new(Live {
-        active: false,
-        push_enabled: true,
-    })
+    Box::new(Live::of(false, true))
 }
 
 /// The push action disabled.
 fn push_disabled() -> Box<dyn PageState> {
-    Box::new(Live {
-        active: true,
-        push_enabled: false,
-    })
+    Box::new(Live::of(true, false))
 }
 
 /// The actions: key, glyph, and the name that is also the tooltip.
@@ -55,14 +48,31 @@ const ACTIONS: [(&str, &str, &str); 3] = [
 
 const BRANCH: &str = "feature/glass-toolbar";
 
+/// The toolbar and two switches for the window being active and the push action being enabled.
+/// The knobs set the branch label and whether the other two actions are enabled.
 struct Live {
     active: bool,
     push_enabled: bool,
+    branch: String,
+    fetch_enabled: bool,
+    pull_enabled: bool,
+}
+
+impl Live {
+    fn of(active: bool, push_enabled: bool) -> Self {
+        Self {
+            active,
+            push_enabled,
+            branch: BRANCH.to_owned(),
+            fetch_enabled: true,
+            pull_enabled: true,
+        }
+    }
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Toolbar");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Toolbar");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "MAIN TOOLBAR", x, y);
         let bar = Rect::new(card.x, y + 24.0, card.w, 52.0);
@@ -72,18 +82,25 @@ impl PageState for Live {
             under: CARD.premultiplied(),
             name: "Main toolbar",
         };
-        let push_enabled = self.push_enabled;
+        let (push_enabled, fetch_enabled, pull_enabled) =
+            (self.push_enabled, self.fetch_enabled, self.pull_enabled);
+        let branch = &self.branch;
         ui.toolbar("bar", bar, &opts, |ui, cols| {
             // The actions touch (spacing 0); the branch label sits one group gap after the last.
             let mut ax = cols.left.x;
             for (key, glyph, name) in ACTIONS {
                 let at = Rect::new(ax, cols.left.y, ACTION_SIZE, ACTION_SIZE);
-                ui.toolbar_action(key, at, glyph, name, key != "push" || push_enabled);
+                let enabled = match key {
+                    "push" => push_enabled,
+                    "fetch" => fetch_enabled,
+                    _ => pull_enabled,
+                };
+                ui.toolbar_action(key, at, glyph, name, enabled);
                 ax += ACTION_SIZE;
             }
-            let w = label_width(ui.painter(), icon::SEARCH, BRANCH);
+            let w = label_width(ui.painter(), icon::SEARCH, branch);
             let at = Rect::new(ax + GROUP_GAP, cols.left.y, w, ACTION_SIZE);
-            ui.toolbar_label("branch", at, icon::SEARCH, BRANCH, "Branch");
+            ui.toolbar_label("branch", at, icon::SEARCH, branch, "Branch");
         });
 
         let ty = bar.y + bar.h + 32.0;
@@ -105,6 +122,12 @@ impl PageState for Live {
             "Push enabled",
         );
         label(ui, "Push enabled", x + 292.0, ty);
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.text(ui, "Branch label", &mut self.branch);
+        panel.toggle(ui, "Fetch enabled", &mut self.fetch_enabled);
+        panel.toggle(ui, "Pull enabled", &mut self.pull_enabled);
     }
 }
 

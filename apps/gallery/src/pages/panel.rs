@@ -13,7 +13,9 @@ use lune_ui::widgets::panel::{PanelKind, PanelOptions, PanelSlot, TEXT_INSET};
 use lune_ui::widgets::stat::StatOptions;
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Expect, Page, PageKind, PageState, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "panel",
@@ -37,6 +39,15 @@ enum Show {
 
 struct Live(Show);
 
+/// The panel sets the knob offers, in the order shown.
+const SHOWS: [(&str, Show); 5] = [
+    ("All four", Show::All),
+    ("Flush", Show::Flush),
+    ("Strip", Show::Strip),
+    ("Card", Show::Card),
+    ("Unavailable", Show::Unavailable),
+];
+
 fn live() -> Box<dyn PageState> {
     Box::new(Live(Show::All))
 }
@@ -58,8 +69,8 @@ fn unavailable() -> Box<dyn PageState> {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let area = card(ui, "Panel");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let area = card(ui, stage, "Panel");
         let (x, y) = (area.x + 24.0, area.y + 18.0);
         if self.0 != Show::All {
             let at = Rect::new(x, y + 24.0, 640.0, 360.0);
@@ -96,6 +107,14 @@ impl PageState for Live {
         unavailable_panel(ui, Rect::new(x, y2, w, h));
         heading(ui, "STRIP", x2, y2 - 24.0);
         strip_panel(ui, Rect::new(x2, y2, w, h));
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let names: Vec<&str> = SHOWS.iter().map(|(n, _)| *n).collect();
+        let mut at = SHOWS.iter().position(|(_, s)| *s == self.0).unwrap_or(0);
+        if panel.choice(ui, "Panels", &names, &mut at) {
+            self.0 = SHOWS[at].1;
+        }
     }
 }
 

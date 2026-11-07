@@ -16,8 +16,10 @@ use lune_ui::ui::{Sense, Ui};
 use lune_ui::widgets::code_editor::{ANCHOR_INSET, CodeOptions, LineBand};
 use lune_ui::widgets::text_lines::{HighlightSpan, Highlighter, PlainHighlighter};
 
-use super::{card, heading};
+use super::{card, heading, on_card};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "code-editor-view",
@@ -302,47 +304,71 @@ fn bad_spans() -> Box<dyn PageState> {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Code editor view");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Code editor view");
         heading(ui, "CODE EDITOR VIEW", card.x + 24.0, card.y + 24.0);
         if self.toggle {
             let mut edit = !self.read_only;
             let label = "Edit";
             ui.checkbox(
                 "edit",
-                Rect::new(BAR.x, BAR.y, 120.0, 24.0),
+                on_card(card, Rect::new(BAR.x, BAR.y, 120.0, 24.0)),
                 &mut edit,
                 label,
             );
             self.read_only = !edit;
         }
         if let Some(key) = self.notice {
-            notice(ui, key);
+            notice(ui, card, key);
         }
         match self.shape {
-            Shape::One => self.one(ui),
-            Shape::Synced => self.synced(ui),
-            Shape::Anchored => self.anchored(ui),
+            Shape::One => self.one(ui, card),
+            Shape::Synced => self.synced(ui, card),
+            Shape::Anchored => self.anchored(ui, card),
+        }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.toggle(ui, "Read only", &mut self.read_only);
+        panel.toggle(ui, "Wrap long lines", &mut self.wrap);
+        panel.toggle(ui, "Line numbers", &mut self.gutter);
+        let mut enabled = !self.disabled;
+        if panel.toggle(ui, "Enabled", &mut enabled) {
+            self.disabled = !enabled;
+        }
+        let modes = [
+            ("Plain", Colors::Plain),
+            ("Syntax", Colors::Syntax),
+            ("Spans past the text", Colors::Bad),
+        ];
+        let names: Vec<&str> = modes.iter().map(|(n, _)| *n).collect();
+        let mut at = modes
+            .iter()
+            .position(|(_, c)| *c == self.colors)
+            .unwrap_or(0);
+        if panel.choice(ui, "Highlighting", &names, &mut at) {
+            self.colors = modes[at].1;
         }
     }
 }
 
 /// Lunegit's strip above the text: padding 12 and 6, `surface_input`, a 13 px icon and 11 px text.
-fn notice(ui: &mut Ui<'_>, key: &str) {
+fn notice(ui: &mut Ui<'_>, card: Rect, key: &str) {
     let t = *ui.theme();
-    ui.painter().fill(BAR, 0.0, t.surface_input);
+    let bar = on_card(card, BAR);
+    ui.painter().fill(bar, 0.0, t.surface_input);
     let mark = icon::glyph(icon::WARNING, 13.0, t.fg_secondary);
-    let at = Rect::new(BAR.x + 12.0, BAR.y, 13.0, BAR.h);
+    let at = Rect::new(bar.x + 12.0, bar.y, 13.0, bar.h);
     ui.painter().text_centered(&mark, at);
     let text = ui.tr(key);
     let spec = Spec::plain(text, Style::ui(11.0, t.fg_secondary));
     let h = ui.painter().measure(&spec).1;
     ui.painter()
-        .text(&spec, BAR.x + 31.0, BAR.y + (BAR.h - h) / 2.0);
+        .text(&spec, bar.x + 31.0, bar.y + (bar.h - h) / 2.0);
 }
 
 impl Live {
-    fn one(&mut self, ui: &mut Ui<'_>) {
+    fn one(&mut self, ui: &mut Ui<'_>, card: Rect) {
         let t = *ui.theme();
         let bands: Vec<LineBand> = self
             .bands
@@ -374,11 +400,11 @@ impl Live {
         };
         let doc = &mut self.docs[0];
         ui.with_enabled(!self.disabled, |ui| {
-            ui.code_editor("code", RECT, doc, &opts)
+            ui.code_editor("code", on_card(card, RECT), doc, &opts)
         });
     }
 
-    fn synced(&mut self, ui: &mut Ui<'_>) {
+    fn synced(&mut self, ui: &mut Ui<'_>, card: Rect) {
         let t = *ui.theme();
         let side = CodeOptions {
             read_only: true,
@@ -392,13 +418,13 @@ impl Live {
             ..CodeOptions::default()
         };
         for (i, doc) in self.docs.iter_mut().enumerate() {
-            let rect = pane(i, PANE_W);
+            let rect = on_card(card, pane(i, PANE_W));
             let opts = if i == 3 { &result } else { &side };
             ui.code_editor(("pane", i), rect, doc, opts);
         }
     }
 
-    fn anchored(&mut self, ui: &mut Ui<'_>) {
+    fn anchored(&mut self, ui: &mut Ui<'_>, card: Rect) {
         let t = *ui.theme();
         let opts = CodeOptions {
             label: "Result",
@@ -406,7 +432,7 @@ impl Live {
         };
         for (i, doc) in self.docs.iter_mut().enumerate() {
             let key = ("pane", i);
-            ui.code_editor(key, pane(i, HALF_W), doc, &opts);
+            ui.code_editor(key, on_card(card, pane(i, HALF_W)), doc, &opts);
             // Out of view there is no rect: nothing draws and nothing registers.
             if let Some(line) = ui.code_line_rect(key, 7) {
                 let strip = Rect::new(line.right() - ANCHOR_INSET - 96.0, line.y, 96.0, line.h);

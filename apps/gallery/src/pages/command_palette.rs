@@ -19,7 +19,9 @@ use lune_ui::widgets::command_palette::{Palette, PaletteRow, PaletteSection};
 use lune_ui::widgets::dialog::{Cancel, Dialog, DialogGlass};
 
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "command-palette",
@@ -217,8 +219,8 @@ fn find(query: &str, expanded: [bool; 2]) -> Found {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let c = card(ui, "Command palette");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let c = card(ui, stage, "Command palette");
         let (x, y) = (c.x + 24.0, c.y + 24.0);
         heading(ui, "A PALETTE OVER THE PAGE", x, y);
         let w = button_width(ui.painter(), "Open palette");
@@ -298,6 +300,13 @@ impl PageState for Live {
                 self.confirming = false;
             }
         }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.text(ui, "Query", &mut self.query);
+        panel.toggle(ui, "Disabled", &mut self.disabled);
+        // Last: the open palette is modal and blocks this pane.
+        panel.toggle(ui, "Open", &mut self.open);
     }
 }
 

@@ -9,7 +9,9 @@ use lune_ui::widgets::button::{ButtonKind, button_width};
 use lune_ui::widgets::pie_chart::{PieOptions, PieSlice};
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "pie-chart",
@@ -65,8 +67,8 @@ fn change() -> Box<dyn PageState> {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Pie chart");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Pie chart");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "STORAGE BY KIND", x, y);
         let label = "Retarget the data";
@@ -112,6 +114,24 @@ impl PageState for Live {
                 live: false,
             },
         );
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let shapes = [
+            ("Three slices", Shape::Three),
+            ("Empty", Shape::Empty),
+            ("Half", Shape::Half),
+            ("Full", Shape::Full),
+        ];
+        let names: Vec<&str> = shapes.iter().map(|(n, _)| *n).collect();
+        let mut at = shapes
+            .iter()
+            .position(|(_, s)| *s == self.shape)
+            .unwrap_or(0);
+        if panel.choice(ui, "Slices", &names, &mut at) {
+            self.shape = shapes[at].1;
+        }
+        panel.toggle(ui, "Second data", &mut self.second);
     }
 }
 

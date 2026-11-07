@@ -12,7 +12,9 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::banner::EmptyState;
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "banner",
@@ -54,54 +56,55 @@ const SUBTITLE: &str =
 const ACTIONS: [&str; 2] = ["Open folder", "Create repository"];
 
 fn live() -> Box<dyn PageState> {
-    Box::new(Live {
-        busy: true,
-        banner: true,
-        view: true,
-        disabled: false,
-    })
+    Box::new(Live::of(true, true, true, false))
 }
 
 /// The banner alone, its spinner running.
 fn banner_only() -> Box<dyn PageState> {
-    Box::new(Live {
-        busy: true,
-        banner: true,
-        view: false,
-        disabled: false,
-    })
+    Box::new(Live::of(true, true, false, false))
 }
 
 /// The empty view alone: nothing moves.
 fn view_only() -> Box<dyn PageState> {
-    Box::new(Live {
-        busy: false,
-        banner: false,
-        view: true,
-        disabled: false,
-    })
+    Box::new(Live::of(false, false, true, false))
 }
 
 /// The empty view with its actions disabled.
 fn view_disabled() -> Box<dyn PageState> {
-    Box::new(Live {
-        busy: false,
-        banner: false,
-        view: true,
-        disabled: true,
-    })
+    Box::new(Live::of(false, false, true, true))
 }
 
+/// The banner and the empty view. The knobs say which show, the texts, the picture and whether
+/// the actions are enabled.
 struct Live {
     busy: bool,
     banner: bool,
     view: bool,
     disabled: bool,
+    banner_text: String,
+    title: String,
+    subtitle: String,
+    picture: bool,
+}
+
+impl Live {
+    fn of(busy: bool, banner: bool, view: bool, disabled: bool) -> Self {
+        Self {
+            busy,
+            banner,
+            view,
+            disabled,
+            banner_text: INDEXING.to_owned(),
+            title: "No repository open".to_owned(),
+            subtitle: SUBTITLE.to_owned(),
+            picture: true,
+        }
+    }
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Banner and empty state");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Banner and empty state");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "BANNER", x, y);
         let mut bottom = y + 24.0;
@@ -109,7 +112,7 @@ impl PageState for Live {
             let h = ui.banner(
                 "banner",
                 Rect::new(x, bottom, (card.w - 48.0).min(640.0), 0.0),
-                INDEXING,
+                &self.banner_text,
                 self.busy,
             );
             bottom += h + 12.0;
@@ -138,9 +141,9 @@ impl PageState for Live {
                     "empty",
                     area,
                     &EmptyState {
-                        image: Some(LOGO),
-                        title: "No repository open",
-                        subtitle: SUBTITLE,
+                        image: self.picture.then_some(LOGO),
+                        title: &self.title,
+                        subtitle: &self.subtitle,
                         actions: &ACTIONS,
                     },
                 )
@@ -150,6 +153,19 @@ impl PageState for Live {
 
     fn images(&self) -> Vec<(ImageId, ImageData)> {
         vec![(LOGO, logo())]
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.toggle(ui, "Banner", &mut self.banner);
+        panel.text(ui, "Banner text", &mut self.banner_text);
+        panel.toggle(ui, "Empty state", &mut self.view);
+        panel.text(ui, "Title", &mut self.title);
+        panel.text(ui, "Subtitle", &mut self.subtitle);
+        panel.toggle(ui, "Picture", &mut self.picture);
+        let mut enabled = !self.disabled;
+        if panel.toggle(ui, "Actions enabled", &mut enabled) {
+            self.disabled = !enabled;
+        }
     }
 }
 

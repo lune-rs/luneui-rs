@@ -12,8 +12,10 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::code_block::{CodeBlockOptions, height};
 use lune_ui::widgets::text_lines::HighlightSpan;
 
-use super::{card, heading};
+use super::{card, heading, on_card};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "code-block",
@@ -193,8 +195,8 @@ fn bad(_text: &str) -> Vec<(usize, HighlightSpan)> {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Code block");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Code block");
         heading(ui, "CODE BLOCK", card.x + 24.0, card.y + 24.0);
         let spans = match self.colors {
             Colors::Plain => Vec::new(),
@@ -219,7 +221,37 @@ impl PageState for Live {
             base
         };
         let h = height(ui, self.text, &opts);
-        ui.code_block("block", Rect::new(AT.0, AT.1, WIDTH, h), self.text, &opts);
+        ui.code_block(
+            "block",
+            on_card(card, Rect::new(AT.0, AT.1, WIDTH, h)),
+            self.text,
+            &opts,
+        );
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let samples: [(&str, &'static str, Colors); 6] = [
+            ("Wide line", WIDE, Colors::Plain),
+            ("Commands", PLAIN, Colors::Plain),
+            ("Highlighted code", CODE, Colors::Syntax),
+            ("Environment block", ENV, Colors::Env),
+            (
+                "Spans past the text",
+                "0123456789\nsecond line\nthird",
+                Colors::Bad,
+            ),
+            ("Empty", "", Colors::Plain),
+        ];
+        let names: Vec<&str> = samples.iter().map(|(n, ..)| *n).collect();
+        let mut at = samples
+            .iter()
+            .position(|(_, t, c)| *t == self.text && *c == self.colors)
+            .unwrap_or(0);
+        if panel.choice(ui, "Text", &names, &mut at) {
+            self.text = samples[at].1;
+            self.colors = samples[at].2;
+        }
+        panel.toggle(ui, "Compact look", &mut self.wane);
     }
 }
 

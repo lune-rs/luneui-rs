@@ -9,7 +9,9 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::dropdown::DropdownOptions;
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "dropdown",
@@ -87,8 +89,8 @@ impl Live {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Dropdown");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Dropdown");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "DROPDOWN", x, y);
         let anchor = Rect::new(x, y + 20.0, 210.0, 32.0);
@@ -115,6 +117,21 @@ impl PageState for Live {
                 self.open = false;
             }
         }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.toggle(ui, "Glass surface", &mut self.options.glass);
+        let mut rows = self.options.max_rows.unwrap_or(0) as f32;
+        if panel.number(ui, "Rows shown (0: all)", &mut rows, (0.0, 12.0, 1.0)) {
+            self.options.max_rows = (rows >= 1.0).then_some(rows as usize);
+        }
+        let mut long = self.items.len() > OPTIONS.len();
+        if panel.toggle(ui, "Thirty options", &mut long) {
+            self.items = options(long);
+            self.selected = if long { LONG_SELECTED } else { 0 };
+        }
+        // Last: the open list is dismissed by a press outside it.
+        panel.toggle(ui, "Open", &mut self.open);
     }
 }
 

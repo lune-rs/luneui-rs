@@ -12,11 +12,13 @@
 use lune_ui::access::{AccessAction, Action};
 use lune_ui::image::{ImageData, ImageId, ImageStore};
 use lune_ui::input::{
-    FrameOutput, ImeEvent, Key, Keymap, Modifiers, NamedKey, PointerButton, Repaint,
+    FrameOutput, ImeEvent, Key, Keymap, Modifiers, NamedKey, PointerButton, RawInput, Repaint,
 };
 use lune_ui::lunegit_dark::THEME;
+use lune_ui::material::Material;
 use lune_ui::motion::MotionTier;
-use lune_ui::scene::Scene;
+use lune_ui::paint::Rect;
+use lune_ui::scene::{FrameParams, Scene};
 use lune_ui::shortcuts::Shortcuts;
 use lune_ui::strings::{DisplayFormat, StringTable};
 use lune_ui::testing::ScriptedInput;
@@ -27,6 +29,7 @@ use lune_ui::ui::{FrameConfig, Ui, UiStore, WidgetId};
 
 use crate::scenes::LegacyScene;
 use crate::scenes::{H, W};
+use crate::showcase::knobs::Knobs;
 
 /// One page of the gallery.
 #[derive(Debug, Clone, Copy)]
@@ -55,9 +58,80 @@ pub(crate) struct UiPage {
     pub(crate) bench: &'static [Step],
 }
 
+/// Where a page draws: the whole window (a scene, the bench, the page alone in a window) or a
+/// rect of it (the showcase shell's content pane). A page gets its origin from the [`card`]
+/// `card` returns and lays everything out relative to it, so one page serves both.
+///
+/// [`card`]: crate::pages::card
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct Stage {
+    rect: Option<Rect>,
+    /// The clip the host holds over the page, in the space the page draws in. `Painter::on`
+    /// drops the clip, so a page that changes layer gets it back through [`Stage::on`].
+    clip: Option<Rect>,
+}
+
+impl Stage {
+    /// The whole window: `card` paints the window glass, the title and the card, as always.
+    pub(crate) const fn window() -> Self {
+        Self {
+            rect: None,
+            clip: None,
+        }
+    }
+
+    /// A rect of the window: `card` paints the card there and no window glass or title.
+    #[allow(dead_code)] // the showcase shell's stage (step 2); the tests use it now
+    pub(crate) const fn at(rect: Rect) -> Self {
+        Self {
+            rect: Some(rect),
+            clip: None,
+        }
+    }
+
+    /// The stage with the host's clip `clip`, in the space the page draws in (a scrolled host's
+    /// is its pane moved by the offset).
+    #[must_use]
+    pub(crate) const fn clipped(mut self, clip: Rect) -> Self {
+        self.clip = Some(clip);
+        self
+    }
+
+    /// `Painter::on`, then the host's clip again: a page that draws on more than one layer goes
+    /// through here, or the clip around it would be lost at the first change.
+    pub(crate) fn on<H: Copy + PartialEq>(
+        &self,
+        p: &mut lune_ui::paint::Painter<'_, H>,
+        layer: lune_ui::scene::LayerId,
+    ) {
+        p.on(layer);
+        if let Some(clip) = self.clip {
+            p.set_clip(Some(clip));
+        }
+    }
+
+    /// `r` cut to the host's clip: what of it shows. A request the clip cannot cut (a backdrop)
+    /// is asked for at this rect, so it never reaches the host's other panes.
+    pub(crate) fn visible(&self, r: Rect) -> Rect {
+        self.clip.map_or(r, |clip| r.intersect(&clip))
+    }
+
+    /// The rect, when the page is not alone in the window.
+    pub(crate) const fn rect(&self) -> Option<Rect> {
+        self.rect
+    }
+
+    /// The area the page owns: the stage's rect, or the painter's whole window. A page that
+    /// anchors to the edges of "its window" (caption buttons, a resize border) reads it here
+    /// instead of from `ui.painter().window`.
+    pub(crate) fn area(&self, ui: &mut Ui<'_>) -> Rect {
+        self.rect.unwrap_or(ui.painter().window)
+    }
+}
+
 /// What a Ui page draws each frame. The runner calls `draw` under `ui.scope(page.id)`.
 pub(crate) trait PageState {
-    fn draw(&mut self, ui: &mut Ui<'_>);
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage);
 
     /// The string table the page's window runs with (a test locale); the default is empty, so
     /// every lookup falls back to the toolkit's English.
@@ -86,6 +160,97 @@ pub(crate) trait PageState {
     /// that has no tray.
     fn tray_state(&self) -> Option<TrayState> {
         None
+    }
+
+    /// Input the page adds to a frame's before it begins: the host of other pages replays a
+    /// scene's script here. `store` holds the previous frame, for the rects a script aims at.
+    /// The default adds nothing.
+    fn inject(&mut self, _store: &UiStore, _input: &mut RawInput) {}
+
+    /// Changes whenever the string table (`strings`) may have: the runner asks for the table
+    /// again when it does. The default never changes.
+    fn epoch(&self) -> u64 {
+        0
+    }
+
+    /// The motion tier the page runs under, read at the start of every frame; `None` keeps the
+    /// runner's own (a scene's tier, or Full in the window).
+    fn tier(&self) -> Option<MotionTier> {
+        None
+    }
+
+    /// How the frame is drawn: the backdrop blur and whether acrylic carries noise. `None`
+    /// keeps the gallery's own values.
+    fn frame_params(&self) -> Option<FrameTweaks> {
+        None
+    }
+
+    /// The OS material the window should have, when the page chooses one. `None` leaves it.
+    fn material(&self) -> Option<Material> {
+        None
+    }
+
+    /// The window told the page whether its last `material` took.
+    fn material_applied(&mut self, _result: Result<(), String>) {}
+
+    /// How fast the page's clock runs against the real one (1.0 is real time). Window mode only:
+    /// the app passes time in, so slow motion needs nothing of the toolkit.
+    fn time_scale(&self) -> f32 {
+        1.0
+    }
+
+    /// The page's zoom: the window draws and reads the pointer at this multiple of the
+    /// display's scale. Window mode only.
+    fn zoom(&self) -> f32 {
+        1.0
+    }
+
+    /// The page's knobs: one row per option of the component the page shows, each bound to a
+    /// field of the page, which the showcase draws at the top of its settings pane. A knob's
+    /// default is what the page draws without it. The default has none.
+    fn knobs(&mut self, _ui: &mut Ui<'_>, _panel: &mut Knobs<'_>) {}
+}
+
+/// What the page asks of the draw of a frame, besides the display list it makes.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct FrameTweaks {
+    /// Gaussian sigma of the backdrop blur, in physical pixels.
+    pub(crate) blur_sigma: f32,
+    /// Saturation boost on the blurred backdrop.
+    pub(crate) saturation: f32,
+    /// Acrylic carries the noise texture.
+    pub(crate) noise: bool,
+}
+
+impl FrameTweaks {
+    /// The gallery's own values: the ones every scene and the pixel gate draw with.
+    pub(crate) const DEFAULT: FrameTweaks = FrameTweaks {
+        blur_sigma: crate::scenes::BLUR_SIGMA,
+        saturation: crate::scenes::BLUR_SATURATION,
+        noise: true,
+    };
+
+    /// The renderer's frame parameters for a target of `size` physical pixels at scale `scale`.
+    pub(crate) fn params(&self, size: (u32, u32), scale: f32) -> FrameParams {
+        FrameParams {
+            size,
+            scale,
+            blur_sigma: self.blur_sigma,
+            saturation: self.saturation,
+        }
+    }
+
+    /// Takes the noise off every acrylic of `scene` when it is off here. The flag is the last of
+    /// a shape's parameters, as `Painter::acrylic` wrote it.
+    pub(crate) fn apply_noise(&self, scene: &mut Scene) {
+        if self.noise {
+            return;
+        }
+        for layer in &mut scene.layers {
+            for acrylic in &mut layer.geometry.acrylic {
+                acrylic.shape.params[3] = 0.0;
+            }
+        }
     }
 }
 
@@ -160,13 +325,23 @@ impl UiScene {
         format!("{}@{}x", self.id, self.scale)
     }
 
+    /// The window the scene runs in, in logical pixels: the gallery's 1040 by 660, or for the
+    /// showcase's own scenes (`showcase-*`) the 1600 by 900 its window opens at.
+    pub(crate) fn window(&self) -> (u32, u32) {
+        if self.id.starts_with("showcase-") {
+            (1600, 900)
+        } else {
+            (W, H)
+        }
+    }
+
     /// The dump's size in physical pixels: the window times the scale, whole at 1.5 (1560 by 990).
     pub(crate) fn size(&self) -> (u32, u32) {
-        let (w, h) = (
-            (W as f32 * self.scale).round(),
-            (H as f32 * self.scale).round(),
-        );
-        (w as u32, h as u32)
+        let (w, h) = self.window();
+        (
+            (w as f32 * self.scale).round() as u32,
+            (h as f32 * self.scale).round() as u32,
+        )
     }
 }
 
@@ -224,9 +399,151 @@ pub(crate) enum Ev {
 }
 
 /// The id of the widget at `path` under page `page`.
+#[cfg(test)]
 pub(crate) fn path_id(page: &str, path: &[&str]) -> WidgetId {
     path.iter()
         .fold(WidgetId::ROOT.with(page), |id, key| id.with(*key))
+}
+
+/// Where a script's key paths resolve: the retained store of the page's frame, and the id of
+/// the scope the page draws under (the paths are the keys under it, outermost first).
+pub(crate) struct Scope<'a> {
+    /// The page's name, for messages.
+    pub(crate) name: &'a str,
+    pub(crate) store: &'a UiStore,
+    pub(crate) root: WidgetId,
+}
+
+impl Scope<'_> {
+    /// The id of the widget at `path`.
+    pub(crate) fn id(&self, path: &[&str]) -> WidgetId {
+        path.iter().fold(self.root, |id, key| id.with(*key))
+    }
+
+    /// The previous frame's rect of the widget at `path`.
+    pub(crate) fn rect_of(&self, path: &[&str]) -> Result<Rect, String> {
+        self.store
+            .last_rect(self.id(path))
+            .ok_or_else(|| format!("{}: no widget at {path:?}", self.name))
+    }
+}
+
+/// Applies one scripted event to `input`. `held` is the modifiers `Ev::Mods` holds; `shift`
+/// moves the absolute positions of `Ev::PointerAt` (a page on a stage sits somewhere else than
+/// a page alone in the window); `cue` receives an `Ev::Cue`.
+pub(crate) fn apply_event(
+    input: &mut ScriptedInput,
+    held: &mut Modifiers,
+    ev: &Ev,
+    shift: (f32, f32),
+    scope: &Scope<'_>,
+    cue: &mut dyn FnMut(&str),
+) -> Result<(), String> {
+    let primary = PointerButton::Primary;
+    match ev {
+        Ev::PointerOver(path) => {
+            let r = scope.rect_of(path)?;
+            input.pointer_to(r.x + r.w / 2.0, r.y + r.h / 2.0);
+        }
+        Ev::PointerAt(x, y) => {
+            input.pointer_to(*x + shift.0, *y + shift.1);
+        }
+        Ev::Press => {
+            input.press(primary);
+        }
+        Ev::Release => {
+            input.release(primary);
+        }
+        Ev::Click => {
+            input.click(primary);
+        }
+        Ev::Key(k) => {
+            input.key_down(Key::Named(*k), None);
+        }
+        Ev::Tab => {
+            input.key_down(Key::Named(NamedKey::Tab), None);
+        }
+        Ev::ShiftTab => {
+            let shift = Modifiers {
+                shift: true,
+                ..Modifiers::default()
+            };
+            input
+                .set_modifiers(shift)
+                .key_down(Key::Named(NamedKey::Tab), None)
+                .set_modifiers(Modifiers::default());
+        }
+        Ev::WindowFocus(f) => {
+            input.focus(*f);
+        }
+        Ev::Access(path, action) => {
+            scope.rect_of(path)?;
+            input.access(AccessAction {
+                target: scope.id(path),
+                action: *action,
+                value: None,
+            });
+        }
+        Ev::Scroll { x, y, precise } => {
+            if *precise {
+                input.scroll_pixels(*x, *y);
+            } else {
+                input.scroll_lines(*x, *y);
+            }
+        }
+        Ev::Type(text) => {
+            for c in text.chars() {
+                let s = c.to_string();
+                let key = if c == ' ' {
+                    Key::Named(NamedKey::Space)
+                } else {
+                    Key::Character(s.clone())
+                };
+                input.key_down(key, Some(&s));
+            }
+        }
+        Ev::KeyChar(s, mods) => {
+            input
+                .set_modifiers(*mods)
+                .key_down(Key::Character((*s).to_owned()), Some(s))
+                .set_modifiers(*held);
+        }
+        Ev::KeyMod(k, mods) => {
+            input
+                .set_modifiers(*mods)
+                .key_down(Key::Named(*k), None)
+                .set_modifiers(*held);
+        }
+        Ev::Mods(mods) => {
+            *held = *mods;
+            input.set_modifiers(*mods);
+        }
+        Ev::ImePreedit(text, cursor) => {
+            input.ime(ImeEvent::Preedit {
+                text: (*text).to_owned(),
+                cursor: *cursor,
+            });
+        }
+        Ev::ImeCommit(text) => {
+            input.ime(ImeEvent::Commit((*text).to_owned()));
+        }
+        Ev::ClipboardText(text) => {
+            input.clipboard_text(text);
+        }
+        Ev::Cue(name) => {
+            cue(name);
+        }
+        Ev::FileHover(path) => {
+            input.file_hover(*path);
+        }
+        Ev::FileHoverCancelled => {
+            input.file_hover_cancelled();
+        }
+        Ev::FileDrop(path) => {
+            input.file_drop(*path);
+        }
+    }
+    Ok(())
 }
 
 /// One Ui page in flight: its retained store, state and scripted input.
@@ -240,6 +557,9 @@ pub(crate) struct Player {
     /// The modifiers `Ev::Mods` holds.
     held: Modifiers,
     shortcuts: Shortcuts,
+    stage: Stage,
+    /// `PageState::epoch` when `strings` was read.
+    epoch: u64,
 }
 
 impl std::fmt::Debug for Player {
@@ -272,133 +592,45 @@ impl Player {
             tier,
             held: Modifiers::default(),
             shortcuts: Shortcuts::default(),
+            stage: Stage::window(),
+            epoch: 0,
         }
+    }
+
+    #[allow(dead_code)] // the showcase shell (step 2); the tests use it now
+    /// Draws the page on `stage` from now on (the default is the whole window).
+    pub(crate) fn set_stage(&mut self, stage: Stage) {
+        self.stage = stage;
     }
 
     /// A player for the gallery's window size.
     pub(crate) fn for_scene(page: &'static str, scene: &UiScene) -> Self {
+        let (w, h) = scene.window();
         Self::new(
             page,
             (scene.state)(),
-            (W as f32, H as f32),
+            (w as f32, h as f32),
             scene.scale,
             scene.tier,
         )
     }
 
-    /// The previous frame's rect of the widget at `path`.
-    fn rect_of(&self, path: &[&str]) -> Result<lune_ui::paint::Rect, String> {
-        self.store
-            .last_rect(path_id(self.page, path))
-            .ok_or_else(|| format!("{}: no widget at {path:?}", self.page))
-    }
-
+    /// Applies `ev` to the scripted input.
     fn apply(&mut self, ev: &Ev) -> Result<(), String> {
-        let primary = PointerButton::Primary;
-        match ev {
-            Ev::PointerOver(path) => {
-                let r = self.rect_of(path)?;
-                self.input.pointer_to(r.x + r.w / 2.0, r.y + r.h / 2.0);
-            }
-            Ev::PointerAt(x, y) => {
-                self.input.pointer_to(*x, *y);
-            }
-            Ev::Press => {
-                self.input.press(primary);
-            }
-            Ev::Release => {
-                self.input.release(primary);
-            }
-            Ev::Click => {
-                self.input.click(primary);
-            }
-            Ev::Key(k) => {
-                self.input.key_down(Key::Named(*k), None);
-            }
-            Ev::Tab => {
-                self.input.key_down(Key::Named(NamedKey::Tab), None);
-            }
-            Ev::ShiftTab => {
-                let shift = Modifiers {
-                    shift: true,
-                    ..Modifiers::default()
-                };
-                self.input
-                    .set_modifiers(shift)
-                    .key_down(Key::Named(NamedKey::Tab), None)
-                    .set_modifiers(Modifiers::default());
-            }
-            Ev::WindowFocus(f) => {
-                self.input.focus(*f);
-            }
-            Ev::Access(path, action) => {
-                self.rect_of(path)?;
-                self.input.access(AccessAction {
-                    target: path_id(self.page, path),
-                    action: *action,
-                    value: None,
-                });
-            }
-            Ev::Scroll { x, y, precise } => {
-                if *precise {
-                    self.input.scroll_pixels(*x, *y);
-                } else {
-                    self.input.scroll_lines(*x, *y);
-                }
-            }
-            Ev::Type(text) => {
-                for c in text.chars() {
-                    let s = c.to_string();
-                    let key = if c == ' ' {
-                        Key::Named(NamedKey::Space)
-                    } else {
-                        Key::Character(s.clone())
-                    };
-                    self.input.key_down(key, Some(&s));
-                }
-            }
-            Ev::KeyChar(s, mods) => {
-                self.input
-                    .set_modifiers(*mods)
-                    .key_down(Key::Character((*s).to_owned()), Some(s))
-                    .set_modifiers(self.held);
-            }
-            Ev::KeyMod(k, mods) => {
-                self.input
-                    .set_modifiers(*mods)
-                    .key_down(Key::Named(*k), None)
-                    .set_modifiers(self.held);
-            }
-            Ev::Mods(mods) => {
-                self.held = *mods;
-                self.input.set_modifiers(*mods);
-            }
-            Ev::ImePreedit(text, cursor) => {
-                self.input.ime(ImeEvent::Preedit {
-                    text: (*text).to_owned(),
-                    cursor: *cursor,
-                });
-            }
-            Ev::ImeCommit(text) => {
-                self.input.ime(ImeEvent::Commit((*text).to_owned()));
-            }
-            Ev::ClipboardText(text) => {
-                self.input.clipboard_text(text);
-            }
-            Ev::Cue(name) => {
-                self.state.cue(name);
-            }
-            Ev::FileHover(path) => {
-                self.input.file_hover(*path);
-            }
-            Ev::FileHoverCancelled => {
-                self.input.file_hover_cancelled();
-            }
-            Ev::FileDrop(path) => {
-                self.input.file_drop(*path);
-            }
-        }
-        Ok(())
+        let scope = Scope {
+            name: self.page,
+            store: &self.store,
+            root: WidgetId::ROOT.with(self.page),
+        };
+        let state = &mut self.state;
+        apply_event(
+            &mut self.input,
+            &mut self.held,
+            ev,
+            (0.0, 0.0),
+            &scope,
+            &mut |name| state.cue(name),
+        )
     }
 
     /// Runs one frame at `ms` of app time with `events` and returns what `Ui::finish` does.
@@ -413,11 +645,16 @@ impl Player {
         for ev in events {
             self.apply(ev)?;
         }
-        let raw = self.input.end_frame();
+        let mut raw = self.input.end_frame();
+        self.state.inject(&self.store, &mut raw);
+        if self.state.epoch() != self.epoch {
+            self.epoch = self.state.epoch();
+            self.strings = self.state.strings();
+        }
         let config = FrameConfig {
             // Read after the events, so a cue's change shows in the frame it comes with.
             theme: self.state.theme().unwrap_or(THEME),
-            tier: self.tier,
+            tier: self.state.tier().unwrap_or(self.tier),
             strings: &self.strings,
             arg_format: &DisplayFormat,
             // Scripted scenes run the same on every host.
@@ -427,7 +664,8 @@ impl Player {
         let mut ui = Ui::begin(&mut self.store, &raw, config, text);
         let page = self.page;
         let state = &mut self.state;
-        ui.scope(page, |ui| state.draw(ui));
+        let stage = self.stage;
+        ui.scope(page, |ui| state.draw(ui, &stage));
         Ok(ui.finish())
     }
 }
@@ -462,7 +700,7 @@ mod tests {
     use crate::pages::PAGES;
     use lune_ui::access::{Actions, Node, Role, States};
     use lune_ui::motion::{Kind, Motion};
-    use lune_ui::paint::Rect;
+    use lune_ui::scene::LayerId;
     use lune_ui::testing::FakeText;
     use lune_ui::ui::Sense;
     use std::cell::Cell;
@@ -566,7 +804,7 @@ mod tests {
     const B: Rect = Rect::new(200.0, 10.0, 100.0, 40.0);
 
     impl PageState for Probe {
-        fn draw(&mut self, ui: &mut Ui<'_>) {
+        fn draw(&mut self, ui: &mut Ui<'_>, _stage: &Stage) {
             let a = ui.id("a");
             let b = ui.id("b");
             let ra = ui.interact(a, A, Sense::CLICK_FOCUS);
@@ -661,6 +899,105 @@ mod tests {
         assert_eq!(clicks.get(), 2);
         assert_eq!(path_id("p", &["a"]), WidgetId::ROOT.with("p").with("a"));
     }
+    type StateFn = fn() -> Box<dyn PageState>;
+
+    /// Nodes of overlays that centre themselves in the window, not in the stage (a modal dialog):
+    /// the test cannot tell an overlay's node from a page's, so it names these `(page, name)`
+    /// pairs, the name being a substring of the node's.
+    const OVERLAY_NODES: &[(&str, &str)] =
+        &[("locale", "Discard changes"), ("ui", "Discard changes")];
+
+    /// Pages whose scenes open a modal or a popup list that fills the window (a dialog, a palette,
+    /// a dropdown's scrolled rows): their nodes are an overlay's, so only their shapes and text
+    /// on the base and page layers are checked.
+    const OVERLAY_PAGES: &[&str] = &["dialog", "dropdown", "command-palette"];
+
+    /// Where the page's content lies on a stage: its semantic nodes' bounds and the shapes and
+    /// text it draws on the base and page layers (overlay layers are left out), in the live
+    /// state and in each scene's starting state, when `drawn_on`. Names what, as far as a clip
+    /// lets it show, lies left of `stage`'s x or above its y.
+    fn off_stage(page: &Page, drawn_on: Stage, stage: Rect) -> Vec<String> {
+        let PageKind::Ui(ui_page) = page.kind else {
+            return Vec::new();
+        };
+        let mut states: Vec<(String, StateFn)> = vec![("live".to_owned(), ui_page.state)];
+        states.extend(ui_page.scenes.iter().map(|s| (s.id.to_owned(), s.state)));
+        let mut out = BTreeSet::new();
+        for (which, state) in states {
+            let mut player = Player::new(
+                page.id,
+                state(),
+                (W as f32, H as f32),
+                1.0,
+                MotionTier::Full,
+            );
+            player.set_stage(drawn_on);
+            let outside = |x: f32, y: f32| x < stage.x - 0.5 || y < stage.y - 0.5;
+            for ms in [0, 16, 300] {
+                let (scene, frame) = player.frame(&mut FakeText, ms, &[]).expect("frame");
+                for n in &frame.tree.nodes {
+                    let overlay = OVERLAY_NODES
+                        .iter()
+                        .any(|(page_id, name)| *page_id == page.id && n.name.contains(name));
+                    let overlay = overlay || OVERLAY_PAGES.contains(&page.id);
+                    if outside(n.bounds.x, n.bounds.y) && !overlay {
+                        out.insert(format!("{which}: {} node {:?}", n.name, n.bounds));
+                    }
+                }
+                for id in [LayerId::Base, LayerId::Page] {
+                    let layer = &scene.layers[id as usize];
+                    for t in &layer.texts {
+                        if outside(t.x.max(t.clip.x), t.y.max(t.clip.y)) {
+                            out.insert(format!("{which}: {id:?} text at ({}, {})", t.x, t.y));
+                        }
+                    }
+                    let geometry = &layer.geometry;
+                    let acrylic = geometry.acrylic.iter().map(|a| &a.shape);
+                    for s in geometry.under.iter().chain(&geometry.over).chain(acrylic) {
+                        let [mut x, mut y, w, h] = s.rect;
+                        if s.clip[2] > 0.0 {
+                            (x, y) = (x.max(s.clip[0]), y.max(s.clip[1]));
+                        }
+                        if w > 0.0 && h > 0.0 && outside(x, y) {
+                            out.insert(format!("{which}: {id:?} shape {:?}", s.rect));
+                        }
+                    }
+                }
+            }
+        }
+        out.into_iter().collect()
+    }
+
+    /// Every Ui page's live state and scene states draw inside a content rect: nothing they make
+    /// lies left of or above it. Names each offender.
+    #[test]
+    fn every_ui_page_draws_inside_its_stage() {
+        let stage = Rect::new(300.0, 80.0, 1020.0, 592.0);
+        let mut bad = Vec::new();
+        for page in PAGES {
+            let off = off_stage(page, Stage::at(stage), stage);
+            if !off.is_empty() {
+                bad.push(format!(
+                    "{}: {} off the stage\n  {}",
+                    page.id,
+                    off.len(),
+                    off.join("\n  ")
+                ));
+            }
+        }
+        assert!(bad.is_empty(), "{}", bad.join("\n"));
+    }
+
+    /// The instrument finds what it should: the button page drawn on the whole window lies left
+    /// of and above the stage rect, drawn on the stage it does not.
+    #[test]
+    fn the_stage_check_sees_an_offender() {
+        let stage = Rect::new(300.0, 80.0, 1020.0, 592.0);
+        let button = PAGES.iter().find(|p| p.id == "button").expect("a page");
+        assert!(!off_stage(button, Stage::window(), stage).is_empty());
+        assert!(off_stage(button, Stage::at(stage), stage).is_empty());
+    }
+
     /// The `*-disabled` scenes of the D47 pass (M11 review round 1): each draws a scope in
     /// `with_enabled(false, ..)`, so a node is `Disabled`, and its pointer, click, Tab or key
     /// script leaves no widget focused.

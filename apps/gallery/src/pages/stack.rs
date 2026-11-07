@@ -8,7 +8,9 @@ use lune_ui::paint::Rect;
 use lune_ui::ui::Ui;
 
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "stack",
@@ -39,24 +41,37 @@ const SAMPLES: [Sample; 5] = [
 ];
 
 /// The card's heading, then the content area under it.
-fn content(ui: &mut Ui<'_>) -> Rect {
-    let card = card(ui, "Stack");
+fn content(ui: &mut Ui<'_>, stage: &Stage) -> Rect {
+    let card = card(ui, stage, "Stack");
     let (x, y) = (card.x + 24.0, card.y + 24.0);
     heading(ui, "STACK", x, y);
     Rect::new(x, y + 24.0, card.w - 48.0, card.h - 48.0 - 24.0)
 }
 
-/// One sample group in the window's own layout.
-struct Sheet;
+/// The sample groups in the window's own layout, or the one the knob picks, filling the area.
+#[derive(Default)]
+struct Sheet {
+    /// 0 shows every group; n shows `SAMPLES[n - 1]` alone.
+    pick: usize,
+}
 
 impl PageState for Sheet {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let area = content(ui);
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let area = content(ui, stage);
+        if let Some(which) = self.pick.checked_sub(1).and_then(|i| SAMPLES.get(i)) {
+            sample(ui, *which, area);
+            return;
+        }
         let band = area.h / SAMPLES.len() as f32;
         for (i, which) in SAMPLES.iter().enumerate() {
             let at = Rect::new(area.x, area.y + i as f32 * band, area.w, band);
             sample(ui, *which, at);
         }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let names = ["All", "Gaps", "Sizing", "Alignment", "Grid", "Insets"];
+        panel.choice(ui, "Group", &names, &mut self.pick);
     }
 }
 
@@ -64,8 +79,8 @@ impl PageState for Sheet {
 struct Show(Sample);
 
 impl PageState for Show {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let area = content(ui);
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let area = content(ui, stage);
         sample(ui, self.0, area);
     }
 }
@@ -232,7 +247,7 @@ fn insets(ui: &mut Ui<'_>, area: Rect) {
 }
 
 fn sheet() -> Box<dyn PageState> {
-    Box::new(Sheet)
+    Box::new(Sheet::default())
 }
 
 fn gaps_state() -> Box<dyn PageState> {

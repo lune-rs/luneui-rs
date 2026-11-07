@@ -16,7 +16,9 @@ use lune_ui::widgets::menu::{MenuItem, MenuRow};
 
 use super::controls_ui::Controls;
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "theme",
@@ -83,6 +85,8 @@ struct Themed {
     level: AcrylicLevel,
     /// The window's pickers; the scenes draw without them.
     pickers: bool,
+    /// The file the theme came from (an index into [`FILES`]).
+    file: usize,
 }
 
 impl Themed {
@@ -94,10 +98,17 @@ impl Themed {
             theme: file.theme,
             level: AcrylicLevel::Default,
             pickers,
+            file: FILES
+                .iter()
+                .position(|(_, b)| b.as_ptr() == bytes.as_ptr())
+                .unwrap_or(0),
         }
     }
 
     fn swap_to(&mut self, bytes: &[u8]) {
+        if let Some(at) = FILES.iter().position(|(_, b)| b.as_ptr() == bytes.as_ptr()) {
+            self.file = at;
+        }
         let file = load(bytes);
         self.info = describe(&file);
         self.theme = file.theme;
@@ -105,8 +116,8 @@ impl Themed {
 }
 
 impl PageState for Themed {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let area = card(ui, "luneui gallery");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let area = card(ui, stage, "luneui gallery");
         self.controls.draw(ui, area);
         let x = area.x + 24.0;
         if self.pickers {
@@ -153,6 +164,22 @@ impl PageState for Themed {
             "swap" => self.swap_to(BLUE),
             "swap-back" => self.swap_to(DARK_MODERN),
             _ => {}
+        }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let names: Vec<&str> = FILES.iter().map(|(n, _)| *n).collect();
+        let mut at = self.file;
+        if panel.choice(ui, "Theme file", &names, &mut at) {
+            self.swap_to(FILES[at].1);
+        }
+        let names: Vec<&str> = LEVELS.iter().map(|(n, _)| *n).collect();
+        let mut at = LEVELS
+            .iter()
+            .position(|(_, l)| *l == self.level)
+            .unwrap_or(0);
+        if panel.choice(ui, "Acrylic level", &names, &mut at) {
+            self.level = LEVELS[at].1;
         }
     }
 }
@@ -250,21 +277,25 @@ const MENU: [MenuRow<'static>; 3] = [
 ];
 
 impl PageState for Acrylic {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
         let theme = *ui.theme();
-        let win = ui.painter().window;
+        let win = stage.area(ui);
         let band = win.w / STRIPES.len() as f32;
-        let panel = Rect::new(60.0, 70.0, 560.0, 480.0);
+        let panel = Rect::new(win.x + 60.0, win.y + 70.0, 560.0, 480.0);
         let material = theme.glass.panel.material_opacity;
         let under = premul([0x70, 0x70, 0x70, 0xFF]);
         {
             let p = ui.painter();
-            p.on(LayerId::Base);
+            stage.on(p, LayerId::Base);
             for (i, c) in STRIPES.iter().enumerate() {
-                p.fill(Rect::new(i as f32 * band, 0.0, band, win.h), 0.0, *c);
+                p.fill(
+                    Rect::new(win.x + i as f32 * band, win.y, band, win.h),
+                    0.0,
+                    *c,
+                );
             }
             // Acrylic replaces what is below it within a layer, so the panel is above the stripes.
-            p.on(LayerId::Page);
+            stage.on(p, LayerId::Page);
             p.acrylic(panel, 8.0, theme.glass.panel.premultiplied(), under, true);
         }
         heading(ui, "PANEL GLASS", panel.x + 24.0, panel.y + 24.0);

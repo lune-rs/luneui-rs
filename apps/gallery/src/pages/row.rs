@@ -10,7 +10,9 @@ use lune_ui::widgets::row::{ItemRow, SettingRow};
 use lune_ui::widgets::tone::Tone;
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "row",
@@ -47,6 +49,11 @@ struct Rows {
     on: bool,
     second: bool,
     checked: [bool; 4],
+    /// The setting rows' knobs: the first one's title, whether both show a description and how
+    /// wide the control's slot is.
+    title: String,
+    describe: bool,
+    control_w: f32,
 }
 
 fn state(mode: Mode) -> Box<dyn PageState> {
@@ -55,6 +62,9 @@ fn state(mode: Mode) -> Box<dyn PageState> {
         on: true,
         second: false,
         checked: [true, false, false, true],
+        title: "Launch at login".to_owned(),
+        describe: true,
+        control_w: CONTROL,
     })
 }
 
@@ -71,33 +81,36 @@ fn states() -> Box<dyn PageState> {
 }
 
 impl PageState for Rows {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Row");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Row");
+        let (x, top) = (card.x + 24.0, card.y + 48.0);
         match self.mode {
             Mode::Setting => {
                 heading(ui, "SETTING ROW", card.x + 24.0, card.y + 24.0);
-                let mut y = TOP;
+                let mut y = top;
                 let first = SettingRow {
-                    title: "Launch at login",
-                    description: Some("Open the app when you sign in to this computer."),
+                    title: &self.title,
+                    description: self
+                        .describe
+                        .then_some("Open the app when you sign in to this computer."),
                     off: !self.on,
-                    control_w: CONTROL,
+                    control_w: self.control_w,
                 };
-                let on = &mut self.on;
+                let (on, title) = (&mut self.on, &self.title);
                 y += GAP
-                    + ui.setting_row("first", Rect::new(X, y, WIDTH, 0.0), &first, |ui, slot| {
-                        ui.toggle("switch", slot, on, "Launch at login");
+                    + ui.setting_row("first", Rect::new(x, y, WIDTH, 0.0), &first, |ui, slot| {
+                        ui.toggle("switch", slot, on, title);
                     });
                 let second = SettingRow {
                     title: "Compact lists",
-                    description: Some("Show more rows in every list."),
+                    description: self.describe.then_some("Show more rows in every list."),
                     off: !self.second,
-                    control_w: CONTROL,
+                    control_w: self.control_w,
                 };
                 let on = &mut self.second;
                 ui.setting_row(
                     "second",
-                    Rect::new(X, y, WIDTH, 0.0),
+                    Rect::new(x, y, WIDTH, 0.0),
                     &second,
                     |ui, slot| {
                         ui.toggle("switch", slot, on, "Compact lists");
@@ -112,13 +125,13 @@ impl PageState for Rows {
                     ("Upload the report", "waiting", Tone::Neutral, "-"),
                     ("Verify the signature", "failed", Tone::Err, "0.4 s"),
                 ];
-                let mut y = TOP;
+                let mut y = top;
                 for (i, (title, badge, tone, value)) in rows.into_iter().enumerate() {
                     let checked = &mut self.checked[i];
                     y += GAP
                         + ui.item_row(
                             ("item", i),
-                            Rect::new(X, y, WIDTH, 0.0),
+                            Rect::new(x, y, WIDTH, 0.0),
                             &ItemRow { name: title },
                             |ui, c| {
                                 ui.checkbox(
@@ -147,7 +160,7 @@ impl PageState for Rows {
                     card.x + 24.0,
                     card.y + 24.0,
                 );
-                let mut y = TOP;
+                let mut y = top;
                 for (i, (title, off, disabled)) in [
                     ("Rest", false, false),
                     ("Hover", false, false),
@@ -168,7 +181,7 @@ impl PageState for Rows {
                         + ui.with_enabled(!disabled, |ui| {
                             ui.setting_row(
                                 ("row", i),
-                                Rect::new(X, y, WIDTH, 0.0),
+                                Rect::new(x, y, WIDTH, 0.0),
                                 &row,
                                 |ui, slot| {
                                     ui.toggle("switch", slot, &mut on, title);
@@ -178,6 +191,14 @@ impl PageState for Rows {
                 }
             }
         }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.toggle(ui, "First on", &mut self.on);
+        panel.toggle(ui, "Second on", &mut self.second);
+        panel.text(ui, "First title", &mut self.title);
+        panel.toggle(ui, "Descriptions", &mut self.describe);
+        panel.number(ui, "Control width", &mut self.control_w, (24.0, 120.0, 1.0));
     }
 }
 

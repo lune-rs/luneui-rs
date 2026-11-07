@@ -8,7 +8,9 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::stepper::{StepRange, StepperLook, StepperState, paint};
 
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "stepper",
@@ -21,7 +23,11 @@ pub(crate) static PAGE: Page = Page {
 };
 
 fn live() -> Box<dyn PageState> {
-    Box::new(Live { value: 12 })
+    Box::new(Live {
+        value: 12,
+        max: 99.0,
+        step: 1.0,
+    })
 }
 
 fn specimens() -> Box<dyn PageState> {
@@ -34,30 +40,47 @@ const RANGE: StepRange = StepRange {
     step: 1.0,
 };
 
-/// One real stepper through the `Ui`; the app applies each reported step.
+/// One real stepper through the `Ui`; the app applies each reported step. The knobs set the
+/// value, the top of the range and the size of a step.
 struct Live {
     value: u32,
+    max: f32,
+    step: f32,
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Stepper");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Stepper");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "STEPPER", x, y);
         let resp = ui.stepper(
             "stepper",
             Rect::new(x, y + 20.0, 140.0, 32.0),
             self.value,
-            RANGE,
+            StepRange {
+                max: f64::from(self.max),
+                step: f64::from(self.step),
+                ..RANGE
+            },
             "Count",
         );
         if let Some(step) = resp.step {
             let next = i64::from(self.value) + i64::from(step);
-            self.value = next.clamp(0, 99) as u32;
+            self.value = next.clamp(0, self.max as i64) as u32;
         }
         if let Some(set) = resp.set {
             self.value = set as u32;
         }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let mut value = self.value as f32;
+        if panel.number(ui, "Value", &mut value, (0.0, self.max, 1.0)) {
+            self.value = value.round() as u32;
+        }
+        panel.number(ui, "Largest", &mut self.max, (10.0, 200.0, 1.0));
+        panel.number(ui, "Step", &mut self.step, (1.0, 10.0, 1.0));
+        self.value = self.value.min(self.max as u32);
     }
 }
 
@@ -65,8 +88,8 @@ impl PageState for Live {
 struct Specimens;
 
 impl PageState for Specimens {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Stepper states");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Stepper states");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "STEPPER STATES", x, y);
         let theme = *ui.theme();

@@ -8,7 +8,9 @@ use lune_ui::widgets::field::FieldState;
 use lune_ui::widgets::form_field::FormField;
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Expect, Page, PageKind, PageState, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "form-field",
@@ -20,16 +22,19 @@ pub(crate) static PAGE: Page = Page {
     }),
 };
 
-const X: f32 = 34.0;
 const WIDTH: f32 = 360.0;
-const TOP: f32 = 82.0;
 /// The controls' height.
 const CONTROL: f32 = 32.0;
 
+/// Three fields; the knobs set the first one's label, hint, error and layout.
 struct States {
     name: String,
     email: String,
     port: String,
+    label: String,
+    hint: bool,
+    error: String,
+    inline: bool,
 }
 
 fn states() -> Box<dyn PageState> {
@@ -37,25 +42,29 @@ fn states() -> Box<dyn PageState> {
         name: "Lune".to_owned(),
         email: String::new(),
         port: "8080".to_owned(),
+        label: "Display name".to_owned(),
+        hint: true,
+        error: String::new(),
+        inline: false,
     })
 }
 
 impl PageState for States {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Form field");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Form field");
         heading(ui, "NORMAL, ERROR, INLINE", card.x + 24.0, card.y + 24.0);
-        let mut y = TOP;
+        let (x, mut y) = (card.x + 24.0, card.y + 48.0);
 
         let normal = FormField {
-            label: "Display name",
-            hint: Some("Shown to other members."),
-            error: None,
-            inline: false,
-            control_size: (0.0, CONTROL),
+            label: &self.label,
+            hint: self.hint.then_some("Shown to other members."),
+            error: (!self.error.is_empty()).then_some(self.error.as_str()),
+            inline: self.inline,
+            control_size: (if self.inline { 120.0 } else { 0.0 }, CONTROL),
         };
         let name = &mut self.name;
         y += 24.0
-            + ui.form_field("name", Rect::new(X, y, WIDTH, 0.0), &normal, |ui, r| {
+            + ui.form_field("name", Rect::new(x, y, WIDTH, 0.0), &normal, |ui, r| {
                 ui.text_field("input", r, name, "Name", FieldState::default())
                     .id
             });
@@ -69,7 +78,7 @@ impl PageState for States {
         };
         let email = &mut self.email;
         y += 24.0
-            + ui.form_field("email", Rect::new(X, y, WIDTH, 0.0), &error, |ui, r| {
+            + ui.form_field("email", Rect::new(x, y, WIDTH, 0.0), &error, |ui, r| {
                 ui.text_field("input", r, email, "Email", FieldState::default())
                     .id
             });
@@ -82,10 +91,17 @@ impl PageState for States {
             control_size: (120.0, CONTROL),
         };
         let port = &mut self.port;
-        ui.form_field("port", Rect::new(X, y, WIDTH, 0.0), &inline, |ui, r| {
+        ui.form_field("port", Rect::new(x, y, WIDTH, 0.0), &inline, |ui, r| {
             ui.text_field("input", r, port, "Port", FieldState::default())
                 .id
         });
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.text(ui, "Label", &mut self.label);
+        panel.toggle(ui, "Hint", &mut self.hint);
+        panel.text(ui, "Error", &mut self.error);
+        panel.toggle(ui, "Inline", &mut self.inline);
     }
 }
 

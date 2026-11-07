@@ -10,8 +10,10 @@ use lune_ui::paint::Rect;
 use lune_ui::ui::Ui;
 use lune_ui::widgets::icon_rail::{PITCH, RailItem};
 
-use super::{caption, card, heading};
+use super::{caption, card, heading, on_card};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "icon-rail",
@@ -94,9 +96,10 @@ impl Live {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        card(ui, "Icon rail");
-        heading(ui, "ICON RAIL", X, Y);
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Icon rail");
+        let (ox, oy) = (card.x + 24.0, card.y + 24.0);
+        heading(ui, "ICON RAIL", ox, oy);
         let item = |(key, glyph, name): (u64, &'static str, &'static str)| RailItem {
             key,
             glyph,
@@ -113,12 +116,34 @@ impl PageState for Live {
         };
         let top: Vec<RailItem<'_>> = TOP.iter().map(|i| item(*i)).collect();
         let bottom: Vec<RailItem<'_>> = BOTTOM.iter().map(|i| item(*i)).collect();
-        if let Some(key) = ui.icon_rail("rail", RAIL, &top, &bottom, "Panels") {
+        if let Some(key) = ui.icon_rail("rail", on_card(card, RAIL), &top, &bottom, "Panels") {
             self.active = key;
             self.last = Some(key);
         }
         let shown = self.last.map_or("none".to_owned(), |k| k.to_string());
-        caption(ui, &format!("Last activated: {shown}"), X + 72.0, Y + 34.0);
+        caption(
+            ui,
+            &format!("Last activated: {shown}"),
+            ox + 72.0,
+            oy + 34.0,
+        );
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.toggle(ui, "Dot on Changes", &mut self.dot);
+        let mut badge = self.badge.unwrap_or(0) as f32;
+        if panel.number(
+            ui,
+            "Badge on Alerts (0: none)",
+            &mut badge,
+            (0.0, 120.0, 1.0),
+        ) {
+            self.badge = (badge >= 1.0).then_some(badge as u32);
+        }
+        let mut active = self.active as f32;
+        if panel.number(ui, "Active item", &mut active, (1.0, 10.0, 1.0)) {
+            self.active = active.round() as u64;
+        }
     }
 }
 

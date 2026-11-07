@@ -8,7 +8,9 @@ use lune_ui::widgets::progress::ProgressOptions;
 use lune_ui::widgets::tone::Tone;
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Expect, Page, PageKind, PageState, UiPage, UiScene};
+use crate::showcase::knobs::{Knobs, TONES, tone_names};
 
 pub(crate) static PAGE: Page = Page {
     id: "progress",
@@ -23,15 +25,55 @@ pub(crate) static PAGE: Page = Page {
 const BAR_W: f32 = 360.0;
 
 /// A page state that draws its sections with one function.
-struct Sections(&'static [fn(&mut Ui<'_>, f32, f32) -> f32]);
+/// A page state that draws its sections with one function, and a sample the knobs shape.
+struct Sections {
+    list: &'static [fn(&mut Ui<'_>, f32, f32) -> f32],
+    /// Show a sample the knobs shape, under the sections.
+    show: bool,
+    value: f32,
+    indeterminate: bool,
+    /// An index into [`TONES`].
+    tone: usize,
+    head: String,
+}
+
+impl Sections {
+    fn new(list: &'static [fn(&mut Ui<'_>, f32, f32) -> f32]) -> Self {
+        Self {
+            list,
+            show: false,
+            value: 0.4,
+            indeterminate: false,
+            tone: 0,
+            head: "Sample".to_owned(),
+        }
+    }
+}
 
 impl PageState for Sections {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Progress");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Progress");
         let (x, mut y) = (card.x + 24.0, card.y + 24.0);
-        for section in self.0 {
+        for section in self.list {
             y += section(ui, x, y) + 28.0;
         }
+        if self.show {
+            let opts = ProgressOptions {
+                value: (!self.indeterminate).then_some(self.value),
+                tone: TONES[self.tone.min(TONES.len() - 1)].1,
+                head: (!self.head.is_empty()).then_some((self.head.as_str(), "")),
+                name: "Sample",
+            };
+            ui.progress("sample", Rect::new(x, y, BAR_W, 0.0), &opts);
+        }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.toggle(ui, "Show a sample", &mut self.show);
+        panel.number(ui, "Value", &mut self.value, (0.0, 1.0, 0.0));
+        panel.toggle(ui, "Indeterminate", &mut self.indeterminate);
+        panel.choice(ui, "Tone", &tone_names(), &mut self.tone);
+        panel.text(ui, "Head", &mut self.head);
     }
 }
 
@@ -84,7 +126,7 @@ fn indeterminate_section(ui: &mut Ui<'_>, x: f32, y: f32) -> f32 {
 }
 
 fn all() -> Box<dyn PageState> {
-    Box::new(Sections(&[
+    Box::new(Sections::new(&[
         determinate_section,
         variants_section,
         pending_section,
@@ -93,19 +135,19 @@ fn all() -> Box<dyn PageState> {
 }
 
 fn determinate() -> Box<dyn PageState> {
-    Box::new(Sections(&[determinate_section]))
+    Box::new(Sections::new(&[determinate_section]))
 }
 
 fn variants() -> Box<dyn PageState> {
-    Box::new(Sections(&[variants_section]))
+    Box::new(Sections::new(&[variants_section]))
 }
 
 fn pending() -> Box<dyn PageState> {
-    Box::new(Sections(&[pending_section]))
+    Box::new(Sections::new(&[pending_section]))
 }
 
 fn indeterminate() -> Box<dyn PageState> {
-    Box::new(Sections(&[indeterminate_section]))
+    Box::new(Sections::new(&[indeterminate_section]))
 }
 
 const SCENES: &[UiScene] = &[

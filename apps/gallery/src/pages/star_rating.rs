@@ -7,7 +7,9 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::star_rating::{MAX, StarLook, StarState, button_rect, paint};
 
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "star-rating",
@@ -20,11 +22,11 @@ pub(crate) static PAGE: Page = Page {
 };
 
 fn live() -> Box<dyn PageState> {
-    Box::new(Live { value: 3 })
+    Box::new(Live::of(3))
 }
 
 fn unrated() -> Box<dyn PageState> {
-    Box::new(Live { value: 0 })
+    Box::new(Live::of(0))
 }
 
 fn specimens() -> Box<dyn PageState> {
@@ -41,22 +43,52 @@ const fn star(n: u32) -> (f32, f32) {
     (AT.0 + 26.0 * (n - 1) as f32 + 12.0, AT.1 + 12.0)
 }
 
-/// A rating of five stars.
+/// A rating of five stars. The knobs set the value, the number of stars and whether it takes
+/// input.
 struct Live {
     value: u32,
+    max: u32,
+    enabled: bool,
+}
+
+impl Live {
+    fn of(value: u32) -> Self {
+        Self {
+            value,
+            max: MAX,
+            enabled: true,
+        }
+    }
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        card(ui, "Star rating");
-        heading(ui, "STAR RATING", X, Y);
-        ui.star_rating("stars", AT, &mut self.value, MAX, "Rating");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Star rating");
+        let (ox, oy) = (card.x + 24.0, card.y + 24.0);
+        heading(ui, "STAR RATING", ox, oy);
+        let (value, max) = (&mut self.value, self.max);
+        ui.with_enabled(self.enabled, |ui| {
+            ui.star_rating("stars", (ox, oy + 24.0), value, max, "Rating");
+        });
         let text = if self.value == 0 {
             "Unrated".to_owned()
         } else {
-            format!("{} of {MAX}", self.value)
+            format!("{} of {}", self.value, self.max)
         };
-        caption(ui, &text, X, AT.1 + 36.0);
+        caption(ui, &text, ox, (oy + 24.0) + 36.0);
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let mut stars = self.max as f32;
+        if panel.number(ui, "Stars", &mut stars, (1.0, 10.0, 1.0)) {
+            self.max = stars.round() as u32;
+            self.value = self.value.min(self.max);
+        }
+        let mut value = self.value as f32;
+        if panel.number(ui, "Value", &mut value, (0.0, self.max as f32, 1.0)) {
+            self.value = value.round() as u32;
+        }
+        panel.toggle(ui, "Enabled", &mut self.enabled);
     }
 }
 
@@ -64,9 +96,10 @@ impl PageState for Live {
 struct Specimens;
 
 impl PageState for Specimens {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        card(ui, "Star rating states");
-        heading(ui, "STAR RATING STATES", X, Y);
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Star rating states");
+        let (ox, oy) = (card.x + 24.0, card.y + 24.0);
+        heading(ui, "STAR RATING STATES", ox, oy);
         let theme = *ui.theme();
         let rows = [
             ("Value 0", 0, None),
@@ -74,7 +107,7 @@ impl PageState for Specimens {
             ("Hover on star 4", 3, Some(4)),
         ];
         for (i, (name, value, hover)) in rows.into_iter().enumerate() {
-            let y = Y + 24.0 + i as f32 * 40.0;
+            let y = oy + 24.0 + i as f32 * 40.0;
             for n in 1..=MAX {
                 let state = StarState {
                     filled: n <= value,
@@ -83,11 +116,11 @@ impl PageState for Specimens {
                 };
                 paint(
                     ui.painter(),
-                    button_rect((X, y), n - 1),
+                    button_rect((ox, y), n - 1),
                     &StarLook::of(&theme, state),
                 );
             }
-            caption(ui, name, X + 150.0, y + 5.0);
+            caption(ui, name, ox + 150.0, y + 5.0);
         }
     }
 }

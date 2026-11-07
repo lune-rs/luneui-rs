@@ -19,7 +19,9 @@ use lune_ui::widgets::{button, checkbox, combo, field, stepper, toggle};
 
 use super::controls_ui::{Controls, glass};
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "focus",
@@ -52,8 +54,8 @@ fn dialog_after() -> Box<dyn PageState> {
 }
 
 impl PageState for Focus {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let area = card(ui, "luneui gallery");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let area = card(ui, stage, "luneui gallery");
         self.controls.draw(ui, area);
         if self.open_at.is_some_and(|t| ui.time() >= t) {
             let d = Dialog {
@@ -66,6 +68,14 @@ impl PageState for Focus {
             ui.dialog("dialog", &d, &glass(), |_, _, _, _| {});
         }
     }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        // A dialog is modal: it is closed in the dialog, not here.
+        let mut open = self.open_at.is_some();
+        if panel.toggle(ui, "Dialog over the controls", &mut open) {
+            self.open_at = open.then_some(Duration::ZERO);
+        }
+    }
 }
 
 /// Each kind of ring at full opacity, painted from the widgets' public looks (which draw it
@@ -73,8 +83,8 @@ impl PageState for Focus {
 struct Kinds;
 
 impl PageState for Kinds {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let area = card(ui, "Focus rings");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let area = card(ui, stage, "Focus rings");
         let (x, y) = (area.x + 24.0, area.y + 24.0);
         heading(ui, "FOCUS-VISIBLE RINGS", x, y);
         let theme = *ui.theme();

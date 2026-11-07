@@ -11,6 +11,7 @@ the facade `lune-ui`. `apps/gallery` renders the reference scenes; see `docs/STA
 `docs/components/INDEX.md` lists every component (existing, planned, or a rough Lunegit stub).
 
 ```bash
+cargo run -p gallery               # the showcase: every page live, with knobs and settings
 cargo build --workspace
 cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings

@@ -9,7 +9,9 @@ use lune_ui::paint::Rect;
 use lune_ui::ui::Ui;
 
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "image",
@@ -158,19 +160,27 @@ fn shot(ui: &mut Ui<'_>, which: Shot, area: Rect) {
 }
 
 /// The card's heading, then the content area under it.
-fn content(ui: &mut Ui<'_>) -> Rect {
-    let card = card(ui, "Image");
+fn content(ui: &mut Ui<'_>, stage: &Stage) -> Rect {
+    let card = card(ui, stage, "Image");
     let (x, y) = (card.x + 24.0, card.y + 24.0);
     heading(ui, "IMAGE", x, y);
     Rect::new(x, y + 24.0, card.w - 48.0, card.h - 48.0 - 24.0)
 }
 
-/// Every shot in a grid of three columns.
-struct Sheet;
+/// Every shot in a grid of three columns, or the one the knob picks, filling the area.
+#[derive(Default)]
+struct Sheet {
+    /// 0 shows every shot; n shows `SHOTS[n - 1]`.
+    pick: usize,
+}
 
 impl PageState for Sheet {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let area = content(ui);
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let area = content(ui, stage);
+        if let Some(which) = self.pick.checked_sub(1).and_then(|i| SHOTS.get(i)) {
+            shot(ui, *which, area);
+            return;
+        }
         for (i, which) in SHOTS.iter().enumerate() {
             let cell = Rect::new(
                 area.x + (i % 3) as f32 * 300.0,
@@ -185,14 +195,20 @@ impl PageState for Sheet {
     fn images(&self) -> Vec<(ImageId, ImageData)> {
         vec![(WIDE, pattern(200, 100)), (TALL, pattern(100, 200))]
     }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let mut names = vec!["All"];
+        names.extend(SHOTS.iter().map(|s| name(*s)));
+        panel.choice(ui, "Show", &names, &mut self.pick);
+    }
 }
 
 /// One shot filling the content area.
 struct Show(Shot);
 
 impl PageState for Show {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let area = content(ui);
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let area = content(ui, stage);
         shot(ui, self.0, area);
     }
 
@@ -202,7 +218,7 @@ impl PageState for Show {
 }
 
 fn sheet() -> Box<dyn PageState> {
-    Box::new(Sheet)
+    Box::new(Sheet::default())
 }
 
 fn wide() -> Box<dyn PageState> {

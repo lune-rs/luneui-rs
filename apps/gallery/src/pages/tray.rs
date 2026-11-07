@@ -24,7 +24,9 @@ use lune_ui::widgets::popover::{PlaceAlign, Side};
 
 use super::flyout::{ROUTES, rows, state_text, state_tone, stats};
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "tray",
@@ -116,8 +118,8 @@ struct Icon {
 }
 
 impl PageState for Icon {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let area = card(ui, "Tray icon");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let area = card(ui, stage, "Tray icon");
         let (x, y) = (area.x + 24.0, area.y + 24.0);
         heading(ui, "TRAY ICON", x, y);
         let side = 18 * self.scale;
@@ -228,8 +230,8 @@ impl Mock {
 struct PlacementMac;
 
 impl PageState for PlacementMac {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let area = card(ui, "Tray placement");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let area = card(ui, stage, "Tray placement");
         let (x, y) = (area.x + 24.0, area.y + 24.0);
         heading(ui, "MACOS", x, y);
         caption(
@@ -253,8 +255,8 @@ impl PageState for PlacementMac {
 struct PlacementWindows;
 
 impl PageState for PlacementWindows {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let area = card(ui, "Tray placement");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let area = card(ui, stage, "Tray placement");
         let (x, y) = (area.x + 24.0, area.y + 24.0);
         heading(ui, "WINDOWS", x, y);
         caption(
@@ -421,12 +423,12 @@ struct Surface {
 }
 
 impl PageState for Surface {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
         let t = *ui.theme();
-        let win = ui.painter().window;
+        let win = stage.area(ui);
         {
             let p = ui.painter();
-            p.on(lune_ui::paint::LayerId::Base);
+            stage.on(p, lune_ui::paint::LayerId::Base);
             p.fill(win, 0.0, DESKTOP);
         }
         for (i, line) in [
@@ -437,7 +439,18 @@ impl PageState for Surface {
         .enumerate()
         {
             let spec = Spec::plain(line, Style::ui(t.font_base, t.fg_secondary));
-            ui.painter().text(&spec, 400.0, 40.0 + i as f32 * 22.0);
+            ui.painter()
+                .text(&spec, win.x + 400.0, win.y + 40.0 + i as f32 * 22.0);
+        }
+        if stage.rect().is_some() {
+            // The surface is an overlay the toolkit puts at the corner of the window, so it
+            // cannot be moved into a pane: say so instead of drawing it at the window's corner.
+            let spec = Spec::plain(
+                "This surface fills a window of its own, so a pane cannot show it. The tray page opens it for real.",
+                Style::ui(t.font_base, t.fg_tertiary),
+            );
+            ui.painter().text(&spec, win.x + 400.0, win.y + 94.0);
+            return;
         }
         draw_surface(ui, self.surface, TrayState::Serving);
     }
@@ -467,8 +480,8 @@ fn live() -> Box<dyn PageState> {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let area = card(ui, "Tray");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let area = card(ui, stage, "Tray");
         let (x, y) = (area.x + 24.0, area.y + 24.0);
         heading(ui, "TRAY ITEM", x, y);
         let note = if cfg!(any(target_os = "macos", target_os = "windows")) {
@@ -477,6 +490,15 @@ impl PageState for Live {
             "This platform has no tray in the toolkit (Unsupported); the icons below are drawn anyway."
         };
         caption(ui, note, x, y + 20.0);
+        if stage.rect().is_some() {
+            // Only on the showcase's stage: the scenes' pictures stay as they are.
+            caption(
+                ui,
+                "Real: the tray item and the clicks on it. Scripted: the scenes' pointer, and the surface they draw.",
+                x,
+                y + 38.0,
+            );
+        }
         let mut bx = x;
         for s in STATES {
             let label = state_name(s);
@@ -522,6 +544,14 @@ impl PageState for Live {
 
     fn tray_state(&self) -> Option<TrayState> {
         Some(self.state)
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let names: Vec<&str> = STATES.iter().map(|s| state_name(*s)).collect();
+        let mut at = STATES.iter().position(|s| *s == self.state).unwrap_or(0);
+        if panel.choice(ui, "Tray state", &names, &mut at) {
+            self.state = STATES[at];
+        }
     }
 }
 

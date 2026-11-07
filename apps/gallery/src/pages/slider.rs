@@ -9,8 +9,10 @@ use lune_ui::text::{Spec, Style};
 use lune_ui::ui::Ui;
 use lune_ui::widgets::slider::{SliderLook, SliderOptions, SliderState, paint};
 
-use super::{card, heading};
+use super::{card, heading, on_card};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "slider",
@@ -27,6 +29,9 @@ fn live() -> Box<dyn PageState> {
         stepped: 40.0,
         uneven: 9.0,
         continuous: 0.25,
+        max: 100.0,
+        step: 10.0,
+        enabled: true,
     })
 }
 
@@ -57,37 +62,51 @@ const fn on_track(i: usize, fraction: f32) -> (f32, f32) {
     )
 }
 
-fn label(ui: &mut Ui<'_>, text: &str, y: f32) {
+fn label(ui: &mut Ui<'_>, x: f32, text: &str, y: f32) {
     let spec = Spec::plain(text, Style::ui(THEME.font_base, THEME.fg_secondary));
-    ui.painter().text(&spec, X, y + 3.0);
+    ui.painter().text(&spec, x, y + 3.0);
 }
 
-/// Four sliders: stepped, a step that does not divide the range, continuous and disabled.
+/// Four sliders: stepped, a step that does not divide the range, continuous and disabled. The
+/// knobs set the first one's top, step and whether it takes input.
 struct Live {
     stepped: f32,
     uneven: f32,
     continuous: f32,
+    max: f32,
+    step: f32,
+    enabled: bool,
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        card(ui, "Slider");
-        heading(ui, "SLIDERS", X, Y);
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Slider");
+        let (ox, oy) = (card.x + 24.0, card.y + 24.0);
+        let row = |i| on_card(card, row(i));
+        heading(ui, "SLIDERS", ox, oy);
         let stepped = SliderOptions {
             min: 0.0,
-            max: 100.0,
-            step: 10.0,
+            max: self.max,
+            step: self.step,
             name: "Stepped",
         };
-        label(ui, "Step 10", row(0).y);
-        ui.slider("stepped", row(0), &mut self.stepped, &stepped);
+        let caption = if self.step > 0.0 {
+            format!("Step {}", self.step)
+        } else {
+            "Continuous".to_owned()
+        };
+        label(ui, ox, &caption, row(0).y);
+        let value = &mut self.stepped;
+        ui.with_enabled(self.enabled, |ui| {
+            ui.slider("stepped", row(0), value, &stepped);
+        });
         let uneven = SliderOptions {
             min: 0.0,
             max: 10.0,
             step: 3.0,
             name: "Uneven",
         };
-        label(ui, "Step 3 of 10", row(1).y);
+        label(ui, ox, "Step 3 of 10", row(1).y);
         ui.slider("uneven", row(1), &mut self.uneven, &uneven);
         let continuous = SliderOptions {
             min: 0.0,
@@ -95,17 +114,26 @@ impl PageState for Live {
             step: 0.0,
             name: "Continuous",
         };
-        label(ui, "Continuous", row(2).y);
+        label(ui, ox, "Continuous", row(2).y);
         ui.slider("continuous", row(2), &mut self.continuous, &continuous);
-        label(ui, "Disabled", row(3).y);
+        label(ui, ox, "Disabled", row(3).y);
         let mut held = 60.0;
         ui.with_enabled(false, |ui| {
             let disabled = SliderOptions {
+                min: 0.0,
+                max: 100.0,
+                step: 10.0,
                 name: "Disabled",
-                ..stepped
             };
             ui.slider("disabled", row(3), &mut held, &disabled);
         });
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.number(ui, "Largest", &mut self.max, (10.0, 200.0, 1.0));
+        panel.number(ui, "Step (0: continuous)", &mut self.step, (0.0, 50.0, 1.0));
+        panel.toggle(ui, "First enabled", &mut self.enabled);
+        self.stepped = self.stepped.min(self.max);
     }
 }
 
@@ -113,9 +141,11 @@ impl PageState for Live {
 struct Specimens;
 
 impl PageState for Specimens {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        card(ui, "Slider states");
-        heading(ui, "SLIDER STATES", X, Y);
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Slider states");
+        let (ox, oy) = (card.x + 24.0, card.y + 24.0);
+        let row = |i| on_card(card, row(i));
+        heading(ui, "SLIDER STATES", ox, oy);
         let theme = *ui.theme();
         let rest = SliderState {
             fraction: 0.25,
@@ -167,7 +197,7 @@ impl PageState for Specimens {
         ];
         for (i, (name, state, disabled)) in cases.into_iter().enumerate() {
             let r = row(i);
-            label(ui, name, r.y);
+            label(ui, ox, name, r.y);
             let look = SliderLook::of(&theme, state);
             let p = ui.painter();
             if disabled {

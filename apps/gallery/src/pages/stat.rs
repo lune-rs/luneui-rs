@@ -8,7 +8,9 @@ use lune_ui::widgets::stat::StatOptions;
 use lune_ui::widgets::tone::Tone;
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "stat",
@@ -24,15 +26,63 @@ pub(crate) static PAGE: Page = Page {
 const FLYOUT_W: f32 = 330.0;
 
 /// A page state that draws its sections with one function.
-struct Sections(&'static [fn(&mut Ui<'_>, f32, f32) -> f32]);
+/// A page state that draws its sections with one function, and a sample the knobs shape.
+struct Sections {
+    list: &'static [fn(&mut Ui<'_>, f32, f32) -> f32],
+    /// Show a sample the knobs shape, under the sections.
+    show: bool,
+    label: String,
+    value: String,
+    gold: bool,
+    compact: bool,
+    no_data: bool,
+    meter: f32,
+}
+
+impl Sections {
+    fn new(list: &'static [fn(&mut Ui<'_>, f32, f32) -> f32]) -> Self {
+        Self {
+            list,
+            show: false,
+            label: "Sample".to_owned(),
+            value: "1,234".to_owned(),
+            gold: false,
+            compact: false,
+            no_data: false,
+            meter: 0.0,
+        }
+    }
+}
 
 impl PageState for Sections {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Stat");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Stat");
         let (x, mut y) = (card.x + 24.0, card.y + 24.0);
-        for section in self.0 {
+        for section in self.list {
             y += section(ui, x, y) + 28.0;
         }
+        if self.show {
+            let opts = StatOptions {
+                label: &self.label,
+                value: &self.value,
+                gold: self.gold,
+                compact: self.compact,
+                no_data: self.no_data,
+                meter: (self.meter > 0.0).then_some(self.meter),
+                ..StatOptions::default()
+            };
+            ui.stat("sample", Rect::new(x, y, 240.0, 0.0), &opts);
+        }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.toggle(ui, "Show a sample", &mut self.show);
+        panel.text(ui, "Label", &mut self.label);
+        panel.text(ui, "Value", &mut self.value);
+        panel.toggle(ui, "Gold", &mut self.gold);
+        panel.toggle(ui, "Compact", &mut self.compact);
+        panel.toggle(ui, "No data", &mut self.no_data);
+        panel.number(ui, "Meter (0: none)", &mut self.meter, (0.0, 1.0, 0.0));
     }
 }
 
@@ -130,7 +180,7 @@ fn compact_section(ui: &mut Ui<'_>, x: f32, y: f32) -> f32 {
 }
 
 fn all() -> Box<dyn PageState> {
-    Box::new(Sections(&[
+    Box::new(Sections::new(&[
         default_section,
         gold_section,
         no_data_section,
@@ -140,23 +190,23 @@ fn all() -> Box<dyn PageState> {
 }
 
 fn strip() -> Box<dyn PageState> {
-    Box::new(Sections(&[default_section]))
+    Box::new(Sections::new(&[default_section]))
 }
 
 fn gold() -> Box<dyn PageState> {
-    Box::new(Sections(&[gold_section]))
+    Box::new(Sections::new(&[gold_section]))
 }
 
 fn no_data() -> Box<dyn PageState> {
-    Box::new(Sections(&[no_data_section]))
+    Box::new(Sections::new(&[no_data_section]))
 }
 
 fn meter() -> Box<dyn PageState> {
-    Box::new(Sections(&[meter_section]))
+    Box::new(Sections::new(&[meter_section]))
 }
 
 fn compact() -> Box<dyn PageState> {
-    Box::new(Sections(&[compact_section]))
+    Box::new(Sections::new(&[compact_section]))
 }
 
 /// One cell whose number changes on its second frame: 1000 first, then 2000.
@@ -165,8 +215,8 @@ struct ValueChange {
 }
 
 impl PageState for ValueChange {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Stat");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Stat");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "VALUE CHANGE", x, y);
         let (n, text) = if self.frames == 0 {

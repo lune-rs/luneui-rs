@@ -11,8 +11,10 @@ use lune_ui::text::{Spec, Style};
 use lune_ui::ui::Ui;
 use lune_ui::widgets::scroll_area::{Bars, Extent, Reveal, ScrollOptions, ScrollView, Target};
 
-use super::{card, heading};
+use super::{card, heading, on_card};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "scroll-area",
@@ -118,8 +120,8 @@ struct Live {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Scroll area");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Scroll area");
         heading(ui, "SCROLL AREA", card.x + 24.0, card.y + 24.0);
         let opts = ScrollOptions {
             bars: self.bars,
@@ -136,7 +138,27 @@ impl PageState for Live {
                 Reveal::Center,
             );
         }
-        ui.scroll_area("area", AREA, &opts, |ui, view| ((), lines(ui, view, count)));
+        ui.scroll_area("area", on_card(card, AREA), &opts, |ui, view| {
+            ((), lines(ui, view, count))
+        });
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let mut lines = self.lines as f32;
+        if panel.number(ui, "Lines", &mut lines, (1.0, 400.0, 1.0)) {
+            self.lines = lines.round() as u32;
+        }
+        panel.toggle(ui, "Follow the tail", &mut self.follow_tail);
+        let modes = ["Auto", "Hidden", "Disabled"];
+        let bars = [Bars::Auto, Bars::Hidden, Bars::Disabled];
+        let index = |b: Bars| bars.iter().position(|x| *x == b).unwrap_or(0);
+        let (mut x, mut y) = (index(self.bars.0), index(self.bars.1));
+        if panel.choice(ui, "Horizontal bar", &modes, &mut x) {
+            self.bars.0 = bars[x];
+        }
+        if panel.choice(ui, "Vertical bar", &modes, &mut y) {
+            self.bars.1 = bars[y];
+        }
     }
 }
 

@@ -11,8 +11,10 @@ use lune_ui::text::{Spec, Style};
 use lune_ui::ui::Ui;
 use lune_ui::widgets::virtual_list::{Heights, ListOptions, RowKey, SelectionMode};
 
-use super::{card, heading};
+use super::{card, heading, on_card};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "virtual-list",
@@ -94,9 +96,10 @@ struct Live {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Virtualized list");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Virtualized list");
         heading(ui, "VIRTUALIZED LIST", card.x + 24.0, card.y + 24.0);
+        let list = on_card(card, LIST);
         if !self.seeded {
             self.seeded = true;
             let state = ui.list_state("list");
@@ -110,7 +113,7 @@ impl PageState for Live {
             label: "Rows",
         };
         ui.with_enabled(self.enabled, |ui| {
-            ui.virtual_list("list", LIST, &opts, key, |ui, row| {
+            ui.virtual_list("list", list, &opts, key, |ui, row| {
                 let spec = Spec::plain(
                     format!("Row {}", row.index),
                     Style::ui(THEME.font_base, THEME.fg_primary),
@@ -122,8 +125,16 @@ impl PageState for Live {
         });
         if self.count == 0 {
             let spec = Spec::plain("No rows", Style::ui(THEME.font_base, THEME.fg_tertiary));
-            ui.painter().text_centered(&spec, LIST);
+            ui.painter().text_centered(&spec, list);
         }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let mut rows = self.count as f32;
+        if panel.number(ui, "Rows", &mut rows, (0.0, 1_000_000.0, 1.0)) {
+            self.count = rows.round() as usize;
+        }
+        panel.toggle(ui, "Enabled", &mut self.enabled);
     }
 }
 

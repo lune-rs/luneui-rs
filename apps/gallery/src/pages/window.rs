@@ -14,8 +14,10 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::caption::{CaptionButton, CaptionOptions};
 use lune_ui::window::{EDGE_BORDER, ResizeEdge, edge_at};
 
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
-use crate::scenes::{H, TITLE_BAND, W};
+use crate::scenes::TITLE_BAND;
+use crate::showcase::knobs::Knobs;
 
 use super::{caption, card};
 
@@ -54,6 +56,20 @@ fn wane() -> Box<dyn PageState> {
     Box::new(Inactive)
 }
 
+/// The caption buttons along the top right of `area`. The widget places them from the origin of
+/// the window it is given, so an area that is not at the window's origin moves them there with a
+/// translation (which carries their hit regions and nodes with it, and leaves the host's clip
+/// where it is on screen).
+fn caption_in(ui: &mut Ui<'_>, area: Rect, opts: CaptionOptions) -> Option<CaptionButton> {
+    if area.x == 0.0 && area.y == 0.0 {
+        return ui.caption_buttons("caption", area, opts);
+    }
+    ui.painter().push_translate(area.x, area.y);
+    let clicked = ui.caption_buttons("caption", Rect::new(0.0, 0.0, area.w, area.h), opts);
+    ui.painter().pop_translate();
+    clicked
+}
+
 /// The window with live caption buttons.
 #[derive(Default)]
 struct Caption {
@@ -61,18 +77,22 @@ struct Caption {
 }
 
 impl PageState for Caption {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "luneui gallery");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "luneui gallery");
         caption(ui, "Caption buttons", card.x + 24.0, card.y + 24.0);
-        let win = ui.painter().window;
+        let win = stage.area(ui);
         let opts = CaptionOptions {
             height: BUTTON_HEIGHT,
             maximized: self.maximized,
             active: true,
         };
-        if ui.caption_buttons("caption", win, opts) == Some(CaptionButton::Maximize) {
+        if caption_in(ui, win, opts) == Some(CaptionButton::Maximize) {
             self.maximized = !self.maximized;
         }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.toggle(ui, "Maximized", &mut self.maximized);
     }
 }
 
@@ -81,10 +101,11 @@ impl PageState for Caption {
 struct Edges;
 
 impl PageState for Edges {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "luneui gallery");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "luneui gallery");
         let t = *ui.theme();
-        let (w, h, b) = (W as f32, H as f32, EDGE_BORDER);
+        let win = stage.area(ui);
+        let (w, h, b) = (win.w, win.h, EDGE_BORDER);
         let regions = [
             (Rect::new(0.0, 0.0, b, b), t.ok),
             (Rect::new(b, 0.0, w - 2.0 * b, b), t.warn),
@@ -99,7 +120,8 @@ impl PageState for Edges {
         for (i, (r, tone)) in regions.into_iter().enumerate() {
             let centre = (r.x + r.w / 2.0, r.y + r.h / 2.0);
             let name = edge_at(centre, w, h).map_or("none", edge_name);
-            ui.painter().fill(r, 0.0, tone);
+            ui.painter()
+                .fill(Rect::new(r.x + win.x, r.y + win.y, r.w, r.h), 0.0, tone);
             // The legend: a swatch and the name `edge_at` gave, two columns of four.
             let (col, row) = ((i / 4) as f32, (i % 4) as f32);
             let (x, y) = (card.x + 24.0 + col * 160.0, card.y + 56.0 + row * 22.0);
@@ -129,16 +151,24 @@ fn edge_name(e: ResizeEdge) -> &'static str {
 struct Inactive;
 
 impl PageState for Inactive {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
         let theme = *ui.theme();
-        let win = ui.painter().window;
+        let win = stage.area(ui);
         let band = TITLE_BAND;
         let margin = 10.0;
-        let card = Rect::new(margin, band, win.w - 2.0 * margin, win.h - band - margin);
+        // On a stage the card is the stage's rect and the window around it is not ours to paint.
+        let card = stage.rect().unwrap_or(Rect::new(
+            margin,
+            band,
+            win.w - 2.0 * margin,
+            win.h - band - margin,
+        ));
         let p = ui.painter();
-        p.on(LayerId::Base);
+        stage.on(p, LayerId::Base);
         let solid = premul(theme.window_fallback);
-        p.acrylic(win, 0.0, solid, [0.0; 4], false);
+        if stage.rect().is_none() {
+            p.acrylic(win, 0.0, solid, [0.0; 4], false);
+        }
         p.acrylic(
             card,
             chrome::CARD_RADIUS,
@@ -146,18 +176,20 @@ impl PageState for Inactive {
             solid,
             false,
         );
-        let spec = Spec::plain(
-            "luneui gallery",
-            Style::ui(12.0, theme.fg_secondary).medium(),
-        );
-        p.text_centered(&spec, Rect::new(0.0, 0.0, win.w, band - 2.0));
+        if stage.rect().is_none() {
+            let spec = Spec::plain(
+                "luneui gallery",
+                Style::ui(12.0, theme.fg_secondary).medium(),
+            );
+            p.text_centered(&spec, Rect::new(0.0, 0.0, win.w, band - 2.0));
+        }
         caption(ui, "Inactive, Wane", card.x + 24.0, card.y + 24.0);
         let opts = CaptionOptions {
             height: BUTTON_HEIGHT,
             maximized: false,
             active: false,
         };
-        ui.caption_buttons("caption", win, opts);
+        caption_in(ui, win, opts);
     }
 
     fn theme(&self) -> Option<Theme> {

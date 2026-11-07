@@ -6,8 +6,8 @@ use lune_ui::paint::Rect;
 use lune_ui::text::{Spec, Style};
 use lune_ui::ui::Ui;
 
-use crate::page::Page;
-use crate::scenes::background_in;
+use crate::page::{Page, Stage};
+use crate::scenes::{CARD_MARGIN, TITLE_BAND, background_in, card_in};
 
 mod a11y;
 mod badge;
@@ -163,12 +163,39 @@ pub(crate) static PAGES: &[&Page] = &[
     &tray::PAGE,
     &file_drop::PAGE,
     &window::PAGE,
+    &crate::showcase::PAGE,
+    &crate::showcase::labs::glass::PAGE,
+    &crate::showcase::labs::blur::PAGE,
+    &crate::showcase::labs::effects::PAGE,
+    &crate::showcase::labs::motion::PAGE,
+    &crate::showcase::labs::tokens::PAGE,
+    &crate::showcase::labs::clipboard::PAGE,
+    &crate::showcase::labs::json::PAGE,
 ];
 
-/// The window background of a Ui page (glass, focused) and its card. Returns the card.
-pub(crate) fn card(ui: &mut Ui<'_>, title: &str) -> Rect {
+/// The window background of a Ui page (glass, focused) and its card. Returns the card. On a
+/// stage that is a rect of the window, only the card is painted, at the rect: the window glass
+/// and the title belong to whoever owns the window.
+pub(crate) fn card(ui: &mut Ui<'_>, stage: &Stage, title: &str) -> Rect {
     let theme = *ui.theme();
-    background_in(ui.painter(), &theme, true, true, title)
+    match stage.rect() {
+        None => background_in(ui.painter(), &theme, true, true, title),
+        Some(rect) => card_in(ui.painter(), &theme, true, true, rect),
+    }
+}
+
+/// `r`, given in the coordinates of a page that is alone in the window, moved to the same place
+/// in `card`: a page keeps its layout constants (a scene's script aims at them) and lays them
+/// out from the card it was given, wherever its stage puts it.
+pub(crate) fn on_card(card: Rect, r: Rect) -> Rect {
+    let (dx, dy) = card_shift(card);
+    Rect::new(r.x + dx, r.y + dy, r.w, r.h)
+}
+
+/// How far `card` lies from where a page alone in the window has it: add it to a coordinate
+/// given in window coordinates.
+pub(crate) fn card_shift(card: Rect) -> (f32, f32) {
+    (card.x - CARD_MARGIN, card.y - TITLE_BAND)
 }
 
 /// A small section heading at (`x`, `y`).

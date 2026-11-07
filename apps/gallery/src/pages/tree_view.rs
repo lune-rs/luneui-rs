@@ -13,8 +13,10 @@ use lune_ui::text::{Spec, Style};
 use lune_ui::ui::Ui;
 use lune_ui::widgets::tree_view::{ROW, TreeOptions, TreeRow, TreeRowCtx};
 
-use super::{caption, card, heading};
+use super::{caption, card, heading, on_card};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "tree-view",
@@ -87,6 +89,9 @@ struct Live {
     activated: Option<&'static str>,
     /// Draw the tree inside `with_enabled(false, ..)`.
     disabled: bool,
+    /// The indent guides, and whether a press on a row toggles it.
+    guides: bool,
+    toggle_on_row: bool,
 }
 
 fn state(open: &'static [u64], selected: Option<u64>) -> Box<dyn PageState> {
@@ -94,6 +99,8 @@ fn state(open: &'static [u64], selected: Option<u64>) -> Box<dyn PageState> {
         seed: Some((open, selected)),
         activated: None,
         disabled: false,
+        guides: true,
+        toggle_on_row: false,
     })
 }
 
@@ -103,6 +110,8 @@ fn disabled() -> Box<dyn PageState> {
         seed: Some((&[SRC, GPU], Some(GPU))),
         activated: None,
         disabled: true,
+        guides: true,
+        toggle_on_row: false,
     })
 }
 
@@ -139,8 +148,8 @@ fn size_cell(ui: &mut Ui<'_>, ctx: &TreeRowCtx) {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let c = card(ui, "Tree view");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let c = card(ui, stage, "Tree view");
         let (x, y) = (c.x + 24.0, c.y + 24.0);
         heading(ui, "A FILE TREE", x, y);
         if let Some((open, selected)) = self.seed.take() {
@@ -151,11 +160,12 @@ impl PageState for Live {
         let opts = TreeOptions {
             rows: &ROWS,
             label: "Files",
-            guides: true,
-            toggle_on_row: false,
+            guides: self.guides,
+            toggle_on_row: self.toggle_on_row,
         };
+        let tree = on_card(c, TREE);
         let out = ui.with_enabled(!self.disabled, |ui| {
-            ui.tree_view("tree", TREE, &opts, size_cell)
+            ui.tree_view("tree", tree, &opts, size_cell)
         });
         if let Some(key) = out.activated {
             self.activated = ROWS.iter().find(|r| r.key == key).map(|r| r.text);
@@ -164,13 +174,22 @@ impl PageState for Live {
             Some(text) => format!("Opened: {text}"),
             None => "Enter or a double click opens a row.".to_owned(),
         };
-        caption(ui, &said, TREE.right() + 24.0, y + 20.0);
+        caption(ui, &said, tree.right() + 24.0, y + 20.0);
         caption(
             ui,
             "Arrows move and fold, Space selects.",
-            TREE.right() + 24.0,
+            tree.right() + 24.0,
             y + 40.0,
         );
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.toggle(ui, "Indent guides", &mut self.guides);
+        panel.toggle(ui, "A press on a row toggles it", &mut self.toggle_on_row);
+        let mut enabled = !self.disabled;
+        if panel.toggle(ui, "Enabled", &mut enabled) {
+            self.disabled = !enabled;
+        }
     }
 }
 

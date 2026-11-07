@@ -15,8 +15,10 @@ use lune_ui::widgets::settings_page::SettingsPage;
 use lune_ui::widgets::stepper::StepRange;
 
 use super::controls_ui::OPTIONS;
-use super::{card, heading};
+use super::{card, heading, on_card};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "settings-page",
@@ -96,8 +98,8 @@ impl Live {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Settings page");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Settings page");
         heading(ui, "SETTINGS PAGE", card.x + 24.0, card.y + 24.0);
         if self.restart_at.is_some_and(|t| ui.time() >= t) {
             self.restart = true;
@@ -118,7 +120,7 @@ impl PageState for Live {
         );
         let mut changed = false;
         let first_enabled = !self.row_disabled;
-        let resp = ui.settings_page("page", PAGE_RECT, &page, |ui, vp| {
+        let resp = ui.settings_page("page", on_card(card, PAGE_RECT), &page, |ui, vp| {
             let mut y = vp.y;
             let before = *updates;
             let row = SettingRow {
@@ -197,6 +199,24 @@ impl PageState for Live {
         }
         if resp.restart {
             self.restart = false;
+        }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.toggle(ui, "Restart notice", &mut self.restart);
+        panel.toggle(ui, "Window active", &mut self.active);
+        let mut first = !self.row_disabled;
+        if panel.toggle(ui, "First row enabled", &mut first) {
+            self.row_disabled = !first;
+        }
+        let mut recent = self.recent as f32;
+        if panel.number(
+            ui,
+            "Recent files",
+            &mut recent,
+            (STEPS.min as f32, STEPS.max as f32, 1.0),
+        ) {
+            self.recent = recent.round() as u32;
         }
     }
 }

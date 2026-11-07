@@ -31,7 +31,7 @@ and the vendored snapshot (`scripts/export-snapshot.sh`, `docs/consuming.md`).
 | `crates/lune-ui-winit` | winit adapter: input translation, output application, glass window attributes |
 | `crates/lune-ui-platform` | OS glass (`Material`) per platform, the tray item, the popover window; the only crate with `unsafe` |
 | `crates/lune-ui` | Facade: `lib.rs` only, re-exports the four crates at the old paths |
-| `apps/gallery` | A page registry (legacy Painter-API pages and `Ui` pages), a glass window, `--dump <dir>` (offscreen PNG frames on a headless device, no window), `--list`, `--bench` (frame-time probes). App code, outside `crates/` (D12): it bundles fonts |
+| `apps/gallery` | A page registry (legacy Painter-API pages and `Ui` pages), a glass window that is the showcase (`showcase/`, below), `--dump <dir>` (offscreen PNG frames on a headless device, no window), `--list`, `--bench` (frame-time probes). App code, outside `crates/` (D12): it bundles fonts |
 | `tools/dump-compare` | Compares two dirs of PNG frame dumps pixel by pixel (the pixel gate's compare tool) |
 | `scripts/` | Gates and generators, see "Boundary rules" and "Pixel gates"; `export-snapshot.sh` writes the snapshot an app vendors (D239) |
 | `docs/consuming.md` | How an app takes the toolkit in before a remote exists: what the snapshot holds, the app's duties, the release size, the migration map from Luneterm 296cfdc |
@@ -455,6 +455,19 @@ with modifiers, IME preedit and commit, the clipboard's answer, file hover and d
 request from the OS clipboard (D215; `--dump` never builds one). `UiScene.scale` is an `f32`. A page may also name a theme and a tray state (`PageState::theme`, `tray_state`), read by the `Player` and by window mode. `gallery --smoke-platform` (a logged-in GUI session; exit 2 without one) puts a real item in the tray for about 2 seconds and prints each fact it measured (D225). The bundled fonts have no CJK glyph, so the IME scenes'
 "かな" draws as boxes (D90). A shown overlay fades from the first frame that draws it, so a scene that wants
 it visible needs a frame at the due time. Window mode and the bench draw the list page with 1,000,000 rows, the code editor page with a 1,000,000-line document, the table, lane graph and diff pages with 100,000 rows or lines, and the markdown page with a document of 2,800 blocks (400 sections).
+
+### The showcase
+
+Window mode opens one page, the showcase (`apps/gallery/src/showcase/`, D246 to D254), which hosts every other page. `Showcase` is an ordinary Ui page:
+`mod.rs` draws three panes (the sidebar with its search field, the content pane, the settings pane) and holds the hosted page as a child `Box<dyn PageState>`
+under an id scope of its own; a chosen scene's script is replayed into the frame's input through `PageState::inject`. The hosted page draws on a `Stage`
+(`Stage::at(rect)`: its card at the rect, no window glass, the host's clip kept through `Stage::on`) on a fixed 1,020 x 616 canvas that scrolls in the pane.
+`nav.rs` is the sidebar model (groups, rows, search, row keys). `settings.rs` is the global settings, answered to the window through the `PageState` hooks
+`theme`, `tier`, `frame_params`, `material`, `time_scale` and `zoom` (the window keeps an accumulated clock, so a speed change never jumps time, and scales the
+pointer with the zoom). `knobs.rs` is `Knobs` (`toggle`, `choice`, `number`, `text`, `button`), the rows a page declares in `PageState::knobs`. `labs/` holds the
+glass, blur, effects, motion, tokens, clipboard and JSON pages, each an ordinary page in `PAGES`. A page that changes layers inside the pane goes through `Stage::on`
+(`Painter::on` drops the clip); the shell resets to the base layer after the pane. Tests: `showcase::tests` (clicks through `Translator`, the settings, the clip),
+`showcase::knobs::tests` (one turned knob per page, and every sidebar page has a knob or a named reason not to).
 
 `gallery --bench [--runs N] [--frames N] [--size WxH]` times offscreen frames: a timeline per page,
 cost probes (text fades, a scaling and fading dialog over a blurred stripe page) and a 4 ms-sleep

@@ -20,7 +20,9 @@ use lune_ui::widgets::menu::MenuRow;
 use lune_ui::widgets::popover::PopoverOptions;
 
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "dialog",
@@ -59,6 +61,19 @@ enum Variant {
 }
 
 impl Variant {
+    /// The variants, in the order the knob lists them, with their names.
+    const ALL: [(&'static str, Variant); 9] = [
+        ("Confirm", Variant::Confirm),
+        ("Form", Variant::Form),
+        ("Blurred scrim", Variant::Blur),
+        ("Disabled confirm", Variant::Disabled),
+        ("Combo list", Variant::Combo),
+        ("Popover", Variant::Popover),
+        ("Tooltip", Variant::Tooltip),
+        ("Glass menu", Variant::Menu),
+        ("Nested dialog", Variant::Nested),
+    ];
+
     /// Whether the body opens an overlay of its own.
     fn has_child(self) -> bool {
         matches!(
@@ -163,8 +178,8 @@ fn glass() -> DialogGlass {
 }
 
 impl PageState for Dialogs {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Dialog");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Dialog");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "A DIALOG OVER THE PAGE", x, y);
         let by = y + 20.0;
@@ -209,6 +224,22 @@ impl PageState for Dialogs {
                 self.open = false;
             }
         }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let names: Vec<&str> = Variant::ALL.iter().map(|(n, _)| *n).collect();
+        let mut at = Variant::ALL
+            .iter()
+            .position(|(_, v)| *v == self.variant)
+            .unwrap_or(0);
+        if panel.choice(ui, "Variant", &names, &mut at) {
+            self.variant = Variant::ALL[at].1;
+            // A variant starts as its scene does: its overlay open when it has one.
+            self.child = self.variant.has_child();
+            self.stop_at = None;
+        }
+        // Last: an open dialog is modal and blocks the pane, so the variant is chosen first.
+        panel.toggle(ui, "Open", &mut self.open);
     }
 }
 

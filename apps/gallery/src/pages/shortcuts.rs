@@ -10,6 +10,7 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::menu::MenuRow;
 
 use super::{caption, card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 
 pub(crate) static PAGE: Page = Page {
@@ -67,8 +68,8 @@ fn rows(h: &Hints) -> [MenuRow<'_>; 4] {
 struct Menus;
 
 impl PageState for Menus {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Shortcuts");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Shortcuts");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "SHORTCUT HINTS", x, y);
         let mac = hints(&Keymap::MAC);

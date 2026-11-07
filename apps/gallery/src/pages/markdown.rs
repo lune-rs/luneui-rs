@@ -15,8 +15,10 @@ use lune_ui::widgets::markdown::{
 };
 use lune_ui::widgets::text_lines::HighlightSpan;
 
-use super::{caption, card, heading};
+use super::{caption, card, heading, on_card};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "markdown-preview",
@@ -328,6 +330,8 @@ const INLINE_TEXT: [MdInline<'static>; 4] = [
 /// What the page lays out: the model, whether tasks are live, and whether it holds a picture.
 struct Live {
     blocks: Vec<MdBlock<'static>>,
+    /// The knob's document: 0 is the page's own, n the n-th of [`DOCS`].
+    doc: usize,
     tasks_live: bool,
     pic: bool,
     /// The last link raised, shown above the document.
@@ -337,11 +341,25 @@ struct Live {
 fn state(blocks: &[MdBlock<'static>]) -> Live {
     Live {
         blocks: blocks.to_vec(),
+        doc: 0,
         tasks_live: true,
         pic: false,
         opened: None,
     }
 }
+
+/// The documents the knob offers besides the long one.
+const DOCS: [(&str, &[MdBlock<'static>]); 9] = [
+    ("Headings", &HEADINGS),
+    ("Inline", &INLINE),
+    ("Links", &LINKS),
+    ("Lists", &LISTS),
+    ("Quote", &QUOTE),
+    ("Wide table", &WIDE_TABLE),
+    ("Narrow table", &NARROW_TABLE),
+    ("Code", &CODE),
+    ("Rule", &RULE),
+];
 
 fn long() -> Box<dyn PageState> {
     let blocks: Vec<MdBlock<'static>> = (0..400).flat_map(section).collect();
@@ -388,8 +406,8 @@ fn readonly_tasks() -> Box<dyn PageState> {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Markdown preview");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Markdown preview");
         heading(ui, "MARKDOWN PREVIEW", card.x + 24.0, card.y + 24.0);
         if let Some(url) = &self.opened {
             let t = *ui.theme();
@@ -406,7 +424,7 @@ impl PageState for Live {
             tasks_live: self.tasks_live,
             identity: Some(1),
         };
-        let out = ui.markdown("doc", RECT, &self.blocks, &opts);
+        let out = ui.markdown("doc", on_card(card, RECT), &self.blocks, &opts);
         if let Some(url) = out.link {
             self.opened = Some(url);
         }
@@ -418,6 +436,20 @@ impl PageState for Live {
         } else {
             Vec::new()
         }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let mut names = vec!["Long document"];
+        names.extend(DOCS.iter().map(|(n, _)| *n));
+        let mut at = self.doc;
+        if panel.choice(ui, "Document", &names, &mut at) {
+            self.doc = at;
+            self.blocks = match at.checked_sub(1).and_then(|i| DOCS.get(i)) {
+                Some((_, blocks)) => blocks.to_vec(),
+                None => (0..400).flat_map(section).collect(),
+            };
+        }
+        panel.toggle(ui, "Task boxes work", &mut self.tasks_live);
     }
 }
 

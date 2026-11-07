@@ -13,8 +13,10 @@ use lune_ui::widgets::virtual_list::{
     HIGHLIGHT_INSET, Heights, ListOptions, RowKey, SelectionMode, row_fill,
 };
 
-use super::{card, heading};
+use super::{card, heading, on_card};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "list-row",
@@ -106,30 +108,84 @@ fn key(i: usize) -> RowKey {
 }
 
 fn live() -> Box<dyn PageState> {
-    Box::new(Live)
+    Box::new(Live::default())
 }
 
 fn specimens() -> Box<dyn PageState> {
     Box::new(Specimens)
 }
 
-/// A list of 200 rows.
-struct Live;
+/// The selection modes the knob offers, in the order shown.
+const SELECTIONS: [(&str, SelectionMode); 3] = [
+    ("None", SelectionMode::None),
+    ("Single", SelectionMode::Single),
+    ("Multi", SelectionMode::Multi),
+];
+
+/// A list of 200 rows. The knobs take parts off the rows (a row's height stays the same),
+/// choose how rows are selected and say whether the list takes input.
+struct Live {
+    /// Value, sub-line, meta, badge, dot.
+    parts: [bool; 5],
+    /// An index into [`SELECTIONS`].
+    selection: usize,
+    enabled: bool,
+}
+
+impl Default for Live {
+    fn default() -> Self {
+        Self {
+            parts: [true; 5],
+            selection: 1,
+            enabled: true,
+        }
+    }
+}
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "List row");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "List row");
+        let list = on_card(card, LIST);
         heading(ui, "LIST ROWS", card.x + 24.0, card.y + 24.0);
         let opts = ListOptions {
             count: 200,
             heights: Heights::Fixed(row_height()),
-            selection: SelectionMode::Single,
+            selection: SELECTIONS[self.selection.min(SELECTIONS.len() - 1)].1,
             index_of: None,
             label: "Branches",
         };
-        ui.virtual_list("list", LIST, &opts, key, |ui, ctx| {
-            ui.list_row(ctx, &row_of(ctx.index), SIDE_PANEL_PADDING)
+        let [value, sub, meta, badge, dot] = self.parts;
+        ui.with_enabled(self.enabled, |ui| {
+            ui.virtual_list("list", list, &opts, key, |ui, ctx| {
+                let mut row = row_of(ctx.index);
+                if !value {
+                    row.value = None;
+                }
+                if !sub {
+                    row.sub = None;
+                }
+                if !meta {
+                    row.meta = None;
+                }
+                if !badge {
+                    row.badge = None;
+                }
+                if !dot {
+                    row.dot = None;
+                }
+                ui.list_row(ctx, &row, SIDE_PANEL_PADDING)
+            })
         });
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let names = ["Value", "Sub-line", "Meta", "Badge", "Dot"];
+        for (name, on) in names.into_iter().zip(self.parts.iter_mut()) {
+            panel.toggle(ui, name, on);
+        }
+        let modes: Vec<&str> = SELECTIONS.iter().map(|(n, _)| *n).collect();
+        panel.choice(ui, "Selection", &modes, &mut self.selection);
+        panel.toggle(ui, "Enabled", &mut self.enabled);
     }
 }
 
@@ -137,14 +193,15 @@ impl PageState for Live {
 struct Specimens;
 
 impl PageState for Specimens {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "List row states");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "List row states");
         heading(
             ui,
             "REST, HOVER, SELECTED, SELECTED + HOVER, FOCUS-VISIBLE, DISABLED",
             card.x + 24.0,
             card.y + 24.0,
         );
+        let list = on_card(card, LIST);
         let theme = *ui.theme();
         let h = row_height();
         // Name, hovered, selected, focus-visible, disabled.
@@ -157,7 +214,7 @@ impl PageState for Specimens {
             ("Disabled", false, false, false, true),
         ];
         for (i, (name, hovered, selected, focus, disabled)) in cases.into_iter().enumerate() {
-            let slot = Rect::new(LIST.x, LIST.y + i as f32 * (h + 4.0), LIST.w, h);
+            let slot = Rect::new(list.x, list.y + i as f32 * (h + 4.0), list.w, h);
             let p = ui.painter();
             if disabled {
                 p.push_xform(Xform {

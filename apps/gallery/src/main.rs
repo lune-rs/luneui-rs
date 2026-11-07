@@ -24,6 +24,7 @@ mod page;
 mod pages;
 mod popover;
 mod scenes;
+mod showcase;
 mod smoke;
 mod window;
 
@@ -35,9 +36,9 @@ use lune_ui::frame::{FrameParams, FrameRenderer};
 use lune_ui::gpu::{self, Gpu};
 use lune_ui::scene::Scene;
 use lune_ui::text::TextCache;
-use page::{PageKind, meets_expectation, register_images, release_images, run_scene};
+use page::{FrameTweaks, PageKind, meets_expectation, register_images, release_images, run_scene};
 use pages::PAGES;
-use scenes::{BLUR_SATURATION, BLUR_SIGMA, H, W};
+use scenes::{H, W};
 
 const USAGE: &str = "usage: gallery [--dump <dir> | --list | --bench [--runs N] [--frames N] [--size WxH] | --smoke-platform]\n  --smoke-platform needs a logged-in GUI session (it puts an item in the tray for about 2 s); exit 2 without one";
 
@@ -145,7 +146,8 @@ fn scene_names() -> Vec<String> {
     names
 }
 
-/// Draws a finished display list at scale `s` into `target` (`size` physical pixels).
+/// Draws a finished display list at scale `s` into `target` (`size` physical pixels) with the
+/// gallery's own blur.
 fn draw_scene(
     r: &mut Renderer,
     scene: &Scene,
@@ -153,12 +155,16 @@ fn draw_scene(
     target: &wgpu::TextureView,
     size: (u32, u32),
 ) -> Result<(), String> {
-    let params = FrameParams {
-        size,
-        scale: s,
-        blur_sigma: BLUR_SIGMA,
-        saturation: BLUR_SATURATION,
-    };
+    draw_with(r, scene, target, FrameTweaks::DEFAULT.params(size, s))
+}
+
+/// Draws a finished display list into `target` with `params`.
+fn draw_with(
+    r: &mut Renderer,
+    scene: &Scene,
+    target: &wgpu::TextureView,
+    params: FrameParams,
+) -> Result<(), String> {
     let mut customs: [&mut dyn lune_ui::custom::CustomDraw; 1] = [&mut r.fill];
     r.frame
         .draw_with(&mut r.gpu, &mut r.text, scene, target, params, &mut customs)

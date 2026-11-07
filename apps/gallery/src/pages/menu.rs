@@ -13,7 +13,9 @@ use lune_ui::widgets::popover::{PlaceAlign, Side};
 use lune_ui::widgets::tone::Tone;
 
 use super::{card, heading};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "menu",
@@ -106,7 +108,12 @@ const VARIANTS: [MenuRow<'static>; 8] = [
 ];
 
 fn live() -> Box<dyn PageState> {
-    Box::new(Live { open: None })
+    Box::new(Live {
+        open: None,
+        side: 0,
+        align: 0,
+        gap: 4.0,
+    })
 }
 
 fn variants() -> Box<dyn PageState> {
@@ -141,11 +148,29 @@ enum Shown {
 /// The page plays the app: a button opens its menu, a pick or a dismissal closes it.
 struct Live {
     open: Option<Shown>,
+    /// The anchored menu's side of its button and its alignment (indices into [`SIDES`] and
+    /// [`ALIGNS`]), and the gap between them.
+    side: usize,
+    align: usize,
+    gap: f32,
 }
 
+const SIDES: [(&str, Side); 4] = [
+    ("Bottom", Side::Bottom),
+    ("Top", Side::Top),
+    ("Left", Side::Left),
+    ("Right", Side::Right),
+];
+
+const ALIGNS: [(&str, PlaceAlign); 3] = [
+    ("Start", PlaceAlign::Start),
+    ("Center", PlaceAlign::Center),
+    ("End", PlaceAlign::End),
+];
+
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Menu");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Menu");
         let (mut x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "MENU", x, y);
         let at = (x, y + 60.0);
@@ -171,7 +196,9 @@ impl PageState for Live {
             (Some(Shown::Variants), _) => ui.menu("variants-menu", &VARIANTS, at),
             (Some(Shown::Anchored), Some(rect)) => {
                 let anchor_id = Some(ui.id("anchored"));
-                let options = options_below(rect, anchor_id);
+                let side = SIDES[self.side.min(SIDES.len() - 1)].1;
+                let align = ALIGNS[self.align.min(ALIGNS.len() - 1)].1;
+                let options = options_at(rect, anchor_id, (side, align, self.gap));
                 ui.menu_with("anchored-menu", &ROWS, &options)
             }
             _ => return,
@@ -180,16 +207,49 @@ impl PageState for Live {
             self.open = None;
         }
     }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let names: Vec<&str> = SIDES.iter().map(|(n, _)| *n).collect();
+        panel.choice(ui, "Anchored side", &names, &mut self.side);
+        let names: Vec<&str> = ALIGNS.iter().map(|(n, _)| *n).collect();
+        panel.choice(ui, "Anchored alignment", &names, &mut self.align);
+        panel.number(ui, "Anchored gap", &mut self.gap, (0.0, 24.0, 1.0));
+        // Last: an open menu is dismissed by a press outside it.
+        let shown = [
+            None,
+            Some(Shown::Plain),
+            Some(Shown::Variants),
+            Some(Shown::Anchored),
+        ];
+        let mut at = shown.iter().position(|s| *s == self.open).unwrap_or(0);
+        if panel.choice(
+            ui,
+            "Open menu",
+            &["None", "Plain", "Variants", "Anchored"],
+            &mut at,
+        ) {
+            self.open = shown[at];
+        }
+    }
 }
 
 /// A menu under `rect`, its left edge on the anchor's.
 fn options_below(rect: Rect, anchor_id: Option<WidgetId>) -> MenuOptions<'static> {
+    options_at(rect, anchor_id, (Side::Bottom, PlaceAlign::Start, 4.0))
+}
+
+/// A menu at `side` of `rect`, aligned and `gap` px away.
+fn options_at(
+    rect: Rect,
+    anchor_id: Option<WidgetId>,
+    (side, align, gap): (Side, PlaceAlign, f32),
+) -> MenuOptions<'static> {
     MenuOptions {
         place: MenuPlace::Anchor {
             rect,
-            side: Side::Bottom,
-            align: PlaceAlign::Start,
-            gap: 4.0,
+            side,
+            align,
+            gap,
         },
         anchor_id,
         name: "Anchored actions",
@@ -202,8 +262,8 @@ struct Pinned {
 }
 
 impl PageState for Pinned {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Menu");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Menu");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "MENU", x, y);
         ui.menu("menu", self.rows, (x, y + 60.0));
@@ -217,12 +277,12 @@ struct Anchored {
 }
 
 impl PageState for Anchored {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Menu");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Menu");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "MENU", x, y);
         let top = if self.low {
-            ui.painter().window.bottom() - 72.0
+            stage.area(ui).bottom() - 72.0
         } else {
             y + 20.0
         };
@@ -238,8 +298,8 @@ impl PageState for Anchored {
 struct Closing;
 
 impl PageState for Closing {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        let card = card(ui, "Menu");
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Menu");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "MENU", x, y);
         if ui.time().as_millis() < 300 {

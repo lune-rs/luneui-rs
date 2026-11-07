@@ -14,8 +14,10 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::button::{ButtonKind, ButtonOptions};
 use lune_ui::widgets::split_panes::{Pane, SplitOptions, SplitSide};
 
-use super::{card, heading};
+use super::{card, heading, on_card};
+use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "split-panes",
@@ -36,6 +38,9 @@ const ROWS: Rect = Rect::new(X, Y + 296.0, 940.0, 240.0);
 const TOGGLE: Rect = Rect::new(X, Y + 20.0, 150.0, 24.0);
 
 const COLS_DEFAULT: f32 = 300.0;
+
+/// Which pane of the column split keeps its size, as the knob lists them.
+const SIDES: [(&str, SplitSide); 2] = [("First", SplitSide::First), ("Second", SplitSide::Second)];
 const ROWS_DEFAULT: f32 = 100.0;
 
 const COLS_OPTS: SplitOptions<'static> = SplitOptions {
@@ -70,6 +75,10 @@ fn collapsed() -> Box<dyn PageState> {
 struct Live {
     /// The column split's first pane is hidden.
     hidden: bool,
+    /// The column split's sized side (an index into [`SIDES`]) and its limits.
+    sized: usize,
+    min: f32,
+    max: f32,
     /// The sizes as of the last frame, for the panes to print.
     cols: f32,
     rows: f32,
@@ -79,6 +88,9 @@ impl Live {
     fn new(hidden: bool) -> Live {
         Live {
             hidden,
+            sized: 0,
+            min: COLS_OPTS.min,
+            max: COLS_OPTS.max,
             cols: COLS_DEFAULT,
             rows: ROWS_DEFAULT,
         }
@@ -96,9 +108,10 @@ fn pane(ui: &mut Ui<'_>, rect: Rect, tint: [u8; 4], title: &str, detail: &str) {
 }
 
 impl PageState for Live {
-    fn draw(&mut self, ui: &mut Ui<'_>) {
-        card(ui, "Split panes");
-        heading(ui, "SPLIT PANES", X, Y);
+    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
+        let card = card(ui, stage, "Split panes");
+        let (ox, oy) = (card.x + 24.0, card.y + 24.0);
+        heading(ui, "SPLIT PANES", ox, oy);
         let ghost = ButtonOptions {
             kind: ButtonKind::Secondary,
             small: true,
@@ -109,50 +122,84 @@ impl PageState for Live {
         } else {
             "Hide first pane"
         };
-        if ui.button_with("toggle", TOGGLE, label, &ghost).clicked {
+        if ui
+            .button_with("toggle", on_card(card, TOGGLE), label, &ghost)
+            .clicked
+        {
             self.hidden = !self.hidden;
         }
 
         let cols = SplitOptions {
             hidden: self.hidden,
+            sized: SIDES[self.sized.min(1)].1,
+            min: self.min,
+            max: self.max,
             ..COLS_OPTS
         };
         let (width, height) = (self.cols, self.rows);
-        let r = ui.split_panes("cols", COLS, &cols, |ui, which, rect| match which {
-            Pane::First => pane(
-                ui,
-                rect,
-                THEME.surface_overlay,
-                "First pane",
-                &format!("Width {width:.0}"),
-            ),
-            Pane::Second => pane(
-                ui,
-                rect,
-                THEME.surface_hover,
-                "Second pane",
-                "Keeps at least 200",
-            ),
-        });
+        let r = ui.split_panes(
+            "cols",
+            on_card(card, COLS),
+            &cols,
+            |ui, which, rect| match which {
+                Pane::First => pane(
+                    ui,
+                    rect,
+                    THEME.surface_overlay,
+                    "First pane",
+                    &format!("Width {width:.0}"),
+                ),
+                Pane::Second => pane(
+                    ui,
+                    rect,
+                    THEME.surface_hover,
+                    "Second pane",
+                    "Keeps at least 200",
+                ),
+            },
+        );
         self.cols = r.size;
 
-        let r = ui.split_panes("rows", ROWS, &ROWS_OPTS, |ui, which, rect| match which {
-            Pane::First => pane(
-                ui,
-                rect,
-                THEME.surface_hover,
-                "Content",
-                "Keeps at least 60",
-            ),
-            Pane::Second => pane(
-                ui,
-                rect,
-                THEME.surface_overlay,
-                "Panel below",
-                &format!("Height {height:.0}"),
-            ),
-        });
+        let r = ui.split_panes(
+            "rows",
+            on_card(card, ROWS),
+            &ROWS_OPTS,
+            |ui, which, rect| match which {
+                Pane::First => pane(
+                    ui,
+                    rect,
+                    THEME.surface_hover,
+                    "Content",
+                    "Keeps at least 60",
+                ),
+                Pane::Second => pane(
+                    ui,
+                    rect,
+                    THEME.surface_overlay,
+                    "Panel below",
+                    &format!("Height {height:.0}"),
+                ),
+            },
+        );
         self.rows = r.size;
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        // The page has its own button for hiding the first pane.
+        let names: Vec<&str> = SIDES.iter().map(|(n, _)| *n).collect();
+        panel.choice(ui, "Column split: sized pane", &names, &mut self.sized);
+        panel.number(
+            ui,
+            "Column split: smallest",
+            &mut self.min,
+            (60.0, 300.0, 1.0),
+        );
+        panel.number(
+            ui,
+            "Column split: largest",
+            &mut self.max,
+            (300.0, 800.0, 1.0),
+        );
     }
 }
 
