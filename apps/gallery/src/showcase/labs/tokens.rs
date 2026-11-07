@@ -37,7 +37,7 @@ macro_rules! colours {
 
 colours! {
     fg_primary, fg_secondary, fg_tertiary, surface_input, surface_hover, surface_selected,
-    border, border_subtle, accent, scroll_thumb, scroll_thumb_hover,
+    border, border_subtle, tree_guide, accent, scroll_thumb, scroll_thumb_hover,
     text_selection, on_accent, dialog_backdrop, dialog_footer,
     menu_text_primary, menu_text_tertiary, menu_text_quaternary, menu_popup_border,
     menu_item_hover, menu_separator, menu_glass, menu_item_pressed, menu_text_disabled,

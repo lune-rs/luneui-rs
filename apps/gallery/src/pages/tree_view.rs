@@ -11,7 +11,9 @@ use lune_ui::motion::MotionTier;
 use lune_ui::paint::Rect;
 use lune_ui::text::{Spec, Style};
 use lune_ui::ui::Ui;
-use lune_ui::widgets::tree_view::{ROW, TreeOptions, TreeRow, TreeRowCtx};
+use lune_ui::widgets::tree_view::{
+    ChevronStyle, GuideStyle, ROW, TreeOptions, TreeRow, TreeRowCtx,
+};
 
 use super::{caption, card, heading, on_card};
 use crate::page::Stage;
@@ -92,15 +94,29 @@ struct Live {
     /// The indent guides, and whether a press on a row toggles it.
     guides: bool,
     toggle_on_row: bool,
+    guide_style: GuideStyle,
+    chevron: ChevronStyle,
 }
 
 fn state(open: &'static [u64], selected: Option<u64>) -> Box<dyn PageState> {
+    styled(open, selected, GuideStyle::Elbow, ChevronStyle::Triangle)
+}
+
+/// A tree seeded like [`state`], with the guide lines and the mark in the given styles.
+fn styled(
+    open: &'static [u64],
+    selected: Option<u64>,
+    guide_style: GuideStyle,
+    chevron: ChevronStyle,
+) -> Box<dyn PageState> {
     Box::new(Live {
         seed: Some((open, selected)),
         activated: None,
         disabled: false,
         guides: true,
         toggle_on_row: false,
+        guide_style,
+        chevron,
     })
 }
 
@@ -112,6 +128,8 @@ fn disabled() -> Box<dyn PageState> {
         disabled: true,
         guides: true,
         toggle_on_row: false,
+        guide_style: GuideStyle::Elbow,
+        chevron: ChevronStyle::Triangle,
     })
 }
 
@@ -120,7 +138,7 @@ fn live() -> Box<dyn PageState> {
 }
 
 fn all_open() -> Box<dyn PageState> {
-    state(&[SRC, GPU, SHADERS, WIDGETS, DOCS], None)
+    state(ALL_OPEN, None)
 }
 
 fn closed() -> Box<dyn PageState> {
@@ -129,6 +147,20 @@ fn closed() -> Box<dyn PageState> {
 
 fn one_open() -> Box<dyn PageState> {
     state(&[SRC], None)
+}
+
+const ALL_OPEN: &[u64] = &[SRC, GPU, SHADERS, WIDGETS, DOCS];
+
+fn straight() -> Box<dyn PageState> {
+    styled(ALL_OPEN, None, GuideStyle::Straight, ChevronStyle::Triangle)
+}
+
+fn on_hover() -> Box<dyn PageState> {
+    styled(ALL_OPEN, None, GuideStyle::OnHover, ChevronStyle::Triangle)
+}
+
+fn chevron() -> Box<dyn PageState> {
+    styled(&[SRC], None, GuideStyle::Elbow, ChevronStyle::Chevron)
 }
 
 fn selected() -> Box<dyn PageState> {
@@ -161,6 +193,8 @@ impl PageState for Live {
             rows: &ROWS,
             label: "Files",
             guides: self.guides,
+            guide_style: self.guide_style,
+            chevron: self.chevron,
             toggle_on_row: self.toggle_on_row,
         };
         let tree = on_card(c, TREE);
@@ -185,6 +219,20 @@ impl PageState for Live {
 
     fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
         panel.toggle(ui, "Indent guides", &mut self.guides);
+        let mut style = self.guide_style as usize;
+        if panel.choice(
+            ui,
+            "Guide lines",
+            &["Elbow", "Straight", "On hover"],
+            &mut style,
+        ) {
+            self.guide_style =
+                [GuideStyle::Elbow, GuideStyle::Straight, GuideStyle::OnHover][style];
+        }
+        let mut mark = self.chevron as usize;
+        if panel.choice(ui, "Disclosure mark", &["Triangle", "Chevron"], &mut mark) {
+            self.chevron = [ChevronStyle::Triangle, ChevronStyle::Chevron][mark];
+        }
         panel.toggle(ui, "A press on a row toggles it", &mut self.toggle_on_row);
         let mut enabled = !self.disabled;
         if panel.toggle(ui, "Enabled", &mut enabled) {
@@ -224,6 +272,33 @@ const SCENES: &[UiScene] = &[
         expect: Expect::Settled,
     },
     settled("tree-view-expanded", 2, one_open),
+    settled("tree-view-straight", 2, straight),
+    // The guides fade in while the pointer is over the tree (120 ms, `hover`), settled by 300 ms.
+    UiScene {
+        id: "tree-view-on-hover",
+        scale: 2.0,
+        tier: MotionTier::Full,
+        state: on_hover,
+        script: &[Step {
+            at_ms: 100,
+            events: &[Ev::PointerAt(SECOND_ROW.0, SECOND_ROW.1)],
+        }],
+        capture_ms: 400,
+        expect: Expect::Settled,
+    },
+    // The thin chevron: the hovered row's brighter than the resting rows'.
+    UiScene {
+        id: "tree-view-chevron",
+        scale: 2.0,
+        tier: MotionTier::Full,
+        state: chevron,
+        script: &[Step {
+            at_ms: 100,
+            events: &[Ev::PointerAt(SECOND_ROW.0, SECOND_ROW.1)],
+        }],
+        capture_ms: 400,
+        expect: Expect::Settled,
+    },
     // The expand is base (250 ms): half way 125 ms after the key.
     UiScene {
         id: "tree-view-expand-mid",

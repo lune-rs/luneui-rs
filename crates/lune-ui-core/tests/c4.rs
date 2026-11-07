@@ -1283,7 +1283,7 @@ mod m7 {
     use lune_ui_core::widgets::split_panes::{Pane, SplitOptions, SplitSide};
     use lune_ui_core::widgets::toast::{ToastAction, ToastKind, ToastSpec, Toasts};
     use lune_ui_core::widgets::tone::Tone;
-    use lune_ui_core::widgets::tree_view::{TreeOptions, TreeRow};
+    use lune_ui_core::widgets::tree_view::{ChevronStyle, GuideStyle, TreeOptions, TreeRow};
 
     const M7_WIN: (f32, f32) = (1240.0, 900.0);
     const RAIL: Rect = Rect::new(0.0, 0.0, 48.0, 420.0);
@@ -1505,6 +1505,8 @@ mod m7 {
                         rows: &TREE_ROWS,
                         label: "Project",
                         guides: true,
+                        guide_style: GuideStyle::Elbow,
+                        chevron: ChevronStyle::Triangle,
                         toggle_on_row: false,
                     },
                     |_, _| {},
@@ -3523,7 +3525,7 @@ mod nested_wheel {
     use lune_ui_core::widgets::text_area::AreaOptions;
     use lune_ui_core::widgets::toast::{ToastKind, ToastSpec, Toasts};
     use lune_ui_core::widgets::tone::Tone;
-    use lune_ui_core::widgets::tree_view::{TreeOptions, TreeRow};
+    use lune_ui_core::widgets::tree_view::{ChevronStyle, GuideStyle, TreeOptions, TreeRow};
     use lune_ui_core::widgets::virtual_list::{Heights, ListOptions, RowKey, SelectionMode};
 
     /// F11: two non-modal overlays on one layer. The wheel over the part where the later one
@@ -3700,6 +3702,8 @@ mod nested_wheel {
                 rows: &rows,
                 label: "Files",
                 guides: false,
+                guide_style: GuideStyle::Elbow,
+                chevron: ChevronStyle::Triangle,
                 toggle_on_row: false,
             };
             ui.tree_view("t", INNER, &o, |_, _| {});
@@ -3966,6 +3970,7 @@ mod m10 {
     use lune_ui_core::widgets::tab_strip::{BusyCue, Tab, TabKey, TabStripOptions};
     use lune_ui_core::widgets::toast::{ToastKind, ToastSpec, Toasts};
     use lune_ui_core::widgets::tone::Tone;
+    use lune_ui_core::widgets::tree_view::{ChevronStyle, GuideStyle, TreeOptions, TreeRow};
     use std::time::Duration;
 
     type Rgb = [u8; 3];
@@ -4037,6 +4042,7 @@ mod m10 {
         surface_selected,
         border,
         border_subtle,
+        tree_guide,
         accent,
         scroll_thumb,
         scroll_thumb_hover,
@@ -4499,6 +4505,44 @@ mod m10 {
                         no_data: false,
                     },
                 );
+                // A tree with a nested level: the guides (`tree_guide`) and a mark.
+                let rows = [
+                    TreeRow {
+                        key: 1,
+                        depth: 0,
+                        text: "src",
+                        glyph: None,
+                        has_children: true,
+                    },
+                    TreeRow {
+                        key: 2,
+                        depth: 1,
+                        text: "main.rs",
+                        glyph: None,
+                        has_children: false,
+                    },
+                    TreeRow {
+                        key: 3,
+                        depth: 1,
+                        text: "lib.rs",
+                        glyph: None,
+                        has_children: false,
+                    },
+                ];
+                ui.tree_state("audit-tree").expanded.insert(1);
+                ui.tree_view(
+                    "audit-tree",
+                    Rect::new(560.0, 400.0, 260.0, 120.0),
+                    &TreeOptions {
+                        rows: &rows,
+                        label: "Audit",
+                        guides: true,
+                        guide_style: GuideStyle::Elbow,
+                        chevron: ChevronStyle::Triangle,
+                        toggle_on_row: false,
+                    },
+                    |_, _| {},
+                );
             }
             2 => {
                 let title = [text("Guide")];
@@ -4960,7 +5004,7 @@ mod m10 {
     fn the_audit_theme_has_a_colour_no_preset_field_has_in_every_field() {
         let (t, p) = (fields(&distinct()), fields(&DARK));
         assert_eq!(t.len(), p.len());
-        assert_eq!(t.len(), 65, "the colour fields of `Theme`");
+        assert_eq!(t.len(), 66, "the colour fields of `Theme`");
         for (i, (name, c)) in t.iter().enumerate() {
             assert_ne!(*c, p[i].1, "{name}");
             for (_, q) in &p {

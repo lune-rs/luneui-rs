@@ -36,7 +36,7 @@ use lune_ui::tray::TrayState;
 use lune_ui::ui::{Ui, UiStore, WidgetId};
 use lune_ui::widgets::field::{FieldOptions, Variant};
 use lune_ui::widgets::scroll_area::{Extent, ScrollOptions};
-use lune_ui::widgets::tree_view::{TreeOptions, TreeRow};
+use lune_ui::widgets::tree_view::{ChevronStyle, GuideStyle, TreeOptions, TreeRow};
 
 use crate::page::{
     Ev, Expect, FrameTweaks, Page, PageKind, PageState, Scope, Stage, Step, UiPage, UiScene,
@@ -421,6 +421,8 @@ impl Showcase {
             rows: &tree_rows,
             label: "Components",
             guides: true,
+            guide_style: GuideStyle::Elbow,
+            chevron: ChevronStyle::Triangle,
             toggle_on_row: true,
         };
         let out = ui.tree_view(key, lay.tree, &opts, |_, _| {});

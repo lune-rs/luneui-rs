@@ -107,6 +107,9 @@ catalogue tables cite one place.
 | toast expand | expand | the toast's height to show its log; text wrapped once at the target width | base | sine-in-out | snap | [D40], [D146] |
 | menu row hover | hover | the row's fill | instant | linear | keep | [D40], [D141] |
 | tree expand | expand | the child block's clip height; one block in motion, another toggle snaps it | base | sine-in-out | snap | [D40], [D151] |
+| tree mark turn | expand | the disclosure mark's angle, 0 deg closed to 90 deg open, about its centre; it is the block's own fraction, so it lands with the rows; with no block (Reduced, Off, an app change of several rows) the mark is at 0 or 90 deg, no transform | base | sine-in-out | snap | [D40], [D271] |
+| tree guide fade | hover | the `OnHover` guides' opacity, 0 with the pointer off the tree, 1 on it | instant | linear | keep | [D40], [D271] |
+| tree chevron hover | hover | the `Chevron` mark's colour, `fg_tertiary` to `fg_secondary` on row hover | instant | linear | keep | [D40], [D271] |
 
 The expand duration is the kind's default, `base` (the entry's question on it is answered: no
 separate token). Off snaps every row above.

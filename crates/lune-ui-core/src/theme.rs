@@ -27,6 +27,9 @@ pub struct Theme {
     pub surface_selected: Rgba,
     pub border: Rgba,
     pub border_subtle: Rgba,
+    /// A tree view's indent guides: white at 0x14 (about 8%), quieter than `border` (R15, D11:
+    /// provisional). A toolkit value, not a file key.
+    pub tree_guide: Rgba,
     pub accent: Rgba,
     /// The scrollbar thumb: `accent` at alpha 0x8C (Wane's `--scroll-thumb`).
     pub scroll_thumb: Rgba,
@@ -296,6 +299,7 @@ pub mod lunegit_dark {
         surface_selected: [0xFF, 0xFF, 0xFF, 0x18],
         border: [0xFF, 0xFF, 0xFF, 0x30],
         border_subtle: [0xFF, 0xFF, 0xFF, 0x1A],
+        tree_guide: [0xFF, 0xFF, 0xFF, 0x14],
         accent: [0x76, 0x7D, 0x85, 0xFF],
         scroll_thumb: [0x76, 0x7D, 0x85, 0x8C],
         scroll_thumb_hover: [0x76, 0x7D, 0x85, 0xE6],

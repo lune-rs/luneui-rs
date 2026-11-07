@@ -13,7 +13,7 @@ summary: Tree rows with guide lines (trunk and rounded elbow) per depth; expansi
 
 Tree rows with guide lines. `TreeGuideControl` draws the trunk and rounded elbow per row, in a 16 px indent per depth [L src/Lunegit.Desktop/Controls/TreeGuideControl.cs:15-21]. Expansion is a per-row flag in Lunegit's view model [L src/Lunegit.Desktop/ViewModels/SidePanelRow.cs:29-41]; the toolkit keeps expansion as a set of node keys (plan contract, Retained state).
 
-`Ui::tree_view(key, rect, &TreeOptions { rows, label, guides, toggle_on_row }, cells) -> TreeResponse { response, activated, toggled, context }` [D151]: the app passes pre-order `TreeRow { key, depth, text, glyph, has_children }`; the toolkit derives what is visible, last-child and the ancestor lines in one walk per frame and builds only the rows in view. `cells(ui, &TreeRowCtx)` draws the right side of a row (it is not called for a row in a moving block, and the text is cut at the row's edge, so a cell that needs room gets it from short names). `Ui::tree_state(key)` is the retained `TreeState { expanded, selected, cursor }`, with `retain`.
+`Ui::tree_view(key, rect, &TreeOptions { rows, label, guides, guide_style, chevron, toggle_on_row }, cells) -> TreeResponse { response, activated, toggled, context }` [D151]: the app passes pre-order `TreeRow { key, depth, text, glyph, has_children }`; the toolkit derives what is visible, last-child and the ancestor lines in one walk per frame and builds only the rows in view. `cells(ui, &TreeRowCtx)` draws the right side of a row (it is not called for a row in a moving block, and the text is cut at the row's edge, so a cell that needs room gets it from short names). `Ui::tree_state(key)` is the retained `TreeState { expanded, selected, cursor }`, with `retain`.
 
 ## Needs
 
@@ -25,7 +25,7 @@ Tree rows with guide lines. `TreeGuideControl` draws the trunk and rounded elbow
 
 ## Existing code
 
-`crates/lune-ui-core/src/widgets/tree_view.rs` (`Ui::tree_view`, `Ui::tree_state`, `TreeRow`, `TreeOptions`, `TreeRowCtx`, `TreeResponse`, `TreeState`, `guide_paths`), on `Ui::scroll_area_untranslated` (rows are placed in `f64`, as in the virtual list). Tests: `crates/lune-ui-core/tests/widget_tree_view.rs`. Page: `apps/gallery/src/pages/tree_view.rs`.
+`crates/lune-ui-core/src/widgets/tree_view.rs` (`Ui::tree_view`, `Ui::tree_state`, `TreeRow`, `TreeOptions`, `TreeRowCtx`, `TreeResponse`, `TreeState`, `guide_paths`), on `Ui::scroll_area_untranslated` (rows are placed in `f64`, as in the virtual list). `GuideStyle`, `ChevronStyle`, `straight_paths`. Tests: `crates/lune-ui-core/tests/widget_tree_view.rs`. Page: `apps/gallery/src/pages/tree_view.rs`.
 
 Lunegit (`/Users/ijat/Projects/AvaloniaApps/Project Lunegit`, HEAD 33a1dd4), paths relative to the repo root:
 - `src/Lunegit.Desktop/Controls/TreeGuideControl.cs`
@@ -42,16 +42,16 @@ Pinned: Lunegit 33a1dd41, Wane 69931d6, this repo fa2958b. Read: Lunegit `src/Lu
 (side-panel row hover; no expand selector: `grep -n -i expand` empty). Wane `docs/ui/components.md:263-276`.
 Conflicts (winner):
 - Guide x: Wane "guide at x 16" [W docs/ui/components.md:263-276] vs the Lunegit guide drawn at the column centre, 8 px ([L src/Lunegit.Desktop/Controls/TreeGuideControl.cs:19] `ColumnCenter = 8`) inside each 16 px indent. Lunegit wins: it is the source the guide drawing comes from (PD6).
-- Guide colour: Wane `--border` (no value in the mock text); Lunegit `TreeGuideLine` #30FFFFFF [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:101]; the repo `border` token is #FFFFFF30 [R crates/lune-ui-core/src/theme.rs:62]. All three use alpha 0x30; the repo token is used.
+- Guide colour: Wane `--border` (no value in the mock text); Lunegit `TreeGuideLine` #30FFFFFF [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:101]. All three use alpha 0x30, and the port used `border`. The user found that "too bright" (R15): the guides now read the toolkit token `tree_guide`, #FFFFFF14 (about 8%), a deliberate deviation from Lunegit [D271], provisional until the look review (D11).
 - No moved code: the Lunegit draw is the only source of the guide shape.
 
 ### Anatomy
 
 - Row: 28 high; radius 6; left padding 8 + depth × 16 [W docs/ui/components.md:263-276].
 - Indent: 16 per depth [L src/Lunegit.Desktop/Controls/TreeGuideControl.cs:18] (`IndentWidth`).
-- Guide: 1 px `border`, round caps and joins [L src/Lunegit.Desktop/Controls/TreeGuideControl.cs:20,201]; trunk at column centre 8 [L src/Lunegit.Desktop/Controls/TreeGuideControl.cs:19]. From the row's left edge: `elbowX = floor((depth-1)*16 + 8) + 0.5`, `stubRight = depth*16`, `cy = h/2`, `r = min(3.5, (stubRight - elbowX)/2, cy)`; an ancestor column k at `floor(k*16 + 8) + 0.5`, full height [L src/Lunegit.Desktop/Controls/TreeGuideControl.cs:136-190]. The painter's stroke has square ends: at a row boundary two ends meet with no overlap, and the stub's free end gets its round cap as a half disc past it. Lunegit strokes all of a row's lines as one geometry so the translucent colour does not double at the junction; the painter has no union, so the branch is drawn from the trunk's edge instead [R crates/lune-ui-core/src/widgets/tree_view.rs `clear_of_trunk`]. `guide_paths` gives the lines of the formulas.
+- Guide: 1 px `tree_guide`, round caps and joins [L src/Lunegit.Desktop/Controls/TreeGuideControl.cs:20,201]; trunk at column centre 8 [L src/Lunegit.Desktop/Controls/TreeGuideControl.cs:19]. From the row's left edge: `elbowX = floor((depth-1)*16 + 8) + 0.5`, `stubRight = depth*16`, `cy = h/2`, `r = min(3.5, (stubRight - elbowX)/2, cy)`; an ancestor column k at `floor(k*16 + 8) + 0.5`, full height [L src/Lunegit.Desktop/Controls/TreeGuideControl.cs:136-190]. The painter's stroke has square ends: at a row boundary two ends meet with no overlap, and the stub's free end gets its round cap as a half disc past it. Lunegit strokes all of a row's lines as one geometry so the translucent colour does not double at the junction; the painter has no union, so the branch is drawn from the trunk's edge instead [R crates/lune-ui-core/src/widgets/tree_view.rs `clear_of_trunk`]. `guide_paths` gives the lines of the formulas.
 - Elbow: 8 wide × 14 high with radius 3.5 [W docs/ui/components.md:263-276], [L src/Lunegit.Desktop/Controls/TreeGuideControl.cs:21], Lunegit's quadratic curve.
-- Chevron slot 14, on every row when any row has children, after the left padding, then 4; `icon::CHEVRON_RIGHT` or `CHEVRON_DOWN` in `fg_tertiary`; a section header's chevron is 14 [L src/Lunegit.Desktop/Views/SidePanels/BranchesPanelView.axaml:149-151]. Glyph 14 in `fg_secondary`, then 6. Text `font_base`, `fg_primary` (`fg_bright` selected). The gaps have no source; the visual batch may change `CHEVRON_GAP` and `GLYPH_GAP`.
+- Mark slot 14 (`CHEVRON`), on every row when any row has children, after the left padding, then 4; a section header's chevron is 14 [L src/Lunegit.Desktop/Views/SidePanels/BranchesPanelView.axaml:149-151]. The mark is drawn by the tree, not a glyph (R15, [D271]): `ChevronStyle::Triangle` (default) is a solid triangle by `fill_path` in `fg_tertiary`, 6 wide by 8 tall pointing right (a file manager's list-view disclosure triangle); `ChevronStyle::Chevron` is the old `>` as a 1.25 px stroke inside a 10 px box, `fg_tertiary` at rest and `fg_secondary` while the row is hovered. Both are centred on the slot horizontally and on the label's x-height line vertically (`MARK_DROP` below the row's centre), and turn about that centre from 0 deg (closed) to 90 deg (open). Glyph 14 in `fg_secondary`, then 6. Text `font_base`, `fg_primary` (`fg_bright` selected). The gaps have no source; the visual batch may change `CHEVRON_GAP` and `GLYPH_GAP`.
 - Has-next: the trunk continues to the next sibling [W docs/ui/components.md:263-276].
 - Parts: name 13; model RznMono 11 tertiary; tokens 11; cost RznMono 13 right-aligned, min 72 [W docs/ui/components.md:263-276].
 
@@ -73,6 +73,9 @@ Conflicts (winner):
 |---|---|---|---|---|---|---|
 | expand or collapse | container height (children enter or leave) | expand | base | sine-in-out | snap | [D40], [L .claude/docs/animation-rules.md:84] |
 | rest ↔ hover | row fill | hover | instant | linear | keep | [L src/Lunegit.Desktop/Themes/Animations.axaml:125-130] |
+| expand or collapse | the mark's angle, 0 to 90 deg (the block's own fraction) | expand | base | sine-in-out | snap (no transform) | [D271], docs/motion.md "tree mark turn" |
+| pointer enters or leaves the tree (`GuideStyle::OnHover`) | guide opacity | hover | instant | linear | keep (Reduced fades, Off snaps) | [D271] |
+| rest ↔ row hover (`ChevronStyle::Chevron`) | the mark's colour | hover | instant | linear | keep | [D271] |
 | selection change | row fill | selection | fast | linear | keep | as the list |
 
 Expand animates the container, never the rows: rows are not animated per row (motion.md list, [L .claude/docs/animation-rules.md:145]).
@@ -111,6 +114,11 @@ Never animated: the per-row expand, virtualized rows during scroll [L .claude/do
 
 None: row names and costs are app text.
 
+### Guide and mark styles (R15, D271)
+
+- `GuideStyle::Elbow` (default): the trunk and rounded elbow above. `Straight`: one full height line per depth above the row, at the column of each (`straight_paths`), whether or not the ancestor is the last child: no elbow, no stub. `OnHover`: the elbow lines at an opacity that follows the pointer over the tree's rect; at 0 nothing is recorded. `guides: false` wins over every style.
+- `ChevronStyle::Triangle` (default) and `Chevron`: see Anatomy. The shell's sidebar tree takes the defaults. The gallery's knobs on the page expose both.
+
 ### Gallery scenes
 
 - `tree-view-depth` (new, at 2x and 1x): three depths with guides and has-next, settled.
@@ -120,10 +128,13 @@ None: row names and costs are app text.
 - `tree-view-selected` (new): one row selected, settled.
 - `tree-view-disabled` (new): the tree in a disabled scope (0.4 opacity), a row selected, the pointer on a row, Tab and Down pressed: no hover fill, no ring, settled.
 - `tree-view-focus` (new): the ring on the cursor's row, settled.
+- `tree-view-straight` (new): `GuideStyle::Straight`, settled.
+- `tree-view-on-hover` (new): `GuideStyle::OnHover`, the pointer on the second row, settled (the elbow fully in).
+- `tree-view-chevron` (new): `ChevronStyle::Chevron`, the pointer on the second row: one hovered chevron beside resting ones.
 
 ### Painter primitives
 
-- Existing: fill, fill_radii, stroke, text. [R crates/lune-ui-core/src/paint.rs]
+- Existing: fill, fill_radii, fill_path (the triangle), stroke, text. [R crates/lune-ui-core/src/paint.rs]
 - New: none.
 - The elbow is a polyline through `stroke`; the round cap is a `fill_radii` half disc.
 
