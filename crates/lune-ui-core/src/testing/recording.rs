@@ -4,15 +4,13 @@ use crate::scene::{
     BackdropRequest, CustomItem, FrameParams, ImageItem, Scene, Shape, StrokeVertex, TextItem,
 };
 
-/// `scene` with every overlay folded into its fixed layer ([`Scene::merged`]) and the backdrop's
-/// tag cleared: the scene [`Painter::on`](crate::paint::Painter::on) would have built from the same
+/// `scene` with every overlay folded into its fixed layer ([`Scene::merged`]): the scene [`Painter::on`](crate::paint::Painter::on) would have built from the same
 /// draws, to compare what an overlay draws with what the Painter API draws.
 pub fn flattened(scene: &Scene) -> Scene {
     use crate::scene::LayerId::{Base, Modal, Page, Popup, Raised, Toast};
     Scene {
         layers: [Base, Page, Popup, Modal, Raised, Toast].map(|id| scene.merged(id)),
         overlays: Vec::new(),
-        backdrop: scene.backdrop.map(|b| BackdropRequest { tag: 0, ..b }),
     }
 }
 
@@ -46,7 +44,8 @@ pub enum DrawCall {
         layer: usize,
         vertices: Vec<StrokeVertex>,
     },
-    /// The blurred backdrop, drawn after the layers below [`Scene::split`] and before the rest.
+    /// One blurred backdrop, drawn before its layer, or at [`Scene::floor`] when its layer is
+    /// below that.
     Backdrop(BackdropRequest),
 }
 
@@ -93,11 +92,12 @@ impl RecordingRenderer {
     /// Records one frame of `scene` drawn at `params`.
     pub fn render(&mut self, scene: &Scene, params: &FrameParams) {
         let mut calls = Vec::new();
+        let floor = scene.floor();
+        let mut waiting = Vec::new();
         for (i, layer) in scene.in_order().into_iter().enumerate() {
-            if i == scene.split()
-                && let Some(b) = scene.backdrop
-            {
-                calls.push(DrawCall::Backdrop(b));
+            waiting.extend(layer.backdrops.iter().copied().map(DrawCall::Backdrop));
+            if i >= floor {
+                calls.append(&mut waiting);
             }
             let g = &layer.geometry;
             let shapes = |v: &[Shape], f: fn(usize, Shape) -> DrawCall| {

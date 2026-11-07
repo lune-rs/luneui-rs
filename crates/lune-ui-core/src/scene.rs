@@ -8,11 +8,11 @@
 //!   their calls fell in the frame, so a kind never interleaves across overlays;
 //! - inside a layer: the acrylic shapes, the under shapes, the path fills, the custom items (in
 //!   record order), the images (in record order), the text, the over shapes, the strokes;
-//! - the layers before [`Scene::split`] in that order render into an offscreen scene, the one a
-//!   backdrop blurs; that scene is then copied to the target, the [`BackdropRequest`] (if any) is
-//!   drawn over it, and the remaining layers follow. The split is at the fixed layer
-//!   [`SCENE_LAYERS`], or at the backdrop's own layer when that is later, so a glass surface
-//!   blurs everything drawn before it.
+//! - a layer with [`BackdropRequest`]s is a stop: everything drawn before it is blurred, its
+//!   requests draw over that, and the layer follows, so a glass surface blurs everything drawn
+//!   before it, other glass included. The layers before [`Scene::floor`] always render offscreen:
+//!   a request on one of them stops at the floor instead. Up to the last stop the frame renders
+//!   into an offscreen scene; that is then copied to the target and the rest draws there.
 
 use crate::image::{Fit, ImageAlign, ImageId};
 use crate::paint::Rect;
@@ -39,7 +39,7 @@ pub enum LayerId {
 
 pub const LAYER_COUNT: usize = 6;
 
-/// The layers always drawn to the offscreen scene (see [`Scene::split`]): those under popups, so a
+/// The layers always drawn to the offscreen scene (see [`Scene::floor`]): those under popups, so a
 /// glass menu can blur them.
 pub const SCENE_LAYERS: usize = 2;
 
@@ -164,6 +164,9 @@ pub struct Layer {
     pub customs: Vec<CustomItem>,
     /// Image draws, in record order; drawn after the customs, before the text.
     pub images: Vec<ImageItem>,
+    /// Blurred-backdrop regions, in record order; each blurs what is drawn before this layer and
+    /// draws under everything of it.
+    pub backdrops: Vec<BackdropRequest>,
 }
 
 impl Layer {
@@ -178,6 +181,7 @@ impl Layer {
         self.texts.extend_from_slice(&other.texts);
         self.customs.extend_from_slice(&other.customs);
         self.images.extend_from_slice(&other.images);
+        self.backdrops.extend_from_slice(&other.backdrops);
     }
 }
 
@@ -187,11 +191,6 @@ pub struct BackdropRequest {
     pub rect: [f32; 4],
     pub radius: f32,
     pub alpha: f32,
-    /// The index of the fixed layer the region sits under, with `tag` naming the overlay on it
-    /// (0 for the fixed layer itself): everything drawn before that layer is blurred.
-    pub layer: usize,
-    /// The overlay the region belongs to, as [`OverlayLayer::tag`]; 0 for none.
-    pub tag: u32,
     /// Gaussian σ of this blur, as [`FrameParams::blur_sigma`]; 0 means the frame's.
     pub sigma: f32,
     /// Saturation boost of this blur, as [`FrameParams::saturation`]; 0 means the frame's.
@@ -208,17 +207,13 @@ pub struct OverlayLayer {
     pub layer: Layer,
 }
 
-/// One painted frame: every layer, and the glass backdrop request. [`Self::in_order`] is the draw
-/// order.
+/// One painted frame: every layer. [`Self::in_order`] is the draw order.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Scene {
     /// What was drawn on each [`LayerId`] outside any overlay, indexed by `id as usize`.
     pub layers: [Layer; LAYER_COUNT],
     /// What each overlay drew, in first-drawn order, which need not be draw order.
     pub overlays: Vec<OverlayLayer>,
-    /// Blurred-backdrop region requested by a glass surface (physical px). One per frame: of two
-    /// requests the lower layer keeps it, and on one layer the last wins.
-    pub backdrop: Option<BackdropRequest>,
 }
 
 impl Scene {
@@ -253,20 +248,17 @@ impl Scene {
         out
     }
 
-    /// How many layers of [`Self::in_order`] draw to the offscreen scene, before the backdrop: those
-    /// before the fixed layer [`SCENE_LAYERS`], or before the backdrop's own layer when that is
-    /// later.
-    pub fn split(&self) -> usize {
-        let floor = self.position(SCENE_LAYERS, 0);
-        self.backdrop
-            .map_or(floor, |b| self.position(b.layer, b.tag).max(floor))
+    /// Every backdrop request of the frame, in draw order.
+    pub fn backdrops(&self) -> impl Iterator<Item = &BackdropRequest> {
+        self.in_order().into_iter().flat_map(|l| &l.backdrops)
     }
 
-    /// Where the fixed layer `on` (`tag` 0) or its overlay `tag` comes in [`Self::in_order`].
-    fn position(&self, on: usize, tag: u32) -> usize {
-        let before = self.overlays.iter();
-        let before = before.filter(|o| (o.on as usize, o.tag) < (on, tag));
-        on + usize::from(tag > 0) + before.count()
+    /// How many layers of [`Self::in_order`] always draw to the offscreen scene: those before the
+    /// fixed layer [`SCENE_LAYERS`]. The first stop a request can make is this place, so a request
+    /// on one of those layers blurs them all and draws over them.
+    pub fn floor(&self) -> usize {
+        let below = self.overlays.iter();
+        SCENE_LAYERS + below.filter(|o| (o.on as usize) < SCENE_LAYERS).count()
     }
 }
 

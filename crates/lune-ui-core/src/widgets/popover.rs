@@ -300,7 +300,7 @@ mod tests {
             };
             menu_paint(&mut b, &[], &layout, &[]);
             assert!(a.scene == b.scene, "scale {scale}");
-            assert!(a.scene.backdrop.is_some());
+            assert!(a.scene.backdrops().next().is_some());
         }
     }
 

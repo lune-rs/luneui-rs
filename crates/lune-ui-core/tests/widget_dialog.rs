@@ -797,7 +797,7 @@ fn every_close_path_of_the_form_fires_once() {
 
 /// The blur request of a frame, or `None`.
 fn blur_of(scene: &Scene) -> Option<lune_ui_core::scene::BackdropRequest> {
-    scene.backdrop
+    scene.backdrops().next().copied()
 }
 
 #[test]
@@ -810,7 +810,7 @@ fn the_scrim_blur_asks_for_the_window_at_sigma_eight_on_the_modal_layer() {
     let mut h = opened_with(&d, &BLUR);
     let (scene, _, _, _) = frame_with(&mut h, Some((&d, &BLUR)));
     let b = blur_of(&scene).expect("the blur is asked for");
-    assert_eq!(b.layer, LayerId::Modal as usize);
+    assert_eq!(scene.merged(LayerId::Modal).backdrops, [b], "on the dialog");
     assert_eq!((b.sigma, b.saturation), (8.0, 1.0));
     assert_eq!(b.rect, [0.0, 0.0, WIN.0, WIN.1]);
     assert_eq!(b.radius, 0.0);
@@ -818,8 +818,6 @@ fn the_scrim_blur_asks_for_the_window_at_sigma_eight_on_the_modal_layer() {
     // The scrim keeps its colour over the blur.
     let scrim = scene.merged(LayerId::Modal).geometry.under[0];
     assert_eq!(scrim.color, premul(DARK.dialog_backdrop));
-    // The dialog's own layer comes right after the fixed `Modal` layer in the draw order.
-    assert_eq!(scene.split(), LayerId::Modal as usize + 1);
 }
 
 #[test]
@@ -857,10 +855,7 @@ fn the_blur_fades_with_the_scrim_opening_and_closing() {
     let (b, s) = fade_of(&scene);
     assert!(b > 0.0 && b < 1.0, "closing: {b}");
     assert!((b - s).abs() < 1e-5, "{b} vs {s}");
-    assert_eq!(
-        blur_of(&scene).map(|b| b.layer),
-        Some(LayerId::Modal as usize)
-    );
+    assert_eq!(scene.merged(LayerId::Modal).backdrops.len(), 1);
     h.at_ms(3180);
     let (scene, _, _, _) = frame_with(&mut h, None);
     assert_eq!(blur_of(&scene), None, "gone with the dialog");
@@ -905,15 +900,18 @@ fn raised_menu_fill(scene: &Scene) -> bool {
 }
 
 #[test]
-fn a_glass_menu_above_a_blurred_scrim_loses_the_blur_and_draws_its_fill() {
+fn a_glass_menu_above_a_blurred_scrim_keeps_a_blur_of_its_own() {
     let mut h = UiHarness::new(WIN);
     menu_frame(&mut h, &BLUR);
     h.at_ms(1000);
     menu_frame(&mut h, &BLUR);
     let scene = menu_frame(&mut h, &BLUR);
-    let b = blur_of(&scene).expect("one blur");
-    assert_eq!(b.layer, LayerId::Modal as usize, "the lower layer keeps it");
-    assert_eq!(b.sigma, 8.0, "the scrim's sigma, not the menu's");
+    let scrim = &scene.merged(LayerId::Modal).backdrops;
+    assert_eq!(scrim.len(), 1);
+    assert_eq!(scrim[0].sigma, 8.0, "the scrim's sigma");
+    let menu = &scene.merged(LayerId::Raised).backdrops;
+    assert_eq!(menu.len(), 1);
+    assert_eq!(menu[0].sigma, 0.0, "the frame's sigma, for the menu");
     assert!(
         raised_menu_fill(&scene),
         "the menu still draws its fill, on Raised"
@@ -924,9 +922,9 @@ fn a_glass_menu_above_a_blurred_scrim_loses_the_blur_and_draws_its_fill() {
     h.at_ms(1000);
     menu_frame(&mut h, &DialogOptions::default());
     let scene = menu_frame(&mut h, &DialogOptions::default());
-    let b = blur_of(&scene).expect("the menu's blur");
-    assert_eq!(b.layer, LayerId::Raised as usize);
-    assert_eq!(b.sigma, 0.0, "the frame's sigma");
+    assert_eq!(scene.backdrops().count(), 1, "the menu's blur");
+    let menu = &scene.merged(LayerId::Raised).backdrops;
+    assert_eq!(menu[0].sigma, 0.0, "the frame's sigma");
     assert!(raised_menu_fill(&scene));
 }
 

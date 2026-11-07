@@ -1,6 +1,6 @@
 //! The blur lab: a glass panel over content that moves, so what the backdrop blur does to edges
 //! and colour is visible frame by frame. Sigma and saturation are the frame's, set in the
-//! settings pane. The lab owns the frame's one backdrop; the shell asks for none.
+//! settings pane. The lab owns the frame's backdrop; the shell asks for none.
 
 use std::time::Duration;
 
@@ -182,16 +182,12 @@ mod tests {
     use lune_ui::testing::FakeText;
 
     #[test]
-    fn the_panel_asks_for_the_frames_one_backdrop_over_the_page() {
+    fn the_panel_asks_for_a_backdrop_over_the_page() {
         let mut p = player("lab-blur", live());
         p.frame(&mut FakeText, 0, &[]).expect("frame");
         let (scene, out) = p.frame(&mut FakeText, 16, &[]).expect("frame");
-        let b = scene.backdrop.expect("a backdrop");
-        assert_eq!(
-            b.layer,
-            LayerId::Popup as usize,
-            "everything below is blurred"
-        );
+        // On Popup: everything below is blurred.
+        let b = scene.merged(LayerId::Popup).backdrops[0];
         // The region is the panel, inside the canvas.
         let (x, y, w, h) = (b.rect[0], b.rect[1], b.rect[2], b.rect[3]);
         assert!(

@@ -500,7 +500,10 @@ fn the_menu_card_fills_the_window() {
     let (scene, ..) = draw(&mut ui, 600, true);
     let card = scene.merged(LayerId::Popup).geometry.under[0].rect;
     assert_eq!(card, [0.0, 0.0, w, h]);
-    assert!(scene.backdrop.is_some(), "a glass card asks for the blur");
+    assert!(
+        scene.backdrops().next().is_some(),
+        "a glass card asks for the blur"
+    );
 }
 
 #[test]
@@ -628,7 +631,10 @@ fn the_window_menu_opens_and_closes_with_the_menus_motion_and_goes_idle() {
         let (scene, _, out) = draw(&mut h, t, false);
         if let Some(s) = scene.merged(LayerId::Popup).geometry.under.first() {
             alphas.push(s.color[3]);
-            assert!(scene.backdrop.is_some(), "the blur goes with the fade");
+            assert!(
+                scene.backdrops().next().is_some(),
+                "the blur goes with the fade"
+            );
         }
         if out.repaint == Repaint::Idle {
             break;
@@ -640,5 +646,8 @@ fn the_window_menu_opens_and_closes_with_the_menus_motion_and_goes_idle() {
     assert_eq!(alphas.len(), 12);
     assert!(alphas.windows(2).all(|w| w[1] <= w[0]));
     let (scene, ..) = draw(&mut h, t + 50, false);
-    assert!(scene.backdrop.is_none(), "gone once the close is over");
+    assert!(
+        scene.backdrops().next().is_none(),
+        "gone once the close is over"
+    );
 }

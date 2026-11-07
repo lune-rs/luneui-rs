@@ -370,8 +370,7 @@ fn pixel_probes_at_scale_2() {
         "12 device px above"
     );
     // The backdrop sits under the popup layer, over the card.
-    let b = scene.backdrop.expect("a glass card asks for the blur");
-    assert_eq!(b.layer, LayerId::Popup as usize);
+    let b = scene.merged(LayerId::Popup).backdrops[0];
     assert_eq!(b.rect, fill.rect);
     assert_eq!(b.radius, 18.0);
 }
@@ -474,14 +473,21 @@ fn a_closing_flyout_replays_its_blur_with_the_fade() {
     let f = serving();
     let mut h = opened(&f);
     let (scene, ..) = draw(&mut h, 600, Some(&f));
-    let open = scene.backdrop.expect("blur while open");
+    let open = scene.backdrops().next().copied().expect("blur while open");
     let (scene, _, out) = draw(&mut h, 1000, None);
-    let closing = scene.backdrop.expect("blur while closing");
+    let closing = scene
+        .backdrops()
+        .next()
+        .copied()
+        .expect("blur while closing");
     assert_eq!(closing.rect[2], open.rect[2]);
     assert!(closing.alpha <= open.alpha);
     assert_eq!(out.repaint, Repaint::Now);
     let (scene, ..) = draw(&mut h, 1200, None);
-    assert!(scene.backdrop.is_none(), "gone once the close is over");
+    assert!(
+        scene.backdrops().next().is_none(),
+        "gone once the close is over"
+    );
 }
 
 #[test]
@@ -655,7 +661,11 @@ fn a_window_flyout_card_fills_the_window_at_the_three_states() {
         let (scene, ..) = win_draw(&mut ui, 600, Some(&f));
         // The card is the window: its size, at the origin, whatever the anchor says.
         assert_eq!(card(&scene), [0.0, 0.0, w, h], "{state}");
-        let b = scene.backdrop.expect("a glass card asks for the blur");
+        let b = scene
+            .backdrops()
+            .next()
+            .copied()
+            .expect("a glass card asks for the blur");
         assert_eq!(b.rect, [0.0, 0.0, w, h], "{state}");
     }
 }
@@ -759,7 +769,7 @@ fn win_close_run(tier: MotionTier) -> (u64, Vec<f32>, bool) {
         let (scene, _, out) = win_draw(&mut h, t, None);
         if let Some(s) = scene.merged(LayerId::Popup).geometry.under.first() {
             alphas.push(s.color[3]);
-            blurred &= scene.backdrop.is_some();
+            blurred &= scene.backdrops().next().is_some();
         }
         if out.repaint == Repaint::Idle {
             return (t - 1000, alphas, blurred);
@@ -805,9 +815,9 @@ fn a_window_flyout_opens_and_closes_with_the_menus_curves_and_goes_idle() {
     }
     // Stopped calling, it fades out; once the close is over the blur is gone.
     let (scene, ..) = win_draw(&mut h, 1200, None);
-    assert!(scene.backdrop.is_some());
+    assert!(scene.backdrops().next().is_some());
     let (scene, ..) = win_draw(&mut h, 1400, None);
-    assert!(scene.backdrop.is_none());
+    assert!(scene.backdrops().next().is_none());
 }
 
 #[test]

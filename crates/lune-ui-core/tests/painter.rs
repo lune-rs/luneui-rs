@@ -314,40 +314,68 @@ fn text_queries_forward_to_the_text_system() {
 }
 
 fn backdrop_of(f: impl Fn(&mut P<'_>)) -> Option<BackdropRequest> {
-    scene_of(f).backdrop
+    scene_of(f).backdrops().next().copied()
 }
 
 const LOW: Rect = Rect::new(10.0, 10.0, 40.0, 30.0);
 const HIGH: Rect = Rect::new(60.0, 10.0, 40.0, 30.0);
 
 #[test]
-fn of_two_backdrops_the_lower_layer_keeps_it_in_either_draw_order() {
-    let low_first = backdrop_of(|p| {
+fn backdrops_on_two_layers_both_stand_in_draw_order_whichever_came_first() {
+    let low_first = scene_of(|p| {
         p.on(LayerId::Popup);
         p.backdrop(LOW, 4.0);
         p.on(LayerId::Raised);
         p.backdrop(HIGH, 4.0);
     });
-    let high_first = backdrop_of(|p| {
+    let high_first = scene_of(|p| {
         p.on(LayerId::Raised);
         p.backdrop(HIGH, 4.0);
         p.on(LayerId::Popup);
         p.backdrop(LOW, 4.0);
     });
-    let want = LOW.phys(2.0);
-    assert_eq!(low_first.expect("one").rect, want);
-    assert_eq!(low_first, high_first);
-    assert_eq!(low_first.expect("one").layer, LayerId::Popup as usize);
+    for scene in [low_first, high_first] {
+        let rects: Vec<_> = scene.backdrops().map(|b| b.rect).collect();
+        assert_eq!(rects, [LOW.phys(2.0), HIGH.phys(2.0)]);
+        assert_eq!(scene.layers[LayerId::Popup as usize].backdrops.len(), 1);
+        assert_eq!(scene.layers[LayerId::Raised as usize].backdrops.len(), 1);
+    }
 }
 
 #[test]
-fn on_one_layer_the_last_backdrop_wins() {
-    let b = backdrop_of(|p| {
+fn backdrops_on_one_layer_both_stand_in_record_order() {
+    let scene = scene_of(|p| {
         p.on(LayerId::Popup);
         p.backdrop(LOW, 4.0);
         p.backdrop(HIGH, 4.0);
     });
-    assert_eq!(b.expect("one").rect, HIGH.phys(2.0));
+    let rects: Vec<_> = scene.backdrops().map(|b| b.rect).collect();
+    assert_eq!(rects, [LOW.phys(2.0), HIGH.phys(2.0)]);
+}
+
+#[test]
+fn a_backdrop_that_shows_nothing_records_nothing_but_still_replays() {
+    let invisible = xf((0.0, 0.0), 1.0, 0.0, 0.0);
+    let scene = scene_of(|p| {
+        p.backdrop(Rect::new(10.0, 10.0, 0.0, 30.0), 4.0);
+        p.backdrop(Rect::new(10.0, 10.0, 30.0, 0.0), 4.0);
+        p.push_xform(invisible);
+        p.backdrop(LOW, 4.0);
+        p.pop_xform();
+    });
+    assert_eq!(scene.backdrops().count(), 0);
+    // The op stays in a recording: it shows when replayed where it is visible.
+    let mut t1 = FakeText;
+    let mut rec = painter(&mut t1);
+    rec.push_xform(invisible);
+    rec.start_recording();
+    rec.backdrop(LOW, 4.0);
+    let ops = rec.take_recording();
+    assert_eq!(rec.scene.backdrops().count(), 0);
+    let mut t2 = FakeText;
+    let mut replayed = painter(&mut t2);
+    replayed.replay(&ops);
+    assert_eq!(replayed.scene.backdrops().count(), 1);
 }
 
 #[test]
@@ -358,12 +386,11 @@ fn a_backdrop_carries_the_current_layer_and_its_own_numbers() {
         LayerId::Raised,
         LayerId::Toast,
     ] {
-        let plain = backdrop_of(|p| {
+        let scene = scene_of(|p| {
             p.on(layer);
             p.backdrop(LOW, 4.0);
-        })
-        .expect("asked");
-        assert_eq!(plain.layer, layer as usize);
+        });
+        let plain = scene.layers[layer as usize].backdrops[0];
         assert_eq!((plain.sigma, plain.saturation), (0.0, 0.0), "the frame's");
     }
     let own = backdrop_of(|p| p.backdrop_with(LOW, 4.0, 8.0, 1.5)).expect("asked");
@@ -386,8 +413,8 @@ fn a_replayed_backdrop_is_the_same_request() {
     let mut t2 = FakeText;
     let mut replayed = painter(&mut t2);
     replayed.replay(&ops);
-    assert!(rec.scene.backdrop.is_some());
-    assert_eq!(rec.scene.backdrop, replayed.scene.backdrop);
+    assert_eq!(rec.scene.backdrops().count(), 1);
+    assert!(rec.scene.backdrops().eq(replayed.scene.backdrops()));
 }
 
 /// Where the backdrop falls in the recorded calls: the layers drawn before it and after it.
@@ -423,7 +450,7 @@ fn every_layer(p: &mut P<'_>) {
 }
 
 #[test]
-fn the_recording_renderer_puts_the_backdrop_at_the_split() {
+fn the_recording_renderer_puts_a_backdrop_before_its_layer_and_no_lower_than_the_floor() {
     let at = |layer: LayerId| {
         around_backdrop(&scene_of(|p| {
             every_layer(p);
@@ -580,10 +607,10 @@ fn fills_rings_and_backdrops_take_the_layer_clip_scale_and_alpha_of_the_xform() 
     assert_eq!(g.under[0].radii, [4.0, 8.0, 12.0, 16.0]);
     assert_eq!(g.over[0].radii, [4.0; 4]);
     assert_eq!((g.under[1].radii, g.over[1].radii), ([4.0; 4], [4.0; 4]));
-    let b = scene.backdrop.expect("asked");
+    let b = scene.layers[POPUP].backdrops[0];
     assert_eq!(
-        (b.rect, b.radius, b.alpha, b.layer),
-        ([86.0, 128.0, 40.0, 32.0], 4.0, 0.5, POPUP)
+        (b.rect, b.radius, b.alpha),
+        ([86.0, 128.0, 40.0, 32.0], 4.0, 0.5)
     );
 }
 

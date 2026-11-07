@@ -10,8 +10,7 @@
 //! - clipboard: text copy and paste, on a press only;
 //! - json: the bounded JSON reader on text typed in.
 //!
-//! Only one of them may ask for the backdrop in a frame (one blur a frame): it is the blur
-//! lab's, and the shell asks for none.
+//! Only the blur lab asks for a backdrop; the shell asks for none.
 
 pub(crate) mod blur;
 pub(crate) mod clipboard;

@@ -628,10 +628,9 @@ mod tests {
             .expect("dialog")
             .bounds;
         assert_eq!(card.w, 600.0);
-        assert!(form.backdrop.is_none());
+        assert!(form.backdrops().next().is_none());
         let (blur, _) = run("dialog-scrim-blur");
-        let b = blur.backdrop.expect("blur");
-        assert_eq!((b.layer, b.sigma), (LayerId::Modal as usize, 8.0));
+        assert_eq!(blur.merged(LayerId::Modal).backdrops[0].sigma, 8.0);
         let (_, out) = run("dialog-confirm-disabled");
         let confirm = out
             .tree

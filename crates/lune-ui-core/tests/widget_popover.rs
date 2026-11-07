@@ -498,14 +498,18 @@ fn a_glass_popover_blurs_what_is_under_it_and_replays_the_blur_while_it_closes()
     assert_eq!(under[0].color, premul(DARK.menu_glass));
     assert_eq!(under[0].radii, [9.0; 4]);
     assert_eq!(under[1].color, premul(DARK.menu_popup_border), "the ring");
-    let open = out.scene.backdrop.expect("the blur request");
-    assert_eq!(open.layer, popup as usize);
+    let open = out.scene.merged(popup).backdrops[0];
     assert_eq!(open.rect, [pl.rect.x, pl.rect.y, pl.rect.w, pl.rect.h]);
     assert_eq!(open.radius, 9.0);
     // The app stops calling it: the blur is replayed with the fade, then gone.
     run(&mut h, 1000, &[], |_| {});
     let closing = run(&mut h, 1060, &[], |_| {});
-    let blur = closing.scene.backdrop.expect("blur while it fades");
+    let blur = closing
+        .scene
+        .backdrops()
+        .next()
+        .copied()
+        .expect("blur while it fades");
     assert!(
         blur.alpha < open.alpha,
         "{} against {}",
@@ -518,9 +522,9 @@ fn a_glass_popover_blurs_what_is_under_it_and_replays_the_blur_while_it_closes()
     );
     assert_eq!(closing.repaint, Some(Repaint::Now));
     let idle = run(&mut h, 1300, &[], |_| {});
-    assert!(idle.scene.backdrop.is_none());
+    assert!(idle.scene.backdrops().next().is_none());
     // The default surface asks for no blur.
     let mut h = UiHarness::new(WIN);
     open_one(&mut h, 0);
-    assert!(open_one(&mut h, 400).scene.backdrop.is_none());
+    assert!(open_one(&mut h, 400).scene.backdrops().next().is_none());
 }

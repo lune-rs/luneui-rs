@@ -1414,8 +1414,8 @@ fn a_child_closing_with_its_dialog_leaves_on_its_own_layer() {
         assert!(!has_content(&scene, LayerId::Popup), "{kind:?}");
     }
     let glass = closing_frame(Child::Menu, true, 30);
-    let b = glass.backdrop.expect("the menu's own exit asks for it");
-    assert_eq!(b.layer, LayerId::Raised as usize);
+    let raised = glass.merged(LayerId::Raised).backdrops;
+    assert_eq!(raised.len(), 1, "the menu's own exit asks for it");
 }
 
 #[test]

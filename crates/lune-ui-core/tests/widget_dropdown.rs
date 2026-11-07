@@ -322,8 +322,7 @@ fn a_glass_dropdown_emits_the_backdrop_and_the_glass_fill() {
     assert_eq!(under[0].color, premul(DARK.menu_glass));
     assert_eq!(under[0].radii, [9.0; 4]);
     assert_eq!(under[1].color, premul(DARK.menu_popup_border), "the ring");
-    let b = scene.backdrop.expect("the blur request");
-    assert_eq!(b.layer, popup as usize);
+    let b = scene.merged(popup).backdrops[0];
     assert_eq!(b.rect, under[0].rect);
     assert_eq!(b.radius, 9.0);
     // The plain list asks for no blur and keeps its opaque fill.
@@ -331,7 +330,7 @@ fn a_glass_dropdown_emits_the_backdrop_and_the_glass_fill() {
     let plain = DropdownOptions::default();
     with_options(&mut h, 0, &opts, 0, &plain);
     let (scene, ..) = with_options(&mut h, 500, &opts, 0, &plain);
-    assert!(scene.backdrop.is_none());
+    assert!(scene.backdrops().next().is_none());
     assert_eq!(
         scene.merged(popup).geometry.under[0].color,
         premul(DARK.dropdown_bg)

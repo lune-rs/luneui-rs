@@ -665,20 +665,20 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
     }
 
     /// [`Self::backdrop`] at its own `sigma` and `saturation` (0 means the frame's). Everything
-    /// under this layer is blurred. A frame has one blur: of two requests the lower layer keeps
-    /// it, and on one layer the last wins.
+    /// drawn before this layer is blurred, other glass included. Every request stands, and each has
+    /// its own numbers; one that shows nothing (alpha 0, no area) records nothing.
     pub fn backdrop_with(&mut self, r: Rect, radius: f32, sigma: f32, saturation: f32) {
         self.rec(|| Op::Backdrop(r, radius, sigma, saturation));
-        if self.scene.backdrop.is_some_and(|b| b.layer < self.layer) {
+        let (rect, alpha) = (self.tr(r).phys(self.s), self.alpha_k());
+        let shows = alpha > 0.0 && rect[2] > 0.0 && rect[3] > 0.0;
+        if !shows {
             return;
         }
-        let k = self.scale_k();
-        self.scene.backdrop = Some(BackdropRequest {
-            rect: self.tr(r).phys(self.s),
-            radius: radius * k * self.s,
-            alpha: self.alpha_k(),
-            layer: self.layer,
-            tag: self.slot.map_or(0, |i| self.scene.overlays[i].tag),
+        let radius = radius * self.scale_k() * self.s;
+        self.target().backdrops.push(BackdropRequest {
+            rect,
+            radius,
+            alpha,
             sigma,
             saturation,
         });
@@ -1496,22 +1496,18 @@ mod tests {
     }
 
     #[test]
-    fn the_split_is_at_the_backdrops_own_overlay() {
+    fn a_backdrop_stays_with_the_layer_it_was_asked_on() {
         with_painter(|p| {
             let r = Rect::new(0.0, 0.0, 10.0, 10.0);
-            assert_eq!(p.scene.split(), crate::scene::SCENE_LAYERS);
             p.enter(LayerId::Popup, 7);
-            p.custom(7, r);
-            p.backdrop(r, 0.0);
+            p.backdrop(r, 7.0);
             p.enter(LayerId::Popup, 5);
-            p.custom(5, r);
-            let b = p.scene.backdrop.expect("a request");
-            assert_eq!((b.layer, b.tag), (LayerId::Popup as usize, 7));
-            // Base, Page, the fixed Popup and the older overlay go before the blur.
-            let before = p.scene.split();
-            assert_eq!(before, 4);
-            assert_eq!(slots(&p.scene.in_order()[..before]), [5]);
-            assert_eq!(slots(&p.scene.in_order()[before..]), [7]);
+            p.backdrop(r, 5.0);
+            p.on(LayerId::Page);
+            p.backdrop(r, 1.0);
+            let radii: Vec<f32> = p.scene.backdrops().map(|b| b.radius / 2.0).collect();
+            assert_eq!(radii, [1.0, 5.0, 7.0], "draw order");
+            assert_eq!(p.scene.floor(), crate::scene::SCENE_LAYERS);
         });
     }
 }
