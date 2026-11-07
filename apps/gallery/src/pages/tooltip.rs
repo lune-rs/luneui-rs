@@ -15,6 +15,7 @@ use lune_ui::ui::{Sense, Ui};
 use super::{card, heading, on_card};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "tooltip",
@@ -45,6 +46,7 @@ fn base() -> Live {
         anchor: ANCHOR,
         kind: Kind::Text,
         enabled: true,
+        text: TEXT.to_owned(),
     }
 }
 
@@ -85,7 +87,16 @@ struct Live {
     anchor: Rect,
     kind: Kind,
     enabled: bool,
+    /// The tooltip's text, and the rich tooltip's bold line.
+    text: String,
 }
+
+/// The anchors the knob offers, in the order shown.
+const ANCHORS: [(&str, Rect); 3] = [
+    ("Top left", ANCHOR),
+    ("Bottom edge", LOW),
+    ("Right edge", RIGHT),
+];
 
 /// The rich tooltip's content size (before padding): a bold line, a secondary line, a separator
 /// and a row of three icons.
@@ -115,9 +126,12 @@ impl PageState for Live {
         }
         p.text_centered(&icon::glyph(icon::EDIT, 16.0, ink), anchor);
         match self.kind {
-            Kind::Text => ui.tooltip(&r, TEXT),
+            Kind::Text => ui.tooltip(&r, &self.text),
             Kind::Rich => ui.tooltip_with(&r, RICH, |ui, at| {
-                let bold = Spec::plain(TEXT, Style::ui(THEME.font_s, THEME.fg_primary).bold());
+                let bold = Spec::plain(
+                    self.text.as_str(),
+                    Style::ui(THEME.font_s, THEME.fg_primary).bold(),
+                );
                 let note = Spec::plain(
                     "Change the file name",
                     Style::ui(THEME.font_s, THEME.fg_secondary),
@@ -131,6 +145,23 @@ impl PageState for Live {
                     p.text_centered(&icon::glyph(glyph, 14.0, THEME.fg_secondary), cell);
                 }
             }),
+        }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let mut rich = usize::from(self.kind == Kind::Rich);
+        if panel.choice(ui, "Content", &["Text", "Rich"], &mut rich) {
+            self.kind = if rich == 1 { Kind::Rich } else { Kind::Text };
+        }
+        panel.text(ui, "Text", &mut self.text);
+        panel.toggle(ui, "Enabled", &mut self.enabled);
+        let names: Vec<&str> = ANCHORS.iter().map(|(n, _)| *n).collect();
+        let mut at = ANCHORS
+            .iter()
+            .position(|(_, r)| *r == self.anchor)
+            .unwrap_or(0);
+        if panel.choice(ui, "Anchor", &names, &mut at) {
+            self.anchor = ANCHORS[at].1;
         }
     }
 }

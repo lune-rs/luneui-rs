@@ -21,6 +21,7 @@ use lune_ui::widgets::dialog::{Cancel, Dialog, DialogGlass};
 use super::{caption, card, heading};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "command-palette",
@@ -299,6 +300,13 @@ impl PageState for Live {
                 self.confirming = false;
             }
         }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.text(ui, "Query", &mut self.query);
+        panel.toggle(ui, "Disabled", &mut self.disabled);
+        // Last: the open palette is modal and blocks this pane.
+        panel.toggle(ui, "Open", &mut self.open);
     }
 }
 

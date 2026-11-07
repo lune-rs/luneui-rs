@@ -565,7 +565,7 @@ impl Col {
         self.y += 28.0;
     }
 
-    fn button(&mut self, ui: &mut Ui<'_>, key: &str, text: &str) -> bool {
+    pub(crate) fn button(&mut self, ui: &mut Ui<'_>, key: &str, text: &str) -> bool {
         let rect = Rect::new(self.x, self.y, self.w, 32.0);
         let clicked = ui.button(key, rect, text, ButtonKind::Secondary).clicked;
         self.y += 40.0;

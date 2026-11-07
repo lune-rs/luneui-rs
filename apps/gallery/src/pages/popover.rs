@@ -15,6 +15,7 @@ use lune_ui::widgets::popover::{PopoverOptions, Surface};
 use super::{caption, card, heading, on_card};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "popover",
@@ -87,6 +88,20 @@ fn closing() -> Box<dyn PageState> {
     })
 }
 
+/// The anchors the knob offers, in the order shown.
+const ANCHORS: [(&str, Rect); 3] = [
+    ("Top left", BUTTON),
+    ("Right edge", RIGHT),
+    ("Middle", MIDDLE),
+];
+
+/// The surfaces the knob offers, in the order shown.
+const SURFACES: [(&str, Surface); 3] = [
+    ("Panel", Surface::Panel),
+    ("Glass", Surface::Glass),
+    ("None", Surface::None),
+];
+
 /// The page plays the app: it owns `open` and the anchor.
 struct Live {
     anchor: Rect,
@@ -121,6 +136,29 @@ impl PageState for Live {
                 self.open = false;
             }
         }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let names: Vec<&str> = SURFACES.iter().map(|(n, _)| *n).collect();
+        let mut at = SURFACES
+            .iter()
+            .position(|(_, s)| *s == self.surface)
+            .unwrap_or(0);
+        if panel.choice(ui, "Surface", &names, &mut at) {
+            self.surface = SURFACES[at].1;
+        }
+        panel.number(ui, "Width", &mut self.size.0, (80.0, 400.0, 1.0));
+        panel.number(ui, "Height", &mut self.size.1, (40.0, 450.0, 1.0));
+        let names: Vec<&str> = ANCHORS.iter().map(|(n, _)| *n).collect();
+        let mut at = ANCHORS
+            .iter()
+            .position(|(_, r)| *r == self.anchor)
+            .unwrap_or(0);
+        if panel.choice(ui, "Anchor", &names, &mut at) {
+            self.anchor = ANCHORS[at].1;
+        }
+        // Last: an open popover is dismissed by a press outside it.
+        panel.toggle(ui, "Open", &mut self.open);
     }
 }
 

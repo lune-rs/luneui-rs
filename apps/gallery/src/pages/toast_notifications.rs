@@ -15,6 +15,7 @@ use lune_ui::widgets::toast::{ToastAction, ToastId, ToastKind, ToastSpec, Toasts
 use super::{caption, card, heading};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "toast-notifications",
@@ -131,7 +132,19 @@ struct State {
     /// The toast the later scenes act on at 600 ms.
     subject: Option<ToastId>,
     acted: bool,
+    /// The toast the knobs push: its kind (an index into [`KINDS`]), title and detail.
+    kind: usize,
+    title: String,
+    detail: String,
 }
+
+/// The kinds the knob offers, in the order shown.
+const KINDS: [(&str, ToastKind); 4] = [
+    ("Info", ToastKind::Info),
+    ("Success", ToastKind::Success),
+    ("Warning", ToastKind::Warning),
+    ("Error", ToastKind::Error),
+];
 
 fn state(mode: Mode) -> Box<dyn PageState> {
     Box::new(State {
@@ -142,6 +155,9 @@ fn state(mode: Mode) -> Box<dyn PageState> {
         running: None,
         subject: None,
         acted: false,
+        kind: 0,
+        title: "A toast from the knobs".to_owned(),
+        detail: String::new(),
     })
 }
 
@@ -312,6 +328,20 @@ impl PageState for State {
             self.toasts
                 .update(id, ToastSpec::new(ToastKind::Warning, "Clone cancelled"));
             self.running = None;
+        }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let names: Vec<&str> = KINDS.iter().map(|(n, _)| *n).collect();
+        panel.choice(ui, "Kind", &names, &mut self.kind);
+        panel.text(ui, "Title", &mut self.title);
+        panel.text(ui, "Detail", &mut self.detail);
+        if panel.button(ui, "Push this toast") {
+            let spec = ToastSpec {
+                detail: (!self.detail.is_empty()).then(|| self.detail.clone()),
+                ..ToastSpec::new(KINDS[self.kind.min(KINDS.len() - 1)].1, self.title.clone())
+            };
+            self.toasts.push(spec, ui.time());
         }
     }
 }

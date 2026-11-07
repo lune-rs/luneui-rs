@@ -69,6 +69,12 @@ impl<'c> Knobs<'c> {
         self.turned(ui, *on != before)
     }
 
+    /// A button for an action the page takes at once (push a toast, say). True when pressed.
+    pub(crate) fn button(&mut self, ui: &mut Ui<'_>, label: &str) -> bool {
+        let pressed = self.col.button(ui, label, label);
+        self.turned(ui, pressed)
+    }
+
     /// One of `options`, by index into it. True when the choice changed.
     pub(crate) fn choice(
         &mut self,
@@ -418,9 +424,12 @@ mod tests {
         /// A press that stops the page's own motion first (so the page is still while it is
         /// measured), then the press that is measured.
         Still(Role, &'static str, Role, &'static str),
+        /// A press that makes something the page draws outside the content pane (a toast at the
+        /// window's corner): the semantic tree gets a node of this role and name.
+        Spawns(Role, &'static str, Role, &'static str),
     }
 
-    use Turn::{Press, Slide, Still, Type};
+    use Turn::{Press, Slide, Spawns, Still, Type};
 
     /// Every widget page of this batch: turning the knob changes what the page draws.
     const WIDGET_TURNS: &[(&str, Turn)] = &[
@@ -451,6 +460,22 @@ mod tests {
         ("tab-strip", Press(Role::Switch, "Header tint")),
         ("toolbar", Press(Role::Switch, "Fetch enabled")),
         ("banner", Press(Role::Switch, "Picture")),
+        // Overlays: the knobs that open one come last, since an open modal blocks the pane.
+        ("dropdown", Press(Role::Switch, "Open")),
+        ("menu", Press(Role::Radio, "Variants")),
+        ("popover", Press(Role::Switch, "Open")),
+        ("tooltip", Press(Role::Switch, "Enabled")),
+        ("flyout", Press(Role::Switch, "Open")),
+        (
+            "toast-notifications",
+            Spawns(
+                Role::Button,
+                "Push this toast",
+                Role::Status,
+                "A toast from the knobs",
+            ),
+        ),
+        ("command-palette", Press(Role::Switch, "Open")),
     ];
 
     #[test]
@@ -466,6 +491,15 @@ mod tests {
             match turn {
                 Still(_, _, role, name) => {
                     assert!(shell.press(*role, name), "{page}: no {name}");
+                }
+                Spawns(role, name, made_role, made) => {
+                    assert!(shell.press(*role, name), "{page}: no {name}");
+                    shell.settle();
+                    assert!(
+                        shell.centre(*made_role, made).is_some(),
+                        "{page}: pressing {name} made no {made_role:?} {made}"
+                    );
+                    continue;
                 }
                 Press(role, name) => assert!(shell.press(*role, name), "{page}: no {name}"),
                 Slide(name, at) => {

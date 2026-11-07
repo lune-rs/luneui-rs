@@ -21,6 +21,7 @@ use lune_ui::widgets::tone::Tone;
 use super::{caption, card, heading};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "flyout",
@@ -111,6 +112,7 @@ fn pinned(tray: Tray) -> Live {
         open: true,
         tray,
         stop_at: None,
+        wordmark: "Wane".to_owned(),
     }
 }
 
@@ -150,12 +152,21 @@ fn closing() -> Box<dyn PageState> {
 /// When the closing scene's app stops calling the flyout (after the 180 ms open).
 const STOP_AT: Duration = Duration::from_millis(300);
 
+/// The tray states the knob offers, in the order shown.
+const TRAYS: [(&str, Tray); 3] = [
+    ("Serving", Tray::Serving),
+    ("Degraded", Tray::Degraded),
+    ("Paused", Tray::Paused),
+];
+
 /// The page plays the app: it owns `open` and the tray state.
 struct Live {
     open: bool,
     tray: Tray,
     /// The app stops calling the flyout from this time on.
     stop_at: Option<Duration>,
+    /// The header's name, set by a knob.
+    wordmark: String,
 }
 
 impl PageState for Live {
@@ -184,7 +195,7 @@ impl PageState for Live {
             side: Side::Top,
             align: PlaceAlign::End,
             mark: Some(icon::INFO),
-            wordmark: "Wane",
+            wordmark: &self.wordmark,
             state: state_text(self.tray),
             tone: state_tone(self.tray),
             stats: &stats,
@@ -208,6 +219,17 @@ impl PageState for Live {
             Some(_) => self.open = false,
             None => {}
         }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let names: Vec<&str> = TRAYS.iter().map(|(n, _)| *n).collect();
+        let mut at = TRAYS.iter().position(|(_, t)| *t == self.tray).unwrap_or(0);
+        if panel.choice(ui, "Tray state", &names, &mut at) {
+            self.tray = TRAYS[at].1;
+        }
+        panel.text(ui, "Wordmark", &mut self.wordmark);
+        // Last: the open flyout is dismissed by a press outside it.
+        panel.toggle(ui, "Open", &mut self.open);
     }
 }
 
