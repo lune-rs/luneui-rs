@@ -39,15 +39,18 @@ pub struct Theme {
     pub on_accent: Rgba,
     /// Label on a primary button.
     pub on_accent_text: Rgba,
-    pub dropdown_bg: Rgba,
     pub dialog_backdrop: Rgba,
     pub dialog_footer: Rgba,
     pub menu_text_primary: Rgba,
     pub menu_text_tertiary: Rgba,
     pub menu_text_quaternary: Rgba,
+    /// The 1 px ring of every glass surface (menu, list, popover, tooltip). A deliberate deviation
+    /// from Lunegit's `PopupMenuOuterBorder` (#3AFFFFFF): white at 0x1F, quieter (D11).
     pub menu_popup_border: Rgba,
     pub menu_item_hover: Rgba,
     pub menu_separator: Rgba,
+    /// The tint every glass surface draws over the blurred scene under it (straight alpha; file
+    /// key `MenuGlassBackground`, which Lunegit does not have).
     pub menu_glass: Rgba,
     /// The menu row while pressed: Lunegit `DarkTheme.axaml:305` (#FFFFFF23).
     pub menu_item_pressed: Rgba,
@@ -252,10 +255,10 @@ color_keys! {
     "SurfaceBorder" => |t| Slot::One(&mut t.border),
     "SurfaceBorderSubtle" => |t| Slot::One(&mut t.border_subtle),
     "AccentPrimaryColor" => |t| Slot::One(&mut t.accent),
-    "BackdropDark" => |t| Slot::One(&mut t.dropdown_bg),
     "DialogBackdropBrush" => |t| Slot::One(&mut t.dialog_backdrop),
     "DialogDarkerBlockBackground" => |t| Slot::One(&mut t.dialog_footer),
     "PopupMenuOuterBorder" => |t| Slot::One(&mut t.menu_popup_border),
+    "MenuGlassBackground" => |t| Slot::One(&mut t.menu_glass),
     "PopupMenuItemHover" => |t| Slot::One(&mut t.menu_item_hover),
     "PopupMenuItemPressed" => |t| Slot::One(&mut t.menu_item_pressed),
     "PopupMenuDisabledForeground" => |t| Slot::One(&mut t.menu_text_disabled),
@@ -311,14 +314,13 @@ pub mod lunegit_dark {
         text_selection: [0x76, 0x7D, 0x85, 0x66],
         on_accent: [0xFF, 0xFF, 0xFF, 0xFF],
         on_accent_text: [0xFF, 0xFF, 0xFF, 0xF0],
-        dropdown_bg: [0x00, 0x00, 0x00, 0xF0],
         dialog_backdrop: [0x00, 0x00, 0x00, 0x80],
         dialog_footer: [0x00, 0x00, 0x00, 0x24],
         // Luneium browser context-menu tokens (`tokens.css`, `ContextMenu.css`).
         menu_text_primary: [0xFF, 0xFF, 0xFF, 0xCC],
         menu_text_tertiary: [0xFF, 0xFF, 0xFF, 0x88],
         menu_text_quaternary: [0xFF, 0xFF, 0xFF, 0x66],
-        menu_popup_border: [0xFF, 0xFF, 0xFF, 0x3A],
+        menu_popup_border: [0xFF, 0xFF, 0xFF, 0x1F],
         menu_item_hover: [0xFF, 0xFF, 0xFF, 0x16],
         menu_separator: [0xFF, 0xFF, 0xFF, 0x22],
         // `linear-gradient(rgba(0,0,0,.45)), rgba(165,165,165,.3)` flattened: alpha .615, grey 44.
@@ -547,7 +549,6 @@ mod tests {
             "#FF767D85",
             [0x76, 0x7D, 0x85, 0xFF],
         ),
-        ("BackdropDark", 42, "#F0000000", [0x00, 0x00, 0x00, 0xF0]),
         (
             "DialogBackdropBrush",
             317,
@@ -559,12 +560,6 @@ mod tests {
             318,
             "#24000000",
             [0x00, 0x00, 0x00, 0x24],
-        ),
-        (
-            "PopupMenuOuterBorder",
-            301,
-            "#3AFFFFFF",
-            [0xFF, 0xFF, 0xFF, 0x3A],
         ),
         (
             "PopupMenuItemHover",
@@ -676,9 +671,13 @@ mod tests {
 
     #[test]
     fn every_color_key_holds_the_dark_theme_axaml_value() {
-        // 49 rows plus `GlassTintColor`: all 50 keys of the table are covered, none twice.
+        // 47 rows plus three keys with no row here: `GlassTintColor`, `MenuGlassBackground` (not in
+        // Lunegit) and `PopupMenuOuterBorder` (a deviation, tested below): all 50 keys of the
+        // table are covered, none twice.
         let mut keys: Vec<&str> = AXAML.iter().map(|r| r.0).collect();
         keys.push("GlassTintColor");
+        keys.push("MenuGlassBackground");
+        keys.push("PopupMenuOuterBorder");
         keys.sort_unstable();
         let mut table = COLOR_KEYS.to_vec();
         table.sort_unstable();
@@ -720,6 +719,22 @@ mod tests {
             [0x33, 0x33, 0x33, 0xFF]
         );
         assert_eq!(THEME.window_fallback, [0x33, 0x33, 0x33, 0xFF]);
+    }
+
+    /// `PopupMenuOuterBorder` is #3AFFFFFF in `DarkTheme.axaml:301`; the toolkit's glass ring is
+    /// white at 0x1F, a deliberate deviation (D11, R8). `MenuGlassBackground` is the toolkit's own key.
+    #[test]
+    fn the_glass_ring_and_tint_keys_hold_the_toolkits_values() {
+        assert_eq!(
+            THEME.color_key("PopupMenuOuterBorder"),
+            Some([0xFF, 0xFF, 0xFF, 0x1F])
+        );
+        assert_ne!(THEME.menu_popup_border, [0xFF, 0xFF, 0xFF, 0x3A]);
+        assert_eq!(
+            THEME.color_key("MenuGlassBackground"),
+            Some([44, 44, 44, 157])
+        );
+        assert_eq!(THEME.color_key("BackdropDark"), None);
     }
 
     /// Fields with no key of their own, each with the row that sets its value.

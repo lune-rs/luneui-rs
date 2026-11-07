@@ -52,10 +52,19 @@ fn text_cache() -> TextCache {
 }
 
 fn draw(gpu: &mut Gpu, renderer: &mut FrameRenderer, scene: &Scene) -> Vec<u8> {
+    draw_with(gpu, renderer, scene, params())
+}
+
+fn draw_with(
+    gpu: &mut Gpu,
+    renderer: &mut FrameRenderer,
+    scene: &Scene,
+    params: FrameParams,
+) -> Vec<u8> {
     let texture = dump::target(&gpu.device, wgpu::TextureFormat::Rgba8Unorm, SIZE);
     let view = texture.create_view(&Default::default());
     renderer
-        .draw(gpu, &mut text_cache(), scene, &view, params())
+        .draw(gpu, &mut text_cache(), scene, &view, params)
         .expect("draw");
     dump::read_rgba(&gpu.device, &gpu.queue, &texture).expect("readback")
 }
@@ -74,7 +83,7 @@ fn scene_of(f: impl FnOnce(&mut Painter<'_, u8>)) -> Scene {
 }
 
 /// White bars 40 px wide every 80 px across the window, on `layer`.
-fn bars(p: &mut Painter<'_, u8>, layer: LayerId) {
+fn bars<H: Copy + PartialEq>(p: &mut Painter<'_, H>, layer: LayerId) {
     p.on(layer);
     for i in 0..6 {
         p.fill(
@@ -476,4 +485,84 @@ fn a_frost_at_half_alpha_is_half_the_frost_noise_included() {
         let want = f32::from(*w) / 2.0;
         assert!((f32::from(*h) - want).abs() <= 1.0, "byte {i}: {h} of {w}");
     }
+}
+
+/// R6 on the real surface: a `Ui::dropdown` over a dialog's content, the dialog's scrim at the
+/// preset's `dialog_backdrop`, the frame at the glass menu's numbers (blur 30, saturate 1.8). The
+/// bars stand for the dialog's text (the harness's `FakeText` draws no glyphs). Step 3's bound
+/// holds: what shows inside the list is under an eighth of what the bars show without it.
+#[test]
+fn a_list_over_a_dialogs_content_frosts_it_and_does_not_read_through() {
+    use lune_ui_core::ui::WidgetId;
+    let Some(mut gpu) = headless_gpu() else {
+        return;
+    };
+    let real = FrameParams {
+        blur_sigma: 30.0,
+        saturation: 1.8,
+        ..params()
+    };
+    let anchor = Rect::new(100.0, 28.0, 280.0, 32.0);
+    let modal = OverlayOptions {
+        layer: LayerId::Modal,
+        modal: true,
+        dismiss_on_escape: false,
+        dismiss_on_outside_press: false,
+        dismiss_on_focus_loss: false,
+        anchor: None,
+        initial_focus: None,
+        open: Motion::of(Kind::Appear),
+        close: Motion::of(Kind::Dismiss),
+    };
+    let list = |open: bool| {
+        let mut h = UiHarness::new((SIZE.0 as f32, SIZE.1 as f32));
+        let mut scene = Scene::default();
+        for ms in [0u64, 500, 1_000] {
+            h.at_ms(ms);
+            scene = h
+                .frame(|ui| {
+                    ui.painter().fill(WIN, 0.0, DARKEST);
+                    ui.overlay(
+                        "dialog",
+                        &modal,
+                        |_, _, _| {},
+                        |ui, _| {
+                            ui.painter().fill(WIN, 0.0, DARK.dialog_backdrop);
+                            bars(ui.painter(), LayerId::Modal);
+                            if open {
+                                ui.dropdown(
+                                    "list",
+                                    anchor,
+                                    WidgetId::ROOT.with("combo"),
+                                    &[("one", true), ("two", true)],
+                                    0,
+                                );
+                            }
+                        },
+                    );
+                })
+                .0;
+        }
+        scene
+    };
+    let mut renderer = FrameRenderer::new(&mut gpu, wgpu::TextureFormat::Rgba8Unorm);
+    let without = draw_with(&mut gpu, &mut renderer, &list(false), real);
+    let sharp_range = range(&row(&without, 110, 370));
+    assert!(
+        sharp_range > 60.0,
+        "the bars show (instrument check): {sharp_range}"
+    );
+    let scene = list(true);
+    assert_eq!(scene.backdrops().count(), 1);
+    let with = draw_with(&mut gpu, &mut renderer, &scene, real);
+    let inside = range(&row(&with, 110, 370));
+    assert!(
+        inside < sharp_range / 8.0,
+        "range {inside} of sharp {sharp_range}"
+    );
+    assert_eq!(
+        row(&with, 0, 90),
+        row(&without, 0, 90),
+        "only the list's region changes"
+    );
 }

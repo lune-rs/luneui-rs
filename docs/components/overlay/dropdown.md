@@ -17,7 +17,7 @@ summary: Combo drop-down option list that flips above its anchor near the window
 
 - Drop-down list that stays on screen (R-overlay-1).
 - Wane — States: item rest; hover (`--surface-hover`); selected (`--surface-selected`, 12 px check at the right); disabled (tertiary text, inert). (R-overlay-1)
-- Wane — Sizes: Panel padding 4, radius 9, 1 px `--popup-border-soft` (white at .08; user, 2026-11-04), the same glass as `overlay.menu` (`--menu-glass`, blur 30; user, 2026-11-03: not lune-ui's opaque `dropdown_bg`); rows 32 high, radius 4, padding 0 6 0 9; 4 to 5 px below the anchor, same width; no shadow. (R-overlay-1)
+- Wane — Sizes: Panel padding 4, radius 9, 1 px `--popup-border-soft` (white at .08; user, 2026-11-04), the same glass as `overlay.menu` (`--menu-glass`, blur 30; user, 2026-11-03; the opaque `dropdown_bg` is gone, D8); rows 32 high, radius 4, padding 0 6 0 9; 4 to 5 px below the anchor, same width; no shadow. (R-overlay-1)
 - Wane — Behaviour: Opens under the combo and flips above it near the window bottom; a click outside or Esc closes it; Up, Down, Enter choose. Not mocked: type-ahead, scrolling a long list. (R-overlay-1)
 
 ## Existing code
@@ -34,14 +34,14 @@ Pinned: Lunegit 33a1dd41, Wane 69931d6, this repo fa2958b. Read: `crates/lune-ui
 selector), `src/Lunegit.Desktop/App.axaml:720-745` (ComboBox item states), `src/Lunegit.Desktop/App.axaml:757-763`
 (popup corner 12); Wane `docs/ui/components.md:529-542`.
 Conflicts (winner):
-- Surface: Wane `--menu-glass` blur 30 [W docs/ui/components.md:529-542] vs opaque `dropdown_bg` #000000F0 [R crates/lune-ui-core/src/theme.rs:68]. Both ship [D143]: the opaque list is the default (zero pixel delta), `DropdownOptions.glass` draws the menu's surface (`popover::glass_panel`: radius 9, the blurred scene, `menu_glass`, the `menu_popup_border` ring) and Wane opts in.
-- Radius: Wane 9, Lunegit popup 12 [L src/Lunegit.Desktop/App.axaml:761], code 8 [R crates/lune-ui-core/src/widgets/popup_panel.rs:8-9]. The code wins.
+- Surface: Wane `--menu-glass` blur 30 [W docs/ui/components.md:529-542]. The list is always the glass surface (`popover::glass_panel`: radius 9, the blurred scene, `menu_glass` frosted over it, the `menu_popup_border` ring), the one routine every popup and list draws; the opaque panel and `DropdownOptions::glass` are gone (library-pass step 6a, D8).
+- Radius: Wane 9, Lunegit popup 12 [L src/Lunegit.Desktop/App.axaml:761], code 9 (the glass surface's, [R crates/lune-ui-core/src/widgets/popover.rs:glass_surface]). The code wins.
 - Panel inset: Wane 4 and code 4 agree [R crates/lune-ui-core/src/widgets/dropdown.rs:28-29].
 
 ### Anatomy
 
 - Option row: 32 high; x inset 4 and width `panel.w − 8`; row y = panel y + 4 + i × 32 [R crates/lune-ui-core/src/widgets/dropdown.rs:17,28-33].
-- Panel: width = anchor width [R crates/lune-ui-core/src/widgets/dropdown.rs:25]; height = options × 32 + 8 [R crates/lune-ui-core/src/widgets/dropdown.rs:18]; fill `dropdown_bg` #000000F0 at radius 8, 1 px ring `border` #FFFFFF30 [R crates/lune-ui-core/src/widgets/mod.rs:200-202, crates/lune-ui-core/src/theme.rs:62,68].
+- Panel: width = anchor width [R crates/lune-ui-core/src/widgets/dropdown.rs:25]; height = options × 32 + 8 [R crates/lune-ui-core/src/widgets/dropdown.rs:18]; the glass surface at radius 9 (`menu_glass` frost, 1 px ring `menu_popup_border` #FFFFFF1F); rows at radius 4 with the menu's `menu_item_hover` and `menu_item_pressed` fills [R crates/lune-ui-core/src/widgets/popover.rs, crates/lune-ui-core/src/widgets/dropdown.rs].
 - Placement: 4 below the anchor [R crates/lune-ui-core/src/widgets/dropdown.rs:19]; flips above, at `anchor.y − 4 − h`, minimum 8, when `below + h > window h − 8` [R crates/lune-ui-core/src/widgets/dropdown.rs:20-24].
 - Label: 10 px inset, `fg_primary` when enabled, `fg_tertiary` when disabled [R crates/lune-ui-core/src/widgets/dropdown.rs:40-45, crates/lune-ui-core/src/theme.rs:56,58].
 - Check mark (selected): 12 px glyph, `fg_secondary`, in a 20 px box 26 px from the row's right edge [R crates/lune-ui-core/src/widgets/dropdown.rs:46-48].
@@ -101,8 +101,7 @@ None: option texts come from the app (dropdown.rs:9-12).
 - `dropdown-flipped` (existing): list open above the combo near the bottom edge, settled. [R apps/gallery/src/scenes.rs:444-454]
 - `dropdown-hover`: an enabled row hovered, settled (new).
 - `dropdown-disabled`: one option disabled, settled (new).
-- `dropdown-glass`: the glass surface, settled.
-- `dropdown-scroll`: thirty options in eight rows, glass, opened on the twenty-first, a row hovered, settled.
+- `dropdown-scroll`: thirty options in eight rows, opened on the twenty-first, a row hovered, settled.
 
 ### Painter primitives
 
@@ -116,13 +115,13 @@ None: option texts come from the app (dropdown.rs:9-12).
 - Pixel probes at scale 2: row 64 px high, panel radius 16 px, check glyph 24 px, row radius 8 px. Source values in Anatomy.
 - Conformance: none (no motion).
 - Semantic node: `list` with `list-item` rows; selected row has the `selected` state.
-- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_dropdown.rs`: behaviour `a_click_picks_an_enabled_row_once_and_never_a_disabled_one`, `the_keyboard_highlight_starts_at_the_selected_row_and_skips_disabled_ones`, `down_past_the_last_visible_row_reveals_it_and_enter_picks_it`, `a_selected_row_below_the_fold_opens_in_view_on_the_first_frame`, `the_wheel_scrolls_and_a_click_picks_the_row_under_the_pointer`, `max_rows_caps_the_panel_and_a_short_list_does_not_scroll`, `escape_and_an_outside_press_dismiss`, `it_opens_and_closes_at_once_and_focus_returns_to_the_combo`, `a_glass_dropdown_emits_the_backdrop_and_the_glass_fill`, `a_disabled_dropdown_takes_the_keys_picks_nothing_and_marks_every_node`; pixel probes `the_popup_panel_is_16_px_radius_with_a_2_px_ring_in_the_callers_fill`, `a_hovered_enabled_row_gets_the_hover_fill_and_a_disabled_one_does_not`; node `the_semantic_tree_is_a_list_of_list_items`. The flip above the anchor is `crates/lune-ui-core/src/widgets/popover.rs`'s placement, tested in `widget_popover.rs`.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_dropdown.rs`: behaviour `a_click_picks_an_enabled_row_once_and_never_a_disabled_one`, `the_keyboard_highlight_starts_at_the_selected_row_and_skips_disabled_ones`, `down_past_the_last_visible_row_reveals_it_and_enter_picks_it`, `a_selected_row_below_the_fold_opens_in_view_on_the_first_frame`, `the_wheel_scrolls_and_a_click_picks_the_row_under_the_pointer`, `max_rows_caps_the_panel_and_a_short_list_does_not_scroll`, `escape_and_an_outside_press_dismiss`, `it_opens_and_closes_at_once_and_focus_returns_to_the_combo`, `the_list_is_the_glass_surface`, `a_row_wears_the_menus_hover_and_pressed_fills_at_radius_4`, `a_disabled_dropdown_takes_the_keys_picks_nothing_and_marks_every_node`; pixel probes `a_hovered_enabled_row_gets_the_hover_fill_and_a_disabled_one_does_not`; node `the_semantic_tree_is_a_list_of_list_items`. The flip above the anchor is `crates/lune-ui-core/src/widgets/popover.rs`'s placement, tested in `widget_popover.rs`.
 
 ### Build
 
 - Milestone: M4 (retrofit), M7 (the glass surface and the scrolling list, step 4).
-- Depends on: core.focus, infra.accessibility, overlay.popup-panel, widget.combo, layout.scroll-area.
-- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_dropdown.rs::a_click_picks_an_enabled_row_once_and_never_a_disabled_one, crates/lune-ui-core/tests/widget_dropdown.rs::the_keyboard_highlight_starts_at_the_selected_row_and_skips_disabled_ones, crates/lune-ui-core/tests/widget_dropdown.rs::escape_and_an_outside_press_dismiss, crates/lune-ui-core/tests/widget_dropdown.rs::max_rows_caps_the_panel_and_a_short_list_does_not_scroll, crates/lune-ui-core/tests/widget_dropdown.rs::a_glass_dropdown_emits_the_backdrop_and_the_glass_fill, crates/lune-ui-core/tests/widget_dropdown.rs::the_popup_panel_is_16_px_radius_with_a_2_px_ring_in_the_callers_fill, crates/lune-ui-core/tests/widget_dropdown.rs::the_semantic_tree_is_a_list_of_list_items`; page `dropdown`; unverified here: none (limit: no type-ahead, D143).
+- Depends on: core.focus, infra.accessibility, overlay.popover, widget.combo, layout.scroll-area.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_dropdown.rs::a_click_picks_an_enabled_row_once_and_never_a_disabled_one, crates/lune-ui-core/tests/widget_dropdown.rs::the_keyboard_highlight_starts_at_the_selected_row_and_skips_disabled_ones, crates/lune-ui-core/tests/widget_dropdown.rs::escape_and_an_outside_press_dismiss, crates/lune-ui-core/tests/widget_dropdown.rs::max_rows_caps_the_panel_and_a_short_list_does_not_scroll, crates/lune-ui-core/tests/widget_dropdown.rs::the_list_is_the_glass_surface, crates/lune-ui-core/tests/widget_dropdown.rs::a_row_wears_the_menus_hover_and_pressed_fills_at_radius_4, crates/lune-ui-core/tests/widget_dropdown.rs::the_semantic_tree_is_a_list_of_list_items`; page `dropdown`; unverified here: none (limit: no type-ahead, D143).
 
 ## Open questions
 
@@ -135,4 +134,4 @@ None: option texts come from the app (dropdown.rs:9-12).
 
 Moves in the behaviour-preserving extraction (R-ext-1); the pixel gate covers it only where a glass-ui scene draws it.
 
-Wane (2026-11-04): lune-ui status for Wane's use: partial: widgets/dropdown.rs:9 draws an opaque `dropdown_bg` panel; the menu glass (theme.rs `menu_glass`) is missing on it; Wane priority P0. Native note: Drawn on the modal or popup layer, above scrolling content; the mock's `position: absolute` must become a popup layer with window-edge flipping. Full spec: Wane `docs/ui/components.md`, section `overlay.dropdown`; mock: Wane `docs/ui/mocks/components.html`.
+Wane (2026-11-04): lune-ui status for Wane's use: done in library-pass step 6a: the list draws the menu glass (theme.rs `menu_glass`) through `popover::glass_surface`. Native note: Drawn on the modal or popup layer, above scrolling content; the mock's `position: absolute` must become a popup layer with window-edge flipping. Full spec: Wane `docs/ui/components.md`, section `overlay.dropdown`; mock: Wane `docs/ui/mocks/components.html`.

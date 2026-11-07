@@ -4047,7 +4047,6 @@ mod m10 {
         text_selection,
         on_accent,
         on_accent_text,
-        dropdown_bg,
         dialog_backdrop,
         dialog_footer,
         menu_text_primary,
@@ -4974,7 +4973,7 @@ mod m10 {
     fn the_audit_theme_has_a_colour_no_preset_field_has_in_every_field() {
         let (t, p) = (fields(&distinct()), fields(&DARK));
         assert_eq!(t.len(), p.len());
-        assert_eq!(t.len(), 71, "the colour fields of `Theme`");
+        assert_eq!(t.len(), 70, "the colour fields of `Theme`");
         for (i, (name, c)) in t.iter().enumerate() {
             assert_ne!(*c, p[i].1, "{name}");
             for (_, q) in &p {

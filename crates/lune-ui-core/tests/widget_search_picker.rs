@@ -836,7 +836,7 @@ fn popup_panel(s: &Scene) -> [f32; 4] {
         .geometry
         .under
         .iter()
-        .find(|x| x.color == premul(DARK.dropdown_bg))
+        .find(|x| x.params[2] == 2.0 && x.color == premul(DARK.menu_glass))
         .expect("the panel")
         .rect
 }
@@ -1087,7 +1087,7 @@ fn a_closed_picker_with_no_value_has_no_value_node_and_settles() {
 }
 
 #[test]
-fn at_scale_2_the_popup_radius_is_16_the_search_bar_8_and_the_dash_is_1_px_in_a_2_4_pattern() {
+fn at_scale_2_the_popup_radius_is_18_the_search_bar_8_and_the_dash_is_1_px_in_a_2_4_pattern() {
     use lune_ui_core::testing::ScriptedInput;
     let mut app = App::new();
     let mut h = UiHarness::new(WIN);
@@ -1105,7 +1105,7 @@ fn at_scale_2_the_popup_radius_is_16_the_search_bar_8_and_the_dash_is_1_px_in_a_
         .iter()
         .map(|x| x.radii[0])
         .collect();
-    assert!(radii.contains(&16.0), "the popup panel: {radii:?}");
+    assert!(radii.contains(&18.0), "the popup panel: {radii:?}");
     assert!(
         radii.contains(&8.0),
         "the search bar and the rows: {radii:?}"

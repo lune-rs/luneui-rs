@@ -20,6 +20,7 @@ use lune_ui_core::widgets::button::ButtonKind;
 use lune_ui_core::widgets::dialog::{Cancel, Dialog, DialogGlass};
 use lune_ui_core::widgets::menu::MenuRow;
 use lune_ui_core::widgets::popover::PopoverOptions;
+use lune_ui_core::widgets::search_picker::PickerOptions;
 
 const P: PointerButton = PointerButton::Primary;
 const PAGE_BTN: Rect = Rect::new(10.0, 10.0, 80.0, 30.0);
@@ -1504,7 +1505,9 @@ fn stacked_with_tooltip(inner: bool) -> Scene {
     h.input.pointer_to(x, y);
     stack_frame(&mut h, 2_000, inner);
     stack_frame(&mut h, 2_016, inner);
-    stack_frame(&mut h, 4_000, inner).0
+    // The tooltip's first frame is at opacity 0 and asks for nothing; the next is settled.
+    stack_frame(&mut h, 4_000, inner);
+    stack_frame(&mut h, 5_000, inner).0
 }
 
 #[test]
@@ -1802,4 +1805,159 @@ fn the_scope_keeps_the_clip_and_transform_and_puts_the_painter_back() {
     assert_eq!(after.clip, inside.clip, "the clip is back as it was");
     assert_eq!(after.rect, inside.rect, "the transform is back as it was");
     assert_eq!(inside.rect, Rect::new(5.0, 7.0, 400.0, 300.0).phys(1.0));
+}
+
+// One glass routine: every popup and list that floats over app content frosts what is behind it.
+
+/// What a floating surface must show in `scene`: at least one frost, a backdrop request that covers
+/// each frost, and no opaque fill anywhere in the overlays.
+fn assert_glass(scene: &Scene, what: &str) {
+    let frosts: Vec<[f32; 4]> = scene
+        .in_order()
+        .into_iter()
+        .flat_map(|l| l.geometry.under.iter())
+        .filter(|s| s.is_frost())
+        .map(|s| s.rect)
+        .collect();
+    assert!(!frosts.is_empty(), "{what}: a frost");
+    for f in &frosts {
+        let covered = scene.backdrops().any(|b| {
+            b.rect[0] <= f[0] + 0.01
+                && b.rect[1] <= f[1] + 0.01
+                && b.rect[0] + b.rect[2] >= f[0] + f[2] - 0.01
+                && b.rect[1] + b.rect[3] >= f[1] + f[3] - 0.01
+        });
+        assert!(covered, "{what}: a request covers the frost {f:?}");
+    }
+    for o in &scene.overlays {
+        let g = &o.layer.geometry;
+        for s in g.under.iter().chain(&g.over) {
+            assert!(s.color[3] < 1.0 - 1e-6, "{what}: an opaque fill {s:?}");
+        }
+    }
+}
+
+/// Runs `draw` at 0, 1 s, 2 s, 4 s and 5 s (the tooltip's delay passed, every open settled) with the
+/// pointer at `pointer` from the second frame; returns the last scene.
+fn settled(pointer: Option<(f32, f32)>, mut draw: impl FnMut(&mut Ui<'_>)) -> Scene {
+    let mut h = UiHarness::new(WIN);
+    let mut last = Scene::default();
+    for (i, ms) in [0u64, 1_000, 2_000, 2_016, 4_000, 5_000]
+        .into_iter()
+        .enumerate()
+    {
+        if let (true, Some((x, y))) = (i == 1, pointer) {
+            h.input.pointer_to(x, y);
+        }
+        h.at_ms(ms);
+        last = h.frame(&mut draw).0;
+    }
+    last
+}
+
+#[test]
+fn every_floating_surface_is_glass() {
+    let row = MenuRow::Item {
+        glyph: None,
+        text: "one",
+        shortcut: "",
+    };
+    let anchor = Rect::new(100.0, 100.0, 210.0, 32.0);
+    let anchor_id = WidgetId::ROOT.with("combo");
+    assert_glass(
+        &settled(None, |ui| {
+            ui.menu("menu", &[row], (200.0, 100.0));
+        }),
+        "menu",
+    );
+    // The combo's list is `Ui::dropdown`.
+    assert_glass(
+        &settled(None, |ui| {
+            ui.dropdown(
+                "list",
+                anchor,
+                anchor_id,
+                &[("one", true), ("two", true)],
+                0,
+            );
+        }),
+        "dropdown and the combo's list",
+    );
+    assert_glass(
+        &settled(None, |ui| {
+            let o = PopoverOptions::new(PAGE_BTN, (120.0, 60.0));
+            ui.popover("pop", &o, |_, _| {});
+        }),
+        "popover",
+    );
+    assert_glass(
+        &settled(Some((PAGE_BTN.x + 4.0, PAGE_BTN.y + 4.0)), |ui| {
+            let b = page_button(ui);
+            ui.tooltip(&b, "hint");
+        }),
+        "tooltip",
+    );
+    // The search picker opens by a click on its trigger.
+    let mut h = UiHarness::new(WIN);
+    let trigger = Rect::new(100.0, 100.0, 300.0, 36.0);
+    let mut selected = None;
+    let items = ["Apple", "Banana", "Cherry"];
+    let opts = PickerOptions {
+        placeholder: "Find",
+        name: "Fruit",
+        ..PickerOptions::default()
+    };
+    let mut scene = Scene::default();
+    for (i, ms) in [0u64, 16, 32, 500, 1_000].into_iter().enumerate() {
+        if i == 1 {
+            h.input.pointer_to(150.0, 118.0).click(P);
+        }
+        h.at_ms(ms);
+        scene = h
+            .frame(|ui| {
+                ui.search_picker("p", trigger, &items, &mut selected, &opts);
+            })
+            .0;
+    }
+    assert_glass(&scene, "search picker");
+}
+
+#[test]
+fn a_glass_list_in_a_dialog_and_a_menu_in_a_popover_each_ask_on_their_own_layer() {
+    let scene = stacked_with_tooltip(false);
+    let layers = drawn(&scene);
+    // Dialog, popover, list, tooltip: the popover, the list and the tooltip each have one request
+    // of their own, and the list's is not on the popover's layer.
+    let asks: Vec<usize> = layers.iter().map(|o| o.layer.backdrops.len()).collect();
+    assert_eq!(asks[1..], [1, 1, 1], "{asks:?}");
+    // The dialog card is step 6b's: its scrim is not blurred here, so it asks for nothing.
+    assert_eq!(asks[0], 0);
+
+    // A menu opened from a popover's content.
+    let mut h = UiHarness::new(WIN);
+    let mut last = Scene::default();
+    for ms in [0u64, 500, 1_000] {
+        h.at_ms(ms);
+        last = h
+            .frame(|ui| {
+                ui.popover(
+                    "pop",
+                    &PopoverOptions::new(PAGE_BTN, (200.0, 100.0)),
+                    |ui, _| {
+                        let row = MenuRow::Item {
+                            glyph: None,
+                            text: "one",
+                            shortcut: "",
+                        };
+                        ui.menu("menu", &[row], (300.0, 300.0));
+                    },
+                );
+            })
+            .0;
+    }
+    let layers = drawn(&last);
+    assert_eq!(layers.len(), 2);
+    assert!(layers.iter().all(|o| o.layer.backdrops.len() == 1));
+    assert!(layers[0].tag < layers[1].tag);
+    assert_glass(&last, "the menu in the popover");
 }

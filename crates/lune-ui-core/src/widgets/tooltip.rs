@@ -6,8 +6,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
+use super::popover::{GLASS_RADIUS, glass_surface};
 use super::popover::{PlaceAlign, PlaceRequest, Side, place};
-use super::popup_panel;
 use crate::access::{Node, Role};
 use crate::motion::{Easing, Kind, Motion, Reduce, Time, Token};
 use crate::paint::{LayerId, Ops, Painter, Rect, Xform};
@@ -168,7 +168,6 @@ impl<'a> Ui<'a> {
             return;
         }
 
-        let t = *self.theme();
         let ((cw, ch), data) = layout(self);
         let size = ((cw + 2.0 * PAD_X).min(MAX_WIDTH), ch + 2.0 * PAD_Y);
         let window = self.painter().window;
@@ -220,7 +219,7 @@ impl<'a> Ui<'a> {
                 ui.painter().push_xform(x);
             }
             let ((), ops) = ui.record(|ui| {
-                popup_panel(ui.painter(), rect, t.dropdown_bg, t.border);
+                glass_surface(ui.painter(), rect, GLASS_RADIUS);
                 draw(ui, inner, data);
             });
             if faded.is_some() {

@@ -41,7 +41,7 @@ The 800 ms is the only explicit tooltip delay, on the terminal tab tooltip [L sr
 
 ### Anatomy
 
-- Shell: radius 8, clipped, fill `BackdropDark`, 1 px `SurfaceBorder` border, content padding 10 horizontal and 8 vertical [L src/Lunegit.Desktop/App.axaml:700-717]. The dark preset's `dropdown_bg` and `border` are the nearest existing tokens [R crates/lune-ui-core/src/theme.rs:56-70].
+- Shell: Lunegit's is radius 8, clipped, fill `BackdropDark`, 1 px `SurfaceBorder` border, content padding 10 horizontal and 8 vertical [L src/Lunegit.Desktop/App.axaml:700-717]. The toolkit draws the one glass surface instead (`glass_surface` at radius 9: the backdrop, `menu_glass` frost, the `menu_popup_border` ring, D8), with that padding.
 - Content: plain text (the tab title, a button name) or a small stack: a bold line, a secondary line, an optional icon row with a separator, spaced 4 [L src/Lunegit.Desktop/Views/RepositoryContentView.axaml:401-422], [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:263].
 - Placement: below the anchor, flipped and shifted inside the window by `overlay.popover` [overlay.popover]; Lunegit leaves placement to Avalonia (not in the files read).
 - Used for: a truncated tab title [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:263], the name of an icon-only header button [L src/Lunegit.Desktop/Views/AiProjectDetailView.axaml:92,109,114], the exact bar-chart value, truncated ids, the tray icon state in words [W docs/ui/components.md:647,726,756-758].

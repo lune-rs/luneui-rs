@@ -285,6 +285,17 @@ fn each_skip_kind_is_reported_in_file_order() {
     assert_eq!(f.theme.glass.window.material_opacity, 0.0);
 }
 
+#[test]
+fn a_dropdown_fill_key_is_gone_and_the_glass_tint_has_a_key() {
+    // `BackdropDark` fed the opaque list panel (D8); every list is glass now, so it is unknown.
+    let f = load(&with_colors(r##""BackdropDark":"#F0000000""##));
+    assert_eq!(f.skipped, [Skip::UnknownColor("BackdropDark".to_string())]);
+    assert_eq!(f.theme, DARK);
+    let f = load(&with_colors(r##""MenuGlassBackground":"#80102030""##));
+    assert!(f.skipped.is_empty(), "{:?}", f.skipped);
+    assert_eq!(f.theme.menu_glass, [0x10, 0x20, 0x30, 0x80]);
+}
+
 // --- Envelope -------------------------------------------------------------------------------
 
 #[test]

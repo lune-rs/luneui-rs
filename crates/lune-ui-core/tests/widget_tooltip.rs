@@ -308,7 +308,7 @@ fn pixel_probes_at_scale_2() {
     let out = frame(&mut h, 1300, &[anchor("a", A)]);
     let layer = &out.scene.merged(LayerId::Popup);
     let (fill, ring) = (layer.geometry.under[0], layer.geometry.under[1]);
-    assert_eq!(fill.radii, [16.0; 4], "radius 16 device px");
+    assert_eq!(fill.radii, [18.0; 4], "radius 9 logical, 18 device px");
     assert_eq!(ring.params[1], 2.0, "2 px border");
     let mut t = FakeText;
     let text = t.measure(
@@ -362,13 +362,12 @@ fn the_fade_is_opacity_only_reduced_keeps_it_and_off_snaps() {
         frame(&mut h, 0, &[anchor("a", A)]);
         frame(&mut h, 10, &[anchor("a", A)]);
         frame(&mut h, 790, &[anchor("a", A)]);
-        let mid = frame(&mut h, 830, &[anchor("a", A)]);
+        // The first frame of the appear is at opacity 0 and records no frost; the next is mid-fade.
+        frame(&mut h, 830, &[anchor("a", A)]);
+        let mid = frame(&mut h, 880, &[anchor("a", A)]);
         let fill = mid.scene.merged(LayerId::Popup).geometry.under[0];
-        assert_eq!(
-            fill.color[3] < DARK.dropdown_bg[3] as f32 / 255.0 - 1e-6,
-            expect_fade,
-            "{tier:?}"
-        );
+        assert_eq!(fill.params[2], 2.0, "{tier:?}: the frost");
+        assert_eq!(fill.params[1] < 1.0 - 1e-6, expect_fade, "{tier:?}");
         // It never moves or scales.
         let settled = frame(&mut h, 1300, &[anchor("a", A)]);
         let rest = settled.scene.merged(LayerId::Popup).geometry.under[0];

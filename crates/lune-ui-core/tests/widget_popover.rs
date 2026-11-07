@@ -400,7 +400,10 @@ fn pixel_probes_at_scale_2() {
     let fill = out.scene.merged(LayerId::Popup).geometry.under[0];
     // Gap: 4 logical px = 8 device px under the anchor.
     assert_eq!(fill.rect[1] - ANCHOR.bottom() * 2.0, 8.0);
-    assert_eq!(fill.radii, [16.0; 4], "surface radius 16 device px");
+    assert_eq!(
+        fill.radii, [18.0; 4],
+        "surface radius 9 logical px, 18 device px"
+    );
     // Margin: 8 logical px = 16 device px from the window edge when shifted.
     let mut h = UiHarness::new(WIN);
     h.input.set_scale(2.0);
@@ -523,8 +526,18 @@ fn a_glass_popover_blurs_what_is_under_it_and_replays_the_blur_while_it_closes()
     assert_eq!(closing.repaint, Some(Repaint::Now));
     let idle = run(&mut h, 1300, &[], |_| {});
     assert!(idle.scene.backdrops().next().is_none());
-    // The default surface asks for no blur.
+    // The default surface is the glass one; `Surface::None` asks for no blur.
     let mut h = UiHarness::new(WIN);
     open_one(&mut h, 0);
-    assert!(open_one(&mut h, 400).scene.backdrops().next().is_none());
+    let dflt = open_one(&mut h, 400);
+    assert_eq!(dflt.scene.backdrops().count(), 1);
+    assert_eq!(
+        dflt.scene.merged(popup).geometry.under[0].color,
+        premul(DARK.menu_glass)
+    );
+    let mut h = UiHarness::new(WIN);
+    let none = |o: &mut PopoverOptions| o.surface = Surface::None;
+    run(&mut h, 0, &[("pop", ANCHOR)], none);
+    let out = run(&mut h, 400, &[("pop", ANCHOR)], none);
+    assert!(out.scene.backdrops().next().is_none());
 }

@@ -1,6 +1,5 @@
-//! The dropdown and popup panel (C4 retrofit, `overlay.dropdown` and `overlay.popup-panel`
-//! acceptance): rest identity with the Painter-API `dropdown`, keyboard highlight, disabled rows,
-//! dismissal, focus restore to the combo, the semantic tree, the panel probe.
+//! The dropdown (C4 retrofit, `overlay.dropdown` acceptance): rest identity with the Painter-API `dropdown`, keyboard highlight, disabled rows,
+//! dismissal, focus restore to the combo, the semantic tree, the glass surface and the row fills.
 
 use lune_ui_core::access::{Action, Role, State};
 use lune_ui_core::color::premul;
@@ -14,7 +13,6 @@ use lune_ui_core::ui::WidgetId;
 use lune_ui_core::widgets::dropdown::{
     DropdownOptions, DropdownResponse, dropdown, panel_rect, row_rect,
 };
-use lune_ui_core::widgets::popup_panel;
 
 const WIN: (f32, f32) = (1040.0, 660.0);
 const ANCHOR: Rect = Rect::new(34.0, 100.0, 210.0, 32.0);
@@ -242,21 +240,6 @@ fn the_semantic_tree_is_a_list_of_list_items() {
     }
 }
 
-#[test]
-fn the_popup_panel_is_16_px_radius_with_a_2_px_ring_in_the_callers_fill() {
-    let mut text = FakeText;
-    let mut p = Painter::<u8>::new(2.0, win(), &mut text, None, DARK);
-    let (bg, border) = ([10, 20, 30, 200], [255, 255, 255, 48]);
-    popup_panel(&mut p, Rect::new(10.0, 10.0, 100.0, 60.0), bg, border);
-    let g = &p.scene.layers[0].geometry;
-    let (fill, ring) = (g.under[0], g.under[1]);
-    assert_eq!(fill.radii, [16.0; 4]);
-    assert_eq!(fill.color, premul(bg));
-    assert_eq!(ring.radii, [16.0; 4]);
-    assert_eq!(ring.params[1], 2.0);
-    assert_eq!(ring.color, premul(border));
-}
-
 fn many() -> Vec<(String, bool)> {
     (0..30).map(|i| (format!("Option {i}"), true)).collect()
 }
@@ -275,10 +258,7 @@ fn with_options(
     (scene, resp, out)
 }
 
-const SCROLLING: DropdownOptions = DropdownOptions {
-    glass: false,
-    max_rows: Some(8),
-};
+const SCROLLING: DropdownOptions = DropdownOptions { max_rows: Some(8) };
 
 fn row_id(i: usize) -> WidgetId {
     WidgetId::ROOT.with("dd").with("list").with(i.to_string())
@@ -305,35 +285,58 @@ fn inside(r: Rect, view: Rect) -> bool {
 }
 
 #[test]
-fn a_glass_dropdown_emits_the_backdrop_and_the_glass_fill() {
-    let glass = DropdownOptions {
-        glass: true,
-        max_rows: None,
-    };
+fn the_list_is_the_glass_surface() {
     let opts = [
         ("RznSans".to_owned(), true),
         ("Sans Serif".to_owned(), true),
     ];
     let mut h = UiHarness::new(WIN);
-    with_options(&mut h, 0, &opts, 0, &glass);
-    let (scene, ..) = with_options(&mut h, 500, &opts, 0, &glass);
+    let plain = DropdownOptions::default();
+    with_options(&mut h, 0, &opts, 0, &plain);
+    let (scene, ..) = with_options(&mut h, 500, &opts, 0, &plain);
     let popup = LayerId::Popup;
     let under = &scene.merged(popup).geometry.under;
+    // The frost of `menu_glass` over the blurred scene, then the ring.
     assert_eq!(under[0].color, premul(DARK.menu_glass));
+    assert_eq!(under[0].params[2], 2.0, "a frost");
     assert_eq!(under[0].radii, [9.0; 4]);
     assert_eq!(under[1].color, premul(DARK.menu_popup_border), "the ring");
     let b = scene.merged(popup).backdrops[0];
     assert_eq!(b.rect, under[0].rect);
     assert_eq!(b.radius, 9.0);
-    // The plain list asks for no blur and keeps its opaque fill.
+}
+
+#[test]
+fn a_row_wears_the_menus_hover_and_pressed_fills_at_radius_4() {
+    let fill_of = |scene: &Scene, color| {
+        scene
+            .merged(LayerId::Popup)
+            .geometry
+            .under
+            .iter()
+            .copied()
+            .find(|s| s.color == premul(color) && s.params[2] != 2.0)
+    };
+    let mut text = FakeText;
+    let p = Painter::<u8>::new(1.0, win(), &mut text, None, DARK);
+    let row = row_rect(panel_rect(&p, ANCHOR, OPTIONS.len()), 1);
     let mut h = UiHarness::new(WIN);
-    let plain = DropdownOptions::default();
-    with_options(&mut h, 0, &opts, 0, &plain);
-    let (scene, ..) = with_options(&mut h, 500, &opts, 0, &plain);
-    assert!(scene.backdrops().next().is_none());
-    assert_eq!(
-        scene.merged(popup).geometry.under[0].color,
-        premul(DARK.dropdown_bg)
+    frame(&mut h, 0, ANCHOR, true, 0);
+    let (x, y) = row_centre(ANCHOR, 1);
+    h.input.pointer_to(x, y);
+    frame(&mut h, 10, ANCHOR, true, 0);
+    let (hover, _) = frame(&mut h, 20, ANCHOR, true, 0);
+    let fill = fill_of(&hover, DARK.menu_item_hover).expect("the hover fill");
+    assert_eq!(fill.radii, [4.0; 4]);
+    assert_eq!(fill.rect, [row.x, row.y, row.w, row.h]);
+    assert!(fill_of(&hover, DARK.menu_item_pressed).is_none());
+    h.input.press(P);
+    let (down, _) = frame(&mut h, 30, ANCHOR, true, 0);
+    let fill = fill_of(&down, DARK.menu_item_pressed).expect("the pressed fill");
+    assert_eq!(fill.radii, [4.0; 4]);
+    assert!(
+        fill_of(&down, DARK.menu_item_hover).is_none(),
+        "pressed replaces hover"
     );
 }
 
