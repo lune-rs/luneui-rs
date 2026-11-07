@@ -24,6 +24,7 @@ mod page;
 mod pages;
 mod popover;
 mod scenes;
+mod showcase;
 mod smoke;
 mod window;
 

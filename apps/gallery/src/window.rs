@@ -1,9 +1,11 @@
-//! Window mode: a glass window showing one page. The winit `Translator` turns window events into
-//! `RawInput`, a Ui page draws through the `Ui` each frame, and `OutputState` applies what the
-//! frame asks of the window. Legacy pages paint their fixed scenes through the Painter API.
+//! Window mode: a glass window showing the showcase page, which hosts every other page. The winit
+//! `Translator` turns window events into `RawInput`, the page draws through the `Ui` each frame,
+//! and `OutputState` applies what the frame asks of the window. Legacy pages (the fixed
+//! Painter-API scenes) are not shown here; the dump and the pixel gate still draw them.
 //!
 //! App code: it reads the clock (time since start is the frame's time) and runs the event loop.
-//! No gate opens a window, so this module is compile- and review-checked only.
+//! No gate opens a window, so this module is compile- and review-checked only; the showcase's
+//! tests send the same `Translator` calls through the shell.
 
 use std::process::ExitCode;
 use std::sync::Arc;
@@ -12,15 +14,13 @@ use std::time::{Duration, Instant};
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, StartCause, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoopProxy};
-use winit::keyboard::{Key, ModifiersState, NamedKey};
+use winit::keyboard::{Key, ModifiersState};
 use winit::window::{Window, WindowId};
 
 use lune_ui::access::{AccessBridge, RootInfo};
 use lune_ui::clipboard::Clipboard;
 use lune_ui::gpu::{self, Gpu};
-use lune_ui::input::{
-    ClipboardRequest, FrameOutput, OutputState, Repaint, Translator, control_flow, keymap,
-};
+use lune_ui::input::{ClipboardRequest, OutputState, Translator, control_flow, keymap};
 use lune_ui::lunegit_dark::THEME;
 use lune_ui::material::{self, Material};
 use lune_ui::motion::MotionTier;
@@ -31,10 +31,9 @@ use lune_ui::tray::TrayState;
 use lune_ui::ui::{FrameConfig, Ui, UiStore};
 use lune_ui::window::glass_attributes;
 
-use crate::page::{Page, PageKind, PageState, Stage, register_images, release_images};
-use crate::pages::PAGES;
+use crate::page::{Page, PageKind, PageState, Stage, register_images};
 use crate::popover::{AppEvent, TrayHost, event_loop, route_tray_events};
-use crate::scenes::{H, W};
+use crate::showcase;
 use crate::{Renderer, custom, draw_scene, text_cache};
 use lune_ui::image::ImageId;
 
@@ -54,39 +53,36 @@ pub(crate) struct Shown {
 enum Shortcut {
     NextPage,
     PrevPage,
-    NextScene,
-    PrevScene,
     Quit,
 }
 
-/// The shortcut `key` is under `mods`, if any. Up and Down cycle scenes only on a legacy page
-/// (`legacy`); every other key, Escape included, is the page's.
-fn shortcut(key: &Key, mods: ModifiersState, legacy: bool) -> Option<Shortcut> {
+/// The shortcut `key` is under `mods`, if any. Every other key, Escape included, is the page's.
+fn shortcut(key: &Key, mods: ModifiersState) -> Option<Shortcut> {
     let command = mods.super_key() || mods.control_key();
     match key {
         Key::Character(c) if command && c.as_str() == "]" => Some(Shortcut::NextPage),
         Key::Character(c) if command && c.as_str() == "[" => Some(Shortcut::PrevPage),
         Key::Character(c) if command && c.eq_ignore_ascii_case("q") => Some(Shortcut::Quit),
-        Key::Named(NamedKey::ArrowDown) if legacy => Some(Shortcut::NextScene),
-        Key::Named(NamedKey::ArrowUp) if legacy => Some(Shortcut::PrevScene),
         _ => None,
     }
 }
+
+/// The window's first size, in logical pixels: the 1,020 x 616 canvas of a page, the sidebar and
+/// the margins around them.
+const WINDOW: (f64, f64) = (1600.0, 900.0);
 
 struct App {
     shown: Option<Shown>,
     /// Lets the accessibility handlers, on their own thread, reach the event loop.
     proxy: EventLoopProxy<AppEvent>,
-    /// Index of the page on screen.
-    page: usize,
-    /// The legacy scene on screen.
-    scene: usize,
-    /// The Ui page's retained state; reset when the page changes.
+    /// The showcase page's retained store and state.
     store: UiStore,
     state: Option<Box<dyn PageState>>,
     /// The pictures the page's state registered with the renderer.
     images: Vec<ImageId>,
+    /// The hosted page's string table, and the `PageState::epoch` it was read at.
     strings: StringTable,
+    strings_epoch: u64,
     /// The shortcut table; the gallery's own keys are handled before the frame.
     shortcuts: Shortcuts,
     mods: ModifiersState,
@@ -118,12 +114,11 @@ pub(crate) fn run() -> ExitCode {
     let mut app = App {
         shown: None,
         proxy: event_loop.create_proxy(),
-        page: 0,
-        scene: 0,
         store: UiStore::default(),
         state: None,
         images: Vec::new(),
         strings: StringTable::default(),
+        strings_epoch: 0,
         shortcuts: Shortcuts::default(),
         mods: ModifiersState::empty(),
         clipboard: Clipboard::new(),
@@ -148,13 +143,8 @@ pub(crate) fn setup(
     proxy: EventLoopProxy<AppEvent>,
     show: bool,
 ) -> Result<Shown, String> {
-    let attrs = glass_attributes(
-        "luneui gallery",
-        (f64::from(W), f64::from(H)),
-        (560.0, 360.0),
-        true,
-    )
-    .with_visible(false);
+    let attrs =
+        glass_attributes("luneui gallery", WINDOW, (900.0, 600.0), true).with_visible(false);
     let window = Arc::new(
         event_loop
             .create_window(attrs)
@@ -202,53 +192,27 @@ pub(crate) fn window_title(page: &Page) -> String {
     format!("luneui gallery - {}", page.title)
 }
 
-impl App {
-    fn current(&self) -> &'static Page {
-        PAGES[self.page]
-    }
-
-    fn legacy_len(&self) -> Option<usize> {
-        match self.current().kind {
-            PageKind::Legacy(scenes) => Some(scenes.len()),
-            PageKind::Ui(_) => None,
-        }
-    }
-
-    /// Shows page `index`, with a fresh Ui state.
-    fn go_to(&mut self, index: usize) {
-        self.page = index;
-        self.scene = 0;
-        self.store = UiStore::default();
-        self.state = None;
-        if let Some(shown) = &mut self.shown {
-            release_images(&mut shown.r.gpu, &self.images);
-            self.images.clear();
-        }
-        if let Some(shown) = &self.shown {
-            shown.window.set_title(&window_title(PAGES[index]));
-        }
-        self.sync_tray();
-    }
-
-    /// Puts the live tray in while the `tray` page is on screen and takes it out otherwise. An
-    /// item that cannot be made (no tray here, or the OS refused) is reported once and the page
-    /// draws without it.
-    fn sync_tray(&mut self) {
-        let wanted = self.current().id == "tray";
-        match (wanted, self.tray.is_some()) {
-            (true, false) => {
-                let scale = self.shown.as_ref().map_or(1.0, |s| s.window.scale_factor());
-                match TrayHost::new(self.tray_state, scale) {
-                    Ok(host) => self.tray = Some(host),
-                    Err(e) => eprintln!("tray: {e}"),
-                }
+/// Puts the live tray in while the hosted page has a tray control (the `tray` page) and takes it
+/// out otherwise. An item that cannot be made (no tray here, or the OS refused) is reported once
+/// and the page draws without it. Returns whether the tray surface's flow must be reset.
+fn sync_tray(tray: &mut Option<TrayHost>, wanted: bool, state: TrayState, scale: f64) -> bool {
+    match (wanted, tray.is_some()) {
+        (true, false) => {
+            match TrayHost::new(state, scale) {
+                Ok(host) => *tray = Some(host),
+                Err(e) => eprintln!("tray: {e}"),
             }
-            (false, true) => self.tray = None,
-            _ => {}
+            true
         }
-        self.pop_flow = ControlFlow::Wait;
+        (false, true) => {
+            *tray = None;
+            true
+        }
+        _ => false,
     }
+}
 
+impl App {
     /// Hands the event loop the earlier of what the main window and the tray surface ask for.
     fn set_flow(&self, event_loop: &ActiveEventLoop) {
         event_loop.set_control_flow(merge_flow(self.main_flow, self.pop_flow));
@@ -257,7 +221,7 @@ impl App {
     /// Draws the current page into the window and sets the loop's control flow from the frame's
     /// `Repaint`.
     fn render(&mut self, event_loop: &ActiveEventLoop) -> Result<(), String> {
-        let page = self.current();
+        let page: &'static Page = &showcase::PAGE;
         let Some(shown) = &mut self.shown else {
             return Ok(());
         };
@@ -281,68 +245,76 @@ impl App {
         let size = surface.size();
         let s = window.scale_factor() as f32;
         bridge.drain(translator);
-        let input = translator.take(self.start.elapsed());
-        let mut repaint = Repaint::Idle;
+        let mut input = translator.take(self.start.elapsed());
         // The status item learns what bar it is on a few turns after it is made: ask again soon.
         let mut poll_tray = false;
         let root = RootInfo {
             title: window_title(page),
             scale: window.scale_factor(),
         };
-        let display = match page.kind {
-            PageKind::Legacy(scenes) => {
-                // A legacy page has no tree, but an activation still needs its update.
-                bridge.update(&FrameOutput::default(), &root);
-                scenes[self.scene % scenes.len()].paint(&mut r.text, s, size)
-            }
-            PageKind::Ui(ui_page) => {
-                if self.state.is_none() {
-                    let fresh = (ui_page.state)();
-                    match register_images(&mut r.gpu, fresh.images()) {
-                        Ok(ids) => self.images = ids,
-                        Err(e) => eprintln!("images: {e}"),
-                    }
-                    self.state = Some(fresh);
-                }
-                let Some(state) = self.state.as_mut() else {
-                    return Ok(());
-                };
-                let config = FrameConfig {
-                    theme: state.theme().unwrap_or(THEME),
-                    tier: MotionTier::Full,
-                    strings: &self.strings,
-                    arg_format: &DisplayFormat,
-                    keymap: keymap(),
-                    shortcuts: &self.shortcuts,
-                };
-                let mut ui = Ui::begin(&mut self.store, &input, config, &mut r.text);
-                ui.scope(page.id, |ui| state.draw(ui, &Stage::window()));
-                let (display, out) = ui.finish();
-                if output.apply(window, &out) {
-                    event_loop.exit();
-                }
-                if let Some(ts) = state.tray_state() {
-                    self.tray_state = ts;
-                    if let Some(host) = &mut self.tray {
-                        host.sync(event_loop, ts);
-                        poll_tray = host.wants_poll();
-                    }
-                }
-                // Writes go to the OS; a read is answered with the next frame's input, which needs
-                // a frame.
-                self.clipboard.service(&out, translator);
-                if out
-                    .clipboard
-                    .iter()
-                    .any(|r| matches!(r, ClipboardRequest::Read))
-                {
-                    window.request_redraw();
-                }
-                bridge.update(&out, &root);
-                repaint = out.repaint;
-                display
-            }
+        let PageKind::Ui(ui_page) = page.kind else {
+            return Ok(());
         };
+        if self.state.is_none() {
+            let fresh = (ui_page.state)();
+            match register_images(&mut r.gpu, fresh.images()) {
+                Ok(ids) => self.images = ids,
+                Err(e) => eprintln!("images: {e}"),
+            }
+            self.state = Some(fresh);
+        }
+        let Some(state) = self.state.as_mut() else {
+            return Ok(());
+        };
+        state.inject(&self.store, &mut input);
+        if state.epoch() != self.strings_epoch {
+            self.strings_epoch = state.epoch();
+            self.strings = state.strings();
+        }
+        let config = FrameConfig {
+            theme: state.theme().unwrap_or(THEME),
+            tier: MotionTier::Full,
+            strings: &self.strings,
+            arg_format: &DisplayFormat,
+            keymap: keymap(),
+            shortcuts: &self.shortcuts,
+        };
+        let mut ui = Ui::begin(&mut self.store, &input, config, &mut r.text);
+        ui.scope(page.id, |ui| state.draw(ui, &Stage::window()));
+        let (display, mut out) = ui.finish();
+        // A hosted page's window commands (the window page's caption buttons) are demonstrations:
+        // its Close must not close the gallery. The gallery quits on its shortcut.
+        out.commands.clear();
+        if output.apply(window, &out) {
+            event_loop.exit();
+        }
+        let tray_state = state.tray_state();
+        if let Some(ts) = tray_state {
+            self.tray_state = ts;
+        }
+        if sync_tray(
+            &mut self.tray,
+            tray_state.is_some(),
+            self.tray_state,
+            window.scale_factor(),
+        ) {
+            self.pop_flow = ControlFlow::Wait;
+        }
+        if let (Some(ts), Some(host)) = (tray_state, &mut self.tray) {
+            host.sync(event_loop, ts);
+            poll_tray = host.wants_poll();
+        }
+        // Writes go to the OS; a read is answered with the next frame's input, which needs a frame.
+        self.clipboard.service(&out, translator);
+        if out
+            .clipboard
+            .iter()
+            .any(|r| matches!(r, ClipboardRequest::Read))
+        {
+            window.request_redraw();
+        }
+        bridge.update(&out, &root);
+        let repaint = out.repaint;
         draw_scene(r, &display, s, &view, size)?;
         window.pre_present_notify();
         surface.present(&r.gpu, frame);
@@ -376,7 +348,6 @@ impl ApplicationHandler<AppEvent> for App {
         };
         shown.window.request_redraw();
         self.shown = Some(shown);
-        self.sync_tray();
     }
 
     /// A wake from the accessibility handlers (an action or a tree request waits for a frame), or
@@ -431,22 +402,22 @@ impl ApplicationHandler<AppEvent> for App {
         shown.bridge.window_event(&shown.window, &event);
         let action = match &event {
             WindowEvent::KeyboardInput { event: key, .. } if key.state == ElementState::Pressed => {
-                shortcut(&key.logical_key, self.mods, self.legacy_len().is_some())
+                shortcut(&key.logical_key, self.mods)
             }
             _ => None,
         };
         if let Some(action) = action {
             match action {
                 Shortcut::Quit => event_loop.exit(),
-                Shortcut::NextPage => self.go_to((self.page + 1) % PAGES.len()),
-                Shortcut::PrevPage => self.go_to((self.page + PAGES.len() - 1) % PAGES.len()),
-                Shortcut::NextScene | Shortcut::PrevScene => {
-                    let n = self.legacy_len().unwrap_or(1);
-                    self.scene = if action == Shortcut::NextScene {
-                        (self.scene + 1) % n
+                Shortcut::NextPage | Shortcut::PrevPage => {
+                    let cue = if action == Shortcut::NextPage {
+                        "next-page"
                     } else {
-                        (self.scene + n - 1) % n
+                        "prev-page"
                     };
+                    if let Some(state) = &mut self.state {
+                        state.cue(cue);
+                    }
                 }
             }
             if let Some(shown) = &self.shown {
@@ -527,6 +498,7 @@ fn merge_flow(a: ControlFlow, b: ControlFlow) -> ControlFlow {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use winit::keyboard::NamedKey;
 
     fn ch(s: &str) -> Key {
         Key::Character(s.into())
@@ -535,24 +507,18 @@ mod tests {
     #[test]
     fn bracket_keys_switch_pages_under_command_or_control() {
         for mods in [ModifiersState::SUPER, ModifiersState::CONTROL] {
-            assert_eq!(shortcut(&ch("]"), mods, false), Some(Shortcut::NextPage));
-            assert_eq!(shortcut(&ch("["), mods, false), Some(Shortcut::PrevPage));
-            assert_eq!(shortcut(&ch("q"), mods, false), Some(Shortcut::Quit));
+            assert_eq!(shortcut(&ch("]"), mods), Some(Shortcut::NextPage));
+            assert_eq!(shortcut(&ch("["), mods), Some(Shortcut::PrevPage));
+            assert_eq!(shortcut(&ch("q"), mods), Some(Shortcut::Quit));
         }
-        assert_eq!(shortcut(&ch("]"), ModifiersState::empty(), false), None);
+        assert_eq!(shortcut(&ch("]"), ModifiersState::empty()), None);
     }
 
     #[test]
-    fn up_and_down_cycle_scenes_on_legacy_pages_only() {
-        let (up, down) = (
-            Key::Named(NamedKey::ArrowUp),
-            Key::Named(NamedKey::ArrowDown),
-        );
+    fn the_arrow_keys_are_the_pages() {
         let none = ModifiersState::empty();
-        assert_eq!(shortcut(&down, none, true), Some(Shortcut::NextScene));
-        assert_eq!(shortcut(&up, none, true), Some(Shortcut::PrevScene));
-        assert_eq!(shortcut(&down, none, false), None);
-        assert_eq!(shortcut(&up, none, false), None);
+        assert_eq!(shortcut(&Key::Named(NamedKey::ArrowDown), none), None);
+        assert_eq!(shortcut(&Key::Named(NamedKey::ArrowUp), none), None);
     }
 
     #[test]
@@ -575,7 +541,6 @@ mod tests {
     #[test]
     fn escape_reaches_the_page() {
         let esc = Key::Named(NamedKey::Escape);
-        assert_eq!(shortcut(&esc, ModifiersState::empty(), true), None);
-        assert_eq!(shortcut(&esc, ModifiersState::empty(), false), None);
+        assert_eq!(shortcut(&esc, ModifiersState::empty()), None);
     }
 }

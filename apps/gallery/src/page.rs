@@ -12,7 +12,7 @@
 use lune_ui::access::{AccessAction, Action};
 use lune_ui::image::{ImageData, ImageId, ImageStore};
 use lune_ui::input::{
-    FrameOutput, ImeEvent, Key, Keymap, Modifiers, NamedKey, PointerButton, Repaint,
+    FrameOutput, ImeEvent, Key, Keymap, Modifiers, NamedKey, PointerButton, RawInput, Repaint,
 };
 use lune_ui::lunegit_dark::THEME;
 use lune_ui::motion::MotionTier;
@@ -122,6 +122,17 @@ pub(crate) trait PageState {
     /// that has no tray.
     fn tray_state(&self) -> Option<TrayState> {
         None
+    }
+
+    /// Input the page adds to a frame's before it begins: the host of other pages replays a
+    /// scene's script here. `store` holds the previous frame, for the rects a script aims at.
+    /// The default adds nothing.
+    fn inject(&mut self, _store: &UiStore, _input: &mut RawInput) {}
+
+    /// Changes whenever the string table (`strings`) may have: the runner asks for the table
+    /// again when it does. The default never changes.
+    fn epoch(&self) -> u64 {
+        0
     }
 }
 
@@ -260,9 +271,151 @@ pub(crate) enum Ev {
 }
 
 /// The id of the widget at `path` under page `page`.
+#[cfg(test)]
 pub(crate) fn path_id(page: &str, path: &[&str]) -> WidgetId {
     path.iter()
         .fold(WidgetId::ROOT.with(page), |id, key| id.with(*key))
+}
+
+/// Where a script's key paths resolve: the retained store of the page's frame, and the id of
+/// the scope the page draws under (the paths are the keys under it, outermost first).
+pub(crate) struct Scope<'a> {
+    /// The page's name, for messages.
+    pub(crate) name: &'a str,
+    pub(crate) store: &'a UiStore,
+    pub(crate) root: WidgetId,
+}
+
+impl Scope<'_> {
+    /// The id of the widget at `path`.
+    pub(crate) fn id(&self, path: &[&str]) -> WidgetId {
+        path.iter().fold(self.root, |id, key| id.with(*key))
+    }
+
+    /// The previous frame's rect of the widget at `path`.
+    pub(crate) fn rect_of(&self, path: &[&str]) -> Result<Rect, String> {
+        self.store
+            .last_rect(self.id(path))
+            .ok_or_else(|| format!("{}: no widget at {path:?}", self.name))
+    }
+}
+
+/// Applies one scripted event to `input`. `held` is the modifiers `Ev::Mods` holds; `shift`
+/// moves the absolute positions of `Ev::PointerAt` (a page on a stage sits somewhere else than
+/// a page alone in the window); `cue` receives an `Ev::Cue`.
+pub(crate) fn apply_event(
+    input: &mut ScriptedInput,
+    held: &mut Modifiers,
+    ev: &Ev,
+    shift: (f32, f32),
+    scope: &Scope<'_>,
+    cue: &mut dyn FnMut(&str),
+) -> Result<(), String> {
+    let primary = PointerButton::Primary;
+    match ev {
+        Ev::PointerOver(path) => {
+            let r = scope.rect_of(path)?;
+            input.pointer_to(r.x + r.w / 2.0, r.y + r.h / 2.0);
+        }
+        Ev::PointerAt(x, y) => {
+            input.pointer_to(*x + shift.0, *y + shift.1);
+        }
+        Ev::Press => {
+            input.press(primary);
+        }
+        Ev::Release => {
+            input.release(primary);
+        }
+        Ev::Click => {
+            input.click(primary);
+        }
+        Ev::Key(k) => {
+            input.key_down(Key::Named(*k), None);
+        }
+        Ev::Tab => {
+            input.key_down(Key::Named(NamedKey::Tab), None);
+        }
+        Ev::ShiftTab => {
+            let shift = Modifiers {
+                shift: true,
+                ..Modifiers::default()
+            };
+            input
+                .set_modifiers(shift)
+                .key_down(Key::Named(NamedKey::Tab), None)
+                .set_modifiers(Modifiers::default());
+        }
+        Ev::WindowFocus(f) => {
+            input.focus(*f);
+        }
+        Ev::Access(path, action) => {
+            scope.rect_of(path)?;
+            input.access(AccessAction {
+                target: scope.id(path),
+                action: *action,
+                value: None,
+            });
+        }
+        Ev::Scroll { x, y, precise } => {
+            if *precise {
+                input.scroll_pixels(*x, *y);
+            } else {
+                input.scroll_lines(*x, *y);
+            }
+        }
+        Ev::Type(text) => {
+            for c in text.chars() {
+                let s = c.to_string();
+                let key = if c == ' ' {
+                    Key::Named(NamedKey::Space)
+                } else {
+                    Key::Character(s.clone())
+                };
+                input.key_down(key, Some(&s));
+            }
+        }
+        Ev::KeyChar(s, mods) => {
+            input
+                .set_modifiers(*mods)
+                .key_down(Key::Character((*s).to_owned()), Some(s))
+                .set_modifiers(*held);
+        }
+        Ev::KeyMod(k, mods) => {
+            input
+                .set_modifiers(*mods)
+                .key_down(Key::Named(*k), None)
+                .set_modifiers(*held);
+        }
+        Ev::Mods(mods) => {
+            *held = *mods;
+            input.set_modifiers(*mods);
+        }
+        Ev::ImePreedit(text, cursor) => {
+            input.ime(ImeEvent::Preedit {
+                text: (*text).to_owned(),
+                cursor: *cursor,
+            });
+        }
+        Ev::ImeCommit(text) => {
+            input.ime(ImeEvent::Commit((*text).to_owned()));
+        }
+        Ev::ClipboardText(text) => {
+            input.clipboard_text(text);
+        }
+        Ev::Cue(name) => {
+            cue(name);
+        }
+        Ev::FileHover(path) => {
+            input.file_hover(*path);
+        }
+        Ev::FileHoverCancelled => {
+            input.file_hover_cancelled();
+        }
+        Ev::FileDrop(path) => {
+            input.file_drop(*path);
+        }
+    }
+    Ok(())
 }
 
 /// One Ui page in flight: its retained store, state and scripted input.
@@ -277,6 +430,8 @@ pub(crate) struct Player {
     held: Modifiers,
     shortcuts: Shortcuts,
     stage: Stage,
+    /// `PageState::epoch` when `strings` was read.
+    epoch: u64,
 }
 
 impl std::fmt::Debug for Player {
@@ -310,6 +465,7 @@ impl Player {
             held: Modifiers::default(),
             shortcuts: Shortcuts::default(),
             stage: Stage::window(),
+            epoch: 0,
         }
     }
 
@@ -330,119 +486,22 @@ impl Player {
         )
     }
 
-    /// The previous frame's rect of the widget at `path`.
-    fn rect_of(&self, path: &[&str]) -> Result<lune_ui::paint::Rect, String> {
-        self.store
-            .last_rect(path_id(self.page, path))
-            .ok_or_else(|| format!("{}: no widget at {path:?}", self.page))
-    }
-
+    /// Applies `ev` to the scripted input.
     fn apply(&mut self, ev: &Ev) -> Result<(), String> {
-        let primary = PointerButton::Primary;
-        match ev {
-            Ev::PointerOver(path) => {
-                let r = self.rect_of(path)?;
-                self.input.pointer_to(r.x + r.w / 2.0, r.y + r.h / 2.0);
-            }
-            Ev::PointerAt(x, y) => {
-                self.input.pointer_to(*x, *y);
-            }
-            Ev::Press => {
-                self.input.press(primary);
-            }
-            Ev::Release => {
-                self.input.release(primary);
-            }
-            Ev::Click => {
-                self.input.click(primary);
-            }
-            Ev::Key(k) => {
-                self.input.key_down(Key::Named(*k), None);
-            }
-            Ev::Tab => {
-                self.input.key_down(Key::Named(NamedKey::Tab), None);
-            }
-            Ev::ShiftTab => {
-                let shift = Modifiers {
-                    shift: true,
-                    ..Modifiers::default()
-                };
-                self.input
-                    .set_modifiers(shift)
-                    .key_down(Key::Named(NamedKey::Tab), None)
-                    .set_modifiers(Modifiers::default());
-            }
-            Ev::WindowFocus(f) => {
-                self.input.focus(*f);
-            }
-            Ev::Access(path, action) => {
-                self.rect_of(path)?;
-                self.input.access(AccessAction {
-                    target: path_id(self.page, path),
-                    action: *action,
-                    value: None,
-                });
-            }
-            Ev::Scroll { x, y, precise } => {
-                if *precise {
-                    self.input.scroll_pixels(*x, *y);
-                } else {
-                    self.input.scroll_lines(*x, *y);
-                }
-            }
-            Ev::Type(text) => {
-                for c in text.chars() {
-                    let s = c.to_string();
-                    let key = if c == ' ' {
-                        Key::Named(NamedKey::Space)
-                    } else {
-                        Key::Character(s.clone())
-                    };
-                    self.input.key_down(key, Some(&s));
-                }
-            }
-            Ev::KeyChar(s, mods) => {
-                self.input
-                    .set_modifiers(*mods)
-                    .key_down(Key::Character((*s).to_owned()), Some(s))
-                    .set_modifiers(self.held);
-            }
-            Ev::KeyMod(k, mods) => {
-                self.input
-                    .set_modifiers(*mods)
-                    .key_down(Key::Named(*k), None)
-                    .set_modifiers(self.held);
-            }
-            Ev::Mods(mods) => {
-                self.held = *mods;
-                self.input.set_modifiers(*mods);
-            }
-            Ev::ImePreedit(text, cursor) => {
-                self.input.ime(ImeEvent::Preedit {
-                    text: (*text).to_owned(),
-                    cursor: *cursor,
-                });
-            }
-            Ev::ImeCommit(text) => {
-                self.input.ime(ImeEvent::Commit((*text).to_owned()));
-            }
-            Ev::ClipboardText(text) => {
-                self.input.clipboard_text(text);
-            }
-            Ev::Cue(name) => {
-                self.state.cue(name);
-            }
-            Ev::FileHover(path) => {
-                self.input.file_hover(*path);
-            }
-            Ev::FileHoverCancelled => {
-                self.input.file_hover_cancelled();
-            }
-            Ev::FileDrop(path) => {
-                self.input.file_drop(*path);
-            }
-        }
-        Ok(())
+        let scope = Scope {
+            name: self.page,
+            store: &self.store,
+            root: WidgetId::ROOT.with(self.page),
+        };
+        let state = &mut self.state;
+        apply_event(
+            &mut self.input,
+            &mut self.held,
+            ev,
+            (0.0, 0.0),
+            &scope,
+            &mut |name| state.cue(name),
+        )
     }
 
     /// Runs one frame at `ms` of app time with `events` and returns what `Ui::finish` does.
@@ -457,7 +516,12 @@ impl Player {
         for ev in events {
             self.apply(ev)?;
         }
-        let raw = self.input.end_frame();
+        let mut raw = self.input.end_frame();
+        self.state.inject(&self.store, &mut raw);
+        if self.state.epoch() != self.epoch {
+            self.epoch = self.state.epoch();
+            self.strings = self.state.strings();
+        }
         let config = FrameConfig {
             // Read after the events, so a cue's change shows in the frame it comes with.
             theme: self.state.theme().unwrap_or(THEME),
