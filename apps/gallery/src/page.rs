@@ -19,7 +19,7 @@ use lune_ui::lunegit_dark::THEME;
 use lune_ui::material::Material;
 use lune_ui::motion::MotionTier;
 use lune_ui::paint::Rect;
-use lune_ui::scene::{FrameParams, Scene};
+use lune_ui::scene::{BlurLimits, FrameParams, Scene};
 use lune_ui::shortcuts::Shortcuts;
 use lune_ui::strings::{DisplayFormat, StringTable};
 use lune_ui::testing::ScriptedInput;
@@ -207,6 +207,8 @@ pub(crate) struct FrameTweaks {
     pub(crate) saturation: f32,
     /// Opacity of the noise texture on acrylic and frost; 0 is none.
     pub(crate) noise: f32,
+    /// The blur kernel's cap and the divisor of its working picture.
+    pub(crate) blur: BlurLimits,
 }
 
 impl FrameTweaks {
@@ -215,6 +217,10 @@ impl FrameTweaks {
         blur_sigma: crate::scenes::BLUR_SIGMA,
         saturation: crate::scenes::BLUR_SATURATION,
         noise: NOISE_OPACITY,
+        blur: BlurLimits {
+            kernel_cap: BlurLimits::KERNEL_CAP,
+            downsample: BlurLimits::DOWNSAMPLE,
+        },
     };
 
     /// The renderer's frame parameters for a target of `size` physical pixels at scale `scale`.
@@ -225,7 +231,7 @@ impl FrameTweaks {
             blur_sigma: self.blur_sigma,
             saturation: self.saturation,
             noise_opacity: self.noise,
-            ..FrameParams::default()
+            blur: self.blur,
         }
     }
 }

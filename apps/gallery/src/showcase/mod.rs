@@ -67,7 +67,7 @@ fn changed_settings() -> Box<dyn PageState> {
     shell.settings.tier = MotionTier::Reduced;
     shell.settings.speed = 0.5;
     shell.settings.sigma = 12.0;
-    shell.settings.noise = false;
+    shell.settings.noise = 0.0;
     Box::new(shell)
 }
 
@@ -938,7 +938,7 @@ mod tests {
         s.settings.zoom = 1.5;
         s.settings.sigma = 12.0;
         s.settings.saturation = 2.5;
-        s.settings.noise = false;
+        s.settings.noise = 0.0;
         s.settings.material = Material::Opaque;
         assert!((s.time_scale() - 0.5).abs() < f32::EPSILON);
         assert!((s.zoom() - 1.5).abs() < f32::EPSILON);

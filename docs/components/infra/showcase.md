@@ -41,9 +41,9 @@ rows and the search), `settings.rs` (the global settings), `knobs.rs` (the knob 
 
 Theme (the preset and the five Lunegit files), Motion (tier, speed 0.1x to 2x, the five durations and the
 tooltip delay), Zoom (1x, 1.5x, 2x), Glass (per layer: tint, tint opacity, material opacity; the acrylic
-level; noise on or off; the floating surfaces' tint, opacity and border: `menu_glass` and `menu_popup_border`, D8), Blur (sigma to the kernel's cap, saturation), OS material (the five kinds), Reset.
-They outlive a change of page and go back only by Reset. The noise strength, the luminosity constants and the
-blur kernel's cap are fixed in the toolkit: the noise control is a switch and sigma stops at 16 (D246).
+level; a noise strength slider (0 is off) and the four values of the luminosity curve (applied to the three layers); the floating surfaces' tint, opacity and border: `menu_glass` and `menu_popup_border`, D8), Blur (sigma to 64, saturation, the kernel cap and the working size 1/2, 1/4 or 1/8), OS material (the five kinds), Reset.
+They outlive a change of page and go back only by Reset. Each reaches a frame through `FrameTweaks` or the composed theme (D268); a page with its own theme keeps these
+overrides, as the glass layers do.
 
 ### Knobs (right pane, first)
 
