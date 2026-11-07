@@ -671,6 +671,55 @@ fn a_window_flyout_card_fills_the_window_at_the_three_states() {
 }
 
 #[test]
+fn a_flyout_window_in_an_area_starts_at_the_areas_corner_and_the_window_forms_are_unchanged() {
+    let f = serving();
+    let (w, h) = size_of(&f);
+    let area = Rect::new(120.0, 50.0, w, h);
+    let mut ui = UiHarness::new((w + 300.0, h + 200.0));
+    let mut draw_in = |ms: u64, area: Option<Rect>| {
+        ui.at_ms(ms)
+            .frame(|ui| {
+                match area {
+                    Some(a) => ui.flyout_window_in("fly", a, &f),
+                    None => ui.flyout_window("fly", &f),
+                };
+            })
+            .0
+    };
+    draw_in(0, Some(area));
+    let scene = draw_in(300, Some(area));
+    assert_eq!(
+        card(&scene),
+        [120.0, 50.0, w, h],
+        "the card is at the corner"
+    );
+    let b = scene.backdrops().next().copied().expect("the blur");
+    assert_eq!(b.rect, [120.0, 50.0, w, h]);
+
+    // The window form is the area form with the painter's window, drawn identically.
+    let window = Rect::new(0.0, 0.0, w + 300.0, h + 200.0);
+    let mut a = UiHarness::new((window.w, window.h));
+    let mut b = UiHarness::new((window.w, window.h));
+    let mut last = (Scene::default(), Scene::default());
+    for ms in [0, 300] {
+        last.0 = a
+            .at_ms(ms)
+            .frame(|ui| {
+                ui.flyout_window("fly", &f);
+            })
+            .0;
+        last.1 = b
+            .at_ms(ms)
+            .frame(|ui| {
+                ui.flyout_window_in("fly", window, &f);
+            })
+            .0;
+    }
+    assert_eq!(last.0, last.1);
+    assert_eq!(card(&last.0), [0.0, 0.0, w, h]);
+}
+
+#[test]
 fn a_window_flyout_dismisses_on_escape_and_focus_loss_and_not_on_its_own_card() {
     let f = serving();
     let mut h = win_opened(&f);

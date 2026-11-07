@@ -405,3 +405,50 @@ fn the_painter_form_keeps_its_geometry() {
     assert_eq!(window::CAPTION_BUTTON_WIDTH, 46.0);
     assert_eq!(window::CAPTION_GLYPH_SIZE, 10.0);
 }
+
+#[test]
+fn the_buttons_are_placed_from_the_windows_own_origin() {
+    use lune_ui_core::testing::hit_regions;
+    let win = Rect::new(100.0, 40.0, 800.0, 600.0);
+    // The Ui form: the three hit regions, right-aligned along the top of `win`.
+    let mut h = UiHarness::new((1000.0, 700.0));
+    h.frame(|ui| {
+        ui.caption_buttons("cap", win, opts(false, true));
+    });
+    let regions = hit_regions(&h.store);
+    assert_eq!(regions.len(), 3);
+    let close = regions[2].rect;
+    assert_eq!((close.right(), close.y), (900.0, 40.0));
+    assert_eq!(regions[0].rect.x, 900.0 - 3.0 * 46.0);
+    // A press on the close button at its place is a click on it.
+    let mut hit = None;
+    h.input
+        .pointer_to(880.0, 56.0)
+        .press(PointerButton::Primary);
+    h.at_ms(10)
+        .frame(|ui| hit = ui.caption_buttons("cap", win, opts(false, true)));
+    h.input.release(PointerButton::Primary);
+    h.at_ms(20)
+        .frame(|ui| hit = ui.caption_buttons("cap", win, opts(false, true)));
+    assert_eq!(hit, Some(CaptionButton::Close));
+
+    // The Painter form shares the placement.
+    let mut text = FakeText;
+    let mut p = Painter::<u8>::new(
+        1.0,
+        Rect::new(0.0, 0.0, 1000.0, 700.0),
+        &mut text,
+        None,
+        DARK,
+    );
+    window::caption_buttons(&mut p, win, HEIGHT, false, [0, 1, 2]);
+    let rects: Vec<Rect> = p.hits.iter().map(|(r, _)| *r).collect();
+    assert_eq!(rects, regions.iter().map(|r| r.rect).collect::<Vec<_>>());
+    // At the origin the known answers stand (the 262, 308, 354 of `OVER`).
+    let mut h = UiHarness::new(WIN);
+    h.frame(|ui| {
+        ui.caption_buttons("cap", WINDOW, opts(false, true));
+    });
+    let xs: Vec<f32> = hit_regions(&h.store).iter().map(|r| r.rect.x).collect();
+    assert_eq!(xs, [262.0, 308.0, 354.0]);
+}

@@ -72,12 +72,12 @@ pub const CAPTION_BUTTON_WIDTH: f32 = 46.0;
 pub const CAPTION_GLYPH_SIZE: f32 = 10.0;
 
 /// The rect of caption button `k` (0 minimize, 1 maximize or restore, 2 close) of a window of
-/// `win`'s width, `height` tall, in the window's own coordinates: right-aligned, along the top.
-/// Shared by the Painter form and [`Ui::caption_buttons`](crate::ui::Ui::caption_buttons).
+/// `win`'s width, `height` tall, right-aligned along the top of `win`, wherever `win` is. Shared by
+/// the Painter form and [`Ui::caption_buttons`](crate::ui::Ui::caption_buttons).
 pub(crate) fn caption_rect(win: Rect, height: f32, k: usize) -> Rect {
     Rect::new(
-        win.w - CAPTION_BUTTON_WIDTH * (3 - k) as f32,
-        0.0,
+        win.right() - CAPTION_BUTTON_WIDTH * (3 - k) as f32,
+        win.y,
         CAPTION_BUTTON_WIDTH,
         height,
     )

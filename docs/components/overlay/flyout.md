@@ -101,7 +101,7 @@ None of its own: the header, stats, route and action labels are app text (Wane m
 - `flyout-closed` (new): nothing drawn over the controls scene, settled.
 - `flyout-opening` (new): t = 90 ms (half of fast, 180 ms).
 - `flyout-closing` (new): t = 60 ms (half of instant, 120 ms).
-- `tray-flyout-window` (M10, `platform.tray-icon`): `Ui::flyout_window`, the same body filling a window of its own from its corner, over a flat stand-in for the desktop, settled.
+- `tray-flyout-window` (M10, `platform.tray-icon`): `Ui::flyout_window` (and `Ui::flyout_window_in` for an area of the window), the same body filling a window of its own from its corner, over a flat stand-in for the desktop, settled.
 
 ### Painter primitives
 

@@ -493,6 +493,49 @@ fn row_centre(out: &FrameOutput, n: usize) -> (f32, f32) {
 }
 
 #[test]
+fn a_menu_window_in_an_area_starts_at_the_areas_corner_and_the_window_form_is_unchanged() {
+    let (w, h) = size();
+    let rows = rows();
+    let win = (w + 300.0, h + 200.0);
+    let panel = |out: &FrameOutput| {
+        out.tree
+            .nodes
+            .iter()
+            .find(|n| n.role == Role::Menu)
+            .expect("the menu node")
+            .bounds
+    };
+    let area = Rect::new(120.0, 50.0, w, h);
+    let mut ui = UiHarness::new(win);
+    let mut out = FrameOutput::default();
+    for ms in [0, 300] {
+        out = ui
+            .at_ms(ms)
+            .frame(|ui| {
+                ui.menu_window_in(KEY, area, &rows);
+            })
+            .1;
+    }
+    assert_eq!(panel(&out), Rect::new(120.0, 50.0, w, h));
+
+    // The window form is the same call with the painter's window.
+    let window = Rect::new(0.0, 0.0, win.0, win.1);
+    let (mut a, mut b) = (UiHarness::new(win), UiHarness::new(win));
+    let mut last = (None, None);
+    for ms in [0, 300] {
+        last.0 = Some(a.at_ms(ms).frame(|ui| {
+            ui.menu_window(KEY, &rows);
+        }));
+        last.1 = Some(b.at_ms(ms).frame(|ui| {
+            ui.menu_window_in(KEY, window, &rows);
+        }));
+    }
+    let (la, lb) = (last.0.expect("frame"), last.1.expect("frame"));
+    assert_eq!(la.0, lb.0, "the same scene");
+    assert_eq!(panel(&la.1), Rect::new(0.0, 0.0, w, h));
+}
+
+#[test]
 fn the_menu_card_fills_the_window() {
     let (w, h) = size();
     assert!(w >= 190.0 && h > 100.0);

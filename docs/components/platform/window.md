@@ -23,7 +23,7 @@ Core (`lune-ui-core`): `EDGE_BORDER`, `ResizeEdge`, `edge_at`, `DoubleClick` and
 
 ## Existing code
 
-`crates/lune-ui-core/src/window.rs` (`edge_at`, `DoubleClick`, the Painter-form `caption_buttons` and the shared `CAPTION_BUTTON_WIDTH`, `CAPTION_GLYPH_SIZE`, `caption_rect`); since M11 `Ui::caption_buttons` over `CaptionButton` and `CaptionOptions` in `crates/lune-ui-core/src/widgets/caption.rs` (D240: the Painter form stays, `unfocused` and `chrome` draw through it at zero delta); `crates/lune-ui-winit/src/window.rs:12` (`glass_attributes`), `:28` (`resize_direction`). Integration test `crates/lune-ui-core/tests/window.rs` (edges, 6 px border, double-click gap under 400 ms); `crates/lune-ui-winit/tests/input.rs` covers the direction mapping.
+`crates/lune-ui-core/src/window.rs` (`edge_at`, `DoubleClick`, the Painter-form `caption_buttons` and the shared `CAPTION_BUTTON_WIDTH`, `CAPTION_GLYPH_SIZE`, `caption_rect`, which places the buttons from the window rect's own origin, D266); since M11 `Ui::caption_buttons` over `CaptionButton` and `CaptionOptions` in `crates/lune-ui-core/src/widgets/caption.rs` (D240: the Painter form stays, `unfocused` and `chrome` draw through it at zero delta); `crates/lune-ui-winit/src/window.rs:12` (`glass_attributes`), `:28` (`resize_direction`). Integration test `crates/lune-ui-core/tests/window.rs` (edges, 6 px border, double-click gap under 400 ms); `crates/lune-ui-winit/tests/input.rs` covers the direction mapping.
 
 ## Spec
 

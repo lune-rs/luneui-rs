@@ -315,8 +315,22 @@ impl<'a> Ui<'a> {
     /// the exit are the ones tested there; the app hides the window once `dismissed` and the frame
     /// is idle.
     pub fn flyout_window(&mut self, key: impl Hash, f: &Flyout<'_>) -> FlyoutResponse {
+        let area = self.painter().window;
+        self.flyout_window_in(key, area, f)
+    }
+
+    /// [`Self::flyout_window`] in `area`, a rect of the window in window coordinates: the card's
+    /// corner is the area's corner. A page that hosts a tray surface in a pane of its own window
+    /// passes the pane. Placement is in window coordinates, as every overlay's is: an `Xform` does
+    /// not move it.
+    pub fn flyout_window_in(
+        &mut self,
+        key: impl Hash,
+        area: Rect,
+        f: &Flyout<'_>,
+    ) -> FlyoutResponse {
         let size = flyout_size(self.painter(), f);
-        let options = crate::tray::window_popover(self.painter().window, size, Surface::Glass);
+        let options = crate::tray::window_popover(area, size, Surface::Glass);
         self.flyout_in(
             key,
             f,

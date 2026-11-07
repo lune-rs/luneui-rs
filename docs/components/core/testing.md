@@ -11,7 +11,7 @@ summary: Public testing module: RecordingRenderer, FakeText, ScriptedInput, Null
 
 ## What it is
 
-The fakes of the four seams, public so apps can test their UI code with them: `RecordingRenderer` (consumes a `Scene` in the documented draw order and records each draw call), `FakeText` with `text_system_contract` (the properties every `TextSystem` must have), `ScriptedInput` (builds `RawInput` frames: pointer, clicks, scroll, keys, IME, focus), and `NullMaterial` with `backdrop_contract`. The facade re-exports the module as `lune_ui::testing`.
+`hit_regions(&UiStore)` lists the last frame's hit regions (`HitRegion`: id, rect, layer, tag, enabled) in draw order (D266). The fakes of the four seams, public so apps can test their UI code with them: `RecordingRenderer` (consumes a `Scene` in the documented draw order and records each draw call), `FakeText` with `text_system_contract` (the properties every `TextSystem` must have), `ScriptedInput` (builds `RawInput` frames: pointer, clicks, scroll, keys, IME, focus), and `NullMaterial` with `backdrop_contract`. The facade re-exports the module as `lune_ui::testing`.
 
 ## Needs
 

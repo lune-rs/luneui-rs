@@ -332,7 +332,7 @@ impl App {
         // A hosted page's window commands (the window page's caption buttons) are demonstrations:
         // its Close must not close the gallery. The gallery quits on its shortcut.
         out.commands.clear();
-        if output.apply(window, &out) {
+        if output.apply(window, &out, s) {
             event_loop.exit();
         }
         let tray_state = state.tray_state();

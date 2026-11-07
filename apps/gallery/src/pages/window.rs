@@ -50,20 +50,6 @@ fn edges() -> Box<dyn PageState> {
     Box::new(Edges)
 }
 
-/// The caption buttons along the top right of `area`. The widget places them from the origin of
-/// the window it is given, so an area that is not at the window's origin moves them there with a
-/// translation (which carries their hit regions and nodes with it, and leaves the host's clip
-/// where it is on screen).
-fn caption_in(ui: &mut Ui<'_>, area: Rect, opts: CaptionOptions) -> Option<CaptionButton> {
-    if area.x == 0.0 && area.y == 0.0 {
-        return ui.caption_buttons("caption", area, opts);
-    }
-    ui.painter().push_translate(area.x, area.y);
-    let clicked = ui.caption_buttons("caption", Rect::new(0.0, 0.0, area.w, area.h), opts);
-    ui.painter().pop_translate();
-    clicked
-}
-
 /// The window with live caption buttons.
 struct Caption {
     maximized: bool,
@@ -90,7 +76,7 @@ impl PageState for Caption {
             maximized: self.maximized,
             active: self.active,
         };
-        if caption_in(ui, win, opts) == Some(CaptionButton::Maximize) {
+        if ui.caption_buttons("caption", win, opts) == Some(CaptionButton::Maximize) {
             self.maximized = !self.maximized;
         }
     }

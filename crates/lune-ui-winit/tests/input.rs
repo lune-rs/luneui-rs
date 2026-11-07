@@ -288,7 +288,7 @@ mod files {
     use lune_ui_core::input::{CursorIcon, Event, FrameOutput, RawInput, WindowCommand};
     use lune_ui_core::paint::Rect;
     use lune_ui_core::ui::WidgetId;
-    use lune_ui_winit::input::{ImePlan, OutputState};
+    use lune_ui_winit::input::{ImePlan, OutputState, ime_area_physical};
     use std::path::PathBuf;
 
     fn at_scale_2() -> Translator {
@@ -438,5 +438,36 @@ mod files {
         // Planning changed nothing: the same plan again. The sequences of changes are the unit
         // tests in `src/input.rs` (they can record a plan without a window).
         assert_eq!(state.plan_output(&out(CursorIcon::Text, Some(area))), p);
+    }
+
+    #[test]
+    fn the_ime_area_leaves_in_physical_pixels_at_the_uis_scale() {
+        let area = Rect::new(10.0, 20.0, 30.0, 40.0);
+        // Under a zoom the UI's scale is not the window's: area x scale, whatever the OS says.
+        assert_eq!(
+            ime_area_physical(area, 4.0),
+            Some((40.0, 80.0, 120.0, 160.0))
+        );
+        // At the OS scale it is what the logical position of the same area was: area x 2.
+        assert_eq!(ime_area_physical(area, 2.0), Some((20.0, 40.0, 60.0, 80.0)));
+        assert_eq!(ime_area_physical(area, 1.0), Some((10.0, 20.0, 30.0, 40.0)));
+    }
+
+    #[test]
+    fn a_non_finite_ime_area_or_scale_sends_nothing() {
+        let ok = Rect::new(10.0, 20.0, 30.0, 40.0);
+        for bad in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            for area in [
+                Rect::new(bad, 20.0, 30.0, 40.0),
+                Rect::new(10.0, bad, 30.0, 40.0),
+                Rect::new(10.0, 20.0, bad, 40.0),
+                Rect::new(10.0, 20.0, 30.0, bad),
+            ] {
+                assert_eq!(ime_area_physical(area, 2.0), None, "{area:?}");
+            }
+            assert_eq!(ime_area_physical(ok, bad), None, "scale {bad}");
+        }
+        assert_eq!(ime_area_physical(ok, 0.0), None);
+        assert_eq!(ime_area_physical(ok, -1.0), None);
     }
 }
