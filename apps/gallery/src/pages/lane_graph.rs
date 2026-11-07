@@ -15,6 +15,7 @@ use lune_ui::widgets::virtual_list::{Heights, ListOptions, RowKey, SelectionMode
 use super::{card, heading, on_card};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "lane-graph",
@@ -88,7 +89,17 @@ fn graph_row(ui: &mut Ui<'_>, rect: Rect, dot: u16, lanes: &[LaneLine], edges: &
 struct Listed {
     seed: &'static [usize],
     seeded: bool,
+    /// How many commits the list holds, and how rows are selected (an index into [`SELECTIONS`]).
+    count: usize,
+    selection: usize,
 }
+
+/// The selection modes the knob offers, in the order shown.
+const SELECTIONS: [(&str, SelectionMode); 3] = [
+    ("None", SelectionMode::None),
+    ("Single", SelectionMode::Single),
+    ("Multi", SelectionMode::Multi),
+];
 
 fn key(i: usize) -> RowKey {
     RowKey(i as u64)
@@ -109,9 +120,9 @@ impl PageState for Listed {
             state.selection.extend(self.seed.iter().map(|&i| key(i)));
         }
         let opts = ListOptions {
-            count: COUNT,
+            count: self.count,
             heights: Heights::Fixed(ROW_H),
-            selection: SelectionMode::Single,
+            selection: SELECTIONS[self.selection.min(SELECTIONS.len() - 1)].1,
             index_of: None,
             label: "Commits",
         };
@@ -133,12 +144,23 @@ impl PageState for Listed {
             ROW_H
         });
     }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let mut rows = self.count as f32;
+        if panel.number(ui, "Commits", &mut rows, (0.0, COUNT as f32, 1.0)) {
+            self.count = rows.round() as usize;
+        }
+        let names: Vec<&str> = SELECTIONS.iter().map(|(n, _)| *n).collect();
+        panel.choice(ui, "Selection", &names, &mut self.selection);
+    }
 }
 
 fn big() -> Box<dyn PageState> {
     Box::new(Listed {
         seed: &[],
         seeded: false,
+        count: COUNT,
+        selection: 1,
     })
 }
 
@@ -146,6 +168,8 @@ fn listed() -> Box<dyn PageState> {
     Box::new(Listed {
         seed: &[2],
         seeded: false,
+        count: COUNT,
+        selection: 1,
     })
 }
 

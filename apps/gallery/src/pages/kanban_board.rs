@@ -12,6 +12,7 @@ use lune_ui::widgets::kanban_board::{
 use super::card;
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "kanban-board",
@@ -223,6 +224,15 @@ impl PageState for Board {
                 title: "New column",
                 cards: Vec::new(),
             });
+        }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.toggle(ui, "Window active", &mut self.active);
+        panel.toggle(ui, "Error view", &mut self.error);
+        let mut enabled = !self.disabled;
+        if panel.toggle(ui, "Enabled", &mut enabled) {
+            self.disabled = !enabled;
         }
     }
 }

@@ -494,6 +494,14 @@ mod tests {
         ("primitives", Press(Role::Radio, "dash")),
         ("theme", Press(Role::Radio, "Blue")),
         ("motion", Press(Role::Switch, "Flip the swatches")),
+        // Data.
+        ("progress", Press(Role::Switch, "Show a sample")),
+        ("stat", Press(Role::Switch, "Show a sample")),
+        ("kv-list", Press(Role::Switch, "Show a sample")),
+        ("bar-chart", Press(Role::Radio, "Empty")),
+        ("pie-chart", Press(Role::Radio, "Half")),
+        ("kanban-board", Press(Role::Switch, "Error view")),
+        ("lane-graph", Slide("Commits", 0.0)),
     ];
 
     #[test]

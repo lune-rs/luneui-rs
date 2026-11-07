@@ -10,6 +10,7 @@ use lune_ui::widgets::kv_list::{KvMode, KvOptions};
 use super::{card, heading};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "kv-list",
@@ -49,15 +50,56 @@ const NOTES: [(&str, &str); 2] = [
 ];
 
 /// A page state that draws its sections with one function.
-struct Sections(&'static [fn(&mut Ui<'_>, f32, f32) -> f32]);
+/// The modes the knob offers, in the order shown.
+const MODES: [(&str, KvMode); 3] = [
+    ("Default", KvMode::Default),
+    ("Stacked", KvMode::Stacked),
+    ("Wrap", KvMode::Wrap),
+];
+
+/// A page state that draws its sections with one function, and a sample the knobs shape.
+struct Sections {
+    list: &'static [fn(&mut Ui<'_>, f32, f32) -> f32],
+    /// Show a sample the knobs shape, under the sections.
+    show: bool,
+    mono: bool,
+    /// An index into [`MODES`].
+    mode: usize,
+}
+
+impl Sections {
+    fn new(list: &'static [fn(&mut Ui<'_>, f32, f32) -> f32]) -> Self {
+        Self {
+            list,
+            show: false,
+            mono: false,
+            mode: 0,
+        }
+    }
+}
 
 impl PageState for Sections {
     fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
         let card = card(ui, stage, "Key-value list");
         let (x, mut y) = (card.x + 24.0, card.y + 24.0);
-        for section in self.0 {
+        for section in self.list {
             y += section(ui, x, y) + 28.0;
         }
+        if self.show {
+            let opts = KvOptions {
+                mono: self.mono,
+                mode: MODES[self.mode.min(MODES.len() - 1)].1,
+                ..KvOptions::default()
+            };
+            ui.kv_list("sample", Rect::new(x, y, 560.0, 0.0), &SHORT, &opts);
+        }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.toggle(ui, "Show a sample", &mut self.show);
+        panel.toggle(ui, "Mono values", &mut self.mono);
+        let names: Vec<&str> = MODES.iter().map(|(n, _)| *n).collect();
+        panel.choice(ui, "Mode", &names, &mut self.mode);
     }
 }
 
@@ -99,7 +141,7 @@ fn wrap_section(ui: &mut Ui<'_>, x: f32, y: f32) -> f32 {
 }
 
 fn all() -> Box<dyn PageState> {
-    Box::new(Sections(&[
+    Box::new(Sections::new(&[
         default_section,
         mono_section,
         stacked_section,
@@ -108,15 +150,15 @@ fn all() -> Box<dyn PageState> {
 }
 
 fn default() -> Box<dyn PageState> {
-    Box::new(Sections(&[default_section]))
+    Box::new(Sections::new(&[default_section]))
 }
 
 fn stacked() -> Box<dyn PageState> {
-    Box::new(Sections(&[stacked_section]))
+    Box::new(Sections::new(&[stacked_section]))
 }
 
 fn wrap() -> Box<dyn PageState> {
-    Box::new(Sections(&[wrap_section]))
+    Box::new(Sections::new(&[wrap_section]))
 }
 
 /// The scenes run on the Mac keymap, where the primary modifier is Command.
