@@ -1157,6 +1157,35 @@ mod tests {
         }
     }
 
+    /// Cueing `dialog-popover@2x` over `dialog-combo-open@2x` replaces the page's dialog in one
+    /// frame. Once the first one's exit is over, the dialog's text is on `Modal` and the
+    /// popover's, opened in it, on `Raised`: the same split as the scene cued on a fresh shell.
+    #[test]
+    fn a_dialog_replaced_by_another_returns_to_modal_and_its_popover_stays_raised() {
+        use lune_ui::scene::LayerId;
+        // The text counts of `Modal` and `Raised` after the cues, each settled for 4 s.
+        let counts = |cues: &[&'static str]| {
+            let mut p = player();
+            run(&mut p, 0, 0, &[]);
+            let mut ms = 16;
+            for cue in cues {
+                p.frame(&mut FakeText, ms, &[Ev::Cue(cue)]).expect("frame");
+                ms += 16;
+                for _ in 0..250 {
+                    p.frame(&mut FakeText, ms, &[]).expect("frame");
+                    ms += 16;
+                }
+            }
+            let scene = p.frame(&mut FakeText, ms, &[]).expect("frame").0;
+            let n = |l: LayerId| scene.layers[l as usize].texts.len();
+            (n(LayerId::Modal), n(LayerId::Raised))
+        };
+        let replaced = counts(&["scene dialog-combo-open@2x", "scene dialog-popover@2x"]);
+        let fresh = counts(&["scene dialog-popover@2x"]);
+        assert!(replaced.0 > 0, "the dialog's text is on Modal");
+        assert_eq!(replaced, fresh);
+    }
+
     #[test]
     fn a_click_on_a_hosted_button_fires_it() {
         let mut rig = Rig::new();

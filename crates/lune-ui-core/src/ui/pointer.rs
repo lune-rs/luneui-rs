@@ -29,7 +29,8 @@ pub(crate) struct HitRecord {
     pub(crate) scroll_axes: (bool, bool),
 }
 
-/// The topmost region of `hits` at `pos` that `eligible` admits: highest layer, then latest call.
+/// The topmost region of `hits` at `pos` that `eligible` admits: highest layer, then the overlay opened last (tag 0, the base, is below every overlay of a
+/// layer), then latest call.
 pub(crate) fn topmost<'h>(
     hits: &'h [HitRecord],
     pos: (f32, f32),
@@ -38,7 +39,7 @@ pub(crate) fn topmost<'h>(
     hits.iter()
         .enumerate()
         .filter(|(_, h)| eligible(h) && h.rect.contains(pos))
-        .max_by_key(|(i, h)| (h.layer, *i))
+        .max_by_key(|(i, h)| (h.layer, h.tag, *i))
         .map(|(_, h)| h)
 }
 

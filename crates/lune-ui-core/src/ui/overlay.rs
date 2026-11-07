@@ -104,6 +104,21 @@ fn open_layer(overlays: &[OverlayRec], requested: LayerId, tag: u32) -> LayerId 
     }
 }
 
+/// Whether a modal opened before the overlay with `tag` is still on the stack at `now`: open,
+/// opening, or closing with its exit not yet over. This is the reason a `Raised` overlay stays on
+/// `Raised`; with none left it falls back to the layer it asks for (D137 amended).
+fn modal_below(
+    overlays: &[OverlayRec],
+    tag: u32,
+    now: Time,
+    tokens: &MotionTokens,
+    tier: MotionTier,
+) -> bool {
+    overlays.iter().any(|o| {
+        o.tag < tag && o.opts.modal && (o.active() || o.closing(now, tokens, tier).is_some())
+    })
+}
+
 /// Whether an active modal opened after the overlay with `tag`.
 fn modal_above(overlays: &[OverlayRec], tag: u32) -> bool {
     overlays
@@ -240,9 +255,12 @@ impl<'a> Ui<'a> {
     /// app stops calling it. `exit` gets the linear close progress and `transforms`.
     ///
     /// A `Popup` or `Modal` overlay opened above an active modal draws on [`LayerId::Raised`]
-    /// instead. That is settled at open or reopen and holds until it closes, whatever later frames
-    /// pass as `layer`, so the overlay draws, hits and exits on one layer. A reopen under a modal
-    /// that opened during the close is an open above that modal. What `content` draws is
+    /// instead. That is settled at open or reopen. It holds while an older modal is on the stack
+    /// (open, opening, or closing with its exit not yet over), whatever later frames pass as
+    /// `layer`; when none is left, the next frame puts the overlay on the layer it asks for
+    /// (a dialog that replaces another in one frame is raised only during the first one's exit).
+    /// Once closing, an overlay keeps the layer it has, so it exits where it drew. A reopen under
+    /// a modal that opened during the close is an open above that modal. What `content` draws is
     /// the overlay's alone: a surrounding [`Self::record`] does not get it.
     pub fn overlay<R>(
         &mut self,
@@ -289,7 +307,18 @@ impl<'a> Ui<'a> {
             let tag = self.store.overlays[index].tag;
             open_layer(&self.store.overlays, options.layer, tag)
         } else {
-            self.store.overlays[index].opts.layer
+            let rec = &self.store.overlays[index];
+            let held = rec.opts.layer;
+            // The hold on `Raised` lasts while its reason does: once no older modal is on the
+            // stack, the overlay is on the layer it asks for.
+            if held == LayerId::Raised
+                && matches!(options.layer, LayerId::Popup | LayerId::Modal)
+                && !modal_below(&self.store.overlays, rec.tag, now, &tokens, tier)
+            {
+                options.layer
+            } else {
+                held
+            }
         };
         let rec = &mut self.store.overlays[index];
         if reopened {

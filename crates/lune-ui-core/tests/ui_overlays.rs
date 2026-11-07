@@ -1,6 +1,7 @@
 //! The overlay stack (C4): modal capture, Escape and outside-press dismissal on the top overlay,
 //! phases, exit retention per tier through the exit painter, reopening a closing overlay,
-//! replaying recorded content, and overlays above a modal: the `Raised` layer, chosen at open.
+//! replaying recorded content, and overlays above a modal: the `Raised` layer, chosen at open and held while an older modal is on
+//! the stack.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -985,29 +986,205 @@ fn a_dialog_over_a_dialog_is_raised_takes_input_and_the_first_gets_none() {
 }
 
 #[test]
-fn a_parent_closing_first_leaves_the_child_raised_until_it_closes() {
+fn a_parent_closing_first_leaves_the_child_raised_until_the_parent_is_gone() {
     let mut h = harness();
     let (scene, _) = h.frame(|ui| {
         dialog(ui, "dialog", &modal());
         marked(ui, "child", &popup());
     });
     assert_eq!(fills(&scene, LayerId::Raised), 1);
-    for ms in [10, 1_000, 2_000] {
+    // The dialog stops being called at 10 ms; its exit runs for the close motion.
+    h.at_ms(10);
+    let (scene, _) = h.frame(|ui| {
+        marked(ui, "child", &popup());
+    });
+    assert_eq!(
+        fills(&scene, LayerId::Raised),
+        1,
+        "held while the parent closes"
+    );
+    assert_eq!(fills(&scene, LayerId::Popup), 0);
+    // Its exit is over by 1,000 ms: the reason for the hold is gone, and the child is on Popup.
+    for ms in [1_000, 2_000] {
         h.at_ms(ms);
         let (scene, _) = h.frame(|ui| {
             marked(ui, "child", &popup());
         });
-        assert_eq!(fills(&scene, LayerId::Raised), 1, "held at {ms} ms");
-        assert_eq!(fills(&scene, LayerId::Popup), 0);
+        assert_eq!(fills(&scene, LayerId::Popup), 1, "back on Popup at {ms} ms");
+        assert_eq!(fills(&scene, LayerId::Raised), 0);
     }
+    // A closing child keeps the layer it has.
     h.at_ms(2_010);
     let (scene, _) = h.frame(|_| {});
-    assert_eq!(
-        fills(&scene, LayerId::Raised),
-        1,
-        "its exit is on Raised too"
+    assert_eq!(fills(&scene, LayerId::Popup), 1, "its exit is on Popup too");
+    assert_eq!(fills(&scene, LayerId::Raised), 0);
+}
+
+const CHILD_R: Rect = Rect::new(300.0, 10.0, 50.0, 40.0);
+
+fn fills_at(scene: &Scene, layer: LayerId, r: Rect) -> usize {
+    scene.layers[layer as usize]
+        .geometry
+        .under
+        .iter()
+        .filter(|s| s.rect == r.phys(1.0))
+        .count()
+}
+
+/// A modal `key` that fills `MENU`, holding a popup `pop` that fills `CHILD_R` when `with_child`.
+fn parent_with_child(ui: &mut Ui<'_>, key: &str, with_child: bool) {
+    ui.overlay(
+        key,
+        &modal(),
+        |p, _, _| p.fill(MENU, 0.0, [1, 2, 3, 255]),
+        |ui, _| {
+            ui.painter().fill(MENU, 0.0, [1, 2, 3, 255]);
+            if with_child {
+                ui.overlay(
+                    (key, "pop"),
+                    &popup(),
+                    |p, _, _| p.fill(CHILD_R, 0.0, [4, 5, 6, 255]),
+                    |ui, _| ui.painter().fill(CHILD_R, 0.0, [4, 5, 6, 255]),
+                );
+            }
+        },
     );
-    assert_eq!(fills(&scene, LayerId::Popup), 0);
+}
+
+#[test]
+fn a_dialog_replacing_another_in_one_frame_is_raised_only_during_the_first_ones_exit() {
+    let mut h = harness();
+    parent_with_child_frame(&mut h, 0, Some("a"), None);
+    parent_with_child_frame(&mut h, 1_000, Some("a"), None);
+    // A stops being called; B opens in the same frame, above A, which is still active.
+    let scene = parent_with_child_frame(&mut h, 1_010, None, Some("b"));
+    assert_eq!(fills(&scene, LayerId::Raised), 1, "B is raised over A");
+    assert_eq!(
+        fills_at(&scene, LayerId::Raised, CHILD_R),
+        1,
+        "so is its popover"
+    );
+    assert_eq!(fills(&scene, LayerId::Modal), 1, "A's exit");
+    // Inside A's exit: B and its popover stay on Raised.
+    let scene = parent_with_child_frame(&mut h, 1_020, None, Some("b"));
+    assert_eq!(fills(&scene, LayerId::Raised), 1);
+    assert_eq!(fills_at(&scene, LayerId::Raised, CHILD_R), 1);
+    assert_eq!(fills(&scene, LayerId::Modal), 1, "A's exit");
+    // A's exit is over: B is on Modal, and its popover, with B on the stack, stays on Raised.
+    for ms in [3_000, 3_010] {
+        let scene = parent_with_child_frame(&mut h, ms, None, Some("b"));
+        assert_eq!(fills(&scene, LayerId::Modal), 1, "B on Modal at {ms} ms");
+        assert_eq!(fills(&scene, LayerId::Raised), 0);
+        assert_eq!(
+            fills_at(&scene, LayerId::Raised, CHILD_R),
+            1,
+            "popover on Raised"
+        );
+        assert_eq!(fills_at(&scene, LayerId::Popup, CHILD_R), 0);
+    }
+}
+
+fn parent_with_child_frame(h: &mut UiHarness, ms: u64, a: Option<&str>, b: Option<&str>) -> Scene {
+    h.at_ms(ms)
+        .frame(|ui| {
+            if let Some(key) = a {
+                parent_with_child(ui, key, false);
+            }
+            if let Some(key) = b {
+                parent_with_child(ui, key, true);
+            }
+        })
+        .0
+}
+
+#[test]
+fn a_popover_held_after_its_parent_closed_drops_to_popup_under_a_new_dialog() {
+    let mut h = harness();
+    let frame = |h: &mut UiHarness, ms: u64, dialog: Option<&str>, pop: bool| {
+        let mut clicks = (false, false);
+        let (scene, _) = h.at_ms(ms).frame(|ui| {
+            if let Some(key) = dialog {
+                clicks.0 = marked(ui, key, &modal()).clicked;
+            }
+            if pop {
+                clicks.1 = marked_at(ui, "pop", &popup(), CHILD_R).clicked;
+            }
+        });
+        (scene, clicks)
+    };
+    frame(&mut h, 0, Some("d"), true);
+    frame(&mut h, 1_000, Some("d"), true);
+    // The dialog goes; the popover is still called and held on Raised during its exit.
+    let (scene, _) = frame(&mut h, 1_010, None, true);
+    assert_eq!(fills_at(&scene, LayerId::Raised, CHILD_R), 1);
+    // The exit is over: the popover is back on Popup.
+    let (scene, _) = frame(&mut h, 2_000, None, true);
+    assert_eq!(fills_at(&scene, LayerId::Popup, CHILD_R), 1);
+    // A new dialog opens over it, on Modal, above the popover, and blocks it.
+    let (scene, _) = frame(&mut h, 2_010, Some("n"), true);
+    assert_eq!(fills(&scene, LayerId::Modal), 1);
+    assert_eq!(fills_at(&scene, LayerId::Popup, CHILD_R), 1);
+    let (cx, cy) = (CHILD_R.x + 5.0, CHILD_R.y + 5.0);
+    h.input.pointer_to(cx, cy);
+    frame(&mut h, 2_020, Some("n"), true);
+    h.input.click(P);
+    let (_, clicks) = frame(&mut h, 2_030, Some("n"), true);
+    assert_eq!(clicks, (false, false), "the dialog blocks the popover");
+    h.input.pointer_to(MENU.x + 5.0, MENU.y + 5.0);
+    frame(&mut h, 2_040, Some("n"), true);
+    h.input.click(P);
+    let (_, clicks) = frame(&mut h, 2_050, Some("n"), true);
+    assert_eq!(clicks, (true, false), "the dialog takes its own press");
+}
+
+/// `marked`, but filling and hit-testing `r`.
+fn marked_at(ui: &mut Ui<'_>, key: &str, opts: &OverlayOptions, r: Rect) -> Response {
+    ui.overlay(
+        key,
+        opts,
+        move |p, _, _| p.fill(r, 0.0, [4, 5, 6, 255]),
+        move |ui, _| {
+            ui.painter().fill(r, 0.0, [4, 5, 6, 255]);
+            let id = ui.id((key, "hit"));
+            ui.interact(id, r, Sense::CLICK_FOCUS)
+        },
+    )
+    .1
+}
+
+#[test]
+fn a_child_in_a_nested_dialog_takes_a_press_over_the_dialogs_later_button() {
+    let mut h = harness();
+    let frame = |h: &mut UiHarness, ms: u64| {
+        let mut clicks = (false, false);
+        h.at_ms(ms).frame(|ui| {
+            marked(ui, "lower", &modal());
+            ui.overlay(
+                "upper",
+                &modal(),
+                |_, _, _| {},
+                |ui, _| {
+                    // The child is called first; the footer button, later in call order, sits
+                    // under the same pointer.
+                    clicks.0 = marked(ui, "child", &popup()).clicked;
+                    let id = ui.id("footer");
+                    clicks.1 = ui.interact(id, MENU, Sense::CLICK_FOCUS).clicked;
+                },
+            );
+        });
+        clicks
+    };
+    frame(&mut h, 0);
+    frame(&mut h, 1_000);
+    h.input.pointer_to(MENU.x + 5.0, MENU.y + 5.0);
+    frame(&mut h, 1_010);
+    h.input.click(P);
+    let clicks = frame(&mut h, 1_020);
+    assert_eq!(
+        clicks,
+        (true, false),
+        "the child, opened after the dialog, is above its button"
+    );
 }
 
 #[test]
