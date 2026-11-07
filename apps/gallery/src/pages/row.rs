@@ -12,6 +12,7 @@ use lune_ui::widgets::tone::Tone;
 use super::{card, heading};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "row",
@@ -48,6 +49,11 @@ struct Rows {
     on: bool,
     second: bool,
     checked: [bool; 4],
+    /// The setting rows' knobs: the first one's title, whether both show a description and how
+    /// wide the control's slot is.
+    title: String,
+    describe: bool,
+    control_w: f32,
 }
 
 fn state(mode: Mode) -> Box<dyn PageState> {
@@ -56,6 +62,9 @@ fn state(mode: Mode) -> Box<dyn PageState> {
         on: true,
         second: false,
         checked: [true, false, false, true],
+        title: "Launch at login".to_owned(),
+        describe: true,
+        control_w: CONTROL,
     })
 }
 
@@ -80,21 +89,23 @@ impl PageState for Rows {
                 heading(ui, "SETTING ROW", card.x + 24.0, card.y + 24.0);
                 let mut y = top;
                 let first = SettingRow {
-                    title: "Launch at login",
-                    description: Some("Open the app when you sign in to this computer."),
+                    title: &self.title,
+                    description: self
+                        .describe
+                        .then_some("Open the app when you sign in to this computer."),
                     off: !self.on,
-                    control_w: CONTROL,
+                    control_w: self.control_w,
                 };
-                let on = &mut self.on;
+                let (on, title) = (&mut self.on, &self.title);
                 y += GAP
                     + ui.setting_row("first", Rect::new(x, y, WIDTH, 0.0), &first, |ui, slot| {
-                        ui.toggle("switch", slot, on, "Launch at login");
+                        ui.toggle("switch", slot, on, title);
                     });
                 let second = SettingRow {
                     title: "Compact lists",
-                    description: Some("Show more rows in every list."),
+                    description: self.describe.then_some("Show more rows in every list."),
                     off: !self.second,
-                    control_w: CONTROL,
+                    control_w: self.control_w,
                 };
                 let on = &mut self.second;
                 ui.setting_row(
@@ -180,6 +191,14 @@ impl PageState for Rows {
                 }
             }
         }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.toggle(ui, "First on", &mut self.on);
+        panel.toggle(ui, "Second on", &mut self.second);
+        panel.text(ui, "First title", &mut self.title);
+        panel.toggle(ui, "Descriptions", &mut self.describe);
+        panel.number(ui, "Control width", &mut self.control_w, (24.0, 120.0, 1.0));
     }
 }
 

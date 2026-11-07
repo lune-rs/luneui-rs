@@ -10,6 +10,7 @@ use lune_ui::widgets::tone::Tone;
 use super::{card, heading};
 use crate::page::Stage;
 use crate::page::{Expect, Page, PageKind, PageState, UiPage, UiScene};
+use crate::showcase::knobs::{Knobs, TONES, tone_names};
 
 pub(crate) static PAGE: Page = Page {
     id: "callout",
@@ -51,7 +52,29 @@ const CASES: [(Tone, &str, &str, &str); 4] = [
     ),
 ];
 
-struct Tones;
+/// The four callouts, and a sample under them when the knobs ask for it.
+struct Tones {
+    show: bool,
+    /// An index into [`TONES`].
+    tone: usize,
+    text: String,
+    figure: String,
+    action: String,
+    announce: bool,
+}
+
+impl Default for Tones {
+    fn default() -> Self {
+        Self {
+            show: false,
+            tone: 0,
+            text: "A callout with its own text.".to_owned(),
+            figure: "42".to_owned(),
+            action: "Act".to_owned(),
+            announce: false,
+        }
+    }
+}
 
 impl PageState for Tones {
     fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
@@ -73,11 +96,31 @@ impl PageState for Tones {
                 .height
                 + 12.0;
         }
+        if self.show {
+            let opts = CalloutOptions {
+                tone: TONES[self.tone.min(TONES.len() - 1)].1,
+                icon: icon::INFO,
+                text: &self.text,
+                figure: (!self.figure.is_empty()).then_some(self.figure.as_str()),
+                action: (!self.action.is_empty()).then_some(self.action.as_str()),
+                announce: self.announce,
+            };
+            ui.callout("sample", Rect::new(x, y, WIDTH, 0.0), &opts);
+        }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.toggle(ui, "Show a sample", &mut self.show);
+        panel.choice(ui, "Tone", &tone_names(), &mut self.tone);
+        panel.text(ui, "Text", &mut self.text);
+        panel.text(ui, "Figure", &mut self.figure);
+        panel.text(ui, "Action", &mut self.action);
+        panel.toggle(ui, "Announce", &mut self.announce);
     }
 }
 
 fn tones() -> Box<dyn PageState> {
-    Box::new(Tones)
+    Box::new(Tones::default())
 }
 
 const SCENES: &[UiScene] = &[UiScene {

@@ -17,8 +17,24 @@
 use lune_ui::ui::Ui;
 use lune_ui::widgets::field::FieldOptions;
 use lune_ui::widgets::radio_group::RadioOption;
+use lune_ui::widgets::tone::Tone;
 
 use super::settings::Col;
+
+/// The tones, in the order a knob lists them.
+pub(crate) const TONES: [(&str, Tone); 6] = [
+    ("Neutral", Tone::Neutral),
+    ("Ok", Tone::Ok),
+    ("Warn", Tone::Warn),
+    ("Err", Tone::Err),
+    ("Data", Tone::Data),
+    ("Paused", Tone::Paused),
+];
+
+/// The names of [`TONES`].
+pub(crate) fn tone_names() -> Vec<&'static str> {
+    TONES.iter().map(|(n, _)| *n).collect()
+}
 
 /// The rows of the page's knobs, drawn down the settings column.
 #[derive(Debug)]
@@ -235,6 +251,18 @@ mod tests {
                         out.push(format!("shape {:?} {:?} {:?}", s.rect, s.color, s.radii));
                     }
                 }
+                // Strokes and filled paths (a spinner's arc, a chart's line) by their vertices.
+                for v in g.strokes.iter().chain(&g.fills) {
+                    if pane.contains((v.pos[0], v.pos[1])) {
+                        out.push(format!("vertex {:?} {:?}", v.pos, v.color));
+                    }
+                }
+                // Pictures, and text drawn turned (a spinner's glyph).
+                for i in &layer.images {
+                    if inside(i.dst) {
+                        out.push(format!("image {:?} {:?}", i.source, i.dst));
+                    }
+                }
                 for t in &layer.texts {
                     if inside(Rect::new(t.x, t.y, 1.0, 1.0)) {
                         out.push(format!("text {:?} {} {}", t.key, t.x, t.y));
@@ -387,9 +415,12 @@ mod tests {
         Slide(&'static str, f32),
         /// Text typed into a field.
         Type(&'static str, &'static str),
+        /// A press that stops the page's own motion first (so the page is still while it is
+        /// measured), then the press that is measured.
+        Still(Role, &'static str, Role, &'static str),
     }
 
-    use Turn::{Press, Slide, Type};
+    use Turn::{Press, Slide, Still, Type};
 
     /// Every widget page of this batch: turning the knob changes what the page draws.
     const WIDGET_TURNS: &[(&str, Turn)] = &[
@@ -399,6 +430,15 @@ mod tests {
         ("combo", Press(Role::Switch, "Open")),
         ("text-field", Press(Role::Radio, "Search")),
         ("scrollbar", Slide("Lines", 0.0)),
+        ("badge", Press(Role::Switch, "Show a sample")),
+        ("status-dot", Press(Role::Switch, "Show a sample")),
+        ("verdict-row", Press(Role::Switch, "Show a sample")),
+        (
+            "spinner",
+            Still(Role::Switch, "Busy", Role::Switch, "Last tinted"),
+        ),
+        ("callout", Press(Role::Switch, "Show a sample")),
+        ("row", Press(Role::Switch, "Descriptions")),
     ];
 
     #[test]
@@ -406,9 +446,15 @@ mod tests {
         let mut unchanged = Vec::new();
         for (page, turn) in WIDGET_TURNS {
             let mut shell = Shell::open(page);
+            if let Still(role, name, ..) = turn {
+                shell.turn(*role, name);
+            }
             let rest = shell.page();
             assert!(!rest.is_empty(), "{page} draws");
             match turn {
+                Still(_, _, role, name) => {
+                    assert!(shell.press(*role, name), "{page}: no {name}");
+                }
                 Press(role, name) => assert!(shell.press(*role, name), "{page}: no {name}"),
                 Slide(name, at) => {
                     assert!(
