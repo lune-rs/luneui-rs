@@ -216,6 +216,16 @@ pub(crate) struct PainterState {
     hit_tag: u32,
 }
 
+impl PainterState {
+    /// This state drawing on the fixed layer `layer` instead, with its clip, transforms and hit
+    /// tag as they were.
+    pub(crate) fn on_fixed(mut self, layer: LayerId) -> Self {
+        self.layer = layer as usize;
+        self.slot = None;
+        self
+    }
+}
+
 /// Records one frame's drawing into a [`Scene`] and the hit regions of what it drew, at scale `s`.
 /// Draw calls are in logical px; the painter turns them into physical px.
 pub struct Painter<'a, H> {

@@ -2,7 +2,7 @@
 //! renderer consumes. Std only; the GPU records are mirrored field by field, in physical pixels.
 //!
 //! Draw-order contract, which every renderer follows:
-//! - layers back to front in [`Scene::in_order`]'s order: each of the six fixed layers (see
+//! - layers back to front in [`Scene::in_order`]'s order: each of the seven fixed layers (see
 //!   [`LayerId`]), followed by the overlays on it in tag order, which is open order. Everything of
 //!   an older overlay draws before anything of a newer one on the same fixed layer, however
 //!   their calls fell in the frame, so a kind never interleaves across overlays;
@@ -34,11 +34,17 @@ pub enum LayerId {
     /// The `Ui` picks it at open; nothing asks for it by name. Overlays stacked further share it,
     /// each on a draw layer of its own in open order ([`Scene::in_order`]).
     Raised = 4,
+    /// A surface that stays outside a modal: above everything a modal dims, blurs or blocks, and
+    /// below toasts. The `Ui` puts what [`Ui::outside_modals`](crate::ui::Ui::outside_modals)
+    /// scopes here; an overlay opened inside the scope stays on it, above the scope's own drawing
+    /// by tag.
+    Outside = 5,
     /// Toasts: above modal dialogs, so a toast raised by a dialog stays visible.
-    Toast = 5,
+    Toast = 6,
 }
 
-pub const LAYER_COUNT: usize = 6;
+/// The number of fixed layers: one per [`LayerId`].
+pub const LAYER_COUNT: usize = 7;
 
 /// The layers always drawn to the offscreen scene (see [`Scene::floor`]): those under popups, so a
 /// glass menu can blur them.

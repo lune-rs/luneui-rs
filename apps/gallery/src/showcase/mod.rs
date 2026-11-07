@@ -490,23 +490,23 @@ impl PageState for Showcase {
         // The page first: its widgets then come first in the tab order, as a scene's script
         // (a Tab at its start) expects. The panes do not overlap, so the order draws the same.
         self.content(ui, &lay);
-        // The panes sit above the page's modals: a hit above a modal's layer stays live, so a
-        // hosted dialog that never closes cannot take the way out with it.
-        ui.painter().on(LayerId::Raised);
-        self.sidebar(ui, &lay);
-        // The settings pane has a fill of its own and is drawn after the page.
-        let fill = ui.theme().surface_input;
-        ui.painter().fill(lay.settings, 8.0, fill);
-        self.settings
-            .pane(ui, lay.settings, &mut *self.child, self.generation);
-        if self.replay.is_none() && self.scene.is_some() {
-            let t = *ui.theme();
-            let spec = Spec::plain("live", Style::ui(t.font_s, t.fg_tertiary));
-            let w = ui.painter().measure(&spec).0;
-            ui.painter()
-                .text(&spec, lay.head.right() - w, lay.head.y + 6.0);
-        }
-        ui.painter().on(LayerId::Base);
+        // The panes stay outside the page's modals: a hit on `Outside` is above a modal's layer
+        // and stays live, so a hosted dialog that never closes cannot take the way out with it.
+        ui.outside_modals(|ui| {
+            self.sidebar(ui, &lay);
+            // The settings pane has a fill of its own and is drawn after the page.
+            let fill = ui.theme().surface_input;
+            ui.painter().fill(lay.settings, 8.0, fill);
+            self.settings
+                .pane(ui, lay.settings, &mut *self.child, self.generation);
+            if self.replay.is_none() && self.scene.is_some() {
+                let t = *ui.theme();
+                let spec = Spec::plain("live", Style::ui(t.font_s, t.fg_tertiary));
+                let w = ui.painter().measure(&spec).0;
+                ui.painter()
+                    .text(&spec, lay.head.right() - w, lay.head.y + 6.0);
+            }
+        });
     }
 
     fn strings(&self) -> StringTable {
@@ -1145,7 +1145,7 @@ mod tests {
             let mut p = Player::new(HOST, Box::new(shell), window, 1.0, MotionTier::Full);
             p.frame(&mut FakeText, 0, &[]).expect("frame");
             let scene = p.frame(&mut FakeText, 16, &[]).expect("frame").0;
-            let texts = &scene.merged(lune_ui::scene::LayerId::Raised).texts;
+            let texts = &scene.merged(lune_ui::scene::LayerId::Outside).texts;
             let inside: Vec<_> = texts
                 .iter()
                 .filter(|t| region.contains((t.x + 2.0, t.y + 2.0)))

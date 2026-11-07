@@ -1604,3 +1604,202 @@ fn what_an_overlay_draws_after_a_child_stays_on_its_own_layer() {
             .is_empty()
     );
 }
+
+// A surface outside the modals: `Ui::outside_modals` (R5, D7).
+
+/// The place of `layer` in `scene.in_order()`, by identity.
+fn place(scene: &Scene, layer: &Layer) -> usize {
+    scene
+        .in_order()
+        .iter()
+        .position(|o| std::ptr::eq(*o, layer))
+        .expect("the layer is in the draw order")
+}
+
+/// A button in the scope; `dialog` opens `modal()` at `depth` 1, or a second one inside it at 2.
+fn scope_frame(h: &mut UiHarness, depth: u32) -> Response {
+    let mut out = None;
+    h.frame(|ui| {
+        if depth >= 1 {
+            ui.overlay(
+                "parent",
+                &modal(),
+                |_, _, _| {},
+                |ui, _| {
+                    let card = ui.id("parent-card");
+                    ui.interact(card, CARD, Sense::HOVER);
+                    if depth >= 2 {
+                        ui.overlay(
+                            "child",
+                            &modal(),
+                            |_, _, _| {},
+                            |ui, _| {
+                                let card = ui.id("child-card");
+                                ui.interact(card, CARD, Sense::HOVER);
+                            },
+                        );
+                    }
+                },
+            );
+        }
+        out = Some(ui.outside_modals(|ui| {
+            let id = ui.id("scope-button");
+            ui.interact(id, PAGE_BTN, Sense::CLICK_FOCUS)
+        }));
+    });
+    out.expect("frame ran")
+}
+
+#[test]
+fn a_button_in_the_scope_takes_a_press_under_a_modal_and_under_a_nested_one() {
+    for depth in [1, 2] {
+        let mut h = harness();
+        scope_frame(&mut h, depth);
+        h.input.pointer_to(20.0, 20.0);
+        let b = scope_frame(&mut h, depth);
+        assert!(b.hovered, "depth {depth}: hover reaches the scope");
+        h.input.press(P);
+        let b = scope_frame(&mut h, depth);
+        assert!(b.pressed && b.focused, "depth {depth}: the press lands");
+        h.input.release(P);
+        let b = scope_frame(&mut h, depth);
+        assert!(b.clicked, "depth {depth}: the click completes");
+    }
+}
+
+#[test]
+fn a_page_button_beside_the_scope_stays_blocked_by_the_modal() {
+    let mut h = harness();
+    let run = |h: &mut UiHarness| {
+        let mut out = None;
+        h.frame(|ui| {
+            out = Some(page_button(ui));
+            dialog(ui, "dialog", &modal());
+        });
+        out.expect("frame ran")
+    };
+    run(&mut h);
+    h.input.pointer_to(20.0, 20.0).click(P);
+    let b = run(&mut h);
+    assert!(!b.hovered && !b.clicked, "only the scope is exempt");
+}
+
+#[test]
+fn a_blurred_scrim_runs_before_the_scope_so_its_content_is_not_blurred() {
+    let mut h = harness();
+    let (scene, _) = h.frame(|ui| {
+        ui.overlay(
+            "scrim",
+            &modal(),
+            |_, _, _| {},
+            |ui, _| {
+                ui.painter()
+                    .backdrop(Rect::new(0.0, 0.0, 400.0, 300.0), 0.0)
+            },
+        );
+        ui.outside_modals(|ui| ui.painter().fill(PAGE_BTN, 0.0, [9, 9, 9, 255]));
+    });
+    let order = scene.in_order();
+    let stop = order
+        .iter()
+        .position(|l| !l.backdrops.is_empty())
+        .expect("the scrim's request");
+    let scope = place(&scene, &scene.layers[LayerId::Outside as usize]);
+    assert!(
+        !scene.layers[LayerId::Outside as usize]
+            .geometry
+            .under
+            .is_empty()
+    );
+    assert!(
+        stop < scope,
+        "the request is at {stop}, the scope at {scope}"
+    );
+}
+
+#[test]
+fn a_menu_opened_from_the_scope_stays_on_outside_above_it_even_under_a_modal() {
+    let mut h = harness();
+    let fill = |ui: &mut Ui<'_>| ui.painter().fill(MENU, 0.0, [1, 2, 3, 255]);
+    let (scene, _) = h.frame(|ui| {
+        dialog(ui, "dialog", &modal());
+        ui.outside_modals(|ui| {
+            fill(ui);
+            ui.overlay("menu", &popup(), |_, _, _| {}, |ui, _| fill(ui));
+        });
+    });
+    let outside: Vec<_> = scene
+        .overlays
+        .iter()
+        .filter(|o| o.on == LayerId::Outside)
+        .collect();
+    assert_eq!(outside.len(), 1, "the menu is an overlay layer on Outside");
+    assert!(
+        scene
+            .overlays
+            .iter()
+            .all(|o| o.on != LayerId::Raised && o.on != LayerId::Popup)
+    );
+    let base = place(&scene, &scene.layers[LayerId::Outside as usize]);
+    assert!(
+        place(&scene, &outside[0].layer) > base,
+        "above the scope's own drawing"
+    );
+    assert_eq!(
+        scene.layers[LayerId::Outside as usize].geometry.under.len(),
+        1
+    );
+    assert_eq!(outside[0].layer.geometry.under.len(), 1);
+}
+
+#[test]
+fn a_toast_draws_above_the_scope_and_its_menu() {
+    let mut h = harness();
+    let (scene, _) = h.frame(|ui| {
+        ui.outside_modals(|ui| {
+            ui.painter().fill(PAGE_BTN, 0.0, [1, 2, 3, 255]);
+            ui.overlay(
+                "menu",
+                &popup(),
+                |_, _, _| {},
+                |ui, _| ui.painter().fill(MENU, 0.0, [1, 2, 3, 255]),
+            );
+        });
+        ui.painter().on(LayerId::Toast);
+        ui.painter().fill(PAGE_BTN, 0.0, [4, 5, 6, 255]);
+    });
+    let toast = place(&scene, &scene.layers[LayerId::Toast as usize]);
+    for o in scene.overlays.iter().filter(|o| o.on == LayerId::Outside) {
+        assert!(toast > place(&scene, &o.layer));
+    }
+    assert!(toast > place(&scene, &scene.layers[LayerId::Outside as usize]));
+}
+
+#[test]
+fn the_scope_keeps_the_clip_and_transform_and_puts_the_painter_back() {
+    let mut h = harness();
+    let clip = Rect::new(20.0, 20.0, 50.0, 50.0);
+    let probe = Rect::new(0.0, 0.0, 400.0, 300.0);
+    let (scene, _) = h.frame(|ui| {
+        ui.painter().on(LayerId::Page);
+        ui.painter().push_clip(clip);
+        ui.painter().push_translate(5.0, 7.0);
+        ui.outside_modals(|ui| ui.painter().fill(probe, 0.0, [1, 1, 1, 255]));
+        // Back on the layer the scope found, with the same clip and transform.
+        ui.painter().fill(probe, 0.0, [2, 2, 2, 255]);
+    });
+    let shape = |id: LayerId| {
+        let under = &scene.layers[id as usize].geometry.under;
+        assert_eq!(under.len(), 1, "{id:?} holds one fill");
+        under[0]
+    };
+    let (inside, after) = (shape(LayerId::Outside), shape(LayerId::Page));
+    assert!(
+        inside.clip[2] > 0.0,
+        "the scope draws under the caller's clip"
+    );
+    assert_eq!(inside.clip, clip.phys(1.0));
+    assert_eq!(after.clip, inside.clip, "the clip is back as it was");
+    assert_eq!(after.rect, inside.rect, "the transform is back as it was");
+    assert_eq!(inside.rect, Rect::new(5.0, 7.0, 400.0, 300.0).phys(1.0));
+}

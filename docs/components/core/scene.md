@@ -11,7 +11,7 @@ summary: Plain-data Scene the painter builds and a renderer consumes; the draw-o
 
 ## What it is
 
-`Scene` (six fixed `Layer`s, an `OverlayLayer` per overlay; a `Layer` holds its `BackdropRequest`s), `LayerGeometry` (acrylic, under, over shapes and strokes), `Shape`, `StrokeVertex`, `TextItem`, `CustomItem`, `LayerId`, `LAYER_COUNT`, `SCENE_LAYERS` and `FrameParams`. Std only, in physical pixels; the records mirror the GPU's field by field and the wgpu adapter copies them into its own Pod structs. This is the renderer seam: the data, not a trait. The draw-order contract is in the module doc: layers back to front in `Scene::in_order`, each fixed layer followed by the overlays on it in open order ([D256]); in a layer acrylic, under shapes, custom items, text, over shapes, strokes; layers under `SCENE_LAYERS` render offscreen, which a backdrop request blurs.
+`Scene` (seven fixed `Layer`s, an `OverlayLayer` per overlay; a `Layer` holds its `BackdropRequest`s), `LayerGeometry` (acrylic, under, over shapes and strokes), `Shape`, `StrokeVertex`, `TextItem`, `CustomItem`, `LayerId`, `LAYER_COUNT`, `SCENE_LAYERS` and `FrameParams`. Std only, in physical pixels; the records mirror the GPU's field by field and the wgpu adapter copies them into its own Pod structs. This is the renderer seam: the data, not a trait. The draw-order contract is in the module doc: layers back to front in `Scene::in_order`, each fixed layer followed by the overlays on it in open order ([D256]); in a layer acrylic, under shapes, custom items, text, over shapes, strokes; layers under `SCENE_LAYERS` render offscreen, which a backdrop request blurs.
 
 ## Needs
 

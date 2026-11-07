@@ -88,13 +88,17 @@ impl std::fmt::Debug for OverlayRec {
     }
 }
 
-/// The layer of an overlay opening with `tag` that asks for `requested`: [`LayerId::Raised`] for a
-/// popup or a modal above an active modal, else `requested`.
-fn open_layer(overlays: &[OverlayRec], requested: LayerId, tag: u32) -> LayerId {
+/// The layer of an overlay opening with `tag` that asks for `requested`: [`LayerId::Outside`] for a
+/// popup or a modal opened inside [`Ui::outside_modals`] (`outside`), else [`LayerId::Raised`] for
+/// one above an active modal, else `requested`.
+fn open_layer(overlays: &[OverlayRec], requested: LayerId, tag: u32, outside: bool) -> LayerId {
+    let popup_or_modal = matches!(requested, LayerId::Popup | LayerId::Modal);
     let above_modal = overlays
         .iter()
         .any(|o| o.tag < tag && o.active() && o.opts.modal);
-    if above_modal && matches!(requested, LayerId::Popup | LayerId::Modal) {
+    if outside && popup_or_modal {
+        LayerId::Outside
+    } else if above_modal && popup_or_modal {
         LayerId::Raised
     } else {
         requested
@@ -270,11 +274,12 @@ impl<'a> Ui<'a> {
         let now = self.time();
         let (tokens, tier) = (self.config.theme.motion, self.config.tier);
         let focused = self.store.focus.focused;
+        let outside = self.painter.hit_context().0 == LayerId::Outside as usize;
         let mut index = match self.store.overlays.iter().position(|o| o.id == id) {
             Some(i) => i,
             None => {
                 let tag = next_tag(self.store);
-                let layer = open_layer(&self.store.overlays, options.layer, tag);
+                let layer = open_layer(&self.store.overlays, options.layer, tag, outside);
                 self.store.overlays.push(OverlayRec {
                     id,
                     tag,
@@ -302,7 +307,7 @@ impl<'a> Ui<'a> {
         }
         let layer = if reopened {
             let tag = self.store.overlays[index].tag;
-            open_layer(&self.store.overlays, options.layer, tag)
+            open_layer(&self.store.overlays, options.layer, tag, outside)
         } else {
             let rec = &self.store.overlays[index];
             let held = rec.opts.layer;
@@ -348,6 +353,24 @@ impl<'a> Ui<'a> {
             self.initial_focus(tag, first_hit, options.initial_focus, options.modal);
         }
         (frame, r)
+    }
+
+    /// Runs `f` on [`LayerId::Outside`], a surface that stays live and undimmed under a modal: a
+    /// modal's dim, blur and input block do not reach what `f` draws and registers, at any modal
+    /// depth. `f` draws under the current clip and transform; the painter's layer, clip,
+    /// transforms and hit tag come back afterwards. An overlay opened inside `f` that asks for
+    /// `Popup` or `Modal` is on `Outside` too, above `f`'s own drawing by tag; one that asks for
+    /// `Toast` stays there. Keys are unchanged: Tab stays trapped in the modal and Escape goes to it.
+    ///
+    /// The switch is not recorded, so it does not replay: the scope belongs at a shell's top level,
+    /// not inside [`Self::record`].
+    pub fn outside_modals<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
+        let saved = self.painter.save_state();
+        self.painter
+            .restore_state(self.painter.save_state().on_fixed(LayerId::Outside));
+        let r = f(self);
+        self.painter.restore_state(saved);
+        r
     }
 
     /// Runs `f` and returns what it drew as owned painter calls, for an exit painter to replay.

@@ -7,9 +7,9 @@ use crate::scene::{
 /// `scene` with every overlay folded into its fixed layer ([`Scene::merged`]): the scene [`Painter::on`](crate::paint::Painter::on) would have built from the same
 /// draws, to compare what an overlay draws with what the Painter API draws.
 pub fn flattened(scene: &Scene) -> Scene {
-    use crate::scene::LayerId::{Base, Modal, Page, Popup, Raised, Toast};
+    use crate::scene::LayerId::{Base, Modal, Outside, Page, Popup, Raised, Toast};
     Scene {
-        layers: [Base, Page, Popup, Modal, Raised, Toast].map(|id| scene.merged(id)),
+        layers: [Base, Page, Popup, Modal, Raised, Outside, Toast].map(|id| scene.merged(id)),
         overlays: Vec::new(),
     }
 }
