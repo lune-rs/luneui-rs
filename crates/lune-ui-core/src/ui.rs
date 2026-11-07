@@ -820,8 +820,9 @@ impl<'a> Ui<'a> {
     }
 
     /// Whether the pointer is inside `rect`, given in the current drawing space (it goes through
-    /// the clip and the transform stack, as a hit region does), with nothing of a later overlay or
-    /// a higher layer than the current painter context under it. Ignores `enabled` and `Sense`, so
+    /// the clip and the transform stack, as a hit region does), with nothing drawn above the
+    /// current painter context over it: a higher layer, or the same layer and a later overlay (the
+    /// order [`Self::finish`] picks a press target by, so `Outside` is above every modal). Ignores `enabled` and `Sense`, so
     /// it reads true over a disabled anchor, and reads the previous frame's regions.
     pub fn pointer_in(&self, rect: Rect) -> bool {
         self.pointer_over(self.painter.hit_rect(rect))
@@ -840,7 +841,7 @@ impl<'a> Ui<'a> {
             .store
             .prev_hits
             .iter()
-            .any(|h| (h.tag > tag || h.layer > layer) && h.rect.contains(pos))
+            .any(|h| (h.layer, h.tag) > (layer, tag) && h.rect.contains(pos))
     }
 
     /// The frame's raw input (for events a widget handles itself, such as clipboard replies).

@@ -1808,6 +1808,158 @@ fn the_scope_keeps_the_clip_and_transform_and_puts_the_painter_back() {
     assert_eq!(inside.rect, Rect::new(5.0, 7.0, 400.0, 300.0).phys(1.0));
 }
 
+/// A dialog with a window-wide scrim region, a card and one button, each filled; `fill` colours
+/// the card. Returns the button's response.
+fn scrimmed(ui: &mut Ui<'_>, key: &str, opts: &OverlayOptions, fill: [u8; 4]) -> Response {
+    ui.overlay(
+        key,
+        opts,
+        |_, _, _| {},
+        |ui, _| {
+            let scrim = ui.id((key, "scrim"));
+            ui.interact(scrim, Rect::new(0.0, 0.0, 400.0, 300.0), Sense::CLICK);
+            ui.painter().fill(CARD, 0.0, fill);
+            let card = ui.id((key, "card"));
+            ui.interact(card, CARD, Sense::HOVER);
+            let ok = ui.id((key, "ok"));
+            ui.interact(ok, Rect::new(160.0, 180.0, 60.0, 24.0), Sense::CLICK_FOCUS)
+        },
+    )
+    .1
+}
+
+#[test]
+fn pointer_in_reads_true_in_the_scope_under_a_modal_and_false_for_a_dialog_under_an_outside_hit() {
+    let mut h = harness();
+    let run = |h: &mut UiHarness| {
+        let (mut scope, mut dialog_under) = (None, None);
+        h.frame(|ui| {
+            // A modal whose scrim covers the whole window, and a card over the pane's corner.
+            ui.overlay(
+                "modal",
+                &modal(),
+                |_, _, _| {},
+                |ui, _| {
+                    let scrim = ui.id("scrim");
+                    ui.interact(scrim, Rect::new(0.0, 0.0, 400.0, 300.0), Sense::CLICK);
+                    let card = ui.id("card");
+                    ui.interact(card, CARD, Sense::HOVER);
+                    dialog_under = Some(ui.pointer_in(CARD));
+                },
+            );
+            ui.outside_modals(|ui| {
+                let pane = ui.id("pane");
+                ui.interact(pane, PAGE_BTN, Sense::HOVER);
+                scope = Some(ui.pointer_in(PAGE_BTN));
+                // A strip of the scope over the dialog's card.
+                let strip = ui.id("strip");
+                ui.interact(strip, Rect::new(150.0, 100.0, 40.0, 40.0), Sense::HOVER);
+            });
+        });
+        (scope.expect("ran"), dialog_under.expect("ran"))
+    };
+    run(&mut h);
+    h.input.pointer_to(20.0, 20.0);
+    run(&mut h);
+    let (scope, _) = run(&mut h);
+    assert!(
+        scope,
+        "the scope's pane is not covered by the modal's block"
+    );
+    h.input.pointer_to(160.0, 110.0);
+    run(&mut h);
+    let (_, under) = run(&mut h);
+    assert!(
+        !under,
+        "the dialog's card is covered by the scope's strip: Outside draws above Modal"
+    );
+}
+
+#[test]
+fn an_overlay_opened_at_top_level_above_an_outside_modal_draws_and_takes_input_above_it() {
+    let mut h = harness();
+    let run = |h: &mut UiHarness| {
+        let mut err_ok = None;
+        let (scene, _) = h.frame(|ui| {
+            ui.outside_modals(|ui| {
+                scrimmed(ui, "settings", &modal(), [10, 10, 10, 255]);
+            });
+            ui.overlay(
+                "menu",
+                &popup(),
+                |_, _, _| {},
+                |ui, _| ui.painter().fill(MENU, 0.0, [20, 20, 20, 255]),
+            );
+            err_ok = Some(scrimmed(ui, "error", &modal(), [30, 30, 30, 255]));
+        });
+        (scene, err_ok.expect("ran"))
+    };
+    let (scene, _) = run(&mut h);
+    let of = |tag: u32| {
+        scene
+            .overlays
+            .iter()
+            .find(|o| o.tag == tag)
+            .unwrap_or_else(|| panic!("overlay tag {tag}"))
+    };
+    let first = place(&scene, &of(1).layer);
+    for tag in [2, 3] {
+        assert!(
+            place(&scene, &of(tag).layer) > first,
+            "overlay tag {tag} (on {:?}) draws after the Outside modal",
+            of(tag).on
+        );
+    }
+    assert!(of(2).on as usize >= LayerId::Outside as usize);
+    assert!(of(3).on as usize >= LayerId::Outside as usize);
+    h.input.pointer_to(170.0, 190.0);
+    run(&mut h);
+    h.input.press(P);
+    let (_, ok) = run(&mut h);
+    assert!(ok.pressed, "the error dialog's button takes the press");
+    h.input.release(P);
+    let (_, ok) = run(&mut h);
+    assert!(ok.clicked, "and completes the click");
+}
+
+#[test]
+fn an_overlay_put_on_outside_for_a_modal_drops_back_when_that_modal_is_gone() {
+    let mut h = harness();
+    let run = |h: &mut UiHarness, settings: bool| {
+        h.frame(|ui| {
+            if settings {
+                ui.outside_modals(|ui| {
+                    scrimmed(ui, "settings", &modal(), [10, 10, 10, 255]);
+                });
+            }
+            ui.overlay(
+                "menu",
+                &popup(),
+                |_, _, _| {},
+                |ui, _| ui.painter().fill(MENU, 0.0, [20, 20, 20, 255]),
+            );
+        })
+        .0
+    };
+    let on = |scene: &Scene| {
+        scene
+            .overlays
+            .iter()
+            .find(|o| o.tag == 2)
+            .expect("the menu")
+            .on
+    };
+    assert_eq!(on(&run(&mut h, true)), LayerId::Outside);
+    assert_eq!(on(&run(&mut h, true)), LayerId::Outside, "held");
+    // The modal stops being called; its exit runs, then the menu is back on its own layer.
+    let mut scene = run(&mut h, false);
+    for ms in (50..=3_000).step_by(50) {
+        h.at_ms(ms);
+        scene = run(&mut h, false);
+    }
+    assert_eq!(on(&scene), LayerId::Popup, "the reason is gone");
+}
+
 // One glass routine: every popup and list that floats over app content frosts what is behind it.
 
 /// What a floating surface must show in `scene`: at least one frost, a backdrop request that covers

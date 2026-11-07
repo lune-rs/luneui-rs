@@ -32,7 +32,8 @@ pub enum LayerId {
     Modal = 3,
     /// An overlay opened above an active modal: a popup inside a dialog, or a dialog over a dialog.
     /// The `Ui` picks it at open; nothing asks for it by name. Overlays stacked further share it,
-    /// each on a draw layer of its own in open order ([`Scene::in_order`]).
+    /// each on a draw layer of its own in open order ([`Scene::in_order`]). Over a modal that is on
+    /// `Outside` the overlay is on `Outside` too, so it is above that modal.
     Raised = 4,
     /// A surface that stays outside a modal: above everything a modal dims, blurs or blocks, and
     /// below toasts. The `Ui` puts what [`Ui::outside_modals`](crate::ui::Ui::outside_modals)
