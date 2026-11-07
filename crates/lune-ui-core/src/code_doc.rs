@@ -9,10 +9,10 @@
 //! changed. An edit still moves the starts after it, plain arithmetic that measures 0.9 ms at
 //! 1,000,000 lines (D179).
 //!
-//! Word motions differ from a `String`'s in one way. [`EditText::window`] holds the lines either
-//! side of the caret's, and a word motion reads no further than that window, and one more where
-//! the line past its edge holds text. So a word move crosses one blank line as it does in a
-//! `String`, and across two or more blank lines it stops at the blank line.
+//! Word motions land where a `String`'s do. [`EditText::window`] holds the lines either side of
+//! the caret's; a word motion that finds no word there reads the window past its edge, and so on,
+//! so it crosses any run of blank lines to the next word or the text's edge, reading as many
+//! windows as the lines it crosses.
 
 use std::collections::BTreeMap;
 use std::ops::Range;
@@ -41,6 +41,21 @@ pub struct CodeDoc {
     /// How many lines have each width in chars, so the widest is known as an edit shrinks it.
     widths: BTreeMap<usize, usize>,
     revision: u64,
+    /// The lines the last [`EditBuffer::replace`] changed, kept until the next change.
+    edit: Option<LineEdit>,
+}
+
+/// The lines one [`EditBuffer::replace`] changed: from line `at`, `removed` lines gave way to
+/// `added`. The line the edit starts in keeps its number, so `at` is the line after it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct LineEdit {
+    /// The revision the edit was made on.
+    since: u64,
+    /// The revision it made.
+    made: u64,
+    pub(crate) at: usize,
+    pub(crate) removed: usize,
+    pub(crate) added: usize,
 }
 
 impl Default for CodeDoc {
@@ -68,6 +83,7 @@ impl CodeDoc {
             char_len: 0,
             widths: BTreeMap::new(),
             revision: 0,
+            edit: None,
         };
         doc.reindex();
         doc
@@ -115,6 +131,13 @@ impl CodeDoc {
     /// The width in chars of the widest line, terminators not counted.
     pub fn widest_chars(&self) -> usize {
         self.widths.last_key_value().map_or(0, |w| *w.0)
+    }
+
+    /// The lines changed since revision `since` (a [`EditText::fingerprint`]), when one
+    /// [`EditBuffer::replace`] made every change since: `None` after any other change, or none.
+    pub(crate) fn line_edit(&self, since: u64) -> Option<LineEdit> {
+        self.edit
+            .filter(|e| e.since == since && e.made == self.revision)
     }
 
     /// The byte where line `i` ends, past its terminator.
@@ -257,6 +280,14 @@ impl EditBuffer for CodeDoc {
         for i in changed..moved {
             self.count_width(i);
         }
+        let since = self.revision;
         self.revision = next_revision();
+        self.edit = Some(LineEdit {
+            since,
+            made: self.revision,
+            at: changed + 1,
+            removed: past - changed - 1,
+            added: moved - changed - 1,
+        });
     }
 }

@@ -112,7 +112,8 @@ pub trait EditText {
     /// A slice around char `at` and the char offset it starts at; it holds `at`, and it starts
     /// and ends where text segmentation does not reach across (the whole text, or whole lines).
     /// Grapheme motions and snapping read this window of the caret. A word motion reads it too,
-    /// so a text that answers less than the whole of itself bounds the motion: see
+    /// and the windows past it until it finds a word, so a text that answers less than the whole
+    /// of itself costs a motion one window per stretch it crosses: see
     /// [`CodeDoc`](crate::code_doc::CodeDoc).
     fn window(&self, at: usize) -> (usize, &str);
 
@@ -568,36 +569,22 @@ fn words<'a, T: EditText + ?Sized>(
     (spans, window)
 }
 
-/// Whether the line whose terminator ends at char `edge` is blank.
-fn blank_line_before<T: EditText + ?Sized>(text: &T, edge: usize) -> bool {
-    let tail = text.slice(edge.saturating_sub(3)..edge);
-    let body = tail
-        .strip_suffix("\r\n")
-        .or_else(|| tail.strip_suffix(['\n', '\r']))
-        .unwrap_or(&tail);
-    body.is_empty() || body.ends_with(['\n', '\r'])
-}
-
-/// Whether the line that starts at char `edge` is blank.
-fn blank_line_at<T: EditText + ?Sized>(text: &T, edge: usize) -> bool {
-    let next = text.slice(edge..edge + 1);
-    next.is_empty() || next.starts_with(['\n', '\r'])
-}
-
-/// The word motions read [`EditText::window`]. Finding no word in it, they stop at its edge, unless
-/// the line past the edge holds text: a single blank line does not stop them, so they read one
-/// window more and stop at that one's edge. A text whose window is all of it never gets that far.
+/// The word motions read [`EditText::window`]. Finding no word in it, they read the window past
+/// its edge, and so on, until a word or the text's edge: a run of blank lines does not stop them,
+/// as it does not in a text whose window is all of it. Each window holds at least one line past
+/// the last, so a motion reads as many windows as the lines it crosses, on a key press.
 fn word_left<T: EditText + ?Sized>(text: &T, at: usize, layout: &mut dyn EditLayout) -> usize {
-    let found = |spans: &[(usize, usize)]| spans.iter().rev().find(|w| w.0 < at).map(|w| w.0);
-    let (spans, (base, _)) = words(text, at, layout);
-    if let Some(word) = found(&spans) {
-        return word;
+    let mut from = at;
+    loop {
+        let (spans, (base, _)) = words(text, from, layout);
+        if let Some(word) = spans.iter().rev().find(|w| w.0 < at) {
+            return word.0;
+        }
+        if base == 0 {
+            return 0;
+        }
+        from = base - 1;
     }
-    if base == 0 || blank_line_before(text, base) {
-        return base;
-    }
-    let (spans, (base, _)) = words(text, base - 1, layout);
-    found(&spans).unwrap_or(base)
 }
 
 /// See [`word_left`].
@@ -607,20 +594,23 @@ fn word_right<T: EditText + ?Sized>(
     keymap: Keymap,
     layout: &mut dyn EditLayout,
 ) -> usize {
-    let found = |spans: &[(usize, usize)]| match keymap.word_motion {
-        WordMotion::EndOfWord => spans.iter().find(|w| w.1 > at).map(|w| w.1),
-        WordMotion::StartOfNext => spans.iter().find(|w| w.0 > at).map(|w| w.0),
-    };
-    let (spans, (base, window)) = words(text, at, layout);
-    if let Some(word) = found(&spans) {
-        return word;
+    let len = text.char_len();
+    let mut from = at;
+    loop {
+        let (spans, (base, window)) = words(text, from, layout);
+        let found = match keymap.word_motion {
+            WordMotion::EndOfWord => spans.iter().find(|w| w.1 > at).map(|w| w.1),
+            WordMotion::StartOfNext => spans.iter().find(|w| w.0 > at).map(|w| w.0),
+        };
+        if let Some(word) = found {
+            return word;
+        }
+        let end = base + window.chars().count();
+        if end >= len {
+            return len;
+        }
+        from = end;
     }
-    let end = base + window.chars().count();
-    if end == text.char_len() || blank_line_at(text, end) {
-        return end;
-    }
-    let (spans, (base, window)) = words(text, end, layout);
-    found(&spans).unwrap_or_else(|| base + window.chars().count())
 }
 
 /// The index of the visual line that shows `at`: at a soft wrap, the later one.

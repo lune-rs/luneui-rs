@@ -11,6 +11,7 @@ use std::time::Duration;
 
 use super::button::IconButton;
 use super::code_editor::{CodeOptions, Look, TEXT_PAD};
+use super::scrollbar::BAR;
 use super::text_lines::{HighlightSpan, Highlighter};
 use crate::access::{Live, Node, Role};
 use crate::code_doc::CodeDoc;
@@ -267,6 +268,15 @@ impl Ui<'_> {
             (rect.h - 2.0 * py).max(0.0),
         );
         let frame = rect.inset(edge, edge);
+        // The horizontal bar lies along the frame's bottom. Where the button reaches into that
+        // band (a block of one line), the track ends `BUTTON_GAP` before the button, so the
+        // thumb never lies under it at any offset.
+        let shares = at.bottom() > frame.bottom() - BAR;
+        let bar_room = if shares {
+            (frame.right() - at.x + BUTTON_GAP).max(0.0)
+        } else {
+            0.0
+        };
         let spans = BlockSpans(opts.spans);
         let code = CodeOptions {
             read_only: true,
@@ -282,6 +292,7 @@ impl Ui<'_> {
             skip_tab: !opts.tab_stop,
             ring: Some(rect),
             frame: Some(frame),
+            bar_room,
         };
         let text_view = self.scope("body", |ui| {
             ui.code_frame(body, &mut mem.doc, &code, None, &look)

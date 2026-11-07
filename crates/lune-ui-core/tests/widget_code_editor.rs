@@ -1343,6 +1343,218 @@ fn page_keys_in_one_frame_cross_wrapped_lines_nothing_has_measured_yet() {
     assert_eq!(doc.line(102).chars().position(|c| c == 'X'), Some(100));
 }
 
+/// The gutter numbers drawn, line (from 1) to the y it was drawn at: what the frame showed, so a
+/// move is judged on the screen and not on the heights it measured afterwards.
+fn numbers_at(scene: &Scene, lines: usize) -> std::collections::BTreeMap<usize, f32> {
+    let faint = Style::mono(DARK.font_base, LINE, DARK.fg_faint);
+    let texts = &scene.layers[0].texts;
+    (1..=lines)
+        .filter_map(|n| {
+            let key = key_of(&n.to_string(), faint);
+            texts.iter().find(|t| t.key == key).map(|t| (n, t.y))
+        })
+        .collect()
+}
+
+/// A wrapped read-only view of 300 lines of four rows (80 high, estimated at 20), focused.
+fn wrapped_reader() -> (CodeDoc, CodeOptions<'static>, UiHarness) {
+    let mut doc = long_lines(300, 200);
+    let opts = CodeOptions {
+        gutter: true,
+        read_only: true,
+        ..wrapped()
+    };
+    let h = focused(&mut doc, &opts);
+    (doc, opts, h)
+}
+
+/// Frames until the view rests, a second apart, from the harness's start: once per harness.
+fn rest(h: &mut UiHarness, doc: &mut CodeDoc, opts: &CodeOptions<'_>) -> Run {
+    let mut r = run(h, doc, opts);
+    for n in 1..20 {
+        if r.out.repaint == Repaint::Idle {
+            break;
+        }
+        h.at_ms(n * 1_000);
+        r = run(h, doc, opts);
+    }
+    assert_eq!(r.out.repaint, Repaint::Idle, "the view rests");
+    r
+}
+
+#[test]
+fn home_in_the_frame_after_a_far_jump_in_wrapped_lines_rests_at_the_top() {
+    // End jumps after the frame drew; the next frame draws there and measures the lines above,
+    // which queues a shift. Home in that frame takes none of it.
+    let (mut doc, opts, mut h) = wrapped_reader();
+    press(&mut h, NamedKey::End);
+    run(&mut h, &mut doc, &opts);
+    press(&mut h, NamedKey::Home);
+    run(&mut h, &mut doc, &opts);
+    let r = rest(&mut h, &mut doc, &opts);
+    assert_eq!(offset(&r), 0.0);
+    assert_eq!(numbers_at(&r.scene, 300).get(&1), Some(&RECT.y));
+}
+
+#[test]
+fn end_in_wrapped_lines_rests_with_the_last_line_at_the_bottom() {
+    for far in [0.0, -4000.0] {
+        let (mut doc, opts, mut h) = wrapped_reader();
+        h.input.pointer_to(100.0, 100.0).scroll_pixels(0.0, far);
+        run(&mut h, &mut doc, &opts);
+        press(&mut h, NamedKey::End);
+        run(&mut h, &mut doc, &opts);
+        let r = rest(&mut h, &mut doc, &opts);
+        let last = numbers_at(&r.scene, 300).get(&300).copied();
+        assert_eq!(
+            last,
+            Some(RECT.bottom() - 4.0 * LINE),
+            "after a wheel of {far}"
+        );
+    }
+}
+
+#[test]
+fn page_keys_in_the_frame_after_a_far_jump_in_wrapped_lines_move_one_viewport() {
+    // Through lines that were estimates: what showed at the top shows one viewport lower (Page
+    // Up) or higher (Page Down), within a line.
+    // A wheel's jump draws where it lands; End's lands after its frame drew. Page Down at the
+    // end cannot move, so it follows two wheels.
+    let cases = [
+        (NamedKey::PageUp, RECT.h, Some(-4000.0)),
+        (NamedKey::PageUp, RECT.h, None),
+        (NamedKey::PageDown, -RECT.h, Some(-4000.0)),
+        (NamedKey::PageDown, -RECT.h, Some(-1500.0)),
+    ];
+    for (key, by, far) in cases {
+        let (mut doc, opts, mut h) = wrapped_reader();
+        match far {
+            Some(far) => {
+                h.input.pointer_to(100.0, 100.0).scroll_pixels(0.0, far);
+            }
+            None => press(&mut h, NamedKey::End),
+        }
+        run(&mut h, &mut doc, &opts);
+        press(&mut h, key);
+        let before = numbers_at(&run(&mut h, &mut doc, &opts).scene, 300);
+        let after = numbers_at(&rest(&mut h, &mut doc, &opts).scene, 300);
+        // Every line is four rows once measured, so the first line shown after places the
+        // first shown before, wherever that is now.
+        let (&line, &y) = before.iter().next().expect("lines before");
+        let (&now, &now_y) = after.iter().next().expect("lines after");
+        let moved = now_y + (line as f32 - now as f32) * 4.0 * LINE - y;
+        assert!(
+            (moved - by).abs() <= LINE,
+            "{key:?} after {far:?}: line {line} moved {moved}, not {by}"
+        );
+    }
+}
+
+/// Lines of one to four rows (50 chars a row), the first three of one, in no period: where a
+/// line lands says whether the heights above it are its own, wherever the lines moved.
+fn rowed_lines(n: usize) -> String {
+    let mut r = Lcg(7);
+    (0..n)
+        .map(|i| {
+            if i < 3 {
+                format!("s{i}")
+            } else {
+                "w".repeat(50 * (1 + r.next(4)))
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// A focused wrapped editor on `doc` with every line measured: the wheel walks it down and back.
+fn measured_editor(doc: &mut CodeDoc) -> UiHarness {
+    let opts = CodeOptions {
+        gutter: true,
+        ..wrapped()
+    };
+    let mut h = focused(doc, &opts);
+    for _ in 0..80 {
+        h.input.pointer_to(100.0, 100.0).scroll_pixels(0.0, -100.0);
+        run(&mut h, doc, &opts);
+    }
+    with_mods(&mut h, META, Key::Named(NamedKey::Home));
+    run(&mut h, doc, &opts);
+    run(&mut h, doc, &opts);
+    h
+}
+
+/// The lines a wheel of 1200 px from the top draws, in the frame it lands: placed by the heights
+/// the view holds, before that frame measures anything above it.
+fn landed(h: &mut UiHarness, doc: &mut CodeDoc) -> std::collections::BTreeMap<usize, f32> {
+    let opts = CodeOptions {
+        gutter: true,
+        ..wrapped()
+    };
+    assert_eq!(offset(&run(h, doc, &opts)), 0.0, "from the top");
+    h.input.pointer_to(100.0, 100.0).scroll_pixels(0.0, -1200.0);
+    let shown = numbers_at(&run(h, doc, &opts).scene, doc.line_count());
+    assert!(shown.len() > 1, "the instrument: {shown:?}");
+    shown
+}
+
+#[test]
+fn measured_heights_follow_their_lines_through_an_insert_a_delete_a_paste_and_an_undo() {
+    let opts = CodeOptions {
+        gutter: true,
+        ..wrapped()
+    };
+    type Edit = fn(&mut UiHarness, &mut CodeDoc, &CodeOptions<'_>);
+    let edits: [(&str, Edit); 4] = [
+        ("insert", |h, doc, opts| {
+            press(h, NamedKey::ArrowDown);
+            press(h, NamedKey::Enter);
+            run(h, doc, opts);
+        }),
+        ("delete", |h, doc, opts| {
+            press(h, NamedKey::ArrowDown);
+            for _ in 0..3 {
+                with_mods(h, SHIFT, Key::Named(NamedKey::ArrowDown));
+            }
+            press(h, NamedKey::Backspace);
+            run(h, doc, opts);
+        }),
+        ("paste", |h, doc, opts| {
+            press(h, NamedKey::ArrowDown);
+            chord(h, "v");
+            run(h, doc, opts);
+            h.input.clipboard_text(&"p\n".repeat(7));
+            run(h, doc, opts);
+        }),
+        ("undo", |h, doc, opts| {
+            press(h, NamedKey::ArrowDown);
+            chord(h, "v");
+            run(h, doc, opts);
+            h.input.clipboard_text(&"p\n".repeat(7));
+            run(h, doc, opts);
+            chord(h, "z");
+            run(h, doc, opts);
+        }),
+    ];
+    for (name, edit) in edits {
+        let mut doc = CodeDoc::new(rowed_lines(60));
+        let mut h = measured_editor(&mut doc);
+        let text = doc.text().to_owned();
+        edit(&mut h, &mut doc, &opts);
+        // The instrument: each edit changed the lines, and the undo took the paste back.
+        assert_eq!(doc.text() == text, name == "undo", "{name}");
+        with_mods(&mut h, META, Key::Named(NamedKey::Home));
+        run(&mut h, &mut doc, &opts);
+        // The same text, measured from scratch.
+        let mut fresh = CodeDoc::new(doc.text());
+        let mut f = measured_editor(&mut fresh);
+        assert_eq!(
+            landed(&mut h, &mut doc),
+            landed(&mut f, &mut fresh),
+            "{name}"
+        );
+    }
+}
+
 #[test]
 fn resizing_re_measures_what_is_built() {
     let mut doc = CodeDoc::new("w".repeat(100));
@@ -2337,11 +2549,6 @@ fn walk(wrap: bool, read_only: bool, second: usize, seed: u64, seen: &mut Walked
     frame(&mut h, 16, ids);
     let mut flying = false;
     for step in 0..100 {
-        // A jump in the frame after a far one, wrapped, lands off by what that frame measured
-        // there: the area's own limit, no document's.
-        if wrap {
-            frame(&mut h, 16, ids);
-        }
         flying |= wander(&mut h, &mut r, read_only);
         let mut last = frame(&mut h, 16, ids).0;
         if r.next(3) != 0 {

@@ -26,7 +26,7 @@ use crate::motion::{Easing, Kind, Motion, Resolved, Time, Transition};
 use crate::paint::Rect;
 use crate::ui::{Response, Sense, Ui, WidgetId};
 
-use super::scrollbar::thumb_geometry;
+use super::scrollbar::{ThumbGeometry, thumb_geometry};
 
 /// Logical px per wheel line (D9).
 pub const LINE: f64 = 48.0;
@@ -82,6 +82,10 @@ pub struct ScrollOptions {
     /// A vertical wheel or pixel delta scrolls the horizontal axis, so a plain wheel works on a
     /// strip that only scrolls sideways. The larger of a gesture's two components wins.
     pub wheel_x: bool,
+    /// The room the horizontal and the vertical bar leave at their far end (right, bottom), in
+    /// px, for a control that shares that corner: the track stops that much short, so the thumb
+    /// never lies under the control at any offset. 0 by default.
+    pub bar_room: (f32, f32),
 }
 
 impl Default for ScrollOptions {
@@ -92,6 +96,7 @@ impl Default for ScrollOptions {
             follow_tail: false,
             extent: None,
             wheel_x: false,
+            bar_room: (0.0, 0.0),
         }
     }
 }
@@ -764,6 +769,7 @@ impl Ui<'_> {
         if let Some((f, acts)) = keyed.filter(|_| !self.composing()) {
             let pax = primary_axis(&live, &ext, &vp);
             if live[pax] && ext[pax] > vp[pax] {
+                let mut at_start = false;
                 for (index, ev) in self.focus_events(f) {
                     let FocusEvent::Key {
                         key: Key::Named(k),
@@ -787,8 +793,21 @@ impl Ui<'_> {
                     };
                     if acts {
                         a.jump(clamp_offset(to, ext[pax], vp[pax]));
+                        at_start = k == NamedKey::Home;
                     }
                     self.consume_focus_event(index);
+                }
+                // A shift the content queued in this frame is what grew above the view it drew.
+                // Home lands where nothing is above, so it takes none: it rests at the start,
+                // whatever that frame measured. Every other key keeps it, as the place it moved
+                // from moved by as much.
+                if at_start {
+                    let requests = self.transient::<Requests>(id);
+                    if pax == 1 {
+                        requests.shift_y = 0.0;
+                    } else {
+                        requests.shift_x = 0.0;
+                    }
                 }
             }
         }
@@ -799,19 +818,23 @@ impl Ui<'_> {
             opts.bars.0 == Bars::Auto && live[0],
             opts.bars.1 == Bars::Auto && live[1],
         ];
-        let has_y =
-            bar[1] && thumb_geometry(Axis::Vertical, rect, now_off[1], ext[1], false).is_some();
-        let has_x =
-            bar[0] && thumb_geometry(Axis::Horizontal, rect, now_off[0], ext[0], false).is_some();
+        let room = opts.bar_room;
+        let has_y = bar[1]
+            && bar_geometry(Axis::Vertical, rect, now_off[1], ext[1], false, room.1).is_some();
+        let has_x = bar[0]
+            && bar_geometry(Axis::Horizontal, rect, now_off[0], ext[0], false, room.0).is_some();
         let reveal = self.pointer_in(rect);
-        if has_y && let Some(g) = thumb_geometry(Axis::Vertical, rect, now_off[1], ext[1], has_x) {
+        if has_y
+            && let Some(g) = bar_geometry(Axis::Vertical, rect, now_off[1], ext[1], has_x, room.1)
+        {
             let drag = self.scrollbar(id.with("bar-y"), Axis::Vertical, &g, reveal);
             if drag != 0.0 {
                 let cur = clamp_offset(st.a[1].wanted, ext[1], vp[1]);
                 st.a[1].jump(clamp_offset(cur + g.offset_delta(drag), ext[1], vp[1]));
             }
         }
-        if has_x && let Some(g) = thumb_geometry(Axis::Horizontal, rect, now_off[0], ext[0], has_y)
+        if has_x
+            && let Some(g) = bar_geometry(Axis::Horizontal, rect, now_off[0], ext[0], has_y, room.0)
         {
             let drag = self.scrollbar(id.with("bar-x"), Axis::Horizontal, &g, reveal);
             if drag != 0.0 {
@@ -872,6 +895,28 @@ impl Ui<'_> {
             viewport: rect,
         }
     }
+}
+
+/// [`thumb_geometry`] with the track `room` px short at its far end: the bar of a viewport `room`
+/// shorter over content `room` shorter, so the range, and so where an offset puts the thumb, is
+/// the same, and at the far end the thumb ends where the track does.
+fn bar_geometry(
+    axis: Axis,
+    rect: Rect,
+    offset: f64,
+    extent: f64,
+    corner: bool,
+    room: f32,
+) -> Option<ThumbGeometry> {
+    let room = if room.is_finite() { room.max(0.0) } else { 0.0 };
+    if room == 0.0 {
+        return thumb_geometry(axis, rect, offset, extent, corner);
+    }
+    let short = match axis {
+        Axis::Horizontal => Rect::new(rect.x, rect.y, rect.w - room, rect.h),
+        Axis::Vertical => Rect::new(rect.x, rect.y, rect.w, rect.h - room),
+    };
+    thumb_geometry(axis, short, offset, extent - f64::from(room), corner)
 }
 
 /// A gesture `d` turned onto the horizontal axis: its larger component, so a plain wheel scrolls

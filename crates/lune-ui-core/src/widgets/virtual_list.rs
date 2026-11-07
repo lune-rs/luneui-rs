@@ -328,6 +328,29 @@ impl RowHeights {
         }
     }
 
+    /// Rows `at..at + removed` give way to `added` rows not measured yet, and the rows after them
+    /// keep their heights: an edit of a document that inserts or deletes lines, so a measured
+    /// height follows its line. The tree is rebuilt from `at`, O(rows from `at`), on such an edit
+    /// only: nothing calls it per frame. A range past the end is cut at the end.
+    pub fn splice(&mut self, at: usize, removed: usize, added: usize) {
+        let at = at.min(self.count);
+        let removed = removed.min(self.count - at);
+        if removed == 0 && added == 0 {
+            return;
+        }
+        self.count = self.count - removed + added;
+        if !self.measured {
+            return;
+        }
+        let end = (at + removed).min(self.own.len());
+        self.own
+            .splice(at.min(end)..end, std::iter::repeat_n(0.0, added));
+        self.own.resize(self.count, 0.0);
+        // Node `i` sums rows below `i` only, so nodes up to `at` stand.
+        self.tree.truncate(at + 1);
+        self.grow_tree();
+    }
+
     /// Computes the tree's missing nodes: each adds its row's difference and the child nodes it
     /// covers, an amortised O(1) each.
     fn grow_tree(&mut self) {
@@ -1115,6 +1138,62 @@ mod tests {
     use crate::theme::DARK;
 
     const WIN: (f32, f32) = (500.0, 300.0);
+
+    #[test]
+    fn a_splice_keeps_each_rows_height_with_the_row_and_agrees_with_a_plain_model() {
+        let heights = Heights::Measured { estimate: 20.0 };
+        let mut t = RowHeights::default();
+        let mut rows: Vec<f64> = Vec::new();
+        let mut seed = 11u64;
+        let mut next = |below: usize| {
+            seed = seed
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            ((seed >> 33) as usize) % below
+        };
+        t.sync(50, heights);
+        rows.resize(50, 20.0);
+        for round in 0..300 {
+            // Measure a few rows, then insert or delete some.
+            for _ in 0..4 {
+                let i = next(rows.len());
+                let h = 20.0 * (1 + next(4)) as f32;
+                t.set(i, h);
+                rows[i] = f64::from(h);
+            }
+            let at = next(rows.len() + 1);
+            let removed = next(4).min(rows.len() - at);
+            let added = next(4);
+            t.splice(at, removed, added);
+            rows.splice(at..at + removed, std::iter::repeat_n(20.0, added));
+            if rows.is_empty() {
+                t.splice(0, 0, 1);
+                rows.push(20.0);
+            }
+            t.sync(rows.len(), heights);
+            assert_eq!(t.count(), rows.len(), "round {round}");
+            let mut top = 0.0;
+            for (i, h) in rows.iter().enumerate() {
+                assert_eq!(t.top(i), top, "round {round}: top of row {i}");
+                assert_eq!(t.height(i), *h, "round {round}: height of row {i}");
+                top += h;
+            }
+            assert_eq!(t.total(), top, "round {round}");
+        }
+    }
+
+    #[test]
+    fn a_splice_of_fixed_rows_only_counts_and_past_the_end_is_cut() {
+        let mut t = RowHeights::default();
+        t.sync(10, Heights::Fixed(20.0));
+        t.splice(4, 2, 5);
+        assert_eq!((t.count(), t.total()), (13, 260.0));
+        let mut m = RowHeights::default();
+        m.sync(3, Heights::Measured { estimate: 20.0 });
+        m.set(0, 40.0);
+        m.splice(2, 9, 0);
+        assert_eq!((m.count(), m.total()), (2, 60.0));
+    }
     const RECT: Rect = Rect::new(20.0, 20.0, 200.0, 100.0);
     const RIGHT: Rect = Rect::new(260.0, 20.0, 200.0, 100.0);
     const ROW: f32 = 20.0;

@@ -763,6 +763,56 @@ fn a_ring_holds_the_bar_inside_it() {
     );
 }
 
+#[test]
+fn in_a_one_line_block_the_thumb_never_lies_under_the_copy_button() {
+    // Compact, one line: the 21 px button reaches 4 px into the bar's 9 px band.
+    let wide = "z".repeat(300);
+    let o = opts();
+    let mut ui_h = UiHarness::new(WIN);
+    let mut rect = RECT;
+    ui_h.frame(|ui| rect.h = height(ui, &wide, &o));
+    assert_eq!(rect.h, 34.0, "fixture");
+    let button = Rect::new(rect.right() - 10.0 - 21.0, rect.y + 10.0, 21.0, 21.0);
+    let mut h = UiHarness::new(WIN);
+    h.input.pointer_to(100.0, rect.y + 17.0);
+    let mut ms = 0;
+    let mut frame = |h: &mut UiHarness| {
+        ms += 20;
+        h.at_ms(ms);
+        h.frame(|ui| {
+            ui.code_block("b", rect, &wide, &o);
+        })
+        .0
+    };
+    let mut seen = 0;
+    // From the left end to past the right one, then settled at the right.
+    for step in 0..40 {
+        if step > 0 {
+            h.input.scroll_pixels(-80.0, 0.0);
+        }
+        let scene = frame(&mut h);
+        let thumbs = thumbs(&scene);
+        let Some(t) = thumbs.first() else {
+            continue;
+        };
+        seen += 1;
+        let [x, y, w, th] = t.rect;
+        let thumb = Rect::new(x, y, w, th);
+        assert!(
+            thumb.right() <= button.x || thumb.bottom() <= button.y,
+            "step {step}: thumb {thumb:?} under the button {button:?}"
+        );
+        if step == 39 {
+            assert_eq!(thumb.right(), button.x - 4.0, "fully right, 4 px clear");
+            assert!(
+                thumb.y < button.bottom(),
+                "the instrument: they share a band"
+            );
+        }
+    }
+    assert!(seen > 30, "the instrument: the thumb showed {seen} times");
+}
+
 // Nodes, focus and idle.
 
 #[test]

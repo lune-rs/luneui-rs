@@ -167,6 +167,9 @@ pub(super) struct Look {
     /// pointer's reach, the wheel's and the bar's place. The viewport lies inside it; the extent
     /// is made so that the last column ends at the viewport's right edge when scrolled fully.
     pub frame: Option<Rect>,
+    /// The room the horizontal bar leaves at its right end for a control in that corner
+    /// ([`ScrollOptions::bar_room`]).
+    pub bar_room: f32,
 }
 
 impl Look {
@@ -179,6 +182,7 @@ impl Look {
             skip_tab: false,
             ring: None,
             frame: None,
+            bar_room: 0.0,
         }
     }
 }
@@ -469,7 +473,13 @@ impl EditHost for DocHost<'_> {
         let (keymap, now) = (ui.keymap(), ui.time());
         if !geometric(&cmd) {
             let doc = &mut *self.doc;
+            let since = doc.fingerprint();
             let out = Self::segmenting(ui, |l| edit.apply(cmd, doc, l, keymap, now));
+            // A measured height follows its line: the lines an edit inserts or deletes move the
+            // heights below them, not the last ones.
+            if let Some(e) = self.doc.line_edit(since) {
+                self.tops.heights.splice(e.at, e.removed, e.added);
+            }
             self.sync_heights();
             return out;
         }
@@ -790,6 +800,71 @@ fn draw_lines(
     (shown, seen_w, bar)
 }
 
+/// Measures `line` as the view wraps it.
+fn measure_line(ui: &mut Ui<'_>, host: &mut DocHost<'_>, line: usize, wrap: f32) {
+    let spec = query_spec(host.doc.line(line), host.style, Some(wrap));
+    let h = ui.painter().measure(&spec).1;
+    host.tops.note(line, h);
+}
+
+/// The area's Page keys and End on a wrapped read-only view, pending for `id`, move by heights:
+/// where a line they cross is still an estimate, the move would land off by what it measures
+/// when drawn. Those lines are measured first: a viewport above the view's top `at` for each Page
+/// Up, a viewport below it for each Page Down, the last viewport for End. A line above the view
+/// shifts the area as any does, so the view stays where it is until the key moves it. The cost is
+/// the lines the keys cross, on a key press only.
+fn measure_crossed(
+    ui: &mut Ui<'_>,
+    host: &mut DocHost<'_>,
+    wrap: f32,
+    at: f64,
+    vh: f64,
+    id: WidgetId,
+) {
+    let (mut ups, mut downs, mut end) = (0.0, 0.0, false);
+    for (_, ev) in ui.focus_events(id) {
+        let FocusEvent::Key {
+            key: Key::Named(k),
+            modifiers,
+            ..
+        } = ev
+        else {
+            continue;
+        };
+        if modifiers.control || modifiers.alt || modifiers.logo {
+            continue;
+        }
+        match k {
+            NamedKey::PageUp => ups += vh,
+            NamedKey::PageDown => downs += vh,
+            NamedKey::End => end = true,
+            _ => {}
+        }
+    }
+    let count = host.doc.line_count();
+    let first = host.tops.heights.row_at(at);
+    // The part of the first line above the view's top: measuring lines moves no part of it.
+    let cut = at - host.tops.heights.top(first);
+    let (mut l, mut span) = (first, cut);
+    while l > 0 && span < ups {
+        l -= 1;
+        measure_line(ui, host, l, wrap);
+        span += host.tops.heights.height(l);
+    }
+    let (mut l, mut span) = (first, -cut);
+    while l < count && span <= downs && downs > 0.0 {
+        measure_line(ui, host, l, wrap);
+        span += host.tops.heights.height(l);
+        l += 1;
+    }
+    let (mut l, mut span) = (count, 0.0);
+    while end && l > 0 && span < vh {
+        l -= 1;
+        measure_line(ui, host, l, wrap);
+        span += host.tops.heights.height(l);
+    }
+}
+
 impl Ui<'_> {
     /// A code view under `key` over `rect` on `doc`: lines of mono text with a gutter, read-only or
     /// editable as `opts` says. Only the lines in view are built, so its frame costs the same at
@@ -931,6 +1006,13 @@ impl Ui<'_> {
             }
             (line, pos)
         });
+        if let Some(wrap) = host.wrap
+            && opts.read_only
+            && focused
+        {
+            let at = drawn.1 + self.scroll_pending_shift(AREA);
+            measure_crossed(self, &mut host, wrap, at, vh, id);
+        }
         if host.tops.shift != 0.0 {
             self.scroll_shift(AREA, std::mem::take(&mut host.tops.shift));
         }
@@ -996,6 +1078,7 @@ impl Ui<'_> {
             ),
             extent: Some(extent),
             identity: opts.identity,
+            bar_room: (look.bar_room, 0.0),
             ..ScrollOptions::default()
         };
 

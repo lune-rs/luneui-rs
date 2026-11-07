@@ -317,16 +317,7 @@ impl Ed<CodeDoc> {
     }
 }
 
-/// No two lines in a row hold no word, where a word motion's reach is the same as a `String`'s.
-fn single_blank_lines(text: &str) -> bool {
-    let blank: Vec<bool> = text
-        .split('\n')
-        .map(|l| !l.chars().any(char::is_alphanumeric))
-        .collect();
-    !blank.windows(2).any(|w| w[0] && w[1])
-}
-
-fn script_command(rng: &mut Rng, text: &str) -> EditCommand {
+fn script_command(rng: &mut Rng) -> EditCommand {
     const TYPED: &[&str] = &["a", "b", "z", " ", "é", "😀", "e\u{301}", "\n"];
     const PASTED: &[&str] = &["x y", "one\ntwo", "a\r\nb\rc", "\nz\n", "😀 é"];
     const MOTIONS: &[Motion] = &[
@@ -342,24 +333,23 @@ fn script_command(rng: &mut Rng, text: &str) -> EditCommand {
         Motion::PageDown,
     ];
     let motion = MOTIONS[rng.below(MOTIONS.len())];
-    let words = single_blank_lines(text);
     match rng.below(16) {
         0..=3 => ins(rng.pick(TYPED)),
         4 => EditCommand::Backspace { word: false },
         5 => EditCommand::Delete { word: false },
         6 => mv(motion),
         7 => ext(motion),
-        8 if words => mv(if rng.below(2) == 0 {
+        8 => mv(if rng.below(2) == 0 {
             Motion::WordLeft
         } else {
             Motion::WordRight
         }),
-        9 if words => ext(if rng.below(2) == 0 {
+        9 => ext(if rng.below(2) == 0 {
             Motion::WordLeft
         } else {
             Motion::WordRight
         }),
-        10 if words => {
+        10 => {
             if rng.below(2) == 0 {
                 EditCommand::Backspace { word: true }
             } else {
@@ -393,7 +383,7 @@ fn one_key_script_gives_the_same_text_caret_and_anchor_over_a_string_and_a_docum
         let mut doc = doc_ed(START, keymap);
         for step in 0..3_000 {
             let text = string.text.clone();
-            let cmd = script_command(&mut rng, &text);
+            let cmd = script_command(&mut rng);
             let pause = [10, 100, 600][rng.below(3)];
             string.now += Duration::from_millis(pause);
             doc.now += Duration::from_millis(pause);
@@ -441,39 +431,57 @@ fn a_word_motion_crosses_one_blank_line_as_a_string_does() {
     }
 }
 
-#[test]
-fn across_two_or_more_blank_lines_a_word_motion_stops_at_the_blank_line() {
-    // Lines: foo, "", "", "", bar.
-    const TEXT: &str = "foo\n\n\n\nbar";
-    for keymap in [Keymap::PC, Keymap::MAC] {
-        let mut ed = doc_ed(TEXT, keymap).at(3);
-        ed.run(mv(Motion::WordRight));
-        assert_eq!(ed.edit.caret(), 5, "the second blank line");
-        ed.run(mv(Motion::WordRight));
-        let bar = if keymap == Keymap::PC { 7 } else { 10 };
-        assert_eq!(ed.edit.caret(), bar, "one blank line is left: it crosses");
+/// Where `motion` from `from` lands on a document and on a `String` of `text`.
+fn both(text: &str, keymap: Keymap, motion: Motion, from: usize) -> (usize, usize) {
+    let mut ed = doc_ed(text, keymap).at(from);
+    ed.run(mv(motion));
+    let mut string = Ed::new(text.to_owned(), text, keymap);
+    string.edit.set_selection(from, from);
+    string.cmd(mv(motion), text);
+    (ed.edit.caret(), string.edit.caret())
+}
 
-        let mut ed = doc_ed(TEXT, keymap).at(7);
-        ed.run(mv(Motion::WordLeft));
-        assert_eq!(ed.edit.caret(), 6, "the blank line before bar");
-        ed.run(mv(Motion::WordLeft));
-        assert_eq!(ed.edit.caret(), 5);
-        ed.run(mv(Motion::WordLeft));
-        assert_eq!(ed.edit.caret(), 0, "foo is one blank line away");
+#[test]
+fn across_five_blank_lines_a_word_motion_goes_on_to_the_word_as_a_string_does() {
+    // Lines: foo, five blank lines, bar. Five lines are more than two windows hold.
+    const TEXT: &str = "foo\n\n\n\n\n\nbar";
+    let bar = TEXT.chars().count() - 3;
+    for keymap in [Keymap::PC, Keymap::MAC] {
+        let (right, first) = if keymap == Keymap::PC {
+            (bar, bar)
+        } else {
+            (bar + 3, 3)
+        };
+        assert_eq!(both(TEXT, keymap, Motion::WordRight, 3), (right, right));
+        assert_eq!(both(TEXT, keymap, Motion::WordRight, 0), (first, first));
+        assert_eq!(both(TEXT, keymap, Motion::WordLeft, bar), (0, 0));
+        assert_eq!(both(TEXT, keymap, Motion::WordLeft, bar + 3), (bar, bar));
     }
 }
 
 #[test]
-fn a_word_motion_stops_at_a_blank_line_ended_by_any_terminator() {
-    for text in ["foo\r\n\r\n\r\nbar", "foo\r\r\rbar", "foo\n\r\n\rbar"] {
-        let start = CodeDoc::new(text).line_start(3);
-        let mut ed = doc_ed(text, Keymap::PC).at(start);
-        ed.run(mv(Motion::WordLeft));
-        assert_eq!(
-            ed.edit.caret(),
-            ed.text.line_start(2),
-            "{text:?}: the blank line before bar"
-        );
+fn past_blank_lines_at_the_edges_a_word_motion_stops_at_the_edge() {
+    const TEXT: &str = "\n\n\n\n\nfoo\n\n\n\n\n";
+    let end = TEXT.chars().count();
+    for keymap in [Keymap::PC, Keymap::MAC] {
+        assert_eq!(both(TEXT, keymap, Motion::WordLeft, 5), (0, 0));
+        assert_eq!(both(TEXT, keymap, Motion::WordRight, 8), (end, end));
+    }
+}
+
+#[test]
+fn a_word_motion_crosses_blank_lines_ended_by_any_terminator() {
+    for text in [
+        "foo\r\n\r\n\r\n\r\n\r\n\r\nbar",
+        "foo\r\r\r\r\r\rbar",
+        "foo\n\r\n\r\n\r\r\n\rbar",
+    ] {
+        // Five blank lines.
+        let start = CodeDoc::new(text).line_start(6);
+        let (doc, string) = both(text, Keymap::PC, Motion::WordLeft, start);
+        assert_eq!((doc, string), (0, 0), "{text:?}");
+        let (doc, string) = both(text, Keymap::PC, Motion::WordRight, 3);
+        assert_eq!((doc, string), (start, start), "{text:?}");
     }
 }
 
