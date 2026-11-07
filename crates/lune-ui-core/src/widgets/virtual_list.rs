@@ -1083,13 +1083,15 @@ impl Ui<'_> {
             };
             // A margin row is built and clipped: nothing on it is a Tab stop.
             let hidden = ctx.rect.bottom() <= rect.y || ctx.rect.y >= rect.bottom();
-            // The row that holds the focus is drawn under a keep-alive scope, so what its widgets
-            // keep (an edit's caret) goes on while it is out of view.
+            // The row that holds the focus is drawn under a scope held for this frame, so what its
+            // widgets keep (an edit's caret) goes on while it is out of view; the list renews the
+            // hold each frame it draws and it lapses when the list is not drawn.
             let holds = mem.focus_row.is_some_and(|(k, _)| k == ctx.key);
             let height = self.off_tab_order(hidden, |ui| {
                 ui.node_container(node, |ui| {
                     if holds {
-                        ui.keep_alive(scope, |ui| draw(ui, &ctx))
+                        let id = ui.id(scope);
+                        ui.hold_alive(id, |ui| draw(ui, &ctx))
                     } else {
                         ui.scope(scope, |ui| draw(ui, &ctx))
                     }

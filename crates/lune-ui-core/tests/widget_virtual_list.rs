@@ -1965,3 +1965,38 @@ fn a_deleted_row_clears_the_focus_and_a_move_of_focus_lets_the_kept_row_go() {
         }
     }
 }
+
+#[test]
+fn the_hold_on_a_focused_row_lapses_when_the_list_is_not_drawn() {
+    // A frame without the list, a character queued: whether the field still holds the focus.
+    let undrawn = |h: &mut UiHarness| {
+        h.input.key_down(Key::Character("q".into()), Some("q"));
+        let mut held = false;
+        h.frame(|ui| held = !ui.focus_events(field_id(2)).is_empty());
+        held
+    };
+    for scrolled_out in [false, true] {
+        let f = Fields::new();
+        let mut h = harness();
+        click_field(&mut h, &f, 200, 2);
+        f.frame(&mut h, 200);
+        if scrolled_out {
+            scroll_far(&mut h, &f, 200, true);
+            assert!(f.holds_focus(&mut h, 200, field_id(2)), "instrument");
+        } else {
+            assert_eq!(f.frame(&mut h, 200).out.focused, Some(field_id(2)));
+        }
+        // The first frame without the list may still see the focus (it clears at that frame's
+        // end); from the next one the field takes no key and the row's state is gone.
+        undrawn(&mut h);
+        for frame in 0..4 {
+            assert!(
+                !undrawn(&mut h),
+                "scrolled_out={scrolled_out} frame {frame}: the focus left with the list"
+            );
+        }
+        let mut n = 0;
+        h.frame(|ui| n = *ui.persistent::<u32>(row_id(2).with("n")));
+        assert_eq!(n, 0, "scrolled_out={scrolled_out}: the row's state went");
+    }
+}

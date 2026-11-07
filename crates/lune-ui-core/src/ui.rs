@@ -231,6 +231,8 @@ impl<'a> Ui<'a> {
                 o.phase = overlay::RecPhase::Open;
             }
         }
+        // A hold is for one frame: the widget that wants it renews it as it draws.
+        store.held_scopes.clear();
         let theme_cut = store.last_theme.is_some_and(|t| t != config.theme);
         let active: Vec<Active> = store
             .overlays
@@ -685,7 +687,7 @@ impl<'a> Ui<'a> {
                 .focus
                 .chain
                 .iter()
-                .any(|s| store.live_scopes.contains(s))
+                .any(|s| store.live_scopes.contains(s) || store.held_scopes.contains(s))
         {
             store.focus.focused = None;
         }
@@ -893,6 +895,18 @@ impl<'a> Ui<'a> {
         r
     }
 
+    /// [`Self::keep_alive`] for this frame only: the scope is held by [`Self::hold_focus_in`], so
+    /// it lapses on the first frame its caller does not renew it.
+    pub(crate) fn hold_alive<R>(&mut self, scope: WidgetId, f: impl FnOnce(&mut Self) -> R) -> R {
+        self.store.held_scopes.insert(scope);
+        self.scopes.push(scope);
+        self.alive.push(scope);
+        let r = f(self);
+        self.alive.pop();
+        self.scopes.pop();
+        r
+    }
+
     /// Opens the keep-alive scope `key` without drawing inside it.
     pub fn mark_alive(&mut self, key: impl std::hash::Hash) {
         let id = self.id(key);
@@ -912,19 +926,20 @@ impl<'a> Ui<'a> {
         focus.focused.is_some() && focus.scope_path.contains(&scope)
     }
 
-    /// Keeps the id scope `scope` live as the keep-alive scope of the focused widget inside it: it
-    /// stays live, and the focus survives the widget going undrawn (D15), until
-    /// [`Self::release_scope`].
+    /// Keeps the id scope `scope` live for this frame as the keep-alive scope of the focused
+    /// widget inside it: the focus survives the widget going undrawn (D15), and what the scope's
+    /// widgets keep stays. The hold lasts one frame; the caller renews it each frame it draws, so
+    /// a caller that stops drawing lets go on its own. [`Self::release_scope`] ends it early.
     pub(crate) fn hold_focus_in(&mut self, scope: WidgetId) {
-        self.store.live_scopes.insert(scope);
+        self.store.held_scopes.insert(scope);
         if !self.store.focus.chain.contains(&scope) {
             self.store.focus.chain.push(scope);
         }
     }
 
-    /// [`Self::end_keep_alive`] for a scope given by id.
+    /// Ends a hold on a scope given by id before the frame is over.
     pub(crate) fn release_scope(&mut self, scope: WidgetId) {
-        self.store.live_scopes.remove(&scope);
+        self.store.held_scopes.remove(&scope);
     }
 
     /// Registers `rect` as a hit region of `id` on the painter's current layer and returns the
