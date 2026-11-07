@@ -164,6 +164,13 @@ pub(crate) static PAGES: &[&Page] = &[
     &file_drop::PAGE,
     &window::PAGE,
     &crate::showcase::PAGE,
+    &crate::showcase::labs::glass::PAGE,
+    &crate::showcase::labs::blur::PAGE,
+    &crate::showcase::labs::effects::PAGE,
+    &crate::showcase::labs::motion::PAGE,
+    &crate::showcase::labs::tokens::PAGE,
+    &crate::showcase::labs::clipboard::PAGE,
+    &crate::showcase::labs::json::PAGE,
 ];
 
 /// The window background of a Ui page (glass, focused) and its card. Returns the card. On a

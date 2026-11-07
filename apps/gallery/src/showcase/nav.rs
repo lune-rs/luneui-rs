@@ -122,6 +122,19 @@ pub(crate) const GROUPS: &[Group] = &[
             "window",
         ],
     },
+    // The labs (`showcase/labs`): live pages for what no component page shows.
+    Group {
+        name: "Labs",
+        pages: &[
+            "lab-glass",
+            "lab-blur",
+            "lab-effects",
+            "lab-motion",
+            "lab-tokens",
+            "lab-clipboard",
+            "lab-json",
+        ],
+    },
 ];
 
 /// The index in [`PAGES`] of the page with `id`.

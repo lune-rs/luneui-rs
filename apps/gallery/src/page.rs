@@ -109,6 +109,12 @@ impl Stage {
         }
     }
 
+    /// `r` cut to the host's clip: what of it shows. A request the clip cannot cut (a backdrop)
+    /// is asked for at this rect, so it never reaches the host's other panes.
+    pub(crate) fn visible(&self, r: Rect) -> Rect {
+        self.clip.map_or(r, |clip| r.intersect(&clip))
+    }
+
     /// The rect, when the page is not alone in the window.
     pub(crate) const fn rect(&self) -> Option<Rect> {
         self.rect

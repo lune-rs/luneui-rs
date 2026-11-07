@@ -34,6 +34,7 @@ tree rows and the search).
 - `showcase-home`: the shell on its first page, the Foundation group open.
 - `showcase-search`: a search typed into the field narrows the tree.
 - `showcase-settings`: the settings pane under another theme, a reduced tier, half speed, a wider blur and no noise.
+- `showcase-lab-motion`: the motion lab, chosen by a cue: the seven easings and fifteen kinds at rest.
 - `showcase-table`: a search for the table, then a press on its row, which takes the content pane.
 
 ### Build

@@ -15,6 +15,7 @@
 //! App code: it draws nothing of its own besides the chrome; no clock is read here (the frame's
 //! time comes from the caller).
 
+pub(crate) mod labs;
 mod nav;
 mod settings;
 
@@ -25,7 +26,7 @@ use lune_ui::image::{ImageData, ImageId};
 use lune_ui::input::{Modifiers, RawInput};
 use lune_ui::material::Material;
 use lune_ui::motion::MotionTier;
-use lune_ui::paint::Rect;
+use lune_ui::paint::{LayerId, Rect};
 use lune_ui::strings::StringTable;
 use lune_ui::testing::ScriptedInput;
 use lune_ui::text::{Spec, Style};
@@ -174,6 +175,20 @@ const SCENES: &[UiScene] = &[
         script: &[],
         capture_ms: 0,
         expect: Expect::Settled,
+    },
+    // The motion lab, chosen by a cue: every easing and kind at rest, the spinner turning (a
+    // frame is always due).
+    UiScene {
+        id: "showcase-lab-motion",
+        scale: 1.0,
+        tier: MotionTier::Full,
+        state: home,
+        script: &[Step {
+            at_ms: 0,
+            events: &[Ev::Cue("page lab-motion")],
+        }],
+        capture_ms: 300,
+        expect: Expect::Waiting,
     },
     // Search for the table, then press the page's row: it takes the content pane.
     UiScene {
@@ -444,6 +459,10 @@ impl Showcase {
             ((), Extent::default())
         });
         self.child_root = root;
+        // A page that changed layer through `Painter::on` cleared the clip stack, so the scroll
+        // area's own pop restored nothing and the pane's clip would stay on for the panes drawn
+        // after it: back on the base layer, unclipped.
+        ui.painter().on(LayerId::Base);
         if let Some(replay) = &mut self.replay {
             replay.drawn = true;
             // The next step is due at its time; before the script starts, on the next frame.
@@ -1088,6 +1107,36 @@ mod tests {
                 .collect::<Vec<_>>()
                 .join("\n  ")
         );
+    }
+
+    /// A hosted page that changes layer (the glass lab does) must not leave its clip on the
+    /// panes drawn after it: the sidebar's text is clipped to the sidebar, not to the content.
+    #[test]
+    fn a_page_that_changes_layer_leaves_the_sidebar_and_settings_unclipped() {
+        let window = (1600.0, 900.0);
+        let lay = Layout::of(Rect::new(10.0, 34.0, window.0 - 20.0, window.1 - 44.0));
+        let texts_in = |page: &str, region: Rect| {
+            let mut shell = Showcase::new();
+            shell.cue(&format!("page {page}"));
+            let mut p = Player::new(HOST, Box::new(shell), window, 1.0, MotionTier::Full);
+            p.frame(&mut FakeText, 0, &[]).expect("frame");
+            let scene = p.frame(&mut FakeText, 16, &[]).expect("frame").0;
+            let texts = &scene.layers[lune_ui::scene::LayerId::Base as usize].texts;
+            let inside: Vec<_> = texts
+                .iter()
+                .filter(|t| region.contains((t.x + 2.0, t.y + 2.0)))
+                .collect();
+            let shown = inside.iter().filter(|t| overlaps(t.clip, region)).count();
+            (inside.len(), shown)
+        };
+        for region in [lay.tree, lay.settings] {
+            let (n, shown) = texts_in("lab-glass", region);
+            assert!(n > 3, "texts in {region:?}");
+            assert_eq!(n, shown, "a clip left on cuts the pane at {region:?}");
+            // The same on a page that stays on one layer, as the instrument's check.
+            let (n, shown) = texts_in("button", region);
+            assert_eq!(n, shown);
+        }
     }
 
     #[test]

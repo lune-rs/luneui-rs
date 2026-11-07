@@ -53,7 +53,7 @@ pub(crate) fn kind_name(k: Kind) -> &'static str {
     }
 }
 
-fn token_name(t: Token) -> &'static str {
+pub(crate) fn token_name(t: Token) -> &'static str {
     match t {
         Token::Zero => "zero",
         Token::Instant => "instant",
@@ -146,7 +146,12 @@ fn scaled(p: &mut P<'_>, r: Rect, scale: f32, f: impl FnOnce(&mut P<'_>)) {
 
 /// `e` over 0..1 in `area`: the unit square and the curve (back-out overshoots the top).
 fn plot(p: &mut P<'_>, area: Rect, e: Easing) {
-    p.ring(area, 4.0, 1.0, THEME.border_subtle, false);
+    plot_in(p, area, e, THEME.border_subtle, THEME.accent);
+}
+
+/// [`plot`] with the colours of the frame and the curve.
+pub(crate) fn plot_in(p: &mut P<'_>, area: Rect, e: Easing, frame: [u8; 4], curve: [u8; 4]) {
+    p.ring(area, 4.0, 1.0, frame, false);
     let n = 48;
     let pts: Vec<[f32; 2]> = (0..=n)
         .map(|i| {
@@ -154,7 +159,7 @@ fn plot(p: &mut P<'_>, area: Rect, e: Easing) {
             [area.x + t * area.w, area.bottom() - e.eval(t) * area.h]
         })
         .collect();
-    p.stroke(&pts, false, StrokeStyle::solid(THEME.accent, 2.0));
+    p.stroke(&pts, false, StrokeStyle::solid(curve, 2.0));
 }
 
 fn easings_row(ui: &mut Ui<'_>, x: f32, y: f32) {
@@ -223,7 +228,13 @@ impl PageState for Curve {
 /// The progress of `kind`'s change toward `on` under `tier`, and whether transforms (slide,
 /// scale) apply. Under the frame's own tier this is `Ui::animate_f32`; for another tier the row is
 /// rebuilt from what `MotionTokens::resolve` makes of it there, so one frame can show three tiers.
-fn drive(ui: &mut Ui<'_>, id: WidgetId, kind: Kind, tier: MotionTier, on: bool) -> (f32, bool) {
+pub(crate) fn drive(
+    ui: &mut Ui<'_>,
+    id: WidgetId,
+    kind: Kind,
+    tier: MotionTier,
+    on: bool,
+) -> (f32, bool) {
     let target = if on { 1.0 } else { 0.0 };
     let motion = Motion::of(kind);
     let Some(r) = ui.theme().motion.resolve(&motion, tier) else {
@@ -248,10 +259,41 @@ fn drive(ui: &mut Ui<'_>, id: WidgetId, kind: Kind, tier: MotionTier, on: bool) 
     (ui.animate_f32(id, target, &row), r.transforms)
 }
 
+/// The four colours a swatch is drawn in: the page uses the preset's, a lab the theme's.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Tones {
+    /// The resting fill.
+    pub(crate) dim: [u8; 4],
+    /// The moving, accented fill.
+    pub(crate) hot: [u8; 4],
+    /// The frame around a swatch.
+    pub(crate) ring: [u8; 4],
+    /// The end ticks of the `move` track.
+    pub(crate) faint: [u8; 4],
+}
+
+impl Tones {
+    /// The preset's.
+    const PRESET: Tones = Tones {
+        dim: THEME.surface_selected,
+        hot: THEME.accent,
+        ring: THEME.border_subtle,
+        faint: THEME.fg_faint,
+    };
+}
+
 /// Draws `kind`'s change at progress `v` in `area`. Without `transforms` (Reduced) only the
 /// opacity and colour parts move; the slide and scale parts stay at rest.
-fn swatch(p: &mut P<'_>, area: Rect, kind: Kind, v: f32, transforms: bool, spin_deg: f32) {
-    p.ring(area, 6.0, 1.0, THEME.border_subtle, false);
+pub(crate) fn swatch(
+    p: &mut P<'_>,
+    area: Rect,
+    kind: Kind,
+    v: f32,
+    transforms: bool,
+    spin_deg: f32,
+    tones: &Tones,
+) {
+    p.ring(area, 6.0, 1.0, tones.ring, false);
     let s = (area.h * 0.5).round();
     let e = Rect::new(
         area.x + ((area.w - s) / 2.0).round(),
@@ -259,7 +301,7 @@ fn swatch(p: &mut P<'_>, area: Rect, kind: Kind, v: f32, transforms: bool, spin_
         s,
         s,
     );
-    let (dim, hot) = (THEME.surface_selected, THEME.accent);
+    let (dim, hot) = (tones.dim, tones.hot);
     let t = |moving: f32| if transforms { moving } else { 0.0 };
     match kind {
         Kind::Hover => p.fill(e, 4.0, mix(dim, hot, v)),
@@ -301,12 +343,12 @@ fn swatch(p: &mut P<'_>, area: Rect, kind: Kind, v: f32, transforms: bool, spin_
             p.fill(
                 Rect::new(a, area.y + area.h - 8.0, 2.0, 4.0),
                 0.0,
-                THEME.fg_faint,
+                tones.faint,
             );
             p.fill(
                 Rect::new(b + d - 2.0, area.y + area.h - 8.0, 2.0, 4.0),
                 0.0,
-                THEME.fg_faint,
+                tones.faint,
             );
             p.fill(Rect::new(lerp(a, b, v), e.y, d, d), 4.0, hot);
         }
@@ -337,7 +379,7 @@ fn swatch(p: &mut P<'_>, area: Rect, kind: Kind, v: f32, transforms: bool, spin_
                     [c.0 + r * a.sin(), c.1 - r * a.cos()]
                 })
                 .collect();
-            p.stroke(&ring, true, StrokeStyle::solid(THEME.border_subtle, 1.5));
+            p.stroke(&ring, true, StrokeStyle::solid(tones.ring, 1.5));
             let a = spin_deg.to_radians();
             let dot = Rect::new(c.0 + r * a.sin() - 3.0, c.1 - r * a.cos() - 3.0, 6.0, 6.0);
             p.fill(dot, 3.0, hot);
@@ -459,6 +501,7 @@ fn kinds_grid(
             v,
             transforms,
             spin,
+            &Tones::PRESET,
         );
         let y = cy + area.1 + 4.0;
         label(ui, kind_name(kind), cx, y, THEME.font_s, THEME.fg_primary);
