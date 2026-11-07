@@ -92,7 +92,7 @@ impl Clock {
     }
 
     /// A repaint asked for at a page time, as the real time it comes due at.
-    fn to_real(&self, repaint: Repaint, speed: f32) -> Repaint {
+    fn in_real_time(&self, repaint: Repaint, speed: f32) -> Repaint {
         match repaint {
             Repaint::At(t) => {
                 let ahead = t.saturating_sub(self.scaled);
@@ -380,7 +380,7 @@ impl App {
         window.pre_present_notify();
         surface.present(&r.gpu, frame);
         r.gpu.end_frame(&mut r.text);
-        let (mut flow, redraw) = control_flow(self.clock.to_real(repaint, speed), self.start);
+        let (mut flow, redraw) = control_flow(self.clock.in_real_time(repaint, speed), self.start);
         if poll_tray && flow == ControlFlow::Wait {
             flow = ControlFlow::WaitUntil(Instant::now() + Duration::from_millis(50));
         }
@@ -603,11 +603,17 @@ mod tests {
         let mut c = Clock::default();
         c.advance(ms(1000), 0.5);
         // The page is at 500 ms; 100 ms later on its clock is 200 ms later on the real one.
-        assert_eq!(c.to_real(Repaint::At(ms(600)), 0.5), Repaint::At(ms(1200)));
-        assert_eq!(c.to_real(Repaint::Now, 0.5), Repaint::Now);
-        assert_eq!(c.to_real(Repaint::Idle, 0.5), Repaint::Idle);
+        assert_eq!(
+            c.in_real_time(Repaint::At(ms(600)), 0.5),
+            Repaint::At(ms(1200))
+        );
+        assert_eq!(c.in_real_time(Repaint::Now, 0.5), Repaint::Now);
+        assert_eq!(c.in_real_time(Repaint::Idle, 0.5), Repaint::Idle);
         // Already due: due now.
-        assert_eq!(c.to_real(Repaint::At(ms(400)), 0.5), Repaint::At(ms(1000)));
+        assert_eq!(
+            c.in_real_time(Repaint::At(ms(400)), 0.5),
+            Repaint::At(ms(1000))
+        );
     }
 
     /// Zoom is the translator's scale times the zoom: a point of the pointer in physical pixels
