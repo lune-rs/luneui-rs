@@ -15,6 +15,7 @@ use lune_ui::widgets::text_area::AreaOptions;
 use super::text;
 use crate::page::{Page, PageKind, PageState, Stage, UiPage};
 use crate::pages::{caption, card, heading};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "lab-json",
@@ -44,7 +45,17 @@ const MAX_CHARS: usize = 20_000;
 const MAX_LINES: usize = 400;
 const BOX: (f32, f32) = (470.0, 380.0);
 
+/// The texts the knob loads, in the order shown.
+const SAMPLES: [(&str, &str); 4] = [
+    ("Sample", SAMPLE),
+    ("An array", "[1, 2, 3]"),
+    ("A mistake", "[1, 2,]"),
+    ("A duplicate key", r#"{"a": 1, "a": 2}"#),
+];
+
 struct Json {
+    /// The sample the knob last loaded (an index into [`SAMPLES`]).
+    loaded: usize,
     source: String,
     /// The result: the value pretty-printed, or the error.
     result: String,
@@ -58,6 +69,7 @@ struct Json {
 impl Json {
     fn new() -> Self {
         Self {
+            loaded: 0,
             source: SAMPLE.to_owned(),
             result: String::new(),
             verdict: String::new(),
@@ -241,6 +253,13 @@ impl PageState for Json {
             x,
             y + 20.0 + BOX.1 + 64.0,
         );
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let names: Vec<&str> = SAMPLES.iter().map(|(n, _)| *n).collect();
+        if panel.choice(ui, "Load a text", &names, &mut self.loaded) {
+            self.source = SAMPLES[self.loaded].1.to_owned();
+        }
     }
 }
 

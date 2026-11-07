@@ -13,6 +13,7 @@ use super::text;
 use crate::page::{Page, PageKind, PageState, Stage, UiPage};
 use crate::pages::{caption, card, heading};
 use crate::scenes::card_in;
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "lab-effects",
@@ -172,6 +173,11 @@ impl PageState for Effects {
             t.font_base,
             t.fg_secondary,
         );
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let names: Vec<&str> = TABS.iter().map(|(_, n)| *n).collect();
+        panel.choice(ui, "Active tab", &names, &mut self.tab);
     }
 }
 

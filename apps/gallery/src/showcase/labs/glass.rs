@@ -11,6 +11,7 @@ use lune_ui::ui::{Ui, WidgetId};
 use super::{hex, text};
 use crate::page::{Page, PageKind, PageState, Stage, UiPage};
 use crate::pages::{caption, card, heading};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "lab-glass",
@@ -23,7 +24,7 @@ pub(crate) static PAGE: Page = Page {
 };
 
 fn live() -> Box<dyn PageState> {
-    Box::new(Glass)
+    Box::new(Glass { panel_h: PANEL_H })
 }
 
 /// The width of a layer's panel and the gap between two: three panels and their margins make
@@ -46,7 +47,10 @@ const COLOURS: [[u8; 4]; 6] = [
     [0xF0, 0xF0, 0xF0, 0xFF],
 ];
 
-struct Glass;
+/// The three layers; the knob sets how tall the panels are.
+struct Glass {
+    panel_h: f32,
+}
 
 /// Black and white stripes across `band`.
 fn stripes(p: &mut Painter<'_, WidgetId>, band: Rect) {
@@ -85,12 +89,12 @@ fn bands(x: f32, y: f32) -> [Rect; 2] {
 }
 
 /// The panel of layer `i` on `band`.
-fn panel(band: Rect, i: usize) -> Rect {
+fn panel(band: Rect, i: usize, height: f32) -> Rect {
     Rect::new(
         band.x + 12.0 + i as f32 * (COL_W + GAP),
-        band.y + (band.h - PANEL_H) / 2.0,
+        band.y + (band.h - height) / 2.0,
         COL_W,
-        PANEL_H,
+        height,
     )
 }
 
@@ -116,7 +120,7 @@ impl PageState for Glass {
             stage.on(p, LayerId::Popup);
             for band in [stripe_band, colour_band] {
                 for (i, (name, layer)) in layers.iter().enumerate() {
-                    let r = panel(band, i);
+                    let r = panel(band, i, self.panel_h);
                     p.acrylic(r, 8.0, layer.premultiplied(), under, true);
                     let label = Spec::plain(*name, Style::ui(t.font_m, t.fg_primary).medium());
                     p.text_centered(&label, r);
@@ -157,6 +161,10 @@ impl PageState for Glass {
             x,
             y + 520.0,
         );
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.number(ui, "Panel height", &mut self.panel_h, (40.0, BAND_H, 1.0));
     }
 }
 
@@ -214,7 +222,7 @@ mod tests {
         let [a, b] = bands(34.0, 58.0);
         for band in [a, b] {
             for i in 0..3 {
-                let r = panel(band, i);
+                let r = panel(band, i, PANEL_H);
                 assert!(
                     r.x >= band.x && r.right() <= band.right(),
                     "{r:?} in {band:?}"

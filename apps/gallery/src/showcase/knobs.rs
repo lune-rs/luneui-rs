@@ -524,7 +524,89 @@ mod tests {
             ),
         ),
         ("window", Press(Role::Switch, "Maximized")),
+        // Labs (the motion lab has a test of its own: its spinner never rests).
+        ("lab-glass", Slide("Panel height", 0.0)),
+        ("lab-blur", Slide("Panel width", 0.0)),
+        ("lab-effects", Press(Role::Radio, "History")),
+        ("lab-json", Press(Role::Radio, "A mistake")),
     ];
+
+    /// Pages that have no knob, with the reason. A page not on this list must have one.
+    const NO_KNOBS: &[(&str, &str)] = &[
+        (
+            "locale",
+            "its dialog is modal and always open, so the pane could not be pressed; the pseudo-locale is the page's subject",
+        ),
+        (
+            "shortcuts",
+            "both menus are open from the start and a press outside dismisses them before it reaches the pane",
+        ),
+        (
+            "lab-tokens",
+            "it lists the running theme; the settings pane's theme and glass controls are its knobs",
+        ),
+        (
+            "lab-clipboard",
+            "its two buttons are the options: copy writes the first box, paste reads into the second",
+        ),
+    ];
+
+    /// How many knob rows the pane of the shell shows for the hosted page: the nodes between the
+    /// settings pane's scroll area and its first global section.
+    fn knob_nodes(shell: &Shell) -> usize {
+        let nodes = &shell.last.1.tree.nodes;
+        let Some(theme) = nodes
+            .iter()
+            .position(|n| n.role == Role::RadioGroup && n.name == "Theme")
+        else {
+            return 0;
+        };
+        nodes[..theme]
+            .iter()
+            .rev()
+            .take_while(|n| n.role != Role::ScrollArea)
+            .count()
+    }
+
+    /// Every page of the sidebar declares a knob or is on [`NO_KNOBS`]; the list holds only pages
+    /// that really have none, and names only pages of the sidebar.
+    #[test]
+    fn every_page_of_the_sidebar_has_a_knob_or_a_reason_not_to() {
+        use super::super::nav;
+        use crate::pages::PAGES;
+        let mut missing = Vec::new();
+        let mut stale = Vec::new();
+        let mut listed = 0;
+        for index in nav::order() {
+            let id = PAGES[index].id;
+            let shell = Shell::open(id);
+            let knobs = knob_nodes(&shell);
+            let exempt = NO_KNOBS.iter().any(|(page, _)| *page == id);
+            listed += usize::from(exempt);
+            match (knobs > 0, exempt) {
+                (false, false) => missing.push(id),
+                (true, true) => stale.push(id),
+                _ => {}
+            }
+        }
+        assert!(
+            missing.is_empty(),
+            "pages with no knob and no reason: {missing:?}"
+        );
+        assert!(
+            stale.is_empty(),
+            "pages on NO_KNOBS that have a knob: {stale:?}"
+        );
+        assert_eq!(
+            listed,
+            NO_KNOBS.len(),
+            "NO_KNOBS names a page the sidebar lacks"
+        );
+        // The instrument: a page known to have knobs reads as having them, and a page known
+        // to have none reads as having none.
+        assert!(knob_nodes(&Shell::open("button")) >= 5);
+        assert_eq!(knob_nodes(&Shell::open("locale")), 0);
+    }
 
     #[test]
     fn a_knob_on_each_widget_page_changes_the_page() {

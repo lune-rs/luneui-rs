@@ -17,6 +17,7 @@ use super::text;
 use crate::page::{Page, PageKind, PageState, Stage, UiPage};
 use crate::pages::motion::{EASINGS, Tones, easing_name, kind_name, plot_in, swatch, token_name};
 use crate::pages::{card, heading};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "lab-motion",
@@ -44,7 +45,18 @@ const SWATCH: (f32, f32) = (64.0, 48.0);
 /// A replay button.
 const REPLAY: (f32, f32) = (64.0, 24.0);
 
+/// The tokens the easings' knob offers, in the order shown; the default is the last, `slow`.
+const TOKENS: [(&str, Token); 5] = [
+    ("instant", Token::Instant),
+    ("fast", Token::Fast),
+    ("base", Token::Base),
+    ("moderate", Token::Moderate),
+    ("slow", Token::Slow),
+];
+
 struct Lab {
+    /// The token the easings run over (an index into [`TOKENS`]).
+    token: usize,
     /// When each run began; none is at rest, at its end.
     easing: [Option<Duration>; 7],
     kind: [Option<Duration>; 15],
@@ -53,6 +65,7 @@ struct Lab {
 impl Lab {
     fn new() -> Self {
         Self {
+            token: TOKENS.len() - 1,
             easing: [None; 7],
             kind: [None; 15],
         }
@@ -60,10 +73,10 @@ impl Lab {
 }
 
 /// The row an easing is shown with: a move over the slow token with its Reduced rule kept.
-fn easing_row(e: Easing) -> Motion {
+fn easing_row(e: Easing, token: Token) -> Motion {
     Motion {
         kind: Kind::Move,
-        token: Token::Slow,
+        token,
         easing: e,
         reduced: Reduce::Keep,
         reduced_token: None,
@@ -126,10 +139,14 @@ impl PageState for Lab {
         let (x, y) = (card.x + 24.0, card.y + 20.0);
         let mut moving = false;
 
-        heading(ui, "EASINGS, EACH OVER THE SLOW TOKEN", x, y);
+        let title = format!(
+            "EASINGS, EACH OVER THE {} TOKEN",
+            TOKENS[self.token].0.to_uppercase()
+        );
+        heading(ui, &title, x, y);
         for (i, e) in EASINGS.into_iter().enumerate() {
             let (cx, cy) = (x + i as f32 * E_PITCH, y + 22.0);
-            let motion = easing_row(e);
+            let motion = easing_row(e, TOKENS[self.token].1);
             let run = t.motion.resolve(&motion, tier);
             let key = format!("ease-{}", easing_name(e));
             if replay_button(ui, &key, "Replay", (cx, cy + 128.0), REPLAY.0) {
@@ -236,6 +253,11 @@ impl PageState for Lab {
         };
         ui.request_repaint_at(now + due);
     }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let names: Vec<&str> = TOKENS.iter().map(|(n, _)| *n).collect();
+        panel.choice(ui, "Easings run over", &names, &mut self.token);
+    }
 }
 
 #[cfg(test)]
@@ -257,7 +279,7 @@ mod tests {
 
     #[test]
     fn a_run_goes_from_nothing_to_its_end_on_the_easing() {
-        let m = easing_row(Easing::QuadOut);
+        let m = easing_row(Easing::QuadOut, Token::Slow);
         let run = resolve(&m, MotionTier::Full);
         let ms = Duration::from_millis;
         // At rest and before it starts, the end.
@@ -358,5 +380,20 @@ mod tests {
         assert_eq!(plain[4..], pressed[4..], "and over by 500 ms");
         // Off snaps: the press changes nothing.
         assert_eq!(run(false, MotionTier::Off), run(true, MotionTier::Off));
+    }
+
+    /// The easings' knob changes the times they show: the same frame at the same time, drawn
+    /// over two tokens, differs; over one token twice it does not.
+    #[test]
+    fn the_easings_token_knob_changes_the_times_shown() {
+        let frame = |token: usize| {
+            let mut lab = Lab::new();
+            lab.token = token;
+            let mut p = player("lab-motion", Box::new(lab));
+            p.frame(&mut FakeText, 0, &[]).expect("frame");
+            p.frame(&mut FakeText, 16, &[]).expect("frame").0
+        };
+        assert_eq!(frame(4), frame(4));
+        assert_ne!(frame(4), frame(1));
     }
 }

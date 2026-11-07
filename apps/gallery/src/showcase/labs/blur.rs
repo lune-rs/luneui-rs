@@ -10,6 +10,7 @@ use lune_ui::ui::{Ui, WidgetId};
 
 use crate::page::{Page, PageKind, PageState, Stage, UiPage};
 use crate::pages::{caption, card, heading};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "lab-blur",
@@ -41,6 +42,8 @@ const CIRCLES: [([u8; 4], f32, f32); 3] = [
 ];
 
 struct Blur {
+    /// The panel's size.
+    panel: (f32, f32),
     /// The content moves.
     moving: bool,
     /// The panel goes where the pointer is.
@@ -53,6 +56,7 @@ struct Blur {
 impl Blur {
     fn new() -> Self {
         Self {
+            panel: PANEL,
             moving: true,
             follow: false,
             phase: 0.0,
@@ -110,11 +114,11 @@ fn content(p: &mut Painter<'_, WidgetId>, area: Rect, phase: f32, ink: [u8; 4], 
 }
 
 /// Where the panel lies in `area`: its middle, or under the pointer, kept inside.
-fn panel_in(area: Rect, pointer: Option<(f32, f32)>) -> Rect {
+fn panel_in(area: Rect, pointer: Option<(f32, f32)>, size: (f32, f32)) -> Rect {
     let (cx, cy) = pointer.unwrap_or((area.x + area.w / 2.0, area.y + area.h / 2.0));
-    let x = (cx - PANEL.0 / 2.0).clamp(area.x, area.right() - PANEL.0);
-    let y = (cy - PANEL.1 / 2.0).clamp(area.y, area.bottom() - PANEL.1);
-    Rect::new(x, y, PANEL.0, PANEL.1)
+    let x = (cx - size.0 / 2.0).clamp(area.x, area.right() - size.0);
+    let y = (cy - size.1 / 2.0).clamp(area.y, area.bottom() - size.1);
+    Rect::new(x, y, size.0, size.1)
 }
 
 impl PageState for Blur {
@@ -139,7 +143,7 @@ impl PageState for Blur {
         self.tick(now);
         let area = Rect::new(x, y + 56.0, AREA.0, AREA.1);
         let pointer = if self.follow { ui.pointer_pos() } else { None };
-        let panel = panel_in(area, pointer);
+        let panel = panel_in(area, pointer, self.panel);
         {
             let p = ui.painter();
             stage.on(p, LayerId::Page);
@@ -162,6 +166,11 @@ impl PageState for Blur {
         if self.moving {
             ui.request_repaint_at(now + Duration::from_millis(16));
         }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.number(ui, "Panel width", &mut self.panel.0, (80.0, AREA.0, 1.0));
+        panel.number(ui, "Panel height", &mut self.panel.1, (60.0, AREA.1, 1.0));
     }
 }
 
@@ -217,12 +226,15 @@ mod tests {
     #[test]
     fn the_panel_follows_the_pointer_and_stays_in_the_area() {
         let area = Rect::new(100.0, 100.0, 960.0, 440.0);
-        assert_eq!(panel_in(area, None).x, 100.0 + (960.0 - PANEL.0) / 2.0);
-        let p = panel_in(area, Some((0.0, 0.0)));
+        assert_eq!(
+            panel_in(area, None, PANEL).x,
+            100.0 + (960.0 - PANEL.0) / 2.0
+        );
+        let p = panel_in(area, Some((0.0, 0.0)), PANEL);
         assert_eq!((p.x, p.y), (100.0, 100.0));
-        let p = panel_in(area, Some((5000.0, 5000.0)));
+        let p = panel_in(area, Some((5000.0, 5000.0)), PANEL);
         assert_eq!((p.right(), p.bottom()), (area.right(), area.bottom()));
-        let p = panel_in(area, Some((500.0, 300.0)));
+        let p = panel_in(area, Some((500.0, 300.0)), PANEL);
         assert_eq!((p.x + PANEL.0 / 2.0, p.y + PANEL.1 / 2.0), (500.0, 300.0));
     }
 }
