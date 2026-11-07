@@ -16,6 +16,7 @@ use lune_ui::widgets::tree_view::{ROW, TreeOptions, TreeRow, TreeRowCtx};
 use super::{caption, card, heading, on_card};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "tree-view",
@@ -88,6 +89,9 @@ struct Live {
     activated: Option<&'static str>,
     /// Draw the tree inside `with_enabled(false, ..)`.
     disabled: bool,
+    /// The indent guides, and whether a press on a row toggles it.
+    guides: bool,
+    toggle_on_row: bool,
 }
 
 fn state(open: &'static [u64], selected: Option<u64>) -> Box<dyn PageState> {
@@ -95,6 +99,8 @@ fn state(open: &'static [u64], selected: Option<u64>) -> Box<dyn PageState> {
         seed: Some((open, selected)),
         activated: None,
         disabled: false,
+        guides: true,
+        toggle_on_row: false,
     })
 }
 
@@ -104,6 +110,8 @@ fn disabled() -> Box<dyn PageState> {
         seed: Some((&[SRC, GPU], Some(GPU))),
         activated: None,
         disabled: true,
+        guides: true,
+        toggle_on_row: false,
     })
 }
 
@@ -152,8 +160,8 @@ impl PageState for Live {
         let opts = TreeOptions {
             rows: &ROWS,
             label: "Files",
-            guides: true,
-            toggle_on_row: false,
+            guides: self.guides,
+            toggle_on_row: self.toggle_on_row,
         };
         let tree = on_card(c, TREE);
         let out = ui.with_enabled(!self.disabled, |ui| {
@@ -173,6 +181,15 @@ impl PageState for Live {
             tree.right() + 24.0,
             y + 40.0,
         );
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.toggle(ui, "Indent guides", &mut self.guides);
+        panel.toggle(ui, "A press on a row toggles it", &mut self.toggle_on_row);
+        let mut enabled = !self.disabled;
+        if panel.toggle(ui, "Enabled", &mut enabled) {
+            self.disabled = !enabled;
+        }
     }
 }
 

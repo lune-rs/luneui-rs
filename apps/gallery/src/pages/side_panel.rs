@@ -17,6 +17,7 @@ use lune_ui::widgets::side_panel::SidePanelOptions;
 use super::{caption, card, heading, on_card};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "side-panel",
@@ -51,10 +52,12 @@ fn show_later() -> Box<dyn PageState> {
     Box::new(Live::new(1, true, Some(Duration::from_millis(200))))
 }
 
+/// The host and three panels; the knobs choose the panel and how many rows it holds.
 struct Live {
     panel: u64,
     active: bool,
     switch_at: Option<Duration>,
+    rows: u32,
 }
 
 impl Live {
@@ -63,6 +66,7 @@ impl Live {
             panel,
             active,
             switch_at,
+            rows: 10,
         }
     }
 }
@@ -96,13 +100,14 @@ impl PageState for Live {
             under: CARD.premultiplied(),
             name: TITLES[(self.panel - 1) as usize],
         };
+        let rows = self.rows;
         ui.side_panel("host", host, &opts, |ui, inner| {
             let title = Spec::plain(
                 TITLES[(opts.panel - 1) as usize],
                 Style::ui(THEME.font_base, THEME.fg_bright).medium(),
             );
             ui.painter().text(&title, inner.x, inner.y + 2.0);
-            for i in 0..10 {
+            for i in 0..rows {
                 let r = Rect::new(inner.x, inner.y + 32.0 + i as f32 * ROW, inner.w, ROW);
                 let p = ui.painter();
                 if i % 2 == 0 {
@@ -122,6 +127,17 @@ impl PageState for Live {
             "Window active",
         );
         caption(ui, "Window active", ox + 52.0, host.bottom() + 19.0);
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let mut at = (self.panel.clamp(1, 3) - 1) as usize;
+        if panel.choice(ui, "Panel", &TITLES, &mut at) {
+            self.panel = KEYS[at];
+        }
+        let mut rows = self.rows as f32;
+        if panel.number(ui, "Rows", &mut rows, (0.0, 30.0, 1.0)) {
+            self.rows = rows.round() as u32;
+        }
     }
 }
 

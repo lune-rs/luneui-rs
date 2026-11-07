@@ -17,6 +17,7 @@ use lune_ui::widgets::stat::StatOptions;
 use super::{card, heading};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "page",
@@ -144,6 +145,15 @@ impl PageState for Live {
         });
         if next {
             self.key += 1;
+        }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.toggle(ui, "Window active", &mut self.active);
+        panel.toggle(ui, "Footer", &mut self.footer);
+        let mut rows = self.rows as f32;
+        if panel.number(ui, "Rows", &mut rows, (0.0, 60.0, 1.0)) {
+            self.rows = rows.round() as u32;
         }
     }
 }

@@ -14,6 +14,7 @@ use lune_ui::widgets::virtual_list::{Heights, ListOptions, RowKey, SelectionMode
 use super::{card, heading, on_card};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "virtual-list",
@@ -126,6 +127,14 @@ impl PageState for Live {
             let spec = Spec::plain("No rows", Style::ui(THEME.font_base, THEME.fg_tertiary));
             ui.painter().text_centered(&spec, list);
         }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let mut rows = self.count as f32;
+        if panel.number(ui, "Rows", &mut rows, (0.0, 1_000_000.0, 1.0)) {
+            self.count = rows.round() as usize;
+        }
+        panel.toggle(ui, "Enabled", &mut self.enabled);
     }
 }
 

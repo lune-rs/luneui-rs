@@ -476,6 +476,17 @@ mod tests {
             ),
         ),
         ("command-palette", Press(Role::Switch, "Open")),
+        // Layout.
+        ("stack", Press(Role::Radio, "Grid")),
+        ("scroll-area", Slide("Lines", 0.0)),
+        ("virtual-list", Slide("Rows", 0.0)),
+        ("page", Press(Role::Switch, "Footer")),
+        ("panel", Press(Role::Radio, "Strip")),
+        ("side-panel", Press(Role::Radio, "Branches")),
+        ("icon-rail", Press(Role::Switch, "Dot on Changes")),
+        ("split-panes", Press(Role::Radio, "Second")),
+        ("tree-view", Press(Role::Switch, "Indent guides")),
+        ("settings-page", Press(Role::Switch, "Restart notice")),
     ];
 
     #[test]

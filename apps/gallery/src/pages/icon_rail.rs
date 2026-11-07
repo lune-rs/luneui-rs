@@ -13,6 +13,7 @@ use lune_ui::widgets::icon_rail::{PITCH, RailItem};
 use super::{caption, card, heading, on_card};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "icon-rail",
@@ -126,6 +127,23 @@ impl PageState for Live {
             ox + 72.0,
             oy + 34.0,
         );
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.toggle(ui, "Dot on Changes", &mut self.dot);
+        let mut badge = self.badge.unwrap_or(0) as f32;
+        if panel.number(
+            ui,
+            "Badge on Alerts (0: none)",
+            &mut badge,
+            (0.0, 120.0, 1.0),
+        ) {
+            self.badge = (badge >= 1.0).then_some(badge as u32);
+        }
+        let mut active = self.active as f32;
+        if panel.number(ui, "Active item", &mut active, (1.0, 10.0, 1.0)) {
+            self.active = active.round() as u64;
+        }
     }
 }
 

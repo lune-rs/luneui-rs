@@ -18,6 +18,7 @@ use super::controls_ui::OPTIONS;
 use super::{card, heading, on_card};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "settings-page",
@@ -198,6 +199,24 @@ impl PageState for Live {
         }
         if resp.restart {
             self.restart = false;
+        }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.toggle(ui, "Restart notice", &mut self.restart);
+        panel.toggle(ui, "Window active", &mut self.active);
+        let mut first = !self.row_disabled;
+        if panel.toggle(ui, "First row enabled", &mut first) {
+            self.row_disabled = !first;
+        }
+        let mut recent = self.recent as f32;
+        if panel.number(
+            ui,
+            "Recent files",
+            &mut recent,
+            (STEPS.min as f32, STEPS.max as f32, 1.0),
+        ) {
+            self.recent = recent.round() as u32;
         }
     }
 }
