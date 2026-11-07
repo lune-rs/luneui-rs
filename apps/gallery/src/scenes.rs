@@ -507,11 +507,7 @@ fn dropdown_flipped_scene(p: &mut P<'_>, _t: f32) {
 }
 
 fn dialog_glass() -> DialogGlass {
-    DialogGlass {
-        panel: lunegit_dark::PANEL.premultiplied(),
-        fill: lunegit_dark::WINDOW.premultiplied(),
-        noise: true,
-    }
+    DialogGlass::of(&lunegit_dark::THEME)
 }
 
 const DIALOG_HITS: DialogHits<Hit> = DialogHits {

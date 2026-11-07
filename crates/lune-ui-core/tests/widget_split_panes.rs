@@ -191,7 +191,6 @@ fn frame_with(h: &mut UiHarness, c: &Cfg, write: Option<Option<f32>>) -> Out {
                     cancel: Cancel::Default,
                 };
                 let glass = DialogGlass {
-                    panel: [0.0; 4],
                     fill: [0.0; 4],
                     noise: false,
                 };

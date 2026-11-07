@@ -847,7 +847,6 @@ const DIALOG: Dialog<'static> = Dialog {
 
 fn dialog_glass() -> DialogGlass {
     DialogGlass {
-        panel: [0.0; 4],
         fill: [0.0; 4],
         noise: false,
     }

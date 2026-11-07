@@ -103,8 +103,8 @@ fn an_empty_file_returns_the_base_unchanged() {
 }
 
 #[test]
-fn the_key_table_has_50_distinct_keys_each_of_which_resolves() {
-    assert_eq!(COLOR_KEYS.len(), 50);
+fn the_key_table_has_48_distinct_keys_each_of_which_resolves() {
+    assert_eq!(COLOR_KEYS.len(), 48);
     let mut seen = std::collections::BTreeSet::new();
     for k in COLOR_KEYS {
         assert!(seen.insert(*k), "{k} twice");
@@ -283,6 +283,22 @@ fn each_skip_kind_is_reported_in_file_order() {
     ));
     assert!(f.skipped.is_empty());
     assert_eq!(f.theme.glass.window.material_opacity, 0.0);
+}
+
+#[test]
+fn the_toast_fill_and_border_keys_are_gone() {
+    // The toast card is the glass surface (D8): `menu_glass` and `menu_popup_border` draw it.
+    let f = load(&with_colors(
+        r##""ToastBackground":"#E6181818","ToastBorder":"#33FFFFFF""##,
+    ));
+    assert_eq!(
+        f.skipped,
+        [
+            Skip::UnknownColor("ToastBackground".to_string()),
+            Skip::UnknownColor("ToastBorder".to_string())
+        ]
+    );
+    assert_eq!(f.theme, DARK);
 }
 
 #[test]
@@ -652,7 +668,6 @@ mod closing {
                         cancel: Cancel::Default,
                     };
                     let glass = DialogGlass {
-                        panel: [0.1, 0.1, 0.12, 1.0],
                         fill: [0.2, 0.2, 0.2, 0.62],
                         noise: true,
                     };

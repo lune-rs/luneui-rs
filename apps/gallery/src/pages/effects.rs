@@ -98,11 +98,7 @@ pub(crate) fn dialog_blur(p: &mut P<'_>, frame: u64) {
         confirm: "Discard",
         cancel: Some("Cancel"),
     };
-    let glass = DialogGlass {
-        panel: lunegit_dark::PANEL.premultiplied(),
-        fill: lunegit_dark::WINDOW.premultiplied(),
-        noise: true,
-    };
+    let glass = DialogGlass::of(&lunegit_dark::THEME);
     let hits = DialogHits {
         block: Hit::Block,
         confirm: Hit::Confirm,

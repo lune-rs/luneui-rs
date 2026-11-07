@@ -91,7 +91,7 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
 | [overlay.command-palette](overlay/command-palette.md) | Command palette | done | lunegit | 640 px search dialog over commits, branches, tags, stash, reflog, repos, settings and commands, with prefix filters |
-| [overlay.dialog](overlay/dialog.md) | Modal dialog | done | luneterm, wane | Modal dialog card: dim backdrop, 448 px acrylic card, darker footer, app-supplied body |
+| [overlay.dialog](overlay/dialog.md) | Modal dialog | done | luneterm, wane | Modal dialog card: dim blurred backdrop, 448 px frosted glass card, darker footer, app-supplied body |
 | [overlay.dropdown](overlay/dropdown.md) | Drop-down list | done | luneterm, wane | Combo drop-down option list that flips above its anchor near the window bottom |
 | [overlay.flyout](overlay/flyout.md) | Tray flyout | done | wane | Windows tray left-click surface: header, stats, route list, action rows |
 | [overlay.menu](overlay/menu.md) | Glass context menu | done | luneterm, wane | Glass context menu with open and close motion |

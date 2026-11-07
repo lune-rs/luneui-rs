@@ -12,7 +12,7 @@ summary: Theme token struct and the lunegit_dark preset with the WINDOW, PANEL a
 ## What it is
 
 `Theme` (tokens the widgets read) and the `lunegit_dark` module: `THEME`, `TINT`, `WINDOW`/`PANEL`/`CARD` layers, `INACTIVE_FALLBACK`, `CARD_CORNER_RADIUS`, `TAB_HEADER_HEIGHT`, `BODY_PADDING`.
-Since M10 the three glass layers also travel inside the theme: `Theme.glass: ThemeGlass { window, panel, card }` (preset: the three consts, which stay), so a theme file's tint and opacities load with the rest (D207). `Theme::from_json` loads a file over a base theme and `Theme::with_acrylic(AcrylicLevel)` scales the glass material opacities; see `infra.theme-hot-reload`. `COLOR_KEYS` and `Theme::color_key` expose the key table.
+Since M10 the three glass layers also travel inside the theme: `Theme.glass: ThemeGlass { window, panel, card }` (preset: the three consts, which stay), so a theme file's tint and opacities load with the rest (D207). `Theme::from_json` loads a file over a base theme and `Theme::with_acrylic(AcrylicLevel)` scales the glass material opacities; see `infra.theme-hot-reload`. `COLOR_KEYS` and `Theme::color_key` expose the key table. Every glass surface (menu, list, popover, tooltip, toast, dialog and palette card) draws `menu_glass` and `menu_popup_border`; there is no toast or dialog fill of its own, so `ToastBackground`, `ToastBorder` and `BackdropDark` are unknown file keys (D8).
 
 ## Needs
 

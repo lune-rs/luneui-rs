@@ -27,6 +27,7 @@ use std::hash::Hash;
 use std::time::Duration;
 
 use super::button::{self, ButtonKind, ButtonLook, FOCUS, HOVER, IconButton, PRESS};
+use super::popover::glass_surface;
 use super::progress::{self, ProgressOptions};
 use super::scroll_area::{Bars, Extent, ScrollOptions};
 use super::spinner::{self, SpinnerOptions};
@@ -674,13 +675,11 @@ impl<'a> Ui<'a> {
         card: Rect,
         live: bool,
     ) -> Outcome {
-        let t = *self.theme();
         let eid = self.scope_id();
         let mut out = Outcome::default();
         {
             let p = self.painter();
-            p.fill(card, RADIUS, t.toast_bg);
-            p.ring(card, RADIUS, BORDER, t.toast_border, false);
+            glass_surface(p, card, RADIUS);
             p.push_clip_rounded(card, RADIUS);
         }
         let assertive = spec.kind == ToastKind::Error;

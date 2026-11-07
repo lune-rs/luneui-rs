@@ -56,10 +56,9 @@ pub struct Theme {
     pub menu_item_pressed: Rgba,
     /// A disabled menu row's text: Lunegit `DarkTheme.axaml:307` (#FFFFFF58).
     pub menu_text_disabled: Rgba,
-    /// Toast fill, border and the four tone colours, and the expanded log's fill and text:
-    /// Lunegit `DarkTheme.axaml:333-341`. `toast_info` also tints a loading toast.
-    pub toast_bg: Rgba,
-    pub toast_border: Rgba,
+    /// The four toast tone colours, and the expanded log's fill and text: Lunegit
+    /// `DarkTheme.axaml:335-341`. `toast_info` also tints a loading toast. The toast card itself
+    /// is the glass surface (`menu_glass`, `menu_popup_border`, D8).
     pub toast_info: Rgba,
     pub toast_success: Rgba,
     pub toast_warning: Rgba,
@@ -262,8 +261,6 @@ color_keys! {
     "PopupMenuItemHover" => |t| Slot::One(&mut t.menu_item_hover),
     "PopupMenuItemPressed" => |t| Slot::One(&mut t.menu_item_pressed),
     "PopupMenuDisabledForeground" => |t| Slot::One(&mut t.menu_text_disabled),
-    "ToastBackground" => |t| Slot::One(&mut t.toast_bg),
-    "ToastBorder" => |t| Slot::One(&mut t.toast_border),
     "ToastInfoAccent" => |t| Slot::One(&mut t.toast_info),
     "ToastSuccessAccent" => |t| Slot::One(&mut t.toast_success),
     "ToastWarningAccent" => |t| Slot::One(&mut t.toast_warning),
@@ -328,9 +325,7 @@ pub mod lunegit_dark {
         // Lunegit `DarkTheme.axaml:305,307`.
         menu_item_pressed: [0xFF, 0xFF, 0xFF, 0x23],
         menu_text_disabled: [0xFF, 0xFF, 0xFF, 0x58],
-        // Lunegit `DarkTheme.axaml:333-341`.
-        toast_bg: [0x18, 0x18, 0x18, 0xE6],
-        toast_border: [0xFF, 0xFF, 0xFF, 0x33],
+        // Lunegit `DarkTheme.axaml:335-341`.
         toast_info: [0x61, 0xAF, 0xEF, 0xFF],
         toast_success: [0x4C, 0xAF, 0x50, 0xFF],
         toast_warning: [0xE2, 0xB9, 0x3D, 0xFF],
@@ -458,8 +453,6 @@ mod tests {
             (THEME.window_fallback, [0x33, 0x33, 0x33, 0xFF]),
             (THEME.menu_item_pressed, [0xFF, 0xFF, 0xFF, 0x23]),
             (THEME.menu_text_disabled, [0xFF, 0xFF, 0xFF, 0x58]),
-            (THEME.toast_bg, [0x18, 0x18, 0x18, 0xE6]),
-            (THEME.toast_border, [0xFF, 0xFF, 0xFF, 0x33]),
             (THEME.toast_info, [0x61, 0xAF, 0xEF, 0xFF]),
             (THEME.toast_success, [0x4C, 0xAF, 0x50, 0xFF]),
             (THEME.toast_warning, [0xE2, 0xB9, 0x3D, 0xFF]),
@@ -579,13 +572,6 @@ mod tests {
             "#58FFFFFF",
             [0xFF, 0xFF, 0xFF, 0x58],
         ),
-        (
-            "ToastBackground",
-            333,
-            "#E6181818",
-            [0x18, 0x18, 0x18, 0xE6],
-        ),
-        ("ToastBorder", 334, "#33FFFFFF", [0xFF, 0xFF, 0xFF, 0x33]),
         ("ToastInfoAccent", 335, "#61AFEF", [0x61, 0xAF, 0xEF, 0xFF]),
         (
             "ToastSuccessAccent",
@@ -671,8 +657,8 @@ mod tests {
 
     #[test]
     fn every_color_key_holds_the_dark_theme_axaml_value() {
-        // 47 rows plus three keys with no row here: `GlassTintColor`, `MenuGlassBackground` (not in
-        // Lunegit) and `PopupMenuOuterBorder` (a deviation, tested below): all 50 keys of the
+        // 45 rows plus three keys with no row here: `GlassTintColor`, `MenuGlassBackground` (not in
+        // Lunegit) and `PopupMenuOuterBorder` (a deviation, tested below): all 48 keys of the
         // table are covered, none twice.
         let mut keys: Vec<&str> = AXAML.iter().map(|r| r.0).collect();
         keys.push("GlassTintColor");

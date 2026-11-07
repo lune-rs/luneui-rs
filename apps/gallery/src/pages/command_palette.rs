@@ -154,11 +154,7 @@ fn failing() -> Box<dyn PageState> {
 }
 
 fn glass() -> DialogGlass {
-    DialogGlass {
-        panel: lunegit_dark::PANEL.premultiplied(),
-        fill: lunegit_dark::WINDOW.premultiplied(),
-        noise: true,
-    }
+    DialogGlass::of(&lunegit_dark::THEME)
 }
 
 /// What the page finds for `query`: the rows of the files and of the commands, each with whether

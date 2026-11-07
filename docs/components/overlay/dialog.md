@@ -6,12 +6,12 @@ status: done
 consumers: luneterm, wane
 source: crates/lune-ui-core/src/widgets/dialog.rs
 owner: —
-summary: Modal dialog card: dim backdrop, 448 px acrylic card, darker footer, app-supplied body
+summary: Modal dialog card: dim blurred backdrop, 448 px frosted glass card, darker footer, app-supplied body
 ---
 
 ## What it is
 
-`dialog` with `DialogSpec`, `DialogGlass` and `DialogHits`: dim backdrop, 448 px acrylic card, 24 px padding, darker footer; a `body` closure draws the app content [R crates/lune-ui-core/src/widgets/dialog.rs:1,39-48]. Variants: confirm (title, message, Cancel and one action) [W docs/ui/components.md:557-570]. `Ui::dialog_with` takes `DialogOptions { width, scrim_blur, confirm_enabled }`: the 600 px form width, a blurred scrim and a disabled confirm [D144]. The shell (scrim, the card's open and close motion, exit retention, the node) is `dialog::modal_host`, which the command palette shares.
+`dialog` with `DialogSpec`, `DialogGlass` and `DialogHits`: dim, blurred backdrop, 448 px frosted glass card, 24 px padding, darker footer; a `body` closure draws the app content [R crates/lune-ui-core/src/widgets/dialog.rs:1,39-48]. Variants: confirm (title, message, Cancel and one action) [W docs/ui/components.md:557-570]. `Ui::dialog_with` takes `DialogOptions { width, scrim_blur, confirm_enabled }`: the 600 px form width, the scrim blur (on by default) and a disabled confirm [D144]. The card is `frost` of `DialogGlass.fill` (`DialogGlass::of(&Theme)`: premultiplied `menu_glass`, noise on) with the `menu_popup_border` ring: it asks for no blur of its own, the scrim's covers it, so with `scrim_blur: false` it frosts the sharp page [D8, D9]. The shell (scrim, the card's open and close motion, exit retention, the node) is `dialog::modal_host`, which the command palette shares.
 
 ## Needs
 
@@ -105,7 +105,8 @@ size and the content inside it (laid out once per open, [R crates/lune-ui-core/s
 - `dialog-opening`: confirm and Cancel, t = 125 ms (half of base) (new).
 - `dialog-closing`: confirm and Cancel, t = 90 ms (half of fast) (new).
 - `dialog-form`: 600 px card, two columns of fields in the body, settled.
-- `dialog-scrim-blur`: the confirm dialog over a blurred window, settled.
+- `dialog-scrim-blur`: the confirm dialog over a blurred page, settled (the default scrim).
+- `dialog-scrim-plain`: the confirm dialog with `scrim_blur: false`, settled; it draws no request anywhere.
 - `dialog-confirm-disabled`: the confirm button disabled, settled.
 - `dialog-combo-open`, `dialog-popover`, `dialog-tooltip`, `dialog-menu-glass`, `dialog-nested`: an overlay opened by the body, settled; each draws on `Raised` above the dialog's own text (the gallery tests probe it through the tree and the layer) [D137].
 
@@ -133,7 +134,7 @@ size and the content inside it (laid out once per open, [R crates/lune-ui-core/s
 
 - Resolved [D75]: initial focus is Confirm, Cancel's tab stop comes first, Enter activates the focused button.
 - Resolved [D144]: the toolkit owns the form width (`DialogWidth::Form`, 600); the columns stay the app's body.
-- Resolved [D144]: the scrim blur is `DialogOptions::scrim_blur` (sigma 8, saturation 1), off by default.
+- Resolved [D144, amended by the library pass]: the scrim blur is `DialogOptions::scrim_blur` (sigma 8, saturation 1), on by default; the Painter-API `dialog` and the palette's host follow.
 - Resolved [D144]: exit easing stays quad-out, the shipped Lunegit value (the doc's quad-in is a doc conflict, not a source of the look).
 - Resolved [D144]: a disabled confirm uses the button's own disabled look; the dialog's open focus goes to Cancel, or none.
 

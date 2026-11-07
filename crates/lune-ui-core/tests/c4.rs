@@ -40,7 +40,6 @@ const OPTIONS: [(&str, bool); 3] = [("RznSans", true), ("Sans Serif", true), ("S
 
 fn glass() -> DialogGlass {
     DialogGlass {
-        panel: [0.1, 0.1, 0.12, 1.0],
         fill: [0.2, 0.2, 0.2, 0.62],
         noise: true,
     }
@@ -4058,8 +4057,6 @@ mod m10 {
         menu_glass,
         menu_item_pressed,
         menu_text_disabled,
-        toast_bg,
-        toast_border,
         toast_info,
         toast_success,
         toast_warning,
@@ -4740,7 +4737,6 @@ mod m10 {
                         name: "",
                     },
                     &DialogGlass {
-                        panel: [0.1, 0.1, 0.12, 1.0],
                         fill: [0.2, 0.2, 0.2, 0.62],
                         noise: true,
                     },
@@ -4973,7 +4969,7 @@ mod m10 {
     fn the_audit_theme_has_a_colour_no_preset_field_has_in_every_field() {
         let (t, p) = (fields(&distinct()), fields(&DARK));
         assert_eq!(t.len(), p.len());
-        assert_eq!(t.len(), 70, "the colour fields of `Theme`");
+        assert_eq!(t.len(), 68, "the colour fields of `Theme`");
         for (i, (name, c)) in t.iter().enumerate() {
             assert_ne!(*c, p[i].1, "{name}");
             for (_, q) in &p {

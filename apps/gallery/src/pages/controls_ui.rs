@@ -24,11 +24,7 @@ pub(crate) const OPTIONS: [(&str, bool); 4] = [
 
 /// The dialog glass of the house look.
 pub(crate) fn glass() -> DialogGlass {
-    DialogGlass {
-        panel: lunegit_dark::PANEL.premultiplied(),
-        fill: lunegit_dark::WINDOW.premultiplied(),
-        noise: true,
-    }
+    DialogGlass::of(&lunegit_dark::THEME)
 }
 
 const STEPS: StepRange = StepRange {

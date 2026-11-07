@@ -854,7 +854,6 @@ mod frames {
                 cancel: Cancel::Default,
             };
             let glass = DialogGlass {
-                panel: [0.1, 0.1, 0.12, 1.0],
                 fill: [0.2, 0.2, 0.2, 0.62],
                 noise: true,
             };

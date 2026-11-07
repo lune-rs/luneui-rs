@@ -579,3 +579,37 @@ fn a_list_over_a_dialogs_content_frosts_it_and_does_not_read_through() {
         mean(&b)
     );
 }
+
+#[test]
+fn a_real_dialog_over_an_opaque_background_keeps_the_window_alpha() {
+    use lune_ui_core::widgets::dialog::{Cancel, Dialog, DialogGlass};
+    let Some(mut gpu) = headless_gpu() else {
+        return;
+    };
+    let dialog = Dialog {
+        title: "Title",
+        message: "Message",
+        extra_h: 0.0,
+        confirm: "Yes",
+        cancel: Cancel::Default,
+    };
+    let mut h = UiHarness::new((SIZE.0 as f32, SIZE.1 as f32));
+    let mut scene = Scene::default();
+    for ms in [0u64, 500, 1_000] {
+        h.at_ms(ms);
+        scene = h
+            .frame(|ui| {
+                ui.painter().fill(WIN, 0.0, DARKEST);
+                bars(ui.painter(), LayerId::Page);
+                ui.dialog("d", &dialog, &DialogGlass::of(&DARK), |_, _, _, _| {});
+            })
+            .0;
+    }
+    assert!(
+        scene.backdrops().next().is_some(),
+        "the scrim asks for a blur (instrument check)"
+    );
+    let img = render(&mut gpu, &scene);
+    let low = lowest_alpha(&img);
+    assert!(low >= 254, "lowest alpha {low}");
+}

@@ -28,7 +28,6 @@ const BODY_FILL: [u8; 4] = [200, 30, 30, 255];
 
 fn glass() -> DialogGlass {
     DialogGlass {
-        panel: [0.1, 0.1, 0.12, 1.0],
         fill: [0.2, 0.2, 0.2, 0.62],
         noise: true,
     }
@@ -626,6 +625,11 @@ const BLUR: DialogOptions = DialogOptions {
     scrim_blur: true,
     confirm_enabled: true,
 };
+const PLAIN: DialogOptions = DialogOptions {
+    width: DialogWidth::Confirm,
+    scrim_blur: false,
+    confirm_enabled: true,
+};
 const OFF: DialogOptions = DialogOptions {
     width: DialogWidth::Confirm,
     scrim_blur: false,
@@ -701,7 +705,7 @@ fn the_default_options_draw_what_dialog_draws() {
         DialogOptions::default(),
         DialogOptions {
             width: DialogWidth::Confirm,
-            scrim_blur: false,
+            scrim_blur: true,
             confirm_enabled: true
         }
     );
@@ -807,9 +811,12 @@ fn blur_of(scene: &Scene) -> Option<lune_ui_core::scene::BackdropRequest> {
 #[test]
 fn the_scrim_blur_asks_for_the_window_at_sigma_eight_on_the_modal_layer() {
     let d = the_dialog(Cancel::Default, 0.0);
-    let mut plain = opened_with(&d, &DialogOptions::default());
-    let (scene, _, _, _) = frame_with(&mut plain, Some((&d, &DialogOptions::default())));
-    assert_eq!(blur_of(&scene), None, "no blur by default");
+    let mut plain = opened_with(&d, &PLAIN);
+    let (scene, _, _, _) = frame_with(&mut plain, Some((&d, &PLAIN)));
+    assert_eq!(blur_of(&scene), None, "no blur with `scrim_blur: false`");
+    let mut dflt = opened_with(&d, &DialogOptions::default());
+    let (scene, _, _, _) = frame_with(&mut dflt, Some((&d, &DialogOptions::default())));
+    assert!(blur_of(&scene).is_some(), "the blur is the default");
 
     let mut h = opened_with(&d, &BLUR);
     let (scene, _, _, _) = frame_with(&mut h, Some((&d, &BLUR)));
@@ -922,10 +929,10 @@ fn a_glass_menu_above_a_blurred_scrim_keeps_a_blur_of_its_own() {
     );
     // Without the scrim blur the menu's own blur is the one, on its own layer.
     let mut h = UiHarness::new(WIN);
-    menu_frame(&mut h, &DialogOptions::default());
+    menu_frame(&mut h, &PLAIN);
     h.at_ms(1000);
-    menu_frame(&mut h, &DialogOptions::default());
-    let scene = menu_frame(&mut h, &DialogOptions::default());
+    menu_frame(&mut h, &PLAIN);
+    let scene = menu_frame(&mut h, &PLAIN);
     assert_eq!(scene.backdrops().count(), 1, "the menu's blur");
     let menu = &scene.merged(LayerId::Raised).backdrops;
     assert_eq!(menu[0].sigma, 0.0, "the frame's sigma");

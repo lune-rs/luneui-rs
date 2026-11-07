@@ -111,7 +111,6 @@ const ERROR: BoardError<'static> = BoardError {
 
 fn glass() -> DialogGlass {
     DialogGlass {
-        panel: [0.0; 4],
         fill: [0.0; 4],
         noise: false,
     }

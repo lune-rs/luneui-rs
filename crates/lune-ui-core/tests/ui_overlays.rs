@@ -17,10 +17,12 @@ use lune_ui_core::ui::{
     Dismissal, OverlayFrame, OverlayOptions, OverlayPhase, Response, Sense, Ui, WidgetId,
 };
 use lune_ui_core::widgets::button::ButtonKind;
+use lune_ui_core::widgets::command_palette::{Palette, PaletteRow, PaletteSection};
 use lune_ui_core::widgets::dialog::{Cancel, Dialog, DialogGlass};
 use lune_ui_core::widgets::menu::MenuRow;
 use lune_ui_core::widgets::popover::PopoverOptions;
 use lune_ui_core::widgets::search_picker::PickerOptions;
+use lune_ui_core::widgets::toast::{ToastKind, ToastSpec, Toasts};
 
 const P: PointerButton = PointerButton::Primary;
 const PAGE_BTN: Rect = Rect::new(10.0, 10.0, 80.0, 30.0);
@@ -513,7 +515,6 @@ fn a_nested_record_keeps_the_outer_recording_whole() {
 
 const WIN: (f32, f32) = (800.0, 600.0);
 const GLASS: DialogGlass = DialogGlass {
-    panel: [0.1, 0.1, 0.12, 1.0],
     fill: [0.2, 0.2, 0.2, 0.62],
     noise: false,
 };
@@ -1812,6 +1813,23 @@ fn the_scope_keeps_the_clip_and_transform_and_puts_the_painter_back() {
 /// What a floating surface must show in `scene`: at least one frost, a backdrop request that covers
 /// each frost, and no opaque fill anywhere in the overlays.
 fn assert_glass(scene: &Scene, what: &str) {
+    assert_glass_with(scene, what, false);
+}
+
+/// [`assert_glass`] for a card that holds controls: an opaque fill is allowed where it is content
+/// (a primary button is opaque by design), and not where it covers a whole frost.
+fn assert_card_glass(scene: &Scene, what: &str) {
+    assert_glass_with(scene, what, true);
+}
+
+fn contains(outer: [f32; 4], inner: [f32; 4]) -> bool {
+    outer[0] <= inner[0] + 0.01
+        && outer[1] <= inner[1] + 0.01
+        && outer[0] + outer[2] >= inner[0] + inner[2] - 0.01
+        && outer[1] + outer[3] >= inner[1] + inner[3] - 0.01
+}
+
+fn assert_glass_with(scene: &Scene, what: &str, content_may_be_opaque: bool) {
     let frosts: Vec<[f32; 4]> = scene
         .in_order()
         .into_iter()
@@ -1821,18 +1839,17 @@ fn assert_glass(scene: &Scene, what: &str) {
         .collect();
     assert!(!frosts.is_empty(), "{what}: a frost");
     for f in &frosts {
-        let covered = scene.backdrops().any(|b| {
-            b.rect[0] <= f[0] + 0.01
-                && b.rect[1] <= f[1] + 0.01
-                && b.rect[0] + b.rect[2] >= f[0] + f[2] - 0.01
-                && b.rect[1] + b.rect[3] >= f[1] + f[3] - 0.01
-        });
+        let covered = scene.backdrops().any(|b| contains(b.rect, *f));
         assert!(covered, "{what}: a request covers the frost {f:?}");
     }
     for o in &scene.overlays {
         let g = &o.layer.geometry;
         for s in g.under.iter().chain(&g.over) {
-            assert!(s.color[3] < 1.0 - 1e-6, "{what}: an opaque fill {s:?}");
+            let guarded = !content_may_be_opaque || frosts.iter().any(|f| contains(s.rect, *f));
+            assert!(
+                !guarded || s.color[3] < 1.0 - 1e-6,
+                "{what}: an opaque fill {s:?}"
+            );
         }
     }
 }
@@ -1897,6 +1914,71 @@ fn every_floating_surface_is_glass() {
         }),
         "tooltip",
     );
+    // A dialog's card (the scrim's request covers it), the palette's card, a toast.
+    assert_card_glass(
+        &settled(None, |ui| {
+            ui.dialog("d", &DIALOG, &GLASS, |_, _, _, _| {});
+        }),
+        "dialog card",
+    );
+    let rows = [PaletteRow {
+        key: 1,
+        text: "main.rs",
+        detail: None,
+        icon: None,
+        hint: None,
+        destructive: false,
+    }];
+    let sections = [PaletteSection {
+        title: "FILES",
+        rows: &rows,
+        more: false,
+    }];
+    let mut query = String::new();
+    assert_card_glass(
+        &settled(None, |ui| {
+            let p = Palette {
+                sections: &sections,
+                placeholder: "Search",
+                footer_left: "",
+                error: None,
+                name: "",
+            };
+            ui.command_palette("pal", &mut query, &p, &GLASS);
+        }),
+        "palette card",
+    );
+    let mut toasts = Toasts::default();
+    toasts.push(
+        ToastSpec::new(ToastKind::Info, "Saved"),
+        Duration::from_millis(0),
+    );
+    let mut h = UiHarness::new(WIN);
+    let mut scene = Scene::default();
+    for ms in [0u64, 500, 1_000] {
+        h.at_ms(ms);
+        scene = h
+            .frame(|ui| {
+                ui.toasts("toasts", &mut toasts);
+            })
+            .0;
+    }
+    // The toast sits on the fixed `Toast` layer, which `Scene::overlays` does not list.
+    let g = &scene.merged(LayerId::Toast).geometry;
+    assert!(
+        scene.backdrops().any(|b| g
+            .under
+            .iter()
+            .any(|s| s.is_frost() && contains(b.rect, s.rect))),
+        "a request covers the toast's frost"
+    );
+    assert!(g.under.iter().any(|s| s.is_frost()), "the toast's frost");
+    for s in g.under.iter().chain(&g.over) {
+        assert!(
+            s.color[3] < 1.0 - 1e-6,
+            "an opaque fill on the toast: {s:?}"
+        );
+    }
     // The search picker opens by a click on its trigger.
     let mut h = UiHarness::new(WIN);
     let trigger = Rect::new(100.0, 100.0, 300.0, 36.0);
@@ -1926,12 +2008,10 @@ fn every_floating_surface_is_glass() {
 fn a_glass_list_in_a_dialog_and_a_menu_in_a_popover_each_ask_on_their_own_layer() {
     let scene = stacked_with_tooltip(false);
     let layers = drawn(&scene);
-    // Dialog, popover, list, tooltip: the popover, the list and the tooltip each have one request
-    // of their own, and the list's is not on the popover's layer.
+    // Dialog, popover, list, tooltip: each has one request of its own, and the list's is not on
+    // the popover's layer. The dialog's is its scrim's, which the card is frosted over.
     let asks: Vec<usize> = layers.iter().map(|o| o.layer.backdrops.len()).collect();
-    assert_eq!(asks[1..], [1, 1, 1], "{asks:?}");
-    // The dialog card is step 6b's: its scrim is not blurred here, so it asks for nothing.
-    assert_eq!(asks[0], 0);
+    assert_eq!(asks, [1, 1, 1, 1], "{asks:?}");
 
     // A menu opened from a popover's content.
     let mut h = UiHarness::new(WIN);

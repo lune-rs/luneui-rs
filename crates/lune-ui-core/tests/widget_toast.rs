@@ -320,12 +320,12 @@ fn scale_two_probes_width_radius_padding_gap_and_margin() {
     toasts.push(info("Second"), ms(0));
     let (scene, _) = settle(&mut h, &mut toasts, 0);
     let layer = &scene.merged(LayerId::Toast);
-    // The card fills are the shapes with a fill (the border rings follow each).
+    // The card fills are the frosts, one per card (the border rings are strokes).
     let fills: Vec<_> = layer
         .geometry
         .under
         .iter()
-        .filter(|s| s.params[0] == 0.0 && s.color[3] > 0.8 * premul(DARK.toast_bg)[3])
+        .filter(|s| s.params[2] == 2.0 && s.color[3] > 0.8 * premul(DARK.menu_glass)[3])
         .collect();
     assert_eq!(fills.len(), 2);
     let (first, second) = (fills[0], fills[1]);
@@ -390,13 +390,14 @@ fn card_fill(scene: &Scene) -> [f32; 4] {
 }
 
 fn card_alpha(scene: &Scene) -> f32 {
-    let full = premul(DARK.toast_bg)[3];
+    // A frost keeps its colour unfaded and the fade rides in `params[1]`.
     scene
         .merged(LayerId::Toast)
         .geometry
         .under
-        .first()
-        .map_or(0.0, |s| s.color[3] / full)
+        .iter()
+        .find(|s| s.params[2] == 2.0)
+        .map_or(0.0, |s| s.params[1])
 }
 
 const TIERS: [MotionTier; 3] = [MotionTier::Full, MotionTier::Reduced, MotionTier::Off];
@@ -895,7 +896,6 @@ fn toasts_waiting_on_a_timer_report_at_the_next_deadline_never_now() {
 // -- over a dialog and a raised popover ----------------------------------------------------------
 
 const GLASS: DialogGlass = DialogGlass {
-    panel: [0.1, 0.1, 0.12, 1.0],
     fill: [0.2, 0.2, 0.2, 0.62],
     noise: false,
 };

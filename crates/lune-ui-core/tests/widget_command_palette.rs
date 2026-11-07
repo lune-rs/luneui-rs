@@ -29,7 +29,6 @@ const PAGE_BTN: Rect = Rect::new(20.0, 20.0, 100.0, 32.0);
 
 fn glass() -> DialogGlass {
     DialogGlass {
-        panel: [0.1, 0.1, 0.12, 1.0],
         fill: [0.2, 0.2, 0.2, 0.62],
         noise: true,
     }
