@@ -514,7 +514,7 @@ fn a_list_over_a_dialogs_content_frosts_it_and_does_not_read_through() {
         open: Motion::of(Kind::Appear),
         close: Motion::of(Kind::Dismiss),
     };
-    let list = |open: bool| {
+    let list = |open: bool, with_bars: bool| {
         let mut h = UiHarness::new((SIZE.0 as f32, SIZE.1 as f32));
         let mut scene = Scene::default();
         for ms in [0u64, 500, 1_000] {
@@ -528,7 +528,9 @@ fn a_list_over_a_dialogs_content_frosts_it_and_does_not_read_through() {
                         |_, _, _| {},
                         |ui, _| {
                             ui.painter().fill(WIN, 0.0, DARK.dialog_backdrop);
-                            bars(ui.painter(), LayerId::Modal);
+                            if with_bars {
+                                bars(ui.painter(), LayerId::Modal);
+                            }
                             if open {
                                 ui.dropdown(
                                     "list",
@@ -546,13 +548,13 @@ fn a_list_over_a_dialogs_content_frosts_it_and_does_not_read_through() {
         scene
     };
     let mut renderer = FrameRenderer::new(&mut gpu, wgpu::TextureFormat::Rgba8Unorm);
-    let without = draw_with(&mut gpu, &mut renderer, &list(false), real);
+    let without = draw_with(&mut gpu, &mut renderer, &list(false, true), real);
     let sharp_range = range(&row(&without, 110, 370));
     assert!(
         sharp_range > 60.0,
         "the bars show (instrument check): {sharp_range}"
     );
-    let scene = list(true);
+    let scene = list(true, true);
     assert_eq!(scene.backdrops().count(), 1);
     let with = draw_with(&mut gpu, &mut renderer, &scene, real);
     let inside = range(&row(&with, 110, 370));
@@ -564,5 +566,16 @@ fn a_list_over_a_dialogs_content_frosts_it_and_does_not_read_through() {
         row(&with, 0, 90),
         row(&without, 0, 90),
         "only the list's region changes"
+    );
+    // Live (R9): the same list over a flat ground is not the same pixels, so what is behind
+    // changes the list.
+    let flat = draw_with(&mut gpu, &mut renderer, &list(true, false), real);
+    let (a, b) = (row(&with, 110, 370), row(&flat, 110, 370));
+    let mean = |v: &[f32]| v.iter().sum::<f32>() / v.len() as f32;
+    assert!(
+        (mean(&a) - mean(&b)).abs() > 8.0,
+        "over bars {} over flat {}",
+        mean(&a),
+        mean(&b)
     );
 }

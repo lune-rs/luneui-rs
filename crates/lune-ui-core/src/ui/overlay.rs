@@ -362,7 +362,7 @@ impl<'a> Ui<'a> {
     /// `Popup` or `Modal` is on `Outside` too, above `f`'s own drawing by tag; one that asks for
     /// `Toast` stays there. Keys are unchanged: Tab stays trapped in the modal and Escape goes to it.
     ///
-    /// The switch is not recorded, so it does not replay: the scope belongs at a shell's top level,
+    /// The switch is not recorded, so it does not replay: the scope belongs at an app's top level,
     /// not inside [`Self::record`].
     pub fn outside_modals<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
         let saved = self.painter.save_state();
