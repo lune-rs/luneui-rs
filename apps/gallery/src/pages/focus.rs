@@ -65,7 +65,10 @@ impl PageState for Focus {
                 confirm: "Discard",
                 cancel: Cancel::Default,
             };
-            ui.dialog("dialog", &d, &glass(), |_, _, _, _| {});
+            let r = ui.dialog("dialog", &d, &glass(), |_, _, _, _| {});
+            if r.confirmed || r.cancelled {
+                self.open_at = None;
+            }
         }
     }
 

@@ -90,7 +90,10 @@ impl PageState for Demo {
                         confirm: "Discard",
                         cancel: Cancel::Default,
                     };
-                    ui.dialog("dialog", &d, &glass(), |_, _, _, _| {});
+                    let r = ui.dialog("dialog", &d, &glass(), |_, _, _, _| {});
+                    if r.confirmed || r.cancelled {
+                        self.over = Over::Nothing;
+                    }
                 }
             }
             Over::Menu => {
@@ -107,7 +110,10 @@ impl PageState for Demo {
                     },
                 ];
                 let (dx, dy) = card_shift(area);
-                ui.menu("menu", &rows, (MENU_AT.0 + dx, MENU_AT.1 + dy));
+                let r = ui.menu("menu", &rows, (MENU_AT.0 + dx, MENU_AT.1 + dy));
+                if r.picked.is_some() || r.dismissed {
+                    self.over = Over::Nothing;
+                }
             }
         }
     }
@@ -118,7 +124,6 @@ impl PageState for Demo {
             Over::Menu => 1,
             Over::Dialog { .. } => 2,
         };
-        // A dialog is modal: it is closed in the dialog, not here.
         if panel.choice(
             ui,
             "Over the controls",

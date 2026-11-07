@@ -1196,4 +1196,24 @@ mod tests {
             "the sidebar took the click"
         );
     }
+
+    /// The toolkit never closes an overlay: the page must stop calling it. The `ui` page's dialog
+    /// closes on its own Cancel.
+    #[test]
+    fn a_hosted_dialog_closes_on_its_cancel() {
+        let mut rig = Rig::new();
+        rig.shell.cue("page ui");
+        rig.frame();
+        let out = rig.frame();
+        let mid = |n: &lune_ui::access::Node| {
+            (n.bounds.x + n.bounds.w / 2.0, n.bounds.y + n.bounds.h / 2.0)
+        };
+        rig.click_at(mid(named(&out, "Dialog").expect("the knob")));
+        rig.settle();
+        let out = rig.frame();
+        rig.click_at(mid(named(&out, "Cancel").expect("the dialog's Cancel")));
+        rig.settle();
+        let out = rig.frame();
+        assert!(named(&out, "Cancel").is_none(), "the dialog closed");
+    }
 }

@@ -63,12 +63,15 @@ fn t(ui: &Ui<'_>, key: &str, english: &str) -> String {
 struct Locale {
     controls: Controls,
     pseudo: bool,
+    /// The dialog's own Cancel or Discard closed it.
+    closed: bool,
 }
 
 fn pseudo() -> Box<dyn PageState> {
     Box::new(Locale {
         controls: Controls::new(),
         pseudo: true,
+        closed: false,
     })
 }
 
@@ -117,7 +120,10 @@ impl PageState for Locale {
             confirm: &confirm,
             cancel: Cancel::Default,
         };
-        ui.dialog("dialog", &d, &glass(), |_, _, _, _| {});
+        if !self.closed {
+            let r = ui.dialog("dialog", &d, &glass(), |_, _, _, _| {});
+            self.closed = r.confirmed || r.cancelled;
+        }
     }
 
     fn strings(&self) -> StringTable {
