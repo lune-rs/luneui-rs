@@ -63,7 +63,7 @@ overlay come last: an open modal blocks the pane. Every page of the sidebar has 
 ### Labs
 
 Glass (the three layers over stripes and colour), Blur (a backdrop over moving content; it owns the frame's one
-backdrop), Effects (custom draw, glass off, unfocused, the tab outline), Motion (the 15 kinds and 7 easings,
+backdrop), Effects (custom draw, glass off, the tab outline), Motion (the 15 kinds and 7 easings,
 each replayed on a press), Tokens (every theme colour, size and radius), Clipboard (copy and paste on a press
 only), JSON (the bounded reader on typed text).
 

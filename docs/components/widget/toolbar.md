@@ -37,7 +37,7 @@ Not read: `ToolbarView.axaml:82-220` (the centre and right groups, the branch an
 - Action button: 40 x 40, padding 6, centred content [L src/Lunegit.Desktop/Views/ToolbarView.axaml:13,19,48-50].
 - Action icon: 20 px, `ForegroundMuted` [L src/Lunegit.Desktop/Views/ToolbarView.axaml:11,53-54].
 - Utility icon 16 px [L src/Lunegit.Desktop/Views/ToolbarView.axaml:12]; branch icon 14 px, content spacing 4, max width 420 [L src/Lunegit.Desktop/Views/ToolbarView.axaml:16-18]; branch button padding 6 horizontal, 4 vertical [L src/Lunegit.Desktop/Views/ToolbarView.axaml:20]. The branch label draws `fg_subtle` #808080 at `font_m` 14 [L src/Lunegit.Desktop/Views/ToolbarView.axaml:113,116-117], [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:14], [D133].
-- Glass material: acrylic with the dark tint and opacity (`GlassTintDarkOpacity`, `GlassMaterialDarkOpacity`: the preset's `WINDOW` layer, which the gallery page passes), visible while the window is active; when inactive a solid `WindowFallbackBackground` replaces it [L src/Lunegit.Desktop/Views/ToolbarView.axaml:27-37]; the fallback rule is `material` (M3 `material` entry).
+- Glass material: acrylic with the dark tint and opacity (`GlassTintDarkOpacity`, `GlassMaterialDarkOpacity`: the preset's `WINDOW` layer, which the gallery page passes), drawn whatever the window's state is: Lunegit's solid `WindowFallbackBackground` while inactive [L src/Lunegit.Desktop/Views/ToolbarView.axaml:27-37] is not ported (R13, D262).
 - Button chrome: class `toolbar-action`, see States [L src/Lunegit.Desktop/App.axaml:460-464].
 
 ### States
@@ -86,7 +86,6 @@ None. The tooltips and labels are the app's commands: `Ui::toolbar_action` and `
 ### Gallery scenes
 
 - `toolbar-actions`: three action buttons and the branch label button, rest and hover on the second, its tooltip shown; settled.
-- `toolbar-inactive`: the window inactive, fallback background shown; settled.
 - `toolbar-disabled`: the push action disabled (0.4 opacity, transparent) with the pointer on it: no hover fill, the tooltip still shown (a disabled anchor keeps it); settled.
 - `toolbar-action-mid`: press on the first action, t = 90 ms (half of `fast`).
 - `toolbar-hover-mid`: second action rest → hover, t = 60 ms (half of `instant`).

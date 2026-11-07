@@ -171,13 +171,6 @@ pub(crate) const EFFECTS: &[LegacyScene] = &[
         draw: glass_off_scene,
     },
     LegacyScene {
-        id: "unfocused",
-        scale: 2,
-        time: SETTLED,
-        hover: Some(Hit::Secondary),
-        draw: unfocused_scene,
-    },
-    LegacyScene {
         id: "blur-contrast",
         scale: 2,
         time: SETTLED,
@@ -203,33 +196,26 @@ pub(crate) const EFFECTS: &[LegacyScene] = &[
 // ---- shared pieces ----
 
 /// The window background: a panel layer over the whole window and the card on top (each
-/// replaces what is below). `glass` off puts the layers over an opaque base; unfocused swaps
-/// them for the solid inactive fill. Returns the card.
+/// replaces what is below). `glass` off puts the layers over an opaque base. Returns the card.
 pub(crate) fn background<H: Copy + PartialEq>(
     p: &mut Painter<'_, H>,
     glass: bool,
-    focused: bool,
     title: &str,
 ) -> Rect {
-    background_in(p, &THEME, glass, focused, title)
+    background_in(p, &THEME, glass, title)
 }
 
-/// The panel fill, the card fill and the noise flag of the window layers: `glass` off puts them
-/// over an opaque base, unfocused swaps them for the solid inactive fill.
-fn glass_fills(theme: &Theme, glass: bool, focused: bool) -> ([f32; 4], [f32; 4], bool) {
-    if glass && !focused {
-        let solid = premul(lunegit_dark::INACTIVE_FALLBACK);
-        (solid, solid, false)
-    } else {
-        let mut panel = theme.glass.panel.premultiplied();
-        let mut fill = theme.glass.card.premultiplied();
-        if !glass {
-            let base = premul(OPAQUE_BASE);
-            panel = over(panel, base);
-            fill = over(fill, base);
-        }
-        (panel, fill, true)
+/// The panel fill and the card fill of the window layers: `glass` off puts them over an opaque
+/// base. The window's state does not change them (R13).
+fn glass_fills(theme: &Theme, glass: bool) -> ([f32; 4], [f32; 4]) {
+    let mut panel = theme.glass.panel.premultiplied();
+    let mut fill = theme.glass.card.premultiplied();
+    if !glass {
+        let base = premul(OPAQUE_BASE);
+        panel = over(panel, base);
+        fill = over(fill, base);
     }
+    (panel, fill)
 }
 
 /// Only the card of [`background_in`], at `card`: for a page that sits in a rect of a window
@@ -238,12 +224,11 @@ pub(crate) fn card_in<H: Copy + PartialEq>(
     p: &mut Painter<'_, H>,
     theme: &Theme,
     glass: bool,
-    focused: bool,
     card: Rect,
 ) -> Rect {
     // No layer change: the host's clip is still on, and `Painter::on` would drop it.
-    let (panel, card_fill, noise) = glass_fills(theme, glass, focused);
-    p.acrylic(card, chrome::CARD_RADIUS, card_fill, panel, noise);
+    let (panel, card_fill) = glass_fills(theme, glass);
+    p.acrylic(card, chrome::CARD_RADIUS, card_fill, panel, true);
     card
 }
 
@@ -253,7 +238,6 @@ pub(crate) fn background_in<H: Copy + PartialEq>(
     p: &mut Painter<'_, H>,
     theme: &Theme,
     glass: bool,
-    focused: bool,
     title: &str,
 ) -> Rect {
     p.on(LayerId::Base);
@@ -264,9 +248,9 @@ pub(crate) fn background_in<H: Copy + PartialEq>(
         win.w - 2.0 * CARD_MARGIN,
         win.h - TITLE_BAND - CARD_MARGIN,
     );
-    let (panel, card_fill, noise) = glass_fills(theme, glass, focused);
-    p.acrylic(win, 0.0, panel, [0.0; 4], noise);
-    p.acrylic(card, chrome::CARD_RADIUS, card_fill, panel, noise);
+    let (panel, card_fill) = glass_fills(theme, glass);
+    p.acrylic(win, 0.0, panel, [0.0; 4], true);
+    p.acrylic(card, chrome::CARD_RADIUS, card_fill, panel, true);
     let spec = Spec::plain(title, Style::ui(12.0, theme.fg_secondary).medium());
     p.text_centered(&spec, Rect::new(0.0, 0.0, win.w, TITLE_BAND - 2.0));
     card
@@ -412,12 +396,12 @@ fn controls_content(p: &mut P<'_>, card: Rect, combo_open: bool) -> Rect {
 // ---- scenes ----
 
 fn controls_scene(p: &mut P<'_>, _t: f32) {
-    let card = background(p, true, true, "luneui gallery");
+    let card = background(p, true, "luneui gallery");
     controls_content(p, card, false);
 }
 
 fn menu_scene(p: &mut P<'_>, t: f32) {
-    let card = background(p, true, true, "luneui gallery");
+    let card = background(p, true, "luneui gallery");
     controls_content(p, card, false);
     p.on(LayerId::Popup);
     let win = p.window;
@@ -446,7 +430,7 @@ fn menu_scene(p: &mut P<'_>, t: f32) {
 }
 
 fn custom_draw_scene(p: &mut P<'_>, _t: f32) {
-    let card = background(p, true, true, "luneui gallery");
+    let card = background(p, true, "luneui gallery");
     let t = THEME;
     let x = card.x + 24.0;
     let y = card.y + 24.0;
@@ -489,13 +473,13 @@ fn open_dropdown(p: &mut P<'_>, anchor: Rect) {
 }
 
 fn dropdown_scene(p: &mut P<'_>, _t: f32) {
-    let card = background(p, true, true, "luneui gallery");
+    let card = background(p, true, "luneui gallery");
     let anchor = controls_content(p, card, true);
     open_dropdown(p, anchor);
 }
 
 fn dropdown_flipped_scene(p: &mut P<'_>, _t: f32) {
-    let card = background(p, true, true, "luneui gallery");
+    let card = background(p, true, "luneui gallery");
     heading(
         p,
         "COMBO NEAR THE BOTTOM EDGE: THE LIST OPENS ABOVE",
@@ -517,7 +501,7 @@ const DIALOG_HITS: DialogHits<Hit> = DialogHits {
 };
 
 fn dialog_confirm_scene(p: &mut P<'_>, _t: f32) {
-    let card = background(p, true, true, "luneui gallery");
+    let card = background(p, true, "luneui gallery");
     controls_content(p, card, false);
     let spec = DialogSpec {
         title: "Discard changes",
@@ -530,7 +514,7 @@ fn dialog_confirm_scene(p: &mut P<'_>, _t: f32) {
 }
 
 fn dialog_message_scene(p: &mut P<'_>, _t: f32) {
-    let card = background(p, true, true, "luneui gallery");
+    let card = background(p, true, "luneui gallery");
     controls_content(p, card, false);
     let spec = DialogSpec {
         title: "About",
@@ -543,7 +527,7 @@ fn dialog_message_scene(p: &mut P<'_>, _t: f32) {
 }
 
 fn dialog_body_scene(p: &mut P<'_>, _t: f32) {
-    let card = background(p, true, true, "luneui gallery");
+    let card = background(p, true, "luneui gallery");
     controls_content(p, card, false);
     let spec = DialogSpec {
         title: "Rename",
@@ -576,12 +560,7 @@ fn dialog_body_scene(p: &mut P<'_>, _t: f32) {
 }
 
 fn glass_off_scene(p: &mut P<'_>, _t: f32) {
-    let card = background(p, false, true, "luneui gallery");
-    controls_content(p, card, false);
-}
-
-fn unfocused_scene(p: &mut P<'_>, _t: f32) {
-    let card = background(p, true, false, "luneui gallery");
+    let card = background(p, false, "luneui gallery");
     controls_content(p, card, false);
 }
 
@@ -611,7 +590,7 @@ fn blur_contrast_scene(p: &mut P<'_>, _t: f32) {
 }
 
 fn chrome_scene(p: &mut P<'_>, _t: f32) {
-    let card = background(p, true, true, "luneui gallery");
+    let card = background(p, true, "luneui gallery");
     let t = THEME;
     let tab = TabSpan {
         left: 140.0,
@@ -657,55 +636,5 @@ fn acrylic_scene(p: &mut P<'_>, _t: f32) {
         let r = Rect::new(40.0 + i as f32 * 330.0, 120.0, 300.0, 400.0);
         p.acrylic(r, 8.0, layer.premultiplied(), premul(base), true);
         p.text_centered(&widgets::label(&t, name, t.fg_primary), r);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use lune_ui::scene::Acrylic;
-    use lune_ui::testing::FakeText;
-
-    fn scene_of(id: &str) -> Scene {
-        let row = EFFECTS.iter().find(|s| s.id == id).expect("scene row");
-        let (w, h) = (W * row.scale, H * row.scale);
-        row.paint(&mut FakeText, row.scale as f32, (w, h))
-    }
-
-    fn acrylics(scene: &Scene) -> Vec<Acrylic> {
-        scene
-            .in_order()
-            .into_iter()
-            .flat_map(|l| l.geometry.acrylic.iter().copied())
-            .collect()
-    }
-
-    /// The inactive window draws the solid fallback in place of the glass layers: the window and
-    /// the card are both `window_fallback`, premultiplied, with noise off, and no acrylic item
-    /// carries a glass layer's colour or noise. The fallback goes through the acrylic path (its
-    /// `Src` semantics antialias the card's corners against the panel), so the "fill" is an
-    /// acrylic item whose colour is the fallback, never a glass one. The focused scene beside it
-    /// shows the glass.
-    #[test]
-    fn the_unfocused_scene_draws_the_window_fallback_and_no_glass_layer() {
-        let fallback = premul(THEME.window_fallback);
-        let off = acrylics(&scene_of("unfocused"));
-        assert_eq!(off.len(), 2, "the window and the card");
-        for a in &off {
-            assert_eq!(a.shape.color, fallback, "an inactive layer is the fallback");
-            assert_eq!(a.shape.params[3], 0.0, "no noise on the fallback");
-        }
-        // The card's `under` is the window layer, which is the fallback too.
-        assert_eq!(off[1].shape.under, fallback);
-        // Instrument check: the same background with focus is the glass layers, with noise.
-        let mut text = FakeText;
-        let win = Rect::new(0.0, 0.0, W as f32, H as f32);
-        let mut p: Painter<'_, Hit> = Painter::new(2.0, win, &mut text, None, THEME);
-        background(&mut p, true, true, "t");
-        let on = acrylics(&p.scene);
-        assert_eq!(on.len(), 2);
-        assert_eq!(on[0].shape.color, THEME.glass.panel.premultiplied());
-        assert_eq!(on[1].shape.color, THEME.glass.card.premultiplied());
-        assert!(on.iter().all(|a| a.shape.params[3] == 1.0));
     }
 }

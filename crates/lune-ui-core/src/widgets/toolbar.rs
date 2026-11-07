@@ -3,9 +3,8 @@
 //! [`Ui::toolbar`] draws the bar and hands its three columns to the caller, who places the
 //! actions: [`Ui::toolbar_action`] (a 40 by 40 glyph button with a tooltip) and
 //! [`Ui::toolbar_label`] (a glyph and an elided text, the branch button's shape). The commands and
-//! their names are the app's. The bar is the app's glass layer while the window is active and the
-//! theme's `window_fallback` fill when it is not (D128): the widget names no preset, the caller
-//! passes the layer.
+//! their names are the app's. The bar is the app's glass layer, whatever the window's state (R13): the
+//! widget names no preset, the caller passes the layer.
 //!
 //! The columns are the entry's `*, Auto, *` grid. The middle column's width is the caller's
 //! content, which this widget cannot know before the closure runs, so [`ToolbarCols::center`] is
@@ -43,9 +42,7 @@ pub const LABEL_MAX_WIDTH: f32 = 420.0;
 /// What [`Ui::toolbar`] is given besides its rect.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ToolbarOptions<'a> {
-    /// The window is active: the glass shows. Inactive, the solid fallback replaces it.
-    pub active: bool,
-    /// The glass layer drawn while active.
+    /// The glass layer the bar draws.
     pub glass: GlassLayer,
     /// What the glass layer is composed over (the colour below it, premultiplied).
     /// Pass the layer the bar sits on: acrylic replaces what is under it, and the pixel just outside
@@ -97,13 +94,8 @@ impl Ui<'_> {
         f: impl FnOnce(&mut Ui<'_>, ToolbarCols) -> R,
     ) -> R {
         let id = self.id(&key);
-        let fallback = self.theme().window_fallback;
         let p = self.painter();
-        if opts.active {
-            p.acrylic(rect, 0.0, opts.glass.premultiplied(), opts.under, true);
-        } else {
-            p.fill(rect, 0.0, fallback);
-        }
+        p.acrylic(rect, 0.0, opts.glass.premultiplied(), opts.under, true);
         let node = Node::new(id, Role::Toolbar, opts.name, rect);
         self.scope(&key, |ui| {
             ui.node_container(node, |ui| f(ui, ToolbarCols::of(rect)))

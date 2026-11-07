@@ -35,7 +35,7 @@ Conflicts: none between sources; this repo has no settings page. The eight secti
 
 ### Anatomy
 
-- Glass: acrylic at the top-left corner radius 8 only, PANEL levels (tint 0.8, material 0.7) [L src/Lunegit.Desktop/Views/SettingsPageView.axaml:10-18]; solid fallback while the window is inactive [L src/Lunegit.Desktop/Views/SettingsPageView.axaml:20].
+- Glass: acrylic at the top-left corner radius 8 only, PANEL levels (tint 0.8, material 0.7) [L src/Lunegit.Desktop/Views/SettingsPageView.axaml:10-18]; Lunegit's solid fallback while the window is inactive [L src/Lunegit.Desktop/Views/SettingsPageView.axaml:20] is not ported (R13, D262).
 - Banner: docked bottom; padding 20 by 10; fill `StatusWarningDark`; text `StatusWarningLight`; 14 px warning icon 8 px from the text [L src/Lunegit.Desktop/Views/SettingsPageView.axaml:24-40].
 - Banner action: a button with padding 12 by 6, radius 6, 1 px `StatusWarningLight` border [L src/Lunegit.Desktop/Views/SettingsPageView.axaml:41-51].
 - Content host: 20 px margin on all sides, showing the current section [L src/Lunegit.Desktop/Views/SettingsPageView.axaml:56-58].
@@ -48,7 +48,7 @@ Conflicts: none between sources; this repo has no settings page. The eight secti
 | state | look | cite |
 |---|---|---|
 | page, rest | glass page; content host | [L src/Lunegit.Desktop/Views/SettingsPageView.axaml:9-58] |
-| inactive window | solid fallback | [L src/Lunegit.Desktop/Views/SettingsPageView.axaml:20] |
+| inactive window | the same glass (no `active` field) | [D262] |
 | restart required | banner revealed at the bottom | [L src/Lunegit.Desktop/Views/SettingsPageView.axaml:24-27] |
 | row hover | `settings-item` background tween | [L src/Lunegit.Desktop/Themes/Animations.axaml:113-121] |
 | focus-visible | the focused control (widget.*) | [core.focus] |
@@ -98,7 +98,6 @@ Never animated: the section content swap (no motion in the view, [L src/Lunegit.
 - `settings-page-rows` (new): a page with three rows (a toggle, a combo, a stepper), no banner, settled.
 - `settings-page-restart` (new): the banner revealed at the bottom, settled.
 - `settings-page-restart-mid` (new): the banner 125 ms into its reveal (half of base, 250 ms) [L src/Lunegit.Desktop/App.axaml:153].
-- `settings-page-inactive` (new): the page with the window inactive (solid fallback, same corner), settled.
 - `settings-page-disabled` (new): the first row in `with_enabled(false, ..)` (0.4 opacity), the pointer and a click on its toggle: no hover fill, the toggle unchanged, no restart banner, settled.
 
 ### Painter primitives

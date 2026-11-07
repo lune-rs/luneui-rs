@@ -171,7 +171,6 @@ fn show(ui: &mut Ui<'_>, m: &Model, rect: Rect) -> BoardResponse {
         title: "Roadmap",
         columns: &columns,
         error: m.error.then_some(&ERROR),
-        active: true,
         glass: lune_ui_core::GlassLayer {
             tint: [0, 0, 0, 255],
             tint_opacity: 0.5,
@@ -290,9 +289,15 @@ fn fills(scene: &Scene, layer: LayerId, c: Rgba) -> Vec<Shape> {
         .collect()
 }
 
-/// The ghost's under-fill on `layer`: the one window-fallback fill there.
+/// The ghost's frost on `layer`: the `menu_glass` one there (D168: the ghost stands on glass).
 fn ghost_on(scene: &Scene, layer: LayerId) -> Option<Shape> {
-    fills(scene, layer, DARK.window_fallback).first().copied()
+    scene
+        .merged(layer)
+        .geometry
+        .under
+        .iter()
+        .find(|s| s.is_frost() && s.color == premul(DARK.menu_glass))
+        .copied()
 }
 
 fn ghost(scene: &Scene) -> Option<Shape> {
@@ -570,7 +575,6 @@ fn a_name_given_wins_over_the_title() {
             title: "Roadmap",
             columns: &[],
             error: None,
-            active: false,
             glass: lune_ui_core::GlassLayer {
                 tint: [0, 0, 0, 255],
                 tint_opacity: 0.5,
@@ -815,6 +819,36 @@ fn the_drop_line_sits_in_the_gap_of_the_slot_and_the_target_fills() {
     assert_eq!(line[0].rect[0], CARD_X + 2.0 * LANE_PITCH);
     let r = drag_to(&mut h, &m, 2010, (LANE_X + COLUMN_W + 5.0, LIST_Y));
     assert!(fills(&r.scene, LayerId::Page, DARK.accent).is_empty());
+}
+
+#[test]
+fn the_ghost_stands_on_glass_so_what_is_under_it_does_not_read_through() {
+    // D168's reason: a card dragged over text must not show that text through its own 4% fill.
+    // The ghost asks for a blur of what is under it and frosts `menu_glass` over that.
+    let mut h = UiHarness::new(WIN);
+    let m = model();
+    let r = grab(&mut h, &m, 12, 0);
+    let g = ghost(&r.scene).expect("a ghost");
+    let blurs: Vec<_> = r
+        .scene
+        .backdrops()
+        .filter(|b| {
+            b.rect[0] <= g.rect[0] + 0.01
+                && b.rect[1] <= g.rect[1] + 0.01
+                && b.rect[0] + b.rect[2] >= g.rect[0] + g.rect[2] - 0.01
+                && b.rect[1] + b.rect[3] >= g.rect[1] + g.rect[3] - 0.01
+        })
+        .collect();
+    assert!(!blurs.is_empty(), "a request covers the ghost's frost");
+    let layer = r.scene.merged(LayerId::Popup);
+    assert!(
+        layer
+            .geometry
+            .under
+            .iter()
+            .all(|s| !(s.rect == g.rect && s.color[3] >= 1.0 - 1e-6)),
+        "no opaque fill under the card"
+    );
 }
 
 #[test]

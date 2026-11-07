@@ -1,4 +1,4 @@
-//! The page registry. Legacy pages first (they keep the Painter API and the pixel gate's 15
+//! The page registry. Legacy pages first (they keep the Painter API and the pixel gate's 14
 //! scenes), then the Ui pages in the order they are built. Adding a page is its own file plus one
 //! line in [`PAGES`].
 
@@ -173,14 +173,14 @@ pub(crate) static PAGES: &[&Page] = &[
     &crate::showcase::labs::json::PAGE,
 ];
 
-/// The window background of a Ui page (glass, focused) and its card. Returns the card. On a
+/// The window background of a Ui page (glass) and its card. Returns the card. On a
 /// stage that is a rect of the window, only the card is painted, at the rect: the window glass
 /// and the title belong to whoever owns the window.
 pub(crate) fn card(ui: &mut Ui<'_>, stage: &Stage, title: &str) -> Rect {
     let theme = *ui.theme();
     match stage.rect() {
-        None => background_in(ui.painter(), &theme, true, true, title),
-        Some(rect) => card_in(ui.painter(), &theme, true, true, rect),
+        None => background_in(ui.painter(), &theme, true, title),
+        Some(rect) => card_in(ui.painter(), &theme, true, rect),
     }
 }
 

@@ -61,7 +61,7 @@ n/a — no text.
 
 ### Gallery scenes
 
-- Every scene `gallery --list` prints (421 names) is dumped by the pixel gate; the first 14 legacy ids (`controls`, `menu`, `menu-opening`, `custom-draw`, `dropdown`, `dropdown-flipped`, `dialog-confirm`, `dialog-message`, `dialog-body`, `glass-off`, `unfocused`, `blur-contrast`, `chrome`, `acrylic`) were the set when this entry was written [R apps/gallery/src/scenes.rs:82-180].
+- Every scene `gallery --list` prints (421 names) is dumped by the pixel gate; the first 13 legacy ids (`controls`, `menu`, `menu-opening`, `custom-draw`, `dropdown`, `dropdown-flipped`, `dialog-confirm`, `dialog-message`, `dialog-body`, `glass-off`, `blur-contrast`, `chrome`, `acrylic`) were the set when this entry was written [R apps/gallery/src/scenes.rs:82-180].
 
 ### Painter primitives
 

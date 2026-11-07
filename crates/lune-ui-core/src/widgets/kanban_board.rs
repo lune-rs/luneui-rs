@@ -30,6 +30,7 @@ use super::scroll_area::{Bars, Extent, Reveal, ScrollOptions, ScrollView, Target
 use crate::access::{Action, Live, Node, Role, State};
 use crate::backdrop::GlassLayer;
 use crate::color::Rgba;
+use crate::color::premul;
 use crate::drag::{
     AUTO_SCROLL_TICK, Column, FreeDrag, FreeFrame, FreeResult, SETTLE, SLIDE, edge_step,
     paint_drop_line,
@@ -145,9 +146,7 @@ pub struct BoardOptions<'a> {
     pub columns: &'a [KanbanColumn<'a>],
     /// Shows only this, in place of the columns.
     pub error: Option<&'a BoardError<'a>>,
-    /// The window is active: the glass shows. Inactive, the solid fallback replaces it.
-    pub active: bool,
-    /// The glass layer drawn while active.
+    /// The glass layer the board draws.
     pub glass: GlassLayer,
     /// What the glass is composed over (the colour below it, premultiplied).
     pub under: [f32; 4],
@@ -565,13 +564,8 @@ impl Ui<'_> {
             column_menu: None,
         };
         self.scope(&key, |ui| {
-            let fallback = ui.theme().window_fallback;
             let p = ui.painter();
-            if opts.active {
-                p.acrylic(rect, RADIUS, opts.glass.premultiplied(), opts.under, true);
-            } else {
-                p.fill(rect, RADIUS, fallback);
-            }
+            p.acrylic(rect, RADIUS, opts.glass.premultiplied(), opts.under, true);
             match opts.error {
                 Some(error) => {
                     mem.drag.cancel();
@@ -1283,7 +1277,9 @@ impl Ui<'_> {
         mem.landings = landings;
     }
 
-    /// A card's ghost at the window-space `pos`, over an opaque fill: the card's own is 4% white.
+    /// A card's ghost at the window-space `pos`, over the glass of every floating surface (a blurred
+    /// scene under it and `menu_glass` frosted over that), so what is under the ghost does not read
+    /// through: the card's own fill is 4% white (D168, R13).
     fn board_paint_ghost(&mut self, f: &Frame<'_, '_>, key: u64, pos: (f32, f32), slot: &Slot) {
         let Some(card) = f.card(key) else { return };
         let theme = f.theme;
@@ -1300,7 +1296,8 @@ impl Ui<'_> {
         };
         self.drag_ghost(|ui| {
             let p = ui.painter();
-            p.fill(rect, CARD_RADIUS, theme.window_fallback);
+            p.backdrop(rect, CARD_RADIUS);
+            p.frost(rect, CARD_RADIUS, premul(theme.menu_glass), true);
             paint_card(p, rect, card, &look, &theme);
         });
     }

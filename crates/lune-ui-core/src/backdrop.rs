@@ -27,8 +27,9 @@ pub enum BackdropKind {
 pub enum Material {
     /// Light vibrancy (macOS) or acrylic (Windows), kept active when the window is unfocused.
     Vibrancy,
-    /// Like [`Material::Vibrancy`], but the material follows the window's active state (macOS;
-    /// acrylic on Windows).
+    /// Like [`Material::Vibrancy`], but the material follows the OS: it follows the window's active
+    /// state (macOS; acrylic on Windows). An explicit choice of the app; the toolkit's own
+    /// drawing does not depend on the window's state (R13).
     VibrancyFollowsWindow,
     /// Clear liquid glass (macOS) or Mica (Windows).
     LiquidClear,

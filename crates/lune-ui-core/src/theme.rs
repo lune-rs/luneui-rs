@@ -102,10 +102,6 @@ pub struct Theme {
     pub gold: Rgba,
     /// The neutral status dot.
     pub paused: Rgba,
-    /// The window fill a toolbar shows when the window is inactive or no glass material is
-    /// available: Lunegit's `WindowFallbackBackground` #FF333333 (`DarkTheme.axaml:245`, D128).
-    /// Opaque, so the toolbar never reads as see-through without a backdrop.
-    pub window_fallback: Rgba,
     /// A link, a quote bar and a diff hunk header: Lunegit's `MarkdownLinkForeground` and
     /// `DiffHunkForeground` #61AFEF (D14).
     pub link: Rgba,
@@ -277,7 +273,6 @@ color_keys! {
     "StatusWarningDark" => |t| Slot::One(&mut t.status_warning_dark),
     "StatusError" => |t| Slot::One(&mut t.status_error),
     "StatusErrorLight" => |t| Slot::One(&mut t.status_error_light),
-    "WindowFallbackBackground" => |t| Slot::One(&mut t.window_fallback),
     "MarkdownLinkForeground" => |t| Slot::One(&mut t.link),
     "MarkdownInlineCodeBackground" => |t| Slot::One(&mut t.code_inline),
     "DiffAddedBackground" => |t| Slot::One(&mut t.diff_added),
@@ -359,8 +354,6 @@ pub mod lunegit_dark {
         data_hi: [0x8F, 0xBB, 0xFF, 0xFF],
         gold: [0xE9, 0xC4, 0x6A, 0xFF],
         paused: [0x8A, 0x90, 0x99, 0xFF],
-        // Lunegit `Themes/DarkTheme.axaml:245`.
-        window_fallback: [0x33, 0x33, 0x33, 0xFF],
         // Lunegit `DarkTheme.axaml:106-110,134-141`; the marks are derived (D14).
         link: [0x61, 0xAF, 0xEF, 0xFF],
         code_inline: [0xFF, 0xFF, 0xFF, 0x14],
@@ -405,10 +398,6 @@ pub mod lunegit_dark {
         material_opacity: 0.8,
     };
 
-    /// Solid fill shown while the window is inactive (tint lightened 20%), replacing all
-    /// acrylic layers. Lunegit works around AvaloniaUI/Avalonia#5440 this way.
-    pub const INACTIVE_FALLBACK: Rgba = [0x33, 0x33, 0x33, 0xFF];
-
     pub const CARD_CORNER_RADIUS: f32 = 8.0;
     pub const TAB_HEADER_HEIGHT: f32 = 32.0;
     pub const BODY_PADDING: f32 = 10.0;
@@ -450,7 +439,6 @@ mod tests {
             (THEME.data_hi, [0x8F, 0xBB, 0xFF, 0xFF]),
             (THEME.gold, [0xE9, 0xC4, 0x6A, 0xFF]),
             (THEME.paused, [0x8A, 0x90, 0x99, 0xFF]),
-            (THEME.window_fallback, [0x33, 0x33, 0x33, 0xFF]),
             (THEME.menu_item_pressed, [0xFF, 0xFF, 0xFF, 0x23]),
             (THEME.menu_text_disabled, [0xFF, 0xFF, 0xFF, 0x58]),
             (THEME.toast_info, [0x61, 0xAF, 0xEF, 0xFF]),
@@ -462,7 +450,7 @@ mod tests {
             (THEME.dirty_indicator, [0xD9, 0x8A, 0x3D, 0xFF]),
             (THEME.count_badge, [0xE7, 0x48, 0x56, 0xFF]),
         ];
-        assert_eq!(expected.len(), 33);
+        assert_eq!(expected.len(), 32);
         for (got, want) in expected {
             assert_eq!(got, want);
         }
@@ -624,12 +612,6 @@ mod tests {
         ("StatusError", 63, "#F44336", [0xF4, 0x43, 0x36, 0xFF]),
         ("StatusErrorLight", 64, "#EF9A9A", [0xEF, 0x9A, 0x9A, 0xFF]),
         (
-            "WindowFallbackBackground",
-            245,
-            "#FF333333",
-            [0x33, 0x33, 0x33, 0xFF],
-        ),
-        (
             "MarkdownLinkForeground",
             140,
             "#61AFEF",
@@ -657,8 +639,8 @@ mod tests {
 
     #[test]
     fn every_color_key_holds_the_dark_theme_axaml_value() {
-        // 45 rows plus three keys with no row here: `GlassTintColor`, `MenuGlassBackground` (not in
-        // Lunegit) and `PopupMenuOuterBorder` (a deviation, tested below): all 48 keys of the
+        // 44 rows plus three keys with no row here: `GlassTintColor`, `MenuGlassBackground` (not in
+        // Lunegit) and `PopupMenuOuterBorder` (a deviation, tested below): all 47 keys of the
         // table are covered, none twice.
         let mut keys: Vec<&str> = AXAML.iter().map(|r| r.0).collect();
         keys.push("GlassTintColor");
@@ -699,12 +681,6 @@ mod tests {
         assert_eq!(THEME.glass.window, layer(1.0, 0.7));
         assert_eq!(THEME.glass.card, layer(1.0, 0.8));
         assert_eq!(THEME.glass.panel, layer(0.8, 0.7));
-        // `WindowFallbackBackground` #FF333333 (:245) is the inactive fill.
-        assert_eq!(
-            super::lunegit_dark::INACTIVE_FALLBACK,
-            [0x33, 0x33, 0x33, 0xFF]
-        );
-        assert_eq!(THEME.window_fallback, [0x33, 0x33, 0x33, 0xFF]);
     }
 
     /// `PopupMenuOuterBorder` is #3AFFFFFF in `DarkTheme.axaml:301`; the toolkit's glass ring is

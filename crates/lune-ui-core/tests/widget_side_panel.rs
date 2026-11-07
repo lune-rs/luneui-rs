@@ -1,5 +1,4 @@
-//! The side panel host (`layout.side-panel` acceptance): the glass card and the solid inactive
-//! fill, the radius and padding probes at scale 2, exactly one panel's nodes, hidden panels that
+//! The side panel host (`layout.side-panel` acceptance): the glass card, the radius and padding probes at scale 2, exactly one panel's nodes, hidden panels that
 //! keep their scroll offset and text edit across 600 undrawn frames, the show motion in three
 //! tiers (the first frame does not animate, a show in flight restarts from its look), a hide that
 //! snaps, no focus moved by a show, and the disabled walk.
@@ -51,7 +50,6 @@ fn in_panel(panel: u64, key: &str) -> WidgetId {
 #[derive(Clone, Copy)]
 struct Cfg {
     panel: u64,
-    active: bool,
     enabled: bool,
     keys: &'static [u64],
 }
@@ -60,7 +58,6 @@ impl Cfg {
     fn new(panel: u64) -> Cfg {
         Cfg {
             panel,
-            active: true,
             enabled: true,
             keys: &KEYS,
         }
@@ -91,7 +88,6 @@ fn frame(h: &mut UiHarness, c: &Cfg) -> Out {
         let opts = SidePanelOptions {
             panel: c.panel,
             keys: c.keys,
-            active: c.active,
             glass: GLASS,
             under: UNDER,
             name: line(c.panel),
@@ -220,27 +216,6 @@ fn pixel_probes_at_scale_two() {
     assert_eq!(ring.params[1], 2.0, "1 logical px is 2 physical");
     assert_eq!(ring.rect, a.rect);
     assert_eq!(ring.color, premul(DARK.border));
-}
-
-#[test]
-fn inactive_draws_the_fallback_fill_and_no_acrylic() {
-    let mut h = UiHarness::new(WIN);
-    let out = settled(
-        &mut h,
-        &Cfg {
-            active: false,
-            ..Cfg::new(1)
-        },
-    );
-    let g = &out.scene.layers[0].geometry;
-    assert!(g.acrylic.is_empty());
-    let fill = g
-        .under
-        .iter()
-        .find(|s| s.rect == [20.0, 20.0, 300.0, 400.0])
-        .expect("the card fill");
-    assert_eq!(fill.color, premul(DARK.window_fallback));
-    assert_eq!(fill.radii, [RADIUS; 4]);
 }
 
 #[test]

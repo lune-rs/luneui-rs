@@ -103,8 +103,8 @@ fn an_empty_file_returns_the_base_unchanged() {
 }
 
 #[test]
-fn the_key_table_has_48_distinct_keys_each_of_which_resolves() {
-    assert_eq!(COLOR_KEYS.len(), 48);
+fn the_key_table_has_47_distinct_keys_each_of_which_resolves() {
+    assert_eq!(COLOR_KEYS.len(), 47);
     let mut seen = std::collections::BTreeSet::new();
     for k in COLOR_KEYS {
         assert!(seen.insert(*k), "{k} twice");
@@ -283,6 +283,18 @@ fn each_skip_kind_is_reported_in_file_order() {
     ));
     assert!(f.skipped.is_empty());
     assert_eq!(f.theme.glass.window.material_opacity, 0.0);
+}
+
+#[test]
+fn the_window_fallback_key_is_gone() {
+    // An inactive window stays glass (R13): no widget has a solid fill by window state, so
+    // `WindowFallbackBackground` is an unknown key.
+    let f = load(&with_colors(r##""WindowFallbackBackground":"#FF333333""##));
+    assert_eq!(
+        f.skipped,
+        [Skip::UnknownColor("WindowFallbackBackground".to_string())]
+    );
+    assert_eq!(f.theme, DARK);
 }
 
 #[test]

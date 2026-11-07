@@ -47,7 +47,6 @@ fn id(key: &str) -> WidgetId {
 #[derive(Clone, Copy)]
 struct Cfg {
     rect: Rect,
-    active: bool,
     restart: bool,
     enabled: bool,
     /// The section's height; large enough to scroll with `tall`.
@@ -59,7 +58,6 @@ impl Cfg {
     fn new() -> Cfg {
         Cfg {
             rect: RECT,
-            active: true,
             restart: false,
             enabled: true,
             content_h: 300.0,
@@ -92,7 +90,6 @@ fn frame_with(h: &mut UiHarness, c: &Cfg, app: &mut App, rows: bool) -> Out {
     let mut resp = SettingsResponse::default();
     let (scene, out) = h.frame(|ui| {
         let page = SettingsPage {
-            active: c.active,
             glass: GLASS,
             under: UNDER,
             restart: c.restart,
@@ -246,28 +243,6 @@ fn the_glass_is_the_acrylic_with_one_round_corner() {
     assert_eq!(a.color, GLASS.premultiplied());
     assert_eq!(a.under, UNDER);
     assert_eq!(out.out.repaint, Repaint::Idle);
-}
-
-#[test]
-fn inactive_draws_the_fallback_with_the_same_corner_and_no_acrylic() {
-    let mut h = UiHarness::new(WIN);
-    let out = settled(
-        &mut h,
-        &Cfg {
-            active: false,
-            ..Cfg::new()
-        },
-    );
-    let g = &out.scene.layers[0].geometry;
-    assert!(g.acrylic.is_empty());
-    assert_eq!(DARK.window_fallback, [0x33, 0x33, 0x33, 0xFF]);
-    let fill = g
-        .under
-        .iter()
-        .find(|s| s.rect == [0.0, 0.0, 900.0, 600.0])
-        .expect("the page fill");
-    assert_eq!(fill.color, premul(DARK.window_fallback));
-    assert_eq!(fill.radii, [RADIUS, 0.0, 0.0, 0.0]);
 }
 
 #[test]

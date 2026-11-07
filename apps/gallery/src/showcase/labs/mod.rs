@@ -4,7 +4,7 @@
 //!
 //! - glass: the window, panel and card layers over high-contrast content;
 //! - blur: the backdrop blur over moving content;
-//! - effects: the custom-draw slot, glass off, an unfocused window and the tab outline;
+//! - effects: the custom-draw slot, glass off and the tab outline;
 //! - motion: the fifteen kinds and the seven easings, each replayed on demand;
 //! - tokens: every theme colour, font size and radius;
 //! - clipboard: text copy and paste, on a press only;

@@ -1561,7 +1561,6 @@ mod m7 {
                     &PageOptions {
                         title: "Overview",
                         subtitle: Some("The project at a glance"),
-                        active: true,
                         glass: GLASS,
                         under: UNDER,
                         actions_w: 0.0,
@@ -1580,7 +1579,6 @@ mod m7 {
                     &SidePanelOptions {
                         panel: 1,
                         keys: &[1, 2],
-                        active: true,
                         glass: GLASS,
                         under: UNDER,
                         name: "History",
@@ -1591,7 +1589,6 @@ mod m7 {
                     "settings",
                     SETTINGS,
                     &SettingsPage {
-                        active: true,
                         glass: GLASS,
                         under: UNDER,
                         restart: p.restart,
@@ -2557,7 +2554,6 @@ mod m8 {
                         title: "Roadmap",
                         columns: &columns,
                         error: None,
-                        active: true,
                         glass: GLASS,
                         under: [0.05, 0.06, 0.07, 1.0],
                         name: "",
@@ -4089,7 +4085,6 @@ mod m10 {
         data_hi,
         gold,
         paused,
-        window_fallback,
         link,
         code_inline,
         diff_added,
@@ -4408,8 +4403,7 @@ mod m10 {
             1 => {
                 let win = Rect::new(0.0, 0.0, 900.0, 700.0);
                 ui.caption_buttons("caption", win, CaptionOptions::default());
-                let bar = |active, g| ToolbarOptions {
-                    active,
+                let bar = |g| ToolbarOptions {
                     glass: g,
                     under: UNDER,
                     name: "Bar",
@@ -4417,7 +4411,7 @@ mod m10 {
                 ui.toolbar(
                     "bar-off",
                     Rect::new(0.0, 60.0, 900.0, 52.0),
-                    &bar(false, glass.window),
+                    &bar(glass.window),
                     |ui, _| {
                         ui.toolbar_label(
                             "label",
@@ -4431,7 +4425,7 @@ mod m10 {
                 ui.toolbar(
                     "bar-on",
                     Rect::new(0.0, 120.0, 900.0, 52.0),
-                    &bar(true, glass.panel),
+                    &bar(glass.panel),
                     |ui, _| {
                         ui.toolbar_action(
                             "act",
@@ -4637,7 +4631,6 @@ mod m10 {
                         title: "Roadmap",
                         columns: &columns,
                         error: None,
-                        active: true,
                         glass: glass.card,
                         under: UNDER,
                         name: "",
@@ -4648,7 +4641,6 @@ mod m10 {
                 let page = PageOptions {
                     title: "Page",
                     subtitle: Some("Sub"),
-                    active: true,
                     glass: glass.panel,
                     under: UNDER,
                     actions_w: 0.0,
@@ -4663,7 +4655,6 @@ mod m10 {
                     |_, _| 10.0,
                 );
                 let settings = SettingsPage {
-                    active: true,
                     glass: glass.window,
                     under: UNDER,
                     restart: true,
@@ -4969,7 +4960,7 @@ mod m10 {
     fn the_audit_theme_has_a_colour_no_preset_field_has_in_every_field() {
         let (t, p) = (fields(&distinct()), fields(&DARK));
         assert_eq!(t.len(), p.len());
-        assert_eq!(t.len(), 68, "the colour fields of `Theme`");
+        assert_eq!(t.len(), 67, "the colour fields of `Theme`");
         for (i, (name, c)) in t.iter().enumerate() {
             assert_ne!(*c, p[i].1, "{name}");
             for (_, q) in &p {
@@ -5466,7 +5457,6 @@ mod m11 {
 
     fn toolbar(ui: &mut Ui<'_>, pg: &mut Pg) {
         let opts = ToolbarOptions {
-            active: true,
             glass: GLASS,
             under: UNDER,
             name: "Main toolbar",
@@ -5535,7 +5525,6 @@ mod m11 {
 
     fn settings(ui: &mut Ui<'_>, pg: &mut Pg) {
         let page = SettingsPage {
-            active: true,
             glass: GLASS,
             under: UNDER,
             restart: true,

@@ -449,7 +449,7 @@ window.
 ## Gallery pages and bench
 
 `apps/gallery` is app code (it reads the clock for the bench and bundles fonts). Every screen is a
-`Page` in `apps/gallery/src/pages/mod.rs`: the legacy pages (`reference`, `effects`) hold the 15 fixed Painter-API
+`Page` in `apps/gallery/src/pages/mod.rs`: the legacy pages (`reference`, `effects`) hold the 14 fixed Painter-API
 scenes the pixel gate compares and keep their drawing code; every other page draws through the `Ui`
 (D73). A Ui page has a live state (window mode, the bench), scripted `UiScene`s (timed input, then a
 capture frame, with the `Repaint` it must report: `Settled` or `Moving`) and optional bench steps.
@@ -742,11 +742,11 @@ only under `target/`, except that `scripts/pixel-gate.sh` extracts its base sour
 | Gate | Proves | Compare | Exit codes |
 |---|---|---|---|
 | `scripts/pixel-gate-luneterm.sh` | M1 only: this repo's `lune-ui` drew the same pixels as Luneterm's. Phases: lock parity (every registry package in this repo's `Cargo.lock` is in Luneterm's lock at the rev; `--parity-only` stops here and still applies), run A (Luneterm's own crate), run B (the scratch clone's `lune-ui` repointed at this repo's crate), compare with Luneterm's `dump_compare`. Since M2 step 2 run B cannot build against the new API, so a full run exits 2 by design (roadmap D4) | `18 files, 18 identical, 0 differ, max delta 0` | 0 pass; 1 parity mismatch or pixel difference; 2 usage or setup error |
-| `scripts/pixel-gate.sh [--base <rev>] [--allow <id>...]` | A change since `<rev>` (default `HEAD`) leaves every scene `gallery --list` prints unchanged (431 at M11's close; the 15 legacy scenes stay on the Painter API, so the gate keeps proving the moved drawing code is untouched; scenes a later change adds are reported as new, D59). Dumps `git archive <rev>` and the working tree, compares with `dump-compare --allow-new`. `--allow <id>` names a scene whose frames may differ (reported only); an id not in `gallery --list` is an error | `15 files, 15 identical` | 0 pass; 1 delta or scene missing from the candidate; 2 usage or setup error (a base without `apps/gallery` included: nothing to compare is not a pass) |
+| `scripts/pixel-gate.sh [--base <rev>] [--allow <id>...]` | A change since `<rev>` (default `HEAD`) leaves every scene `gallery --list` prints unchanged (431 at M11's close; the 14 legacy scenes stay on the Painter API, so the gate keeps proving the moved drawing code is untouched; scenes a later change adds are reported as new, D59). Dumps `git archive <rev>` and the working tree, compares with `dump-compare --allow-new`. `--allow <id>` names a scene whose frames may differ (reported only); an id not in `gallery --list` is an error | `15 files, 15 identical` | 0 pass; 1 delta or scene missing from the candidate; 2 usage or setup error (a base without `apps/gallery` included: nothing to compare is not a pass) |
 | `scripts/check-targets.sh [--skip-linux]` | The workspace lints and builds beyond the host: Windows `clippy` (needs the `x86_64-pc-windows-msvc` target) and Linux fmt, clippy and tests in a `rust:1.92` container. Not a pixel gate; it covers the code the host `cfg` hides | `windows: passed`, `linux: passed` or `skipped (<reason>)` | 0 every half that ran passed; 1 a check failed; 2 usage |
 
 Dump file names: the gallery writes `<id>@<scale>x.png` (logical 1040x660; `gallery --list` prints
-the 15 legacy names first, then the Ui pages' scenes: 62 names after M4, 152 after M5, 231 after M6, 305 after M7, 332 after M8, 389 after M9, 413 after M10, 431 after M11); Luneterm's spike writes `NN-<name>@<scale>x.png` (18 scenes). `tools/dump-compare`
+the 14 legacy names first, then the Ui pages' scenes: 62 names after M4, 152 after M5, 231 after M6, 305 after M7, 332 after M8, 389 after M9, 413 after M10, 431 after M11); Luneterm's spike writes `NN-<name>@<scale>x.png` (18 scenes). `tools/dump-compare`
 (`cargo run -p dump-compare -- <baseline> <candidate> [--max-delta N] [--allow-new]`) compares per
 pixel, max channel delta including alpha; a file missing from the candidate, a file only in the
 candidate (unless `--allow-new`), a size or colour-type mismatch or a delta above `N` (default 0)

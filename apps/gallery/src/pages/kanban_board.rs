@@ -1,5 +1,5 @@
 //! The `kanban-board` page: a live board of three columns on a model the page changes, its error,
-//! empty and inactive states, a card being dragged and a card landing.
+//! empty state, a card being dragged and a card landing.
 
 use lune_ui::input::NamedKey;
 use lune_ui::lunegit_dark::{CARD, WINDOW};
@@ -105,17 +105,15 @@ const ERROR: BoardError<'static> = BoardError {
 struct Board {
     columns: Vec<Col>,
     error: bool,
-    active: bool,
     added: u64,
     /// Draw the board inside `with_enabled(false, ..)`.
     disabled: bool,
 }
 
-fn board(columns: Vec<Col>, error: bool, active: bool) -> Box<dyn PageState> {
+fn board(columns: Vec<Col>, error: bool) -> Box<dyn PageState> {
     Box::new(Board {
         columns,
         error,
-        active,
         added: 100,
         disabled: false,
     })
@@ -125,28 +123,23 @@ fn disabled() -> Box<dyn PageState> {
     Box::new(Board {
         columns: model(),
         error: false,
-        active: true,
         added: 100,
         disabled: true,
     })
 }
 
 fn live() -> Box<dyn PageState> {
-    board(model(), false, true)
+    board(model(), false)
 }
 
 fn errored() -> Box<dyn PageState> {
-    board(model(), true, true)
-}
-
-fn inactive() -> Box<dyn PageState> {
-    board(model(), false, false)
+    board(model(), true)
 }
 
 fn empty() -> Box<dyn PageState> {
     let mut columns = model();
     columns.iter_mut().for_each(|c| c.cards.clear());
-    board(columns, false, true)
+    board(columns, false)
 }
 
 impl Board {
@@ -201,7 +194,6 @@ impl PageState for Board {
             title: "Roadmap",
             columns: &columns,
             error: self.error.then_some(&ERROR),
-            active: self.active,
             glass: WINDOW,
             under: CARD.premultiplied(),
             name: "",
@@ -228,7 +220,6 @@ impl PageState for Board {
     }
 
     fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
-        panel.toggle(ui, "Window active", &mut self.active);
         panel.toggle(ui, "Error view", &mut self.error);
         let mut enabled = !self.disabled;
         if panel.toggle(ui, "Enabled", &mut enabled) {
@@ -333,15 +324,6 @@ const SCENES: &[UiScene] = &[
             },
         ],
         capture_ms: 900,
-        expect: Expect::Settled,
-    },
-    UiScene {
-        id: "kanban-board-inactive",
-        scale: 2.0,
-        tier: MotionTier::Full,
-        state: inactive,
-        script: &[],
-        capture_ms: 0,
         expect: Expect::Settled,
     },
     UiScene {
@@ -451,11 +433,6 @@ mod tests {
         let focused = out.focused.and_then(|f| out.tree.get(f)).expect("a focus");
         assert_eq!(focused.name, "Sketch the release notes");
 
-        let (scene, _) = run("kanban-board-inactive");
-        let shapes = scene.layers[LayerId::Base as usize].geometry.under.iter();
-        let fallback = premul(THEME.window_fallback);
-        assert_eq!(shapes.filter(|s| s.color == fallback).count(), 1);
-
         let (_, out) = run("kanban-board-empty");
         assert_eq!(items(&out), 0);
         let hints = out.tree.nodes.iter().filter(|n| n.name == "No cards yet.");
@@ -479,7 +456,6 @@ mod tests {
         let mut b = Board {
             columns: model(),
             error: false,
-            active: true,
             added: 100,
             disabled: false,
         };

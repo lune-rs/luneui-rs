@@ -38,7 +38,7 @@ Conflicts: none between sources. Wane has no side-panel entry; this repo has no 
 
 ### Anatomy
 
-- Host: acrylic card at radius 8 while the window is active [L src/Lunegit.Desktop/Views/SidePanelView.axaml:9]; solid `WindowFallbackBackground` while inactive [L src/Lunegit.Desktop/Views/SidePanelView.axaml:19].
+- Host: acrylic card at radius 8, whatever the window's state [L src/Lunegit.Desktop/Views/SidePanelView.axaml:9]; Lunegit's solid `WindowFallbackBackground` while inactive [L src/Lunegit.Desktop/Views/SidePanelView.axaml:19] is not ported (R13, D262).
 - Inner: a `glass-panel` border with padding 10 [L src/Lunegit.Desktop/Views/SidePanelView.axaml:20]; the border is 1 px `SurfaceBorder` (`border`) at radius 8 [L src/Lunegit.Desktop/App.axaml:294-298], drawn inside the host's rect, so the content starts `RING` 1 + `PAD` 10 = 11 in (C21).
 - Panels: nine views, one visible; visibility = `ActivePanelKey` equals the panel's key [L src/Lunegit.Desktop/Views/SidePanelView.axaml:22-53].
 - The column width is set by the window, not the host; it snaps [L src/Lunegit.Desktop/Themes/Animations.axaml:314-317].
@@ -48,7 +48,7 @@ Conflicts: none between sources. Wane has no side-panel entry; this repo has no 
 | state | look | cite |
 |---|---|---|
 | active window | acrylic host, radius 8 | [L src/Lunegit.Desktop/Views/SidePanelView.axaml:9] |
-| inactive window | solid fallback fill | [L src/Lunegit.Desktop/Views/SidePanelView.axaml:19] |
+| inactive window | the same glass (no `active` option) | [D262] |
 | panel shown | the keyed panel visible, with the show motion | [L src/Lunegit.Desktop/Views/SidePanelView.axaml:22-53], [L src/Lunegit.Desktop/Themes/Animations.axaml:318-335] |
 | panel hidden | not drawn | [L src/Lunegit.Desktop/Views/SidePanelView.axaml:22-53] |
 | focus-visible | the focused control in the panel | [core.focus] |
@@ -92,7 +92,6 @@ None: the host draws no text; panel titles are app text.
 ### Gallery scenes
 
 - `side-panel-shown` (new): one panel (a row list) shown, settled.
-- `side-panel-inactive` (new): the host with the window inactive, settled.
 - `side-panel-show-mid` (new): show at t = 175 ms after the first frame of the new panel (half of moderate, 350 ms) [L src/Lunegit.Desktop/App.axaml:154].
 
 ### Painter primitives
@@ -102,7 +101,7 @@ None: the host draws no text; panel titles are app text.
 
 ### Acceptance
 
-- Behaviour (scripted input, injected time): changing the active key shows exactly one panel; the hidden panels draw nothing; the inactive window draws the fallback fill.
+- Behaviour (scripted input, injected time): changing the active key shows exactly one panel; the hidden panels draw nothing.
 - Pixel probes at scale 2: host radius 16 px; ring 2 px in `border`; content 22 px in; slide 12 px at scale 2 (−6 px) at the start of the show.
 - Conformance: show reaches opacity 1 and offset 0 at 350 ms; Reduced fades opacity only; Off snaps.
 - Semantic node: `group` named by the panel title; hidden panels are not in the tree.

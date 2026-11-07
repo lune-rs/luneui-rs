@@ -1,8 +1,8 @@
 //! The side panel host (`layout.side-panel`, D149): one column on the app's glass layer that shows
 //! one of several panels by key. The panels' contents are the app's.
 //!
-//! [`Ui::side_panel`] draws the card (the layer while the window is active, the theme's
-//! `window_fallback` fill when it is not, D128: the widget names no preset), then runs `content`
+//! [`Ui::side_panel`] draws the card (the app's glass layer, whatever the window's state: R13, the
+//! widget names no preset), then runs `content`
 //! once, for the shown panel, in the rect inside the 1 px [`RING`] and the [`PAD`] of 10. The shown panel runs under
 //! [`Ui::keep_alive`]; every other key of [`SidePanelOptions::keys`] is only marked alive, so a
 //! hidden panel's scroll offset, text edits and other retained state survive however many frames
@@ -55,9 +55,7 @@ pub struct SidePanelOptions<'a> {
     pub panel: u64,
     /// Every panel's key, so the hidden ones stay alive. `panel` need not be repeated.
     pub keys: &'a [u64],
-    /// The window is active: the glass shows. Inactive, the solid fallback replaces it.
-    pub active: bool,
-    /// The glass layer drawn while active.
+    /// The glass layer the card draws.
     pub glass: GlassLayer,
     /// What the card is composed over (premultiplied); see
     /// [`ToolbarOptions::under`](super::toolbar::ToolbarOptions::under).
@@ -91,13 +89,9 @@ impl Ui<'_> {
         content: impl FnOnce(&mut Ui<'_>, Rect),
     ) {
         let id = self.id(&key);
-        let (fallback, border) = (self.theme().window_fallback, self.theme().border);
+        let border = self.theme().border;
         let p = self.painter();
-        if opts.active {
-            p.acrylic(rect, RADIUS, opts.glass.premultiplied(), opts.under, true);
-        } else {
-            p.fill(rect, RADIUS, fallback);
-        }
+        p.acrylic(rect, RADIUS, opts.glass.premultiplied(), opts.under, true);
         p.ring(rect, RADIUS, RING, border, false);
         for k in opts.keys.iter().filter(|k| **k != opts.panel) {
             self.mark_alive((&key, *k));

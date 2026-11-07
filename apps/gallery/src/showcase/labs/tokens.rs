@@ -46,7 +46,7 @@ colours! {
     caption_close_fg, fg_muted, fg_subtle, fg_bright, fg_quaternary, fg_dim, fg_faint,
     surface_overlay, surface_active, surface_separator, surface_divider, ok, warn, err,
     status_warning, status_warning_light, status_error_light, status_error,
-    status_warning_dark, data, data_hi, gold, paused, window_fallback, link, code_inline,
+    status_warning_dark, data, data_hi, gold, paused, link, code_inline,
     diff_added, diff_removed, diff_added_mark, diff_removed_mark,
 }
 
@@ -182,11 +182,11 @@ mod tests {
     }
 
     /// The list is every colour of the struct, none twice and none made up. The reader finds the
-    /// struct's 65 colours (a count that holds the instrument, not only the comparison).
+    /// struct's 64 colours (a count that holds the instrument, not only the comparison).
     #[test]
     fn every_colour_of_the_theme_is_listed() {
         let in_struct = colour_fields_of_the_struct();
-        assert_eq!(in_struct.len(), 65, "the reader of the struct");
+        assert_eq!(in_struct.len(), 64, "the reader of the struct");
         let listed: Vec<&str> = colours(&THEME).iter().map(|(n, _)| *n).collect();
         let (a, b): (BTreeSet<&str>, BTreeSet<&str>) = (
             in_struct.iter().map(String::as_str).collect(),
