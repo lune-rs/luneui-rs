@@ -416,7 +416,9 @@ fn link_regions(
         } else if r.clicked {
             act |= !raised.0;
         }
-        if !r.pressed && !r.press_started {
+        // A disabled response reports no press whatever the pointer does, so it must not end the
+        // capture: the release after it would read as a fresh click.
+        if r.enabled && !r.pressed && !r.press_started {
             raised.0 = false;
         }
         if r.enabled && act && cx.link.is_none() {
