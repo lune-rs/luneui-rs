@@ -4027,6 +4027,8 @@ mod m10 {
                     font_title: _,
                     line_title: _,
                     item_radius: _,
+                    selection_radius: _,
+                    selection_pad: _,
                     motion: _,
                 } = t;
             }

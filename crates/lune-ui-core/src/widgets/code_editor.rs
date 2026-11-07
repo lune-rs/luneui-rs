@@ -25,6 +25,7 @@ use super::field::{
 };
 use super::focus_ring::{self, RingKind};
 use super::scroll_area::{Bars, Extent, Reveal, ScrollOptions, ScrollView, reveal_offset};
+use super::selection;
 use super::text_lines::{Highlighter, PlainHighlighter, line_spec, range_boxes};
 use super::virtual_list::{Heights, RowHeights};
 use crate::access::{AccessValue, Node, Role, TextValue, Value};
@@ -699,6 +700,8 @@ fn draw_lines(
     ui.painter().push_clip(clip);
     let mut bar = None;
     let caret_line = host.doc.line_of(d.caret);
+    // The selected part of each visual row in view, top to bottom, drawn as one shape below.
+    let mut rows: Vec<Rect> = Vec::new();
     for b in &built {
         let composing = d.compose.filter(|c| c.line == b.line);
         let chars = host.doc.line(b.line).chars().count();
@@ -707,17 +710,26 @@ fn draw_lines(
         } else {
             line_selection(host.doc, b.line, chars, &d.selection)
         };
+        let at = rows.len();
+        rows.extend(
+            range_boxes(ui, &b.spec, &range)
+                .into_iter()
+                .map(|r| Rect::new(x + r.x, b.y + r.y, r.w, r.h)),
+        );
         if past_end {
+            // The line end's sliver widens the line's last row, or is a row of its own.
             let pos = caret_at(ui, &b.spec, chars);
             let sliver = Rect::new(x + pos.x, b.y + pos.y, SLIVER, pos.height);
-            ui.painter().fill(sliver, 0.0, t.text_selection);
+            match rows[at..].last_mut() {
+                Some(last) if (last.y - sliver.y).abs() <= 0.5 => {
+                    let (x0, x1) = (last.x.min(sliver.x), last.right().max(sliver.right()));
+                    *last = Rect::new(x0, last.y, x1 - x0, last.h.max(sliver.h));
+                }
+                _ => rows.push(sliver),
+            }
         }
         let own_caret = d.caret_on && d.compose.is_none() && b.line == caret_line;
         if composing.is_none() && !own_caret {
-            for r in range_boxes(ui, &b.spec, &range) {
-                let r = Rect::new(x + r.x, b.y + r.y, r.w, r.h);
-                ui.painter().fill(r, 0.0, t.text_selection);
-            }
             ui.painter().text(&b.spec, x, b.y);
             continue;
         }
@@ -731,11 +743,24 @@ fn draw_lines(
                 c.caret,
                 c.focus_at,
             ),
-            None => Shown::line(b.spec.clone(), range, None, None, Some(local), local),
+            // The selection is in `rows`, drawn with the other lines'.
+            None => Shown::line(b.spec.clone(), 0..0, None, None, Some(local), local),
         };
         let area = draw_shown_inked(ui, &shown, (x, b.y), d.caret_on, t.fg_primary);
         bar = Some(screen_area(ui, area, clip));
     }
+    // Open where the selection runs on to a line out of view (its sliver at least).
+    let sel = &d.selection;
+    let live = d.compose.is_none() && !sel.is_empty();
+    let open = (
+        live && built
+            .first()
+            .is_some_and(|b| sel.start < host.doc.line_start(b.line)),
+        live && built
+            .last()
+            .is_some_and(|b| b.line + 1 < count && sel.end > host.doc.line_start(b.line + 1)),
+    );
+    selection::paint(ui.painter(), &rows, open, t.text_selection);
     ui.painter().pop_clip();
 
     if d.opts.gutter {

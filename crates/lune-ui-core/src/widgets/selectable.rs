@@ -16,6 +16,7 @@ use std::hash::Hash;
 use std::ops::Range;
 
 use super::field::{EditConfig, NodeFacts, Shown, begin_edit, edit_node, edit_pointer, end_edit};
+use super::selection;
 use super::text_lines::range_boxes;
 use crate::access::{Action, Node, Role, State, TextValue, Value};
 use crate::input::CursorIcon;
@@ -115,8 +116,8 @@ impl Ui<'_> {
             self.persistent::<WholeSelection>(id).0 = selected;
             let shown = selected && focused;
             if shown {
-                self.painter()
-                    .fill(Rect::new(rect.x, rect.y, w, h), 0.0, ink);
+                let row = [Rect::new(rect.x, rect.y, w, h)];
+                selection::paint(self.painter(), &row, (false, false), ink);
             }
             self.painter().text(spec, rect.x, rect.y);
             let mut node = Node::new(id, Role::StaticText, name, hit);
@@ -226,10 +227,11 @@ impl Ui<'_> {
         }
         let shown = Shown::new(&cfg, &st.edit, &text, focused);
         let range = if focused { st.edit.selection() } else { 0..0 };
-        for b in range_boxes(self, &shown.spec, &range) {
-            let at = Rect::new(rect.x + b.x, rect.y + b.y, b.w, b.h);
-            self.painter().fill(at, 0.0, ink);
-        }
+        let rows: Vec<Rect> = range_boxes(self, &shown.spec, &range)
+            .iter()
+            .map(|b| Rect::new(rect.x + b.x, rect.y + b.y, b.w, b.h))
+            .collect();
+        selection::paint(self.painter(), &rows, (false, false), ink);
         self.painter().text(spec, rect.x, rect.y);
         let facts = NodeFacts {
             role: Role::StaticText,

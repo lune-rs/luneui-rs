@@ -557,6 +557,8 @@ pub(crate) struct Player {
     stage: Stage,
     /// `PageState::epoch` when `strings` was read.
     epoch: u64,
+    /// Applied to each frame's theme after the page's own (a test's distinct colours).
+    restyle: Option<fn(Theme) -> Theme>,
 }
 
 impl std::fmt::Debug for Player {
@@ -591,7 +593,15 @@ impl Player {
             shortcuts: Shortcuts::default(),
             stage: Stage::window(),
             epoch: 0,
+            restyle: None,
         }
+    }
+
+    /// This player with `restyle` applied to every frame's theme, after the page's own.
+    #[cfg(test)]
+    pub(crate) fn restyled(mut self, restyle: fn(Theme) -> Theme) -> Self {
+        self.restyle = Some(restyle);
+        self
     }
 
     #[allow(dead_code)] // the showcase shell (step 2); the tests use it now
@@ -648,9 +658,10 @@ impl Player {
             self.epoch = self.state.epoch();
             self.strings = self.state.strings();
         }
+        // Read after the events, so a cue's change shows in the frame it comes with.
+        let theme = self.state.theme().unwrap_or(THEME);
         let config = FrameConfig {
-            // Read after the events, so a cue's change shows in the frame it comes with.
-            theme: self.state.theme().unwrap_or(THEME),
+            theme: self.restyle.map_or(theme, |f| f(theme)),
             tier: self.state.tier().unwrap_or(self.tier),
             strings: &self.strings,
             arg_format: &DisplayFormat,
@@ -990,6 +1001,75 @@ mod tests {
             }
         }
         out.into_iter().collect()
+    }
+
+    /// R18: every selection goes through `widgets::selection`. Under a theme whose
+    /// `text_selection` and `accent` are found nowhere else, no scene draws a flat shape (under or
+    /// over the text, on any layer) in the selection's colour or the diff view's (the accent at
+    /// 0x33), every path fill is finite, and the scenes that hold a selection draw it as a path
+    /// fill: so the walker sees the colour where it is drawn, and its silence elsewhere counts.
+    #[test]
+    fn no_widget_fills_a_selection_itself() {
+        use lune_ui::color::{Rgba, premul};
+        const SEL: Rgba = [0x13, 0x57, 0x9B, 0x66];
+        const ACCENT: Rgba = [0x24, 0x68, 0xAC, 0xFF];
+        const DIFF: Rgba = [ACCENT[0], ACCENT[1], ACCENT[2], 0x33];
+        fn restyle(t: Theme) -> Theme {
+            Theme {
+                text_selection: SEL,
+                accent: ACCENT,
+                ..t
+            }
+        }
+        let inks = [premul(SEL), premul(DIFF)];
+        let mut bad = Vec::new();
+        let mut drawn = BTreeSet::new();
+        for page in PAGES {
+            let PageKind::Ui(ui_page) = page.kind else {
+                continue;
+            };
+            for scene in ui_page.scenes {
+                let mut player = Player::for_scene(page.id, scene).restyled(restyle);
+                player.frame(&mut FakeText, 0, &[]).expect("frame");
+                for step in scene.script {
+                    player
+                        .frame(&mut FakeText, step.at_ms, step.events)
+                        .expect("frame");
+                }
+                let (frame, _) = player
+                    .frame(&mut FakeText, scene.capture_ms, &[])
+                    .expect("frame");
+                for layer in frame.in_order() {
+                    let g = &layer.geometry;
+                    if g.under
+                        .iter()
+                        .chain(&g.over)
+                        .any(|s| inks.contains(&s.color))
+                    {
+                        bad.push(format!("{}: a flat selection fill", scene.id));
+                    }
+                    if g.fills.iter().any(|v| v.pos.iter().any(|c| !c.is_finite())) {
+                        bad.push(format!("{}: a fill not finite", scene.id));
+                    }
+                    if g.fills.iter().any(|v| inks.contains(&v.color)) {
+                        drawn.insert(scene.id);
+                    }
+                }
+            }
+        }
+        assert!(bad.is_empty(), "{}", bad.join("\n"));
+        for id in [
+            "code-editor-view-selection",
+            "code-block-selection",
+            "text-edit-selection",
+            "kv-list-selected",
+            "diff-view-selection",
+        ] {
+            assert!(
+                drawn.contains(id),
+                "{id} draws its selection as a path fill"
+            );
+        }
     }
 
     /// Every Ui page's live state and scene states draw inside a content rect: nothing they make

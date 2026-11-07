@@ -287,6 +287,13 @@ const fn at(n: usize, col: usize) -> Ev {
     )
 }
 
+/// A drag from line 2 at column 4 to line 3 at column 14.
+const DRAG: &[Step] = &[
+    key(0, &[at(1, 4), Ev::Press]),
+    key(100, &[at(2, 14)]),
+    key(200, &[Ev::Release, AWAY]),
+];
+
 const SCENES: &[UiScene] = &[
     scene("code-block-rest", rest, &[], 600, Expect::Settled),
     scene(
@@ -319,18 +326,12 @@ const SCENES: &[UiScene] = &[
         600,
         Expect::Settled,
     ),
-    // From line 2 to line 3 by a drag.
-    scene(
-        "code-block-selection",
-        rest,
-        &[
-            key(0, &[at(1, 4), Ev::Press]),
-            key(100, &[at(2, 14)]),
-            key(200, &[Ev::Release, AWAY]),
-        ],
-        700,
-        Expect::Settled,
-    ),
+    // From line 2 to line 3 by a drag, at 2x and at 1x.
+    scene("code-block-selection", rest, DRAG, 700, Expect::Settled),
+    UiScene {
+        scale: 1.0,
+        ..scene("code-block-selection", rest, DRAG, 700, Expect::Settled)
+    },
     // The check mark shows until 1,500 ms after the click: a frame is due then.
     scene(
         "code-block-copied",

@@ -70,6 +70,10 @@ Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, r
 - One text editing engine: `TextEdit` edits through `EditText` and `EditBuffer`, implemented for `str`, `String` and the line-indexed
   `CodeDoc` (D180); a new text kind implements them, it does not get a second engine. A text view draws only the lines in view and
   never shapes, hashes or clones the whole text per frame (D179, D195).
+- One selection drawing: every text selection (and the diff view's row selection, in its own colour) is drawn by
+  `widgets::selection::paint` from the selected part of each row in view, joined into one shape with rounded outer and
+  inner corners (`Painter::fill_joined`, R18, D272); no widget fills a selection itself (the gallery's
+  `no_widget_fills_a_selection_itself` walks every scene for it).
 - A wheel delta routes per axis: the topmost scroll region live on that axis takes it (D178). A composite with nothing to scroll on
   an axis disables that axis (`Bars::unless_fits`), so the delta reaches the area around it (D176).
 - An overlay that opens above an active modal is put on `LayerId::Raised` by `Ui::overlay`, once at open (D137): a widget

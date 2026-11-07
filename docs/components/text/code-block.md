@@ -104,7 +104,7 @@ Lunegit's copy button has no transition (neither tier file styles it). Never ani
 - `code-block-overflow`: one line wider than the block, pointer over, thumb visible, settled.
 - `code-block-hover-copy`: pointer over the copy button, settled.
 - `code-block-focus-copy`: keyboard focus on the copy button, settled.
-- `code-block-selection`: two lines selected, settled.
+- `code-block-selection` (at 2x and 1x): two lines selected, one joined shape (D272), settled.
 - `code-block-copied`: the check mark shown, settled.
 - `code-block-empty`: empty text, copy disabled, settled.
 - `code-block-bad-spans`: spans past the line end and an inverted span, clamped, settled.

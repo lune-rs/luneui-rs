@@ -124,6 +124,12 @@ pub struct Theme {
     pub font_title: f32,
     pub line_title: f32,
     pub item_radius: f32,
+    /// The corner radius of a text selection's joined shape, outer and inner corners alike
+    /// (`widgets::selection`, R18): 3 logical px. A toolkit value, not a file key.
+    pub selection_radius: f32,
+    /// How far a text selection reaches past each selected row's ends, left and right: 2 logical
+    /// px. A toolkit value, not a file key.
+    pub selection_pad: f32,
     /// Motion durations and the Reduced map (`docs/motion.md`).
     pub motion: MotionTokens,
 }
@@ -371,6 +377,8 @@ pub mod lunegit_dark {
         font_title: 18.0,
         line_title: 24.0,
         item_radius: 6.0,
+        selection_radius: 3.0,
+        selection_pad: 2.0,
         motion: crate::motion::MOTION,
     };
 

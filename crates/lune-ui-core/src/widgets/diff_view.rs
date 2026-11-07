@@ -34,6 +34,7 @@ use crate::theme::Theme;
 use crate::ui::{Response, Sense, Ui, WidgetId};
 
 use super::button::IconButton;
+use super::selection;
 use super::text_lines::{HighlightSpan, line_spec, range_boxes};
 use super::virtual_list::{
     Heights, ListOptions, ListResponse, ListStyle, RowCtx, RowKey, SelectionMode,
@@ -559,20 +560,43 @@ impl Ui<'_> {
             label: &label,
         };
         let widest = Flag::new(0.0f32);
+        // The selected rows in view, top to bottom, drawn as one shape after the list.
+        let mut picked: Vec<(usize, Rect)> = Vec::new();
         let resp = self.list_styled(
             side.key(),
             rect,
             &list,
             style,
             |i| RowKey(i as u64),
-            |ui, row| ui.diff_row(view, side, row, &widest, acc),
+            |ui, row| ui.diff_row(view, side, row, &widest, acc, &mut picked),
         );
+        self.diff_selection(side, rect, &picked, view.count());
         let mem = self.persistent::<PaneMem>(mem_id);
         mem.widest = mem.widest.max(widest.get());
         resp
     }
 
-    /// One row inside its slot; returns its height.
+    /// The selection of pane `side` over `rect`: the `picked` rows (index and area), joined by
+    /// the selection routine in the diff's own colour, open where a selected row out of view
+    /// continues it.
+    fn diff_selection(&mut self, side: Side, rect: Rect, picked: &[(usize, Rect)], count: usize) {
+        let (Some(&(first, _)), Some(&(last, _))) = (picked.first(), picked.last()) else {
+            return;
+        };
+        let theme = *self.theme();
+        let chosen = &self.list_state(side.key()).selection;
+        let open = (
+            first > 0 && chosen.contains(&RowKey(first as u64 - 1)),
+            last + 1 < count && chosen.contains(&RowKey(last as u64 + 1)),
+        );
+        let rows: Vec<Rect> = picked.iter().map(|&(_, r)| r).collect();
+        let p = self.painter();
+        p.push_clip(rect);
+        selection::paint(p, &rows, open, selection_fill(&theme));
+        p.pop_clip();
+    }
+
+    /// One row inside its slot; returns its height. A selected row's area goes to `picked`.
     fn diff_row(
         &mut self,
         v: &View<'_>,
@@ -580,6 +604,7 @@ impl Ui<'_> {
         row: &RowCtx,
         widest: &Flag<f32>,
         acc: &mut Acc,
+        picked: &mut Vec<(usize, Rect)>,
     ) -> f32 {
         let theme = v.theme;
         let slot = row.rect;
@@ -604,19 +629,19 @@ impl Ui<'_> {
             }
         }
         let area = Rect::new(slot.x, slot.y, slot.w, height);
+        if row.selected {
+            picked.push((row.index, area));
+        }
 
+        // An empty half: no text, but the row can still be selected.
         let Some(line) = line else {
-            // An empty half: no text, but the row can still be selected.
-            if row.selected {
-                self.painter().fill(area, 0.0, selection_fill(&theme));
-            }
             return height;
         };
         if let Some(fill) = kind_fill(&theme, line.kind) {
             self.painter().fill(area, 0.0, fill);
         }
         if line.kind == LineKind::Hunk {
-            self.hunk_row(v, line, row, area, acc);
+            self.hunk_row(v, line, area, acc);
         } else {
             self.code_row(v, side, line, row, area, wrap, widest);
         }
@@ -670,9 +695,6 @@ impl Ui<'_> {
             }
             p.pop_clip();
         }
-        if row.selected {
-            self.painter().fill(area, 0.0, selection_fill(&theme));
-        }
 
         // The numbers and the prefix stay put; the text scrolls under its column's clip.
         let mut nodes = Vec::new();
@@ -715,14 +737,7 @@ impl Ui<'_> {
     }
 
     /// A hunk row: a rule, the pill with the hunk's text, the actions, a rule.
-    fn hunk_row(
-        &mut self,
-        v: &View<'_>,
-        line: &DiffLine<'_>,
-        row: &RowCtx,
-        area: Rect,
-        acc: &mut Acc,
-    ) {
+    fn hunk_row(&mut self, v: &View<'_>, line: &DiffLine<'_>, area: Rect, acc: &mut Acc) {
         let theme = v.theme;
         let actions = if line.hunk.is_some() {
             v.opts.actions
@@ -764,9 +779,6 @@ impl Ui<'_> {
         let pill_rect = Rect::new(gx, area.y + (area.h - pill.1) / 2.0, pill.0, pill.1);
         p.fill(pill_rect, PILL_RADIUS, theme.surface_selected);
         p.text(&spec, pill_rect.x + PILL_PAD.0, pill_rect.y + PILL_PAD.1);
-        if row.selected {
-            p.fill(area, 0.0, selection_fill(&theme));
-        }
 
         let name = line.text;
         let id = self.id("text");

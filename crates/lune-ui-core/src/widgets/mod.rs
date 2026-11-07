@@ -40,6 +40,7 @@ pub mod scroll_area;
 pub mod scrollbar;
 pub mod search_picker;
 pub mod selectable;
+pub mod selection;
 pub mod settings_page;
 pub mod shine;
 pub mod side_panel;

@@ -33,7 +33,7 @@ Conflicts: the repo menu padding (6) and Lunegit's (MenuItem 10,6) differ; overl
 
 ### Anatomy
 
-- `Theme` struct: colours (`fg_*`, `surface_*`, `border`, `tree_guide` (the tree view's guides, #FFFFFF14, a toolkit value with no file key, D271), `accent`, dialog and menu tokens) and font sizes (`font_s` 11, `font_base` 13, `font_m` 14) [R crates/lune-ui-core/src/theme.rs:11-41].
+- `Theme` struct: colours (`fg_*`, `surface_*`, `border`, `tree_guide` (the tree view's guides, #FFFFFF14, a toolkit value with no file key, D271), `accent`, dialog and menu tokens) the font sizes (`font_s` 11, `font_base` 13, `font_m` 14) and the selection shape's `selection_radius` 3 and `selection_pad` 2 (toolkit values with no file key, D272) [R crates/lune-ui-core/src/theme.rs:11-41].
 - `DARK` = `lunegit_dark::THEME` [R crates/lune-ui-core/src/theme.rs:47].
 - Glass layers `WINDOW`, `PANEL`, `CARD` [R crates/lune-ui-core/src/theme.rs:91-109]; `CARD_CORNER_RADIUS` 8 [R crates/lune-ui-core/src/theme.rs:115]; `TAB_HEADER_HEIGHT` 32 [R crates/lune-ui-core/src/theme.rs:116]; `BODY_PADDING` 10 [R crates/lune-ui-core/src/theme.rs:117].
 - Motion tokens to add in M4 (SF5 names): durations `instant` 120, `fast` 180, `base` 250, `moderate` 350, `slow` 500 [L src/Lunegit.Desktop/App.axaml:151-155]; easings `linear`, `quad-out`, `quad-in`, `sine-in-out`, `back-out`, `cubic-out` (0.215, 0.61, 0.355, 1), `ease-in` (0.42, 0, 1, 1) [R crates/lune-ui-core/src/widgets/menu.rs:46-58]. Kinds are not theme values.

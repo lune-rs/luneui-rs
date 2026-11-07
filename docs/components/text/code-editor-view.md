@@ -113,7 +113,7 @@ n/a — typing, caret movement, selection, scrolling and line bands are high-fre
 - `code-editor-view-highlighted`: the same with keyword, string and comment spans, settled.
 - `code-editor-view-editable`: caret on line 3, settled.
 - `code-editor-view-disabled`: the editable view in a disabled scope (0.4 opacity), a click on line 3 and a typed letter: no caret, the text unchanged, settled.
-- `code-editor-view-selection`: a selection across lines 3 to 5, settled.
+- `code-editor-view-selection` (at 2x, 1x and 1.5x): a selection across lines 3 to 5 as one joined shape (D272), settled.
 - `code-editor-view-wrapped`: a long line wrapped, no gutter (the note editor), settled.
 - `code-editor-view-bands`: lines 4 to 6 added, 9 modified, 12 conflicted, settled.
 - `code-editor-view-bands-clamped`: band sets with lines 0 and 9999, clamped, settled.

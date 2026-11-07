@@ -496,6 +496,26 @@ const fn key(at_ms: u32, events: &'static [Ev]) -> Step {
     Step { at_ms, events }
 }
 
+/// `scene` at `scale`.
+const fn scaled(scene: UiScene, scale: f32) -> UiScene {
+    UiScene { scale, ..scene }
+}
+
+/// A press on line 3 at column 4, a Shift-press on line 5 at column 12: a ragged three-row
+/// selection with a step on each side.
+const SELECTION: &[Step] = &[
+    key(0, &[Ev::PointerAt(line(3, 4).0, line(3, 4).1), Ev::Click]),
+    key(
+        100,
+        &[
+            Ev::Mods(SHIFT),
+            Ev::PointerAt(line(5, 12).0, line(5, 12).1),
+            Ev::Click,
+        ],
+    ),
+    key(200, &[Ev::Mods(NO_MODS), AWAY]),
+];
+
 const SCENES: &[UiScene] = &[
     scene("code-editor-view-readonly", readonly, &[], 600),
     scene("code-editor-view-highlighted", highlighted, &[], 600),
@@ -519,23 +539,15 @@ const SCENES: &[UiScene] = &[
         ],
         600,
     ),
-    // From line 3 to line 5.
-    scene(
-        "code-editor-view-selection",
-        editable,
-        &[
-            key(0, &[Ev::PointerAt(line(3, 4).0, line(3, 4).1), Ev::Click]),
-            key(
-                100,
-                &[
-                    Ev::Mods(SHIFT),
-                    Ev::PointerAt(line(5, 12).0, line(5, 12).1),
-                    Ev::Click,
-                ],
-            ),
-            key(200, &[Ev::Mods(NO_MODS), AWAY]),
-        ],
-        800,
+    // From line 3 to line 5, and the same at 1x and 1.5x: the joined shape at each scale (R18).
+    scene("code-editor-view-selection", editable, SELECTION, 800),
+    scaled(
+        scene("code-editor-view-selection", editable, SELECTION, 800),
+        1.0,
+    ),
+    scaled(
+        scene("code-editor-view-selection", editable, SELECTION, 800),
+        1.5,
     ),
     scene(
         "code-editor-view-wrapped",

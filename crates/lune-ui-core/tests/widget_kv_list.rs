@@ -7,8 +7,8 @@ use lune_ui_core::access::{Role, State, Value};
 use lune_ui_core::color::premul;
 use lune_ui_core::input::{ClipboardRequest, FrameOutput, Key, Modifiers, NamedKey, PointerButton};
 use lune_ui_core::paint::Rect;
-use lune_ui_core::scene::{Scene, Shape, TextItem};
-use lune_ui_core::testing::{FakeText, ScriptedInput, UiHarness};
+use lune_ui_core::scene::{Scene, TextItem};
+use lune_ui_core::testing::{FakeText, ScriptedInput, UiHarness, fill_shapes};
 use lune_ui_core::text::{Spec, Style, elide};
 use lune_ui_core::theme::DARK;
 use lune_ui_core::ui::{Ui, WidgetId};
@@ -35,16 +35,20 @@ fn texts(scene: &Scene) -> Vec<TextItem> {
         .collect()
 }
 
-fn fills(scene: &Scene) -> Vec<Shape> {
+/// The selection shapes as `[x, y, w, h]` (scale 1), padding included; no flat fill has the
+/// selection's colour.
+fn fills(scene: &Scene) -> Vec<[f32; 4]> {
     let c = premul(DARK.text_selection);
-    scene.layers[0]
-        .geometry
-        .under
+    let g = &scene.layers[0].geometry;
+    assert!(!g.under.iter().chain(&g.over).any(|s| s.color == c));
+    fill_shapes(g, DARK.text_selection)
         .iter()
-        .filter(|s| s.color == c)
-        .copied()
+        .map(|r| [r.x, r.y, r.w, r.h])
         .collect()
 }
+
+/// The selection's padding past each end of a row.
+const PAD: f32 = DARK.selection_pad;
 
 fn kv(
     h: &mut UiHarness,
@@ -305,7 +309,7 @@ fn a_drag_across_a_value_then_copy_writes_the_substring() {
     assert_eq!(selection_of(&out, 0), (0, 5));
     let f = fills(&scene);
     assert_eq!(f.len(), 1, "one selection box");
-    assert_eq!(f[0].rect, [x, RECT.y + 2.0, 5.0 * GLYPH, 20.0]);
+    assert_eq!(f[0], [x - PAD, RECT.y + 2.0, 5.0 * GLYPH + 2.0 * PAD, 20.0]);
     h.input.release(PointerButton::Primary);
     plain(&mut h);
     chord(&mut h, "c");
@@ -433,8 +437,8 @@ fn a_press_on_an_elided_value_selects_it_whole_and_copy_writes_all_of_it() {
     let (scene, out, _) = kv(&mut h, rect, &pairs, &opts);
     let f = fills(&scene);
     assert_eq!(f.len(), 1);
-    let w = f[0].rect[2];
-    assert_eq!((f[0].rect[0], f[0].rect[1], f[0].rect[3]), (vx, 32.0, 20.0));
+    let w = f[0][2] - 2.0 * PAD;
+    assert_eq!((f[0][0], f[0][1], f[0][3]), (vx - PAD, 32.0, 20.0));
     assert!(
         w < 200.0 - text_w("Key") - 16.0 + 0.01,
         "the fill covers what is drawn, not the full text"
@@ -795,8 +799,8 @@ fn a_two_run_spec_equal_to_full_selects_part_of_it_and_copies_that_part() {
     assert_eq!(node.text.as_ref().expect("text").selection, (2, 5));
     let f = fills(&scene);
     assert_eq!(f.len(), 1, "one fill: {f:?}");
-    assert!((f[0].rect[0] - (20.0 + 2.0 * GLYPH)).abs() < 0.01, "{f:?}");
-    assert!((f[0].rect[2] - 3.0 * GLYPH).abs() < 0.01, "{f:?}");
+    assert!((f[0][0] - (20.0 + 2.0 * GLYPH - PAD)).abs() < 0.01, "{f:?}");
+    assert!((f[0][2] - (3.0 * GLYPH + 2.0 * PAD)).abs() < 0.01, "{f:?}");
     h.input.release(PointerButton::Primary);
     run(&mut h);
     chord(&mut h, "c");

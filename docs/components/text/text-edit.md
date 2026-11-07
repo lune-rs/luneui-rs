@@ -46,7 +46,7 @@ The moved code wins (pixel-gated). (2) corner radius: Lunegit's filter 4 [L src/
 - Caret: a 1.5 px wide rect, as tall as the text line (16 px when the field is empty), `fg_primary`, drawn 1 px after the text end; vertically centred in a single-line field [R crates/lune-ui-core/src/widgets/mod.rs:137-141].
 - Single line: text clipped to the box inset 6 px, drawn 10 px from the left edge [R crates/lune-ui-core/src/widgets/mod.rs:130-135]; it scrolls horizontally to keep the caret in view [derived: a clipped line must follow the caret; no source states the margin].
 - Multi-line: Lunegit's read-only multi-line text uses no wrap and accepts Return [L src/Lunegit.Desktop/Views/CrashReportWindow.axaml:73-76]; wrapping and the vertical scroll are `layout.scroll-area`.
-- Selection: a range between anchor and head; its fill is a `Theme` value that does not exist yet (Open questions).
+- Selection: a range between anchor and head. Its fill is `Theme::text_selection`, drawn by the one selection routine, `widgets::selection::paint` (R18, D272): the selected part of each visual row in view, `selection_pad` (2) past each end, rows that touch joined into one shape with rounded outer and inner corners of `selection_radius` (3), square where the selection runs on out of view; the text draws over it in its own colour. Every text view uses it: the field and text area (the selection and the composition's clause), the code editor (a row includes its line end's sliver), selectable text (markdown, key-value values) and the diff view (rows, in the accent at 0x33).
 - Placeholder: `fg_tertiary`, shown only while the text is empty [R crates/lune-ui-core/src/widgets/mod.rs:131-133].
 - Password: a fixed mask of 16 dots whatever the length, so it does not leak the key length, and the value cannot be copied [W docs/ui/components.md:350,353].
 - Read-only: the caret and selection work, edits do not; select and copy only [W docs/ui/components.md:661], [L src/Lunegit.Desktop/Views/CrashReportWindow.axaml:74].
@@ -62,7 +62,7 @@ The moved code wins (pixel-gated). (2) corner radius: Lunegit's filter 4 [L src/
 | unfocused, empty | placeholder in `fg_tertiary`, no caret | [R crates/lune-ui-core/src/widgets/mod.rs:131-133] |
 | unfocused, text | text in `fg_primary`, no caret | [R crates/lune-ui-core/src/widgets/mod.rs:134-136] |
 | focused | caret after the text; the box ring turns `accent` | [R crates/lune-ui-core/src/widgets/mod.rs:137-141,50-69] |
-| selecting | selection fill over the range; the caret at the head | [derived: the platform convention; fill value open] |
+| selecting | the joined selection shape under the range (`widgets::selection`, D272); the caret at the head | [derived: the platform convention], [D272] |
 | composing | preedit text with an underline at the caret (see `text.ime`) | [text.ime] |
 | read-only | as focused, edits ignored | [W docs/ui/components.md:661] |
 | password | fixed 16 dots | [W docs/ui/components.md:350,353] |

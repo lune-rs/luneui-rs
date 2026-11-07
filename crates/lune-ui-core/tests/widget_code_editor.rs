@@ -17,7 +17,9 @@ use lune_ui_core::paint::Rect;
 use lune_ui_core::scene::{Scene, Shape};
 use lune_ui_core::shortcuts::{Binding, Chord, Scope, Shortcuts};
 use lune_ui_core::strings::{DisplayFormat, StringTable};
-use lune_ui_core::testing::{FakeText, ScriptedInput, UiHarness, disabled_violations};
+use lune_ui_core::testing::{
+    FakeText, ScriptedInput, UiHarness, disabled_violations, fill_covers, fill_shapes,
+};
 use lune_ui_core::text::{CaretPos, LineSpan, Spec, Style, TextKey, TextSystem, Unit};
 use lune_ui_core::theme::DARK;
 use lune_ui_core::ui::{FrameConfig, Ui, UiStore, WidgetId};
@@ -143,6 +145,7 @@ fn underlines(scene: &Scene, height: f32) -> Vec<Shape> {
 }
 
 /// The fills of `color`.
+/// The flat fills of `color` on the base layer: a band.
 fn fills(scene: &Scene, color: Rgba) -> Vec<[f32; 4]> {
     let want = premul(color);
     let under = &scene.layers[0].geometry.under;
@@ -151,6 +154,23 @@ fn fills(scene: &Scene, color: Rgba) -> Vec<[f32; 4]> {
         .filter(|s| s.color == want)
         .map(|s| s.rect)
         .collect()
+}
+
+/// The bounds of each joined selection shape of `color` on the base layer (scale 1), and no flat
+/// fill of it anywhere.
+fn selected(scene: &Scene, color: Rgba) -> Vec<[f32; 4]> {
+    let g = &scene.layers[0].geometry;
+    let want = premul(color);
+    assert!(!g.under.iter().chain(&g.over).any(|s| s.color == want));
+    fill_shapes(g, color)
+        .iter()
+        .map(|r| [r.x, r.y, r.w, r.h])
+        .collect()
+}
+
+/// Whether the selection of `color` covers `(x, y)` (scale 1).
+fn covers(scene: &Scene, color: Rgba, x: f32, y: f32) -> bool {
+    fill_covers(&scene.layers[0].geometry, color, [x, y])
 }
 
 fn base() -> Style {
@@ -534,16 +554,23 @@ fn a_selection_across_lines_fills_each_with_a_sliver_at_the_ends_it_runs_past() 
     }
     with_mods(&mut h, SHIFT, Key::Named(NamedKey::ArrowRight));
     let r = run(&mut h, &mut doc, &plain());
-    let f = fills(&r.scene, DARK.text_selection);
-    // Line 0: text and sliver. Line 1: only the sliver. Line 2: one char, no sliver.
-    assert_eq!(f.len(), 4, "{f:?}");
-    let rows: Vec<f32> = f.iter().map(|b| b[1]).collect();
-    assert!(rows.contains(&RECT.y) && rows.contains(&(RECT.y + LINE)));
-    assert!(rows.contains(&(RECT.y + 2.0 * LINE)));
-    assert!(
-        f.iter()
-            .any(|b| b[0] == TX && b[1] == RECT.y + LINE && b[2] == 4.0)
+    let f = selected(&r.scene, DARK.text_selection);
+    // One joined shape: line 0's text and sliver, line 1's sliver alone, line 2's one char.
+    let pad = DARK.selection_pad;
+    assert_eq!(f.len(), 1, "{f:?}");
+    assert_eq!(
+        f[0],
+        [TX - pad, RECT.y, 3.0 * GLYPH + 4.0 + 2.0 * pad, 3.0 * LINE]
     );
+    let sel = DARK.text_selection;
+    let mid = |line: f32| RECT.y + (line + 0.5) * LINE;
+    // Line 0 reaches past its text by the sliver; line 1 is the sliver and its padding only.
+    assert!(covers(&r.scene, sel, TX + 3.0 * GLYPH + 3.0, mid(0.0)));
+    assert!(covers(&r.scene, sel, TX + 3.0, mid(1.0)));
+    assert!(!covers(&r.scene, sel, TX + 4.0 + pad + 1.0, mid(1.0)));
+    // Line 2: one char, no sliver.
+    assert!(covers(&r.scene, sel, TX + GLYPH - 0.5, mid(2.0)));
+    assert!(!covers(&r.scene, sel, TX + GLYPH + pad + 1.0, mid(2.0)));
 }
 
 #[test]
@@ -627,7 +654,7 @@ fn a_selection_on_one_line_is_replaced_in_the_drawing_and_comes_back_on_cancel()
     preedit(&mut h, "か", Some((3, 3)));
     let r = run(&mut h, &mut doc, &plain());
     assert_eq!(shown_at(&r.scene, "lかe"), Some(RECT.y));
-    assert!(fills(&r.scene, DARK.text_selection).is_empty());
+    assert!(selected(&r.scene, DARK.text_selection).is_empty());
     h.input.ime(ImeEvent::Disabled);
     let r = run(&mut h, &mut doc, &plain());
     assert_eq!(doc.text(), "lune");
@@ -1801,7 +1828,7 @@ fn a_new_identity_drops_the_selection_and_the_undo() {
     doc.set_text("other\ndocument");
     let r = run(&mut h, &mut doc, &other(2));
     assert_eq!(node_text(&r.out).1, (0, 0));
-    assert!(fills(&r.scene, DARK.text_selection).is_empty());
+    assert!(selected(&r.scene, DARK.text_selection).is_empty());
     chord(&mut h, "z");
     run(&mut h, &mut doc, &other(2));
     assert_eq!(
@@ -2046,8 +2073,10 @@ fn a_selection_ending_on_a_line_end_draws_no_sliver_there() {
     let mut h = focused(&mut doc, &plain());
     with_mods(&mut h, SHIFT, Key::Named(NamedKey::End));
     let r = run(&mut h, &mut doc, &plain());
-    let f = fills(&r.scene, DARK.text_selection);
-    assert_eq!(f.len(), 1, "the text and nothing past it: {f:?}");
+    let f = selected(&r.scene, DARK.text_selection);
+    // The text and nothing past it but the padding.
+    let pad = DARK.selection_pad;
+    assert_eq!(f, [[TX - pad, RECT.y, 3.0 * GLYPH + 2.0 * pad, LINE]]);
 }
 
 // A new identity and the link: the group holds nothing of the last document.

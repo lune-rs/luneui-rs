@@ -169,6 +169,7 @@ enum Op {
     Dash(Vec<[f32; 2]>, bool, f32, f32, f32, Rgba),
     Arc([f32; 2], f32, f32, f32, StrokeStyle),
     FillPath(Vec<[f32; 2]>, Rgba),
+    FillJoined(Vec<Vec<[f32; 2]>>, Vec<[f32; 2]>, Rgba),
     Sector([f32; 2], f32, f32, f32, Rgba),
     Image(Rect, ImageId, Fit, ImageAlign, f32, f32),
     TextRotated(Spec, (f32, f32), f32),
@@ -384,6 +385,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
                     self.arc(*center, *radius, *start, *sweep, *st);
                 }
                 Op::FillPath(pts, c) => self.fill_path(pts, *c),
+                Op::FillJoined(parts, outline, c) => self.fill_joined(parts, outline, *c),
                 Op::Sector(center, radius, start, sweep, c) => {
                     self.sector(*center, *radius, *start, *sweep, *c);
                 }
@@ -548,6 +550,11 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         if radius > 0.0 {
             self.round = Some((rect, radius));
         }
+    }
+
+    /// The current rect clip, in the space draws are made in now; `None` when no rect clips.
+    pub fn clip_rect(&self) -> Option<Rect> {
+        self.clip
     }
 
     fn push_frame(&mut self) {
@@ -1285,6 +1292,47 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         let tris = path::ear_clip(&poly);
         let boundary: Vec<usize> = (0..poly.len()).collect();
         self.emit_fill(&poly, &tris, &boundary, color);
+    }
+
+    /// Fills one shape cut into `parts` (logical px) with `color`, below this layer's text: each
+    /// part is a simple polygon, triangulated alone, so the cost stays linear in the parts however
+    /// many there are; `outline` is the shape's one outer loop and alone gets the one-pixel
+    /// antialiasing fringe, so no seam shows where two parts meet. The parts must tile the
+    /// region `outline` bounds (a part outside it draws unfringed). A part the clipper cannot
+    /// finish draws the triangles found, never panics; a part of over 4096 points draws nothing.
+    /// Points that are not finite, in any part or the outline, draw nothing.
+    pub fn fill_joined(&mut self, parts: &[Vec<[f32; 2]>], outline: &[[f32; 2]], color: Rgba) {
+        self.rec(|| Op::FillJoined(parts.to_vec(), outline.to_vec(), color));
+        let finite = |pts: &[[f32; 2]]| pts.iter().flatten().all(|v| v.is_finite());
+        if !finite(outline) || !parts.iter().all(|p| finite(p)) {
+            return;
+        }
+        let mut verts: Vec<[f32; 2]> = Vec::new();
+        let mut tris: Vec<[usize; 3]> = Vec::new();
+        for part in parts {
+            let mut poly = path::dedup_loop(&self.device_points(part));
+            if poly.len() < 3 {
+                continue;
+            }
+            if path::signed_area2(&poly) < 0.0 {
+                poly.reverse();
+            }
+            let at = verts.len();
+            tris.extend(
+                path::ear_clip(&poly)
+                    .into_iter()
+                    .map(|t| [t[0] + at, t[1] + at, t[2] + at]),
+            );
+            verts.extend(poly);
+        }
+        let ring = path::dedup_loop(&self.device_points(outline));
+        if tris.is_empty() || ring.len() < 3 {
+            return;
+        }
+        let at = verts.len();
+        let boundary: Vec<usize> = (at..at + ring.len()).collect();
+        verts.extend(ring);
+        self.emit_fill(&verts, &tris, &boundary, color);
     }
 
     /// Fills the circular sector of `radius` about `center` (logical px) from angle `start` over
