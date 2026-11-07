@@ -89,7 +89,6 @@ impl PageState for Sections {
             let opts = KvOptions {
                 mono: self.mono,
                 mode: MODES[self.mode.min(MODES.len() - 1)].1,
-                ..KvOptions::default()
             };
             ui.kv_list("sample", Rect::new(x, y, 560.0, 0.0), &SHORT, &opts);
         }
