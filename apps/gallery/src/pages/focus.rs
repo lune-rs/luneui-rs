@@ -21,6 +21,7 @@ use super::controls_ui::{Controls, glass};
 use super::{caption, card, heading};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "focus",
@@ -65,6 +66,14 @@ impl PageState for Focus {
                 cancel: Cancel::Default,
             };
             ui.dialog("dialog", &d, &glass(), |_, _, _, _| {});
+        }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        // A dialog is modal: it is closed in the dialog, not here.
+        let mut open = self.open_at.is_some();
+        if panel.toggle(ui, "Dialog over the controls", &mut open) {
+            self.open_at = open.then_some(Duration::ZERO);
         }
     }
 }

@@ -487,6 +487,13 @@ mod tests {
         ("split-panes", Press(Role::Radio, "Second")),
         ("tree-view", Press(Role::Switch, "Indent guides")),
         ("settings-page", Press(Role::Switch, "Restart notice")),
+        // Foundation.
+        ("ui", Press(Role::Radio, "Menu")),
+        ("focus", Press(Role::Switch, "Dialog over the controls")),
+        ("image", Press(Role::Radio, "alpha 0.5")),
+        ("primitives", Press(Role::Radio, "dash")),
+        ("theme", Press(Role::Radio, "Blue")),
+        ("motion", Press(Role::Switch, "Flip the swatches")),
     ];
 
     #[test]

@@ -14,6 +14,7 @@ use super::controls_ui::{Controls, glass};
 use super::{card, card_shift};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "ui",
@@ -108,6 +109,27 @@ impl PageState for Demo {
                 let (dx, dy) = card_shift(area);
                 ui.menu("menu", &rows, (MENU_AT.0 + dx, MENU_AT.1 + dy));
             }
+        }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let mut at = match self.over {
+            Over::Nothing => 0,
+            Over::Menu => 1,
+            Over::Dialog { .. } => 2,
+        };
+        // A dialog is modal: it is closed in the dialog, not here.
+        if panel.choice(
+            ui,
+            "Over the controls",
+            &["Nothing", "Menu", "Dialog"],
+            &mut at,
+        ) {
+            self.over = match at {
+                1 => Over::Menu,
+                2 => Over::Dialog { stop_at: None },
+                _ => Over::Nothing,
+            };
         }
     }
 }

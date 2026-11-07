@@ -18,6 +18,7 @@ use super::controls_ui::Controls;
 use super::{caption, card, heading};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "theme",
@@ -84,6 +85,8 @@ struct Themed {
     level: AcrylicLevel,
     /// The window's pickers; the scenes draw without them.
     pickers: bool,
+    /// The file the theme came from (an index into [`FILES`]).
+    file: usize,
 }
 
 impl Themed {
@@ -95,10 +98,17 @@ impl Themed {
             theme: file.theme,
             level: AcrylicLevel::Default,
             pickers,
+            file: FILES
+                .iter()
+                .position(|(_, b)| b.as_ptr() == bytes.as_ptr())
+                .unwrap_or(0),
         }
     }
 
     fn swap_to(&mut self, bytes: &[u8]) {
+        if let Some(at) = FILES.iter().position(|(_, b)| b.as_ptr() == bytes.as_ptr()) {
+            self.file = at;
+        }
         let file = load(bytes);
         self.info = describe(&file);
         self.theme = file.theme;
@@ -154,6 +164,22 @@ impl PageState for Themed {
             "swap" => self.swap_to(BLUE),
             "swap-back" => self.swap_to(DARK_MODERN),
             _ => {}
+        }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let names: Vec<&str> = FILES.iter().map(|(n, _)| *n).collect();
+        let mut at = self.file;
+        if panel.choice(ui, "Theme file", &names, &mut at) {
+            self.swap_to(FILES[at].1);
+        }
+        let names: Vec<&str> = LEVELS.iter().map(|(n, _)| *n).collect();
+        let mut at = LEVELS
+            .iter()
+            .position(|(_, l)| *l == self.level)
+            .unwrap_or(0);
+        if panel.choice(ui, "Acrylic level", &names, &mut at) {
+            self.level = LEVELS[at].1;
         }
     }
 }

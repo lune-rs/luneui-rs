@@ -17,6 +17,7 @@ use lune_ui::ui::{Ui, WidgetId};
 use super::{caption, card, heading};
 use crate::page::Stage;
 use crate::page::{Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "motion",
@@ -778,6 +779,14 @@ impl PageState for Live {
             false,
         );
         self.0.keep_alive(ui);
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        // On: every swatch flips every 1.2 s; off: every change has already happened.
+        let mut animate = self.0.drive == Drive::Loop;
+        if panel.toggle(ui, "Flip the swatches", &mut animate) {
+            self.0.drive = if animate { Drive::Loop } else { Drive::Settled };
+        }
     }
 }
 

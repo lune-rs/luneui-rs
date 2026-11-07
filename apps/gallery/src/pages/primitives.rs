@@ -13,6 +13,7 @@ use lune_ui::ui::Ui;
 use super::{caption, card, heading};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "primitives",
@@ -130,12 +131,20 @@ fn content(ui: &mut Ui<'_>, stage: &Stage) -> Rect {
     Rect::new(x, y + 24.0, card.w - 48.0, card.h - 48.0 - 24.0)
 }
 
-/// Every primitive in a grid of three columns.
-struct Sheet;
+/// Every primitive in a grid of three columns, or the one the knob picks, filling the area.
+#[derive(Default)]
+struct Sheet {
+    /// 0 shows every primitive; n shows `SHAPES[n - 1]`.
+    pick: usize,
+}
 
 impl PageState for Sheet {
     fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
         let area = content(ui, stage);
+        if let Some(which) = self.pick.checked_sub(1).and_then(|i| SHAPES.get(i)) {
+            shape(ui, *which, area);
+            return;
+        }
         for (i, which) in SHAPES.iter().enumerate() {
             let cell = Rect::new(
                 area.x + (i % 3) as f32 * 300.0,
@@ -145,6 +154,12 @@ impl PageState for Sheet {
             );
             shape(ui, *which, cell);
         }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let mut names = vec!["All"];
+        names.extend(SHAPES.iter().map(|s| name(*s)));
+        panel.choice(ui, "Show", &names, &mut self.pick);
     }
 }
 
@@ -159,7 +174,7 @@ impl PageState for Show {
 }
 
 fn sheet() -> Box<dyn PageState> {
-    Box::new(Sheet)
+    Box::new(Sheet::default())
 }
 
 fn arc() -> Box<dyn PageState> {
