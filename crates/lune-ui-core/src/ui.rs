@@ -958,6 +958,16 @@ impl<'a> Ui<'a> {
                 focus.scope_path = path.to_vec();
             }
         }
+        let r = self.read_response(id, rect);
+        if r.focused || r.scroll_into_view {
+            self.watch.push((id, content_rect));
+        }
+        r
+    }
+
+    /// The frame's reading of `id` for an enabled region at `rect`: the pointer, key focus and
+    /// accessibility state [`Self::interact`] reports, without registering anything.
+    fn read_response(&self, id: WidgetId, rect: Rect) -> Response {
         let p = &self.pointer;
         let mut r = Response::inert(id, rect, true);
         r.hovered = p.hovered == Some(id);
@@ -981,10 +991,20 @@ impl<'a> Ui<'a> {
         r.focus_visible = r.focused && self.store.focus.visible && self.input.focused;
         r.set_value = self.set_values.get(&id).cloned();
         r.scroll_into_view = self.scroll_into_view.contains(&id);
-        if r.focused || r.scroll_into_view {
-            self.watch.push((id, content_rect));
-        }
         r
+    }
+
+    /// What [`Self::interact`] would report for `id` over `rect` (given in the current drawing
+    /// space), read before the region is registered: for a widget that has to know its state
+    /// before it draws what it must register after (a split's strip sits above its panes, and the
+    /// panes draw the size the strip's input asks for). Registers nothing, and leaves the focus
+    /// path and the watch list alone; the later `interact` finds the same reading.
+    pub(crate) fn peek_response(&self, id: WidgetId, rect: Rect) -> Response {
+        let rect = self.painter.hit_rect(rect);
+        if !self.enabled {
+            return Response::inert(id, rect, false);
+        }
+        self.read_response(id, rect)
     }
 
     /// Runs `f`; with `off` true the regions it registers are no Tab stops: what a virtualized host

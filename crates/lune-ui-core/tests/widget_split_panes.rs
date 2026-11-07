@@ -455,7 +455,7 @@ fn a_drag_of_n_changes_the_size_by_n_on_both_axes_and_sides() {
         let out = clock.drag(&mut h, &c, from, moved(&c, from, travel));
         near(out.size(), want);
         assert_eq!(out.stored, Some(Some(want)));
-        // The panes show it on the catch-up frame.
+        // The panes show it in the frame the drag lands in.
         let g = geometry(c.rect, c.axis, c.sized, want);
         assert_eq!(out.pane(Pane::First), g.first);
         assert_eq!(out.pane(Pane::Second), g.second);
@@ -865,10 +865,10 @@ fn the_arrows_on_a_row_split_with_the_first_pane_sized_follow_the_strip() {
     near(clock.key(&mut h, &c, NamedKey::ArrowUp).size(), 84.0);
 }
 
-// ---- the panes catch up ----
+// ---- the panes draw the size the frame ends with ----
 
 #[test]
-fn a_move_below_the_drag_threshold_asks_for_the_frame_that_shows_it_in_the_panes() {
+fn a_drag_step_below_the_threshold_shows_in_the_panes_in_that_frame() {
     let (mut h, mut clock) = start();
     let c = cfg();
     clock.settle(&mut h, &c);
@@ -879,10 +879,62 @@ fn a_move_below_the_drag_threshold_asks_for_the_frame_that_shows_it_in_the_panes
     h.input.pointer_to(from.0 + 1.0, from.1);
     let moved = clock.frame(&mut h, &c);
     near(moved.size(), 201.0);
-    near(moved.pane(Pane::First).w, 200.0);
-    assert_eq!(moved.out.repaint, Repaint::Now);
-    let next = clock.frame(&mut h, &c);
-    near(next.pane(Pane::First).w, 201.0);
+    near(moved.pane(Pane::First).w, 201.0);
+    near(moved.pane(Pane::Second).x, 225.0);
+    // The strip registers after the panes, in the place they were drawn for.
+    let g = geometry(c.rect, c.axis, c.sized, 201.0);
+    assert_eq!(moved.split.as_ref().expect("drawn").response.rect, g.hit);
+}
+
+#[test]
+fn an_arrow_key_shows_in_the_panes_in_that_frame() {
+    let (mut h, mut clock) = start();
+    let c = cfg();
+    clock.focus(&mut h, &c);
+    h.input.key_down(Key::Named(NamedKey::ArrowRight), None);
+    let out = clock.frame(&mut h, &c);
+    assert!(out.split.as_ref().expect("drawn").changed);
+    near(out.size(), 216.0);
+    near(out.pane(Pane::First).w, 216.0);
+    // Home and End too, and Escape's restore.
+    h.input.key_down(Key::Named(NamedKey::End), None);
+    let out = clock.frame(&mut h, &c);
+    near(out.pane(Pane::First).w, 400.0);
+}
+
+#[test]
+fn an_escape_during_a_drag_puts_the_panes_back_in_that_frame() {
+    let (mut h, mut clock) = start();
+    let c = cfg();
+    clock.settle(&mut h, &c);
+    let from = strip_at(&c, 200.0);
+    let out = clock.drag(&mut h, &c, from, moved(&c, from, 50.0));
+    near(out.pane(Pane::First).w, 250.0);
+    h.input.key_down(Key::Named(NamedKey::Escape), None);
+    let out = clock.frame(&mut h, &c);
+    near(out.pane(Pane::First).w, 200.0);
+}
+
+#[test]
+fn a_set_value_still_asks_for_a_catch_up_frame_and_a_settled_split_is_idle() {
+    let (mut h, mut clock) = start();
+    let c = cfg();
+    clock.settle(&mut h, &c);
+    h.input.access(AccessAction {
+        target: split_id(),
+        action: Action::SetValue,
+        value: Some(AccessValue::Number(321.0)),
+    });
+    let out = clock.frame(&mut h, &c);
+    assert!(out.split.as_ref().expect("drawn").changed);
+    near(out.size(), 321.0);
+    assert_eq!(out.out.repaint, Repaint::Now);
+    // The value arrives with the strip's region, after the panes: they show it a frame later.
+    near(out.pane(Pane::First).w, 200.0);
+    let out = clock.frame(&mut h, &c);
+    near(out.pane(Pane::First).w, 321.0);
+    let out = clock.settle(&mut h, &c);
+    assert_eq!(out.out.repaint, Repaint::Idle);
 }
 
 // ---- accessibility ----
@@ -1540,23 +1592,6 @@ fn a_strip_that_was_focused_and_is_then_disabled_still_takes_its_keys_and_acts_o
 }
 
 // ---- state of the frame ----
-
-#[test]
-fn a_change_asks_for_one_catch_up_frame_and_a_settled_split_is_idle() {
-    let (mut h, mut clock) = start();
-    let c = cfg();
-    clock.focus(&mut h, &c);
-    h.input.key_down(Key::Named(NamedKey::ArrowRight), None);
-    let out = clock.frame(&mut h, &c);
-    assert!(out.split.as_ref().expect("drawn").changed);
-    assert_eq!(out.out.repaint, Repaint::Now);
-    // The panes show the new size one frame later.
-    assert_eq!(out.pane(Pane::First).w, 200.0);
-    let out = clock.frame(&mut h, &c);
-    assert_eq!(out.pane(Pane::First).w, 216.0);
-    let out = clock.settle(&mut h, &c);
-    assert_eq!(out.out.repaint, Repaint::Idle);
-}
 
 #[test]
 fn the_split_draws_only_on_the_layer_it_is_called_on() {

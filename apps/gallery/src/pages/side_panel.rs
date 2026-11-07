@@ -52,6 +52,7 @@ struct Live {
     panel: u64,
     switch_at: Option<Duration>,
     rows: u32,
+    card_moves: bool,
 }
 
 impl Live {
@@ -60,6 +61,7 @@ impl Live {
             panel,
             switch_at,
             rows: 10,
+            card_moves: false,
         }
     }
 }
@@ -91,6 +93,7 @@ impl PageState for Live {
             glass: PANEL,
             under: CARD.premultiplied(),
             name: TITLES[(self.panel - 1) as usize],
+            card_moves: self.card_moves,
         };
         let rows = self.rows;
         ui.side_panel("host", host, &opts, |ui, inner| {
@@ -123,6 +126,7 @@ impl PageState for Live {
         if panel.number(ui, "Rows", &mut rows, (0.0, 30.0, 1.0)) {
             self.rows = rows.round() as u32;
         }
+        panel.toggle(ui, "Card moves with the show", &mut self.card_moves);
     }
 }
 

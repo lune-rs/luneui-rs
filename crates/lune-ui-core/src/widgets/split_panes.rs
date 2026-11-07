@@ -235,9 +235,9 @@ impl Ui<'_> {
     /// registered after both. The sized pane is hidden when `opts.hidden`: only the other is drawn,
     /// on the whole rect.
     ///
-    /// The panes are drawn with the size the frame began with; a size this frame's input changed
-    /// shows in the strip and the response at once and in the panes on the catch-up frame it
-    /// asks for.
+    /// The panes are drawn with the size the frame ends with: the pointer's and the keys' size is
+    /// worked out before they draw. An accessibility set-value is read with the strip's own
+    /// region, after the panes, so it shows in the panes on the catch-up frame it asks for.
     pub fn split_panes(
         &mut self,
         key: impl Hash,
@@ -263,19 +263,16 @@ impl Ui<'_> {
             };
         }
 
-        let at = geometry(rect, opts.axis, opts.sized, before);
-        self.scope(&key, |ui| {
-            pane(ui, Pane::First, at.first, &mut draw);
-            pane(ui, Pane::Second, at.second, &mut draw);
-        });
-
-        let mut r = self.interact(id, at.hit, SENSE);
+        // The size this frame's input asks for is worked out before the panes draw, from what
+        // `interact` will report (read here without registering), so the panes show it in the
+        // frame it is asked in. The strip registers after them, and so stays on top.
+        let peeked = self.peek_response(id, geometry(rect, opts.axis, opts.sized, before).hit);
         let hold = id.with("hold");
-        if !r.enabled {
+        if !peeked.enabled {
             self.transient::<Hold>(hold).0 = None;
         }
-        if r.press_started {
-            let origin = r.press_pos.map_or(0.0, |p| along(p, opts.axis));
+        if peeked.press_started {
+            let origin = peeked.press_pos.map_or(0.0, |p| along(p, opts.axis));
             self.transient::<Hold>(hold).0 = Some(Grab {
                 origin,
                 size: before,
@@ -287,8 +284,9 @@ impl Ui<'_> {
         let mut next = before;
         let mut restore = None;
         // The release frame counts: the event carries the pointer's last move.
-        let following = r.pressed || r.press_started || r.clicked || r.drag_stopped;
-        if let Some(mut grab) = self.transient::<Hold>(hold).0.filter(|_| r.enabled) {
+        let following =
+            peeked.pressed || peeked.press_started || peeked.clicked || peeked.drag_stopped;
+        if let Some(mut grab) = self.transient::<Hold>(hold).0.filter(|_| peeked.enabled) {
             // An Escape that came before the release of this frame counts: the key keeps the
             // press it arrived under (`consume_key_while_pressed`).
             if following && !grab.cancelled && self.consume_key_while_pressed(id, NamedKey::Escape)
@@ -297,8 +295,8 @@ impl Ui<'_> {
                 restore = Some(grab.stored);
                 next = drawn(len, grab.stored, opts);
             } else if following && !grab.cancelled {
-                let now = if r.press_started {
-                    r.press_pos.map(|p| along(p, opts.axis))
+                let now = if peeked.press_started {
+                    peeked.press_pos.map(|p| along(p, opts.axis))
                 } else {
                     self.pointer_pos().map(|p| along(p, opts.axis))
                 };
@@ -321,10 +319,11 @@ impl Ui<'_> {
                     }
                 }
             }
-            if r.pressed && !grab.cancelled {
+            if peeked.pressed && !grab.cancelled {
                 self.note_live_gesture();
             }
-            self.transient::<Hold>(hold).0 = (r.pressed || r.press_started).then_some(grab);
+            self.transient::<Hold>(hold).0 =
+                (peeked.pressed || peeked.press_started).then_some(grab);
         }
 
         // Keys are taken whatever the state of the strip, then applied only when it may act and
@@ -364,10 +363,22 @@ impl Ui<'_> {
                 _ => continue,
             };
             self.consume_focus_event(index);
-            if r.enabled && !following {
+            if peeked.enabled && !following {
                 next = clamp(to, lo, hi);
             }
         }
+
+        let at = geometry(rect, opts.axis, opts.sized, next);
+        self.scope(&key, |ui| {
+            pane(ui, Pane::First, at.first, &mut draw);
+            pane(ui, Pane::Second, at.second, &mut draw);
+        });
+        // The strip registers after the panes, in the place the panes were drawn for.
+        let mut r = self.interact(id, at.hit, SENSE);
+
+        // An accessibility set-value arrives with the region's reading, which a pane drawn
+        // before it cannot see: the panes drew `next`, and a different final size catches up.
+        let drawn_size = next;
         if let (Some(AccessValue::Number(v)), true, false) = (&r.set_value, r.enabled, following)
             && v.is_finite()
         {
@@ -383,11 +394,13 @@ impl Ui<'_> {
         }
         if changed {
             r.mark_changed();
-            // The panes drawn above showed the old size.
+        }
+        if next != drawn_size {
+            // The panes drawn above showed another size.
             self.request_catch_up();
         }
 
-        // The strip, in its new place.
+        // The strip, in its final place.
         let at = geometry(rect, opts.axis, opts.sized, next);
         if r.hovered || r.pressed {
             self.set_cursor(match opts.axis {

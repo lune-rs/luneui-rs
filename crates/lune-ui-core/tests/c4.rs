@@ -1585,6 +1585,7 @@ mod m7 {
                         glass: GLASS,
                         under: UNDER,
                         name: "History",
+                        card_moves: false,
                     },
                     |_, _| {},
                 );

@@ -53,6 +53,7 @@ struct Cfg {
     panel: u64,
     enabled: bool,
     keys: &'static [u64],
+    card_moves: bool,
 }
 
 impl Cfg {
@@ -61,6 +62,7 @@ impl Cfg {
             panel,
             enabled: true,
             keys: &KEYS,
+            card_moves: false,
         }
     }
 }
@@ -92,6 +94,7 @@ fn frame(h: &mut UiHarness, c: &Cfg) -> Out {
             glass: GLASS,
             under: UNDER,
             name: line(c.panel),
+            card_moves: c.card_moves,
         };
         ui.with_enabled(c.enabled, |ui| {
             ui.side_panel("host", HOST, &opts, |ui, rect| {
@@ -336,6 +339,57 @@ fn shown(tier: MotionTier, after: u64) -> Out {
     frame(&mut h, &Cfg::new(2));
     h.at_ms(6000 + after);
     frame(&mut h, &Cfg::new(2))
+}
+
+/// The card and its ring half way into a show of panel 2 over panel 1.
+fn card_mid_show(card_moves: bool) -> (Rect, f32, [f32; 4]) {
+    let mut h = UiHarness::new(WIN);
+    let c = |panel| Cfg {
+        card_moves,
+        ..Cfg::new(panel)
+    };
+    settled(&mut h, &c(1));
+    h.at_ms(6000);
+    frame(&mut h, &c(2));
+    h.at_ms(6120);
+    let out = frame(&mut h, &c(2));
+    let g = &out.scene.layers[0].geometry;
+    let card = g.acrylic[0];
+    let ring = g
+        .under
+        .iter()
+        .find(|s| s.params[0] == 1.0)
+        .expect("the ring");
+    let [x, y, w, h_] = card.shape.rect;
+    // The line's own slide is there either way.
+    let dx = x_of(&out.scene, 2) - 31.0;
+    assert!(dx < 0.0 && dx > SHOW_SLIDE_FROM, "{dx}");
+    (Rect::new(x, y, w, h_), card.opacity, ring.rect)
+}
+
+#[test]
+fn the_card_stays_still_during_a_show_by_default() {
+    let (card, opacity, ring) = card_mid_show(false);
+    assert_eq!(card, HOST);
+    assert_eq!(opacity, 1.0);
+    assert_eq!(ring, [HOST.x, HOST.y, HOST.w, HOST.h]);
+}
+
+#[test]
+fn with_card_moves_the_card_and_ring_take_the_slide_and_the_fade() {
+    let (card, opacity, ring) = card_mid_show(true);
+    // The same slide the content takes: left of its place, and partway.
+    assert!(
+        card.x < HOST.x && card.x > HOST.x + SHOW_SLIDE_FROM,
+        "{card:?}"
+    );
+    assert_eq!((card.y, card.w, card.h), (HOST.y, HOST.w, HOST.h));
+    assert!(opacity > 0.0 && opacity < 1.0, "{opacity}");
+    assert_eq!(
+        ring,
+        [card.x, card.y, card.w, card.h],
+        "the ring goes with the card"
+    );
 }
 
 #[test]
