@@ -97,6 +97,47 @@ pub trait EditLayout {
     fn page_rows(&self) -> usize {
         DEFAULT_PAGE_ROWS
     }
+
+    /// Where a drag that extends a selection ends at `pos`. `at` is what [`Self::hit`] answered,
+    /// snapped to a grapheme boundary, and `bounds` the sorted grapheme boundaries around it.
+    ///
+    /// A wrapped row runs straight into the next, so its end offset shows on the next row and
+    /// `hit` stops at the row's last grapheme: a drag right of the row would leave that grapheme
+    /// out. When `at` is that last grapheme's start and the point is past its middle, the answer
+    /// is the next boundary, which is on the next row. The grapheme's width is taken from the one
+    /// before it on the row (a row of one grapheme counts the point right of its start). Anything
+    /// else is `at`: a hard-broken row keeps its line break out of a drag. A plain click does not
+    /// call this, so its caret stays on the row it was pressed on.
+    fn extend_hit(&mut self, pos: (f32, f32), at: usize, bounds: &[usize]) -> usize {
+        let rows = self.lines_near(at, 0);
+        let i = row_of(&rows, at);
+        let wrapped = rows
+            .get(i)
+            .is_some_and(|r| r.end > r.start && rows.get(i + 1).is_some_and(|n| n.start == r.end));
+        let next = after(bounds, at);
+        if !wrapped || next == at || row_end(&rows, i, bounds) != at || next != rows[i].end {
+            return at;
+        }
+        let here = self.caret(at);
+        let prior = before(bounds, at);
+        let width = if prior < at {
+            let p = self.caret(prior);
+            if p.line == here.line {
+                here.x - p.x
+            } else {
+                0.0
+            }
+        } else {
+            0.0
+        };
+        // Right-to-left rows grow leftward: their width is negative.
+        let past = if width < 0.0 {
+            pos.0 <= here.x + width / 2.0
+        } else {
+            pos.0 >= here.x + width / 2.0
+        };
+        if past { next } else { at }
+    }
 }
 
 /// What the engine reads of a text. Offsets are chars, and all of them are total: past the end
@@ -881,7 +922,7 @@ impl TextEdit {
                 self.place(at, false);
             }
             EditCommand::ExtendTo(pos) => {
-                let at = self.hit(pos, &*text, layout);
+                let at = self.hit_extending(pos, &*text, layout);
                 self.place(at, true);
             }
             EditCommand::Enter if self.flags.multiline => {
@@ -945,6 +986,20 @@ impl TextEdit {
         self.preferred_x = None;
         let at = layout.hit(pos);
         snap(&bounds_near(text, at, Unit::Grapheme, layout), at)
+    }
+
+    /// [`Self::hit`] for a drag that extends the selection: [`EditLayout::extend_hit`].
+    fn hit_extending<T: EditText + ?Sized>(
+        &mut self,
+        pos: (f32, f32),
+        text: &T,
+        layout: &mut dyn EditLayout,
+    ) -> usize {
+        self.preferred_x = None;
+        let at = layout.hit(pos);
+        let bounds = bounds_near(text, at, Unit::Grapheme, layout);
+        let at = snap(&bounds, at);
+        layout.extend_hit(pos, at, &bounds)
     }
 
     fn select_word<T: EditText + ?Sized>(

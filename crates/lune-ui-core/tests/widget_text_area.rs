@@ -268,6 +268,34 @@ fn a_press_lands_on_the_scrolled_line_and_a_drag_selects_per_line() {
 }
 
 #[test]
+fn a_drag_right_of_a_wrapped_row_reaches_the_rows_end() {
+    let opts = AreaOptions {
+        wrap: true,
+        ..AreaOptions::default()
+    };
+    // 40 glyphs of one word wrap into two rows of 20 that run into each other.
+    let mut text = "a".repeat(40);
+    let mut h = UiHarness::new(WIN);
+    run(&mut h, &mut text, &opts);
+    let y = TY + 1.0;
+    h.input
+        .pointer_to(TX + 0.5, y)
+        .press(PointerButton::Primary);
+    run(&mut h, &mut text, &opts);
+    h.input.pointer_to(TX + 20.0 * glyph() + 30.0, y);
+    let (_, _, out) = run(&mut h, &mut text, &opts);
+    assert_eq!(selection(&out), (0, 20), "the row's last glyph is selected");
+    // A plain click at the same point keeps the caret on the first row.
+    let mut h = UiHarness::new(WIN);
+    run(&mut h, &mut text, &opts);
+    h.input
+        .pointer_to(TX + 20.0 * glyph() + 30.0, y)
+        .press(PointerButton::Primary);
+    let (_, _, out) = run(&mut h, &mut text, &opts);
+    assert_eq!(selection(&out), (19, 19), "a click is unchanged");
+}
+
+#[test]
 fn the_cursor_is_text_and_a_thumb_press_reaches_no_text() {
     let mut text = numbered(40);
     let mut h = UiHarness::new(WIN);

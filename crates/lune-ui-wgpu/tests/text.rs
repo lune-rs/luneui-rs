@@ -336,6 +336,83 @@ fn the_caret_after_a_shaped_cluster_is_at_the_width() {
     }
 }
 
+/// A cluster that shapes to several glyphs: `hit` goes by the cluster's own midpoint, not by each
+/// glyph's half, so it never goes backwards along the row (item 40).
+#[test]
+fn a_hit_inside_a_cluster_of_several_glyphs_goes_by_the_clusters_midpoint() {
+    use lune_ui_core::text::{Spec, Style, TextSystem};
+    let mut text = with_fonts();
+    let white = [255; 4];
+    // Two glyphs for one cluster: a mark pair in the mono font, a skin tone in the UI font.
+    let cases = [
+        ("xa\u{308}\u{301}b", Style::mono(13.0, 17.0, white)),
+        ("a\u{1F44D}\u{1F3FD}b", Style::ui(13.0, white)),
+    ];
+    for (s, style) in cases {
+        let spec = Spec::plain(s, style);
+        for scale in [1.0, 2.0] {
+            let y = style.line / 2.0;
+            let cluster = s.char_indices().nth(1).map(|c| c.0).expect("cluster");
+            let end = s.len() - 1;
+            let before = text.caret(&spec, scale, cluster).x;
+            let after = text.caret(&spec, scale, end).x;
+            assert!(after > before, "{s:?} at {scale}");
+            let mid = (before + after) / 2.0;
+            let step = 0.5 / scale;
+            let mut x = before - 1.0;
+            let mut last = 0;
+            while x < after + 1.0 {
+                let got = text.hit(&spec, scale, (x, y));
+                assert!(got >= last, "{s:?} at {scale}, x {x}: {got} after {last}");
+                last = got;
+                if x > before + step && x < mid - step {
+                    assert_eq!(got, cluster, "{s:?} at {scale}, x {x}: left of the middle");
+                }
+                if x > mid + step && x < after - step {
+                    assert_eq!(got, end, "{s:?} at {scale}, x {x}: right of the middle");
+                }
+                x += step;
+            }
+        }
+    }
+}
+
+/// Item 41 on the real layout: a word cut by a wrap, dragged to the right of the first row, takes
+/// the row's last grapheme; a click there keeps the caret before it.
+#[test]
+fn a_drag_right_of_a_cut_word_reaches_the_rows_end() {
+    use lune_ui_core::input::Keymap;
+    use lune_ui_core::text::{Spec, Style, TextSystem};
+    use lune_ui_core::text_edit::{EditCommand, SpecLayout, TextEdit};
+    let mut text = with_fonts();
+    let spec = Spec::plain("w".repeat(40), Style::ui(13.0, [255; 4])).wrapped(120.0);
+    let lines = text.lines(&spec, 1.0);
+    assert!(
+        lines.len() > 1 && lines[0].end == lines[1].start,
+        "{lines:?}"
+    );
+    let (end, y) = (lines[0].end, lines[0].height / 2.0);
+    let far = (text.measure(&spec, 1.0).0 + 40.0, y);
+    let mut body = "w".repeat(40);
+    let mut run = |edit: &mut TextEdit, cmd| {
+        let mut layout = SpecLayout::new(&mut text, &spec, 1.0);
+        edit.apply(
+            cmd,
+            &mut body,
+            &mut layout,
+            Keymap::PC,
+            std::time::Duration::ZERO,
+        );
+    };
+    let mut drag = TextEdit::new();
+    run(&mut drag, EditCommand::PlaceCaret((0.0, y)));
+    run(&mut drag, EditCommand::ExtendTo(far));
+    assert_eq!((drag.selection().start, drag.selection().end), (0, end));
+    let mut click = TextEdit::new();
+    run(&mut click, EditCommand::PlaceCaret(far));
+    assert_eq!(click.caret(), end - 1, "a click keeps the caret on its row");
+}
+
 /// A seeded walk over the texts that trip shaping: wide and narrow chars, spaces, each break.
 fn generated(seed: u64, style: lune_ui_core::text::Style) -> lune_ui_core::text::Spec {
     use lune_ui_core::text::Spec;
