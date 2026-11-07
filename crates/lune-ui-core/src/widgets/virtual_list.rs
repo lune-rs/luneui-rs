@@ -14,11 +14,15 @@
 //! Frame order: the keys move the cursor before anything draws, so the reveal request reaches the
 //! area this frame. Inside the area, every built row registers its region and takes its input, and
 //! only then do the rows draw: a click moves the selection of all rows in the same frame, and a
-//! child widget's region lands above its row's. A measured height takes effect on the next frame
-//! (one catch-up frame); a change above the first visible row shifts the offset by as much, so
-//! that row stays where it is on screen.
+//! child widget's region lands above its row's. A height measured for the first time takes effect
+//! on the next frame (one catch-up frame); a change above the first visible row shifts the offset
+//! by as much, so that row stays where it is on screen. A row's height follows the row, not its
+//! index: what each row measured is kept by its [`RowKey`], and before the rows are placed those
+//! in the window take the height they were measured at, so a sort or a replaced list places them
+//! as a settled frame does and asks for no catch-up for rows already seen. A row never measured
+//! stays on the estimate.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::hash::{Hash, Hasher};
 
 use crate::access::{Action, Node, Role, State};
@@ -506,6 +510,9 @@ struct ListMem {
     ended: f64,
     /// A height changed last frame, so this frame's rows move.
     relaid: bool,
+    /// What each row measured, by its key, in `Measured` mode: a row's height follows the row, so
+    /// a sort or a replaced list places the rows it has seen at their own heights at once.
+    known: BTreeMap<RowKey, f32>,
     /// The content moved last frame: this frame's hover is still that movement's result.
     was_moved: bool,
     /// The row whose press this list already handled, until the release.
@@ -548,6 +555,54 @@ impl ListMem {
         self.relaid = false;
         self.was_moved = moved;
         still
+    }
+
+    /// Gives the rows in the window at `offset` the heights they were measured at, whatever index
+    /// they held then, so they are placed as a settled frame places them. Returns the change in
+    /// the height above the first row in view (the offset shifts by it) and in the whole, and
+    /// whether any row changed. A row never measured stays on the estimate.
+    fn apply_known(&mut self, rows: &Rows<'_>, offset: f64) -> (f64, f64, bool) {
+        if !self.heights.measured || self.known.is_empty() {
+            return (0.0, 0.0, false);
+        }
+        let viewport = f64::from(rows.rect.h);
+        let first = self.heights.row_at(offset);
+        let (mut above, mut total, mut any) = (0.0, 0.0, false);
+        // A change moves the window: until it stops, bounded by what a window can hold.
+        for _ in 0..4 {
+            let mut changed = false;
+            for index in self.heights.window(offset + above, viewport) {
+                let Some(&h) = self.known.get(&(rows.key)(index)) else {
+                    continue;
+                };
+                if self.heights.own.get(index) == Some(&h) {
+                    continue;
+                }
+                let change = self.heights.set(index, h);
+                changed = true;
+                any = true;
+                total += change;
+                if index < first {
+                    above += change;
+                }
+            }
+            if !changed {
+                break;
+            }
+        }
+        (above, total, any)
+    }
+
+    /// Remembers what row `key` measured; a table of a million rows keeps at most a few times
+    /// `count` of them.
+    fn remember(&mut self, key: RowKey, h: f32, count: usize) {
+        if !self.heights.measured || !h.is_finite() {
+            return;
+        }
+        if self.known.len() > 4 * count + 256 {
+            self.known.clear();
+        }
+        self.known.insert(key, h.max(MIN_ROW));
     }
 }
 
@@ -804,8 +859,21 @@ impl Ui<'_> {
         out: &mut Outcome,
     ) -> Response {
         let (id, rect, style) = (rows.id, rows.rect, rows.style);
-        let (scroll_x, offset) = (view_offset.0 as f32, view_offset.1);
+        let (scroll_x, mut offset) = (view_offset.0 as f32, view_offset.1);
         let response = self.interact(id, rect, Sense::CLICK_FOCUS);
+        // Rows already measured take their own heights before anything is placed; one that moved
+        // the rows above the first in view moves the offset by as much, as a measure would.
+        let (above, total, relaid) = mem.apply_known(rows, offset);
+        if relaid {
+            mem.relaid = true;
+            if above != 0.0 {
+                self.scroll_shift(AREA, above);
+                offset += above;
+            }
+            if above != 0.0 || total != 0.0 {
+                self.request_catch_up();
+            }
+        }
         let still = mem.still(offset, rect);
         let viewport = f64::from(rect.h);
         let window = mem.heights.window(offset, viewport);
@@ -955,6 +1023,7 @@ impl Ui<'_> {
                 focus_ring::paint(self.painter(), highlight, RingKind::Button, 1.0);
             }
 
+            mem.remember(ctx.key, height, rows.count());
             let change = mem.heights.set(ctx.index, height);
             if change != 0.0 {
                 relaid = true;
