@@ -98,7 +98,7 @@ impl PageState for Live {
     fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
         let card = card(ui, stage, "Icon rail");
         let (ox, oy) = (card.x + 24.0, card.y + 24.0);
-        heading(ui, "ICON on_card(card, RAIL)", ox, oy);
+        heading(ui, "ICON RAIL", ox, oy);
         let item = |(key, glyph, name): (u64, &'static str, &'static str)| RailItem {
             key,
             glyph,

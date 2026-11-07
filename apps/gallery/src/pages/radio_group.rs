@@ -49,7 +49,7 @@ impl PageState for Live {
     fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
         let card = card(ui, stage, "Radio group");
         let (ox, oy) = (card.x + 24.0, card.y + 24.0);
-        heading(ui, "RADIO on_card(card, GROUP)", ox, oy);
+        heading(ui, "RADIO GROUP", ox, oy);
         let options = [
             RadioOption {
                 key: 1,
