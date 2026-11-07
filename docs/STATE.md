@@ -110,7 +110,7 @@ the disabled-key readers and the chord takers, F11, the audit's 33 unreached col
 3. The user's calls, all reversible and taken at the recommended option: the final tray glyph (`platform.tray-icon`), column resize and reorder in the table (D163, Q15), and three taken calls to
    confirm: the Windows popover activates (D224, Q17), the tray icon is a CPU raster (D218, Q18), the Lunegit fixtures stay bundled (Q19).
 4. CI stays out (D15): the repo has no remote.
-5. The library follow-ups above, starting with the noise and luminosity plan (D246), once the user has reviewed the showcase.
+5. Task `luneui-rs/library-pass`: the user reviewed the components, and the full list with its hand-off is `~/.claude/orchestrations/luneui-rs/library-pass/scope.md`. It covers the library follow-ups above. Planning starts in a fresh session; read that file first.
 
 ## Library follow-ups (found by the gallery showcase; nothing under `crates/` changed, D246)
 
