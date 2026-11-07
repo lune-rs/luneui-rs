@@ -38,7 +38,7 @@ use crate::input::{
     RawInput, Repaint, ScrollDelta,
 };
 use crate::motion::{MotionTier, Time};
-use crate::paint::{Painter, Rect, SUPPRESSED, Xform};
+use crate::paint::{Painter, Rect, SUPPRESSED};
 use crate::scene::{LayerId, Scene};
 use crate::shortcuts::{CommandId, Scope, Shortcuts};
 use crate::strings::{ArgFormat, StringTable};
@@ -1106,13 +1106,7 @@ impl<'a> Ui<'a> {
         }
         self.enabled = false;
         let start = self.painter.hits.len();
-        self.painter.push_xform(Xform {
-            origin: (0.0, 0.0),
-            scale: 1.0,
-            dx: 0.0,
-            dy: 0.0,
-            alpha: DISABLED_ALPHA,
-        });
+        self.painter.push_xform(overlay::disabled_xform());
         let r = f(self);
         self.painter.pop_xform();
         self.disabled.push(start..self.painter.hits.len());

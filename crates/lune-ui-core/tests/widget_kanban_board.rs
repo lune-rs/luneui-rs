@@ -1159,8 +1159,11 @@ fn a_press_on_a_landing_card_holds_it_and_it_goes_on_or_drags_from_there() {
         let r = run(&mut h, &m, frame_ms(17));
         let g = ghost(&r.scene).expect("held");
         assert_eq!(drawn(&r.scene, 11, 1.0).len(), 1);
-        let step = (g.rect[0] - before.rect[0]).abs();
-        assert!(step < 0.35 * LANE_PITCH, "{step}, from {held:?}");
+        assert_eq!(
+            g.rect[..2],
+            before.rect[..2],
+            "the press holds the card where it was drawn, from {held:?}"
+        );
         let r = run(&mut h, &m, frame_ms(18));
         assert_eq!(ghost(&r.scene).expect("held").rect[..2], g.rect[..2]);
         if drags {
@@ -2358,4 +2361,85 @@ fn at_scale_two_a_column_is_544_a_card_s_radius_12_and_the_threshold_8() {
     h.input.pointer_to(x + 4.0, y);
     let r = run(&mut h, &m, 40);
     assert!(ghost(&r.scene).is_some());
+}
+
+/// A card that is sliding up (its neighbour left the column) is pressed, and the pointer moves
+/// 10 px: the ghost is where the body was drawn on the press frame, plus the 10 px, with no step.
+#[test]
+fn a_press_on_a_sliding_card_grabs_it_where_it_is_drawn() {
+    let mut h = UiHarness::new(WIN);
+    let mut m = model();
+    run(&mut h, &m, 0);
+    m.cols[0].1.remove(0);
+    run(&mut h, &m, 10);
+    // The slot of card 12 is now the first; it started a pitch below and is on its way.
+    let pointer = (CARD_X + 20.0, LIST_Y + 20.0);
+    h.input.pointer_to(pointer.0, pointer.1);
+    run(&mut h, &m, 20);
+    h.input.press(P);
+    let r = run(&mut h, &m, 40);
+    let seen = drawn(&r.scene, 12, 1.0);
+    assert_eq!(seen.len(), 1, "the body: {seen:?}");
+    let (x, y) = (seen[0].1 - TEXT, seen[0].2 - TEXT);
+    assert!(
+        y > LIST_Y + 1.0 && y < LIST_Y + PITCH - 1.0,
+        "instrument: mid-slide, not at the slot or where it began: {y}"
+    );
+    h.input.pointer_to(pointer.0, pointer.1 + 10.0);
+    let r = run(&mut h, &m, 50);
+    let g = ghost(&r.scene).expect("the drag");
+    assert_eq!(g.rect[0], x, "no step across");
+    assert!(
+        (g.rect[1] - (y + 10.0)).abs() < 1e-3,
+        "no step down: {} against {}",
+        g.rect[1],
+        y + 10.0
+    );
+}
+
+/// A second Shift move while the card is landing (in its column or across): the landing starts again
+/// from where the card was drawn, so the first frame of it draws the card where the frame before
+/// did, and the card never jumps toward the new slot.
+#[test]
+fn a_second_shift_move_during_a_landing_restarts_from_where_the_card_is_drawn() {
+    for key in [NamedKey::ArrowDown, NamedKey::ArrowRight] {
+        let mut h = UiHarness::new(WIN);
+        let mut m = model();
+        focus(&mut h, &m, 11, 0);
+        shift_key(&mut h, NamedKey::ArrowRight);
+        let r = run(&mut h, &m, frame_ms(1));
+        apply(&mut m, r.r.moved.expect("a move"));
+        let mut r = run(&mut h, &m, frame_ms(2));
+        for k in 3..6 {
+            r = run(&mut h, &m, frame_ms(k));
+        }
+        let before = drawn(&r.scene, 11, 1.0);
+        assert_eq!(before.len(), 1, "the ghost only: {before:?}");
+        assert!(ghost(&r.scene).is_some(), "instrument: still landing");
+        shift_key(&mut h, key);
+        let r = run(&mut h, &m, frame_ms(6));
+        let moved = r.r.moved.expect("the second move");
+        let now = drawn(&r.scene, 11, 1.0);
+        assert_eq!(now.len(), 1, "{now:?}");
+        assert_eq!(
+            (now[0].1, now[0].2),
+            (before[0].1, before[0].2),
+            "{key:?}: restarts where it was drawn"
+        );
+        apply(&mut m, moved);
+        // It then goes to the new slot without a jump: no frame steps more than the one before it
+        // did, plus a pitch's worth of slack for the slot's own move.
+        let mut at = (now[0].1, now[0].2);
+        for k in 7..40 {
+            let r = run(&mut h, &m, frame_ms(k));
+            let seen = drawn(&r.scene, 11, 1.0);
+            assert_eq!(seen.len(), 1, "drawn once at frame {k}");
+            let step = ((seen[0].1 - at.0).powi(2) + (seen[0].2 - at.1).powi(2)).sqrt();
+            assert!(step < LANE_PITCH, "{key:?}: a jump of {step} at frame {k}");
+            at = (seen[0].1, seen[0].2);
+            if r.out.repaint == Repaint::Idle {
+                break;
+            }
+        }
+    }
 }

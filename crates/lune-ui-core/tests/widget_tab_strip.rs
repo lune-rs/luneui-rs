@@ -1837,3 +1837,30 @@ fn a_disabled_strip_pointer_input_reports_nothing() {
     let r = run(&mut h, &mut app);
     assert!(nodes(&r.out.tree, Role::MenuItem).is_empty());
 }
+
+/// A press on a tab activates it; the strip is disabled while the button is held; the release after
+/// it does not activate the tab again (the capture outlives the frame in which the response lies).
+#[test]
+fn a_press_held_across_a_disabled_frame_then_released_activates_once() {
+    let mut app = App::of(3, Some(0));
+    let mut h = bench(&mut app);
+    let tree = run(&mut h, &mut app).out.tree;
+    press_at(&mut h, mid(&tree, "t2"));
+    let r = run(&mut h, &mut app);
+    assert_eq!(
+        activations(&r.events),
+        1,
+        "instrument: the press activates it"
+    );
+    app.enabled = false;
+    assert!(run(&mut h, &mut app).events.is_empty(), "held, disabled");
+    app.enabled = true;
+    h.input.release(PRIMARY);
+    let r = run(&mut h, &mut app);
+    assert_eq!(
+        activations(&r.events),
+        0,
+        "the release is the end of the press, not a click: {:?}",
+        r.events
+    );
+}

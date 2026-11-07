@@ -2382,3 +2382,52 @@ fn a_glass_list_in_a_dialog_and_a_menu_in_a_popover_each_ask_on_their_own_layer(
     assert!(layers[0].tag < layers[1].tag);
     assert_glass(&last, "the menu in the popover");
 }
+
+/// An overlay called inside `with_enabled(false, ..)` draws at the scope's 0.4, and so does its
+/// exit: the scope's look reaches everything drawn inside it, and `enter` does not take it off.
+#[test]
+fn an_overlay_opened_in_a_disabled_scope_draws_and_exits_at_the_disabled_opacity() {
+    const WHITE: [u8; 4] = [255, 255, 255, 255];
+    fn alphas(scene: &Scene, layer: LayerId) -> Vec<f32> {
+        scene
+            .merged(layer)
+            .geometry
+            .under
+            .iter()
+            .map(|s| s.color[3])
+            .collect()
+    }
+    for enabled in [true, false] {
+        let want = if enabled { 1.0 } else { 0.4 };
+        let mut h = harness();
+        let run = |h: &mut UiHarness, ms: u64, called: bool| {
+            h.at_ms(ms);
+            h.frame(|ui| {
+                ui.painter().on(LayerId::Page);
+                if called {
+                    ui.with_enabled(enabled, |ui| {
+                        ui.overlay(
+                            "o",
+                            &popup(),
+                            |p, _, _| p.fill(CARD, 0.0, WHITE),
+                            |ui, _| ui.painter().fill(CARD, 0.0, WHITE),
+                        );
+                    });
+                }
+            })
+            .0
+        };
+        let open = run(&mut h, 0, true);
+        let a = alphas(&open, LayerId::Popup);
+        assert_eq!(a.len(), 1, "enabled {enabled}: {a:?}");
+        assert!((a[0] - want).abs() < 0.01, "enabled {enabled}: {a:?}");
+        // Called no more: the close begins and the exit is drawn in the same frame.
+        let closing = run(&mut h, 10, false);
+        let a = alphas(&closing, LayerId::Popup);
+        assert_eq!(a.len(), 1, "the exit, enabled {enabled}: {a:?}");
+        assert!(
+            (a[0] - want).abs() < 0.01,
+            "the exit, enabled {enabled}: {a:?}"
+        );
+    }
+}

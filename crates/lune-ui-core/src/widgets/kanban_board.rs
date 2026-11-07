@@ -898,8 +898,9 @@ impl Ui<'_> {
             index: to.1,
         });
         mem.reveal = Some(key);
-        // A card's `y` lives inside its column's clip: across columns only the ghost can travel.
-        if to.0 != c {
+        // A card's `y` lives inside its column's clip: across columns only the ghost can travel. A
+        // card already landing starts again from where it is drawn, in its column or across.
+        if to.0 != c || mem.landings.iter().any(|l| l.key == key) {
             let slot = f.lay.lanes[c].slots[i];
             let from = self.board_drawn_at(f, mem, c, &slot);
             self.board_land(f, mem, key, from);
@@ -1109,12 +1110,8 @@ impl Ui<'_> {
         if r.press_started
             && let Some((px, py)) = r.press_pos
         {
-            let top = self.painter().transformed(rect);
-            let top = mem
-                .landings
-                .iter()
-                .find(|l| l.key == key)
-                .map_or((top.x, top.y), |l| l.pos);
+            // Where the card is drawn now: a landing's place, or the slide's, not its slot.
+            let top = self.board_drawn_at(f, mem, at.0, slot);
             mem.grab = (px - top.0, py - top.1);
         }
         self.board_result(f, mem, out, at, key, dragged, &frame);

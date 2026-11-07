@@ -810,3 +810,31 @@ fn a_frost_at_alpha_k_carries_k_and_keeps_its_colour() {
     assert_eq!(under[0].color, colour);
     assert_eq!(under[0].params, [0.0, 0.25, 2.0, 1.0]);
 }
+
+/// A ring's width is a width like a stroke's: a transform's scale scales it (the radius and the
+/// rect already follow it).
+#[test]
+fn a_ring_under_a_scale_transform_is_scaled_like_everything_else() {
+    for (device, scale) in [(1.0_f32, 0.9_f32), (2.0, 0.5), (1.5, 2.0)] {
+        let mut t = FakeText;
+        let mut p: P<'_> = Painter::new(
+            device,
+            Rect::new(0.0, 0.0, 400.0, 300.0),
+            &mut t,
+            None,
+            THEME,
+        );
+        p.ring(Rect::new(10.0, 10.0, 50.0, 30.0), 4.0, 1.0, WHITE, false);
+        p.push_xform(xf((30.0, 25.0), scale, 0.0, 1.0));
+        p.ring(Rect::new(10.0, 10.0, 50.0, 30.0), 4.0, 1.0, WHITE, false);
+        p.pop_xform();
+        let under = &p.scene.layers[0].geometry.under;
+        assert_eq!(under.len(), 2);
+        assert_eq!(under[0].params[1], device, "the plain ring is 1 logical px");
+        assert!(
+            (under[1].params[1] - device * scale).abs() < 1e-5,
+            "scale {scale} at {device}: {}",
+            under[1].params[1]
+        );
+    }
+}

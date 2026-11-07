@@ -745,7 +745,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
     pub fn ring(&mut self, r: Rect, radius: f32, width: f32, color: Rgba, above_text: bool) {
         self.rec(|| Op::Ring(r, radius, width, color, above_text));
         let mut sh = self.shape(r, [radius; 4], premul(color));
-        sh.params = [1.0, width * self.s, 0.0, 0.0];
+        sh.params = [1.0, width * self.s * self.scale_k(), 0.0, 0.0];
         if above_text {
             self.geo().over.push(sh);
         } else {

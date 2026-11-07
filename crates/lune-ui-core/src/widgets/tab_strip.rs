@@ -569,7 +569,9 @@ impl Ui<'_> {
             if resp.press_started {
                 st.pressed = Some(tab.key);
             }
-            if st.pressed == Some(tab.key) && !resp.pressed {
+            // A disabled response reports no press whatever the pointer does, so it must not end
+            // the capture: the release after it would read as a fresh click.
+            if resp.enabled && st.pressed == Some(tab.key) && !resp.pressed {
                 st.pressed = None;
             }
             let close_resp = close.as_ref();
@@ -697,7 +699,6 @@ impl Ui<'_> {
         });
         let close_target = ButtonLook::of(&t, ButtonKind::Ghost, close_state);
         let close_fill = self.animate_color(item.close_id.with("fill"), close_target.fill, &HOVER);
-        let name = self.tr("luneui.tab-strip.close").to_owned();
         let title_spec = title_spec(self, tab.title, look.active);
 
         let p = self.painter();
@@ -725,6 +726,9 @@ impl Ui<'_> {
             }
         }
         if close_alpha > 0.0 {
+            // The name is looked up only while the button shows.
+            let name = self.tr("luneui.tab-strip.close");
+            let p = self.painter();
             p.push_xform(Xform {
                 alpha: close_alpha,
                 ..Xform::translate(0.0, 0.0)
@@ -734,7 +738,7 @@ impl Ui<'_> {
                 glyph_size: CLOSE_GLYPH,
                 color: Some(t.fg_tertiary),
                 radius: BUTTON_RADIUS,
-                name: &name,
+                name,
             };
             let close_look = ButtonLook {
                 fill: close_fill,
@@ -744,6 +748,7 @@ impl Ui<'_> {
             button::paint_icon(p, close_rect(rect), &button, &close_look);
             p.pop_xform();
         }
+        let p = self.painter();
         focus_ring::paint(p, rect, RingKind::Edge { radius: RADIUS }, ring);
     }
 

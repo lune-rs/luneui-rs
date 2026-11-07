@@ -3,9 +3,9 @@
 //! after the app stops calling them (D8). The Ui never closes an overlay; the app stops calling it.
 
 use crate::motion::{Motion, MotionTier, MotionTokens, Resolved, Time};
-use crate::paint::{LayerId, Painter, SUPPRESSED};
+use crate::paint::{LayerId, Painter, SUPPRESSED, Xform};
 
-use super::{Ui, WidgetId};
+use super::{DISABLED_ALPHA, Ui, WidgetId};
 
 /// How an overlay behaves: where it draws, whether it captures input, what dismisses it, where
 /// focus goes and how it moves.
@@ -75,6 +75,8 @@ pub(crate) struct OverlayRec {
     pub(crate) exit: Option<ExitPainter>,
     pub(crate) saved_focus: Option<WidgetId>,
     pub(crate) called: bool,
+    /// The scope it was last called in was disabled: it and its exit draw at `DISABLED_ALPHA`.
+    pub(crate) disabled: bool,
 }
 
 impl std::fmt::Debug for OverlayRec {
@@ -85,6 +87,17 @@ impl std::fmt::Debug for OverlayRec {
             .field("phase", &self.phase)
             .field("saved_focus", &self.saved_focus)
             .finish_non_exhaustive()
+    }
+}
+
+/// What [`Ui::with_enabled`] pushes: the dimming of a disabled scope.
+pub(crate) fn disabled_xform() -> Xform {
+    Xform {
+        origin: (0.0, 0.0),
+        scale: 1.0,
+        dx: 0.0,
+        dy: 0.0,
+        alpha: DISABLED_ALPHA,
     }
 }
 
@@ -328,6 +341,7 @@ impl<'a> Ui<'a> {
                     exit: None,
                     saved_focus: focused,
                     called: false,
+                    disabled: false,
                 });
                 self.opened.push(id);
                 self.store.overlays.len() - 1
@@ -365,6 +379,7 @@ impl<'a> Ui<'a> {
         rec.opts = OverlayOptions { layer, ..*options };
         rec.exit = Some(Box::new(exit));
         rec.called = true;
+        rec.disabled = !self.enabled;
         let tag = rec.tag;
         let (phase, transforms) = rec.opening(now, &tokens, tier);
         let frame = OverlayFrame {
@@ -375,6 +390,11 @@ impl<'a> Ui<'a> {
         };
         let saved = self.painter.save_state();
         self.painter.enter(layer, tag);
+        // `enter` leaves the opener's transforms, its disabled scope's dimming with them: the
+        // scope's look reaches everything drawn inside it, so it is put back.
+        if !self.enabled {
+            self.painter.push_xform(disabled_xform());
+        }
         let first_hit = self.painter.hits.len();
         // Scopes opened by the caller are outside the overlay for `Scope::Within`.
         let floor = std::mem::replace(&mut self.scope_floor, self.scopes.len());
@@ -483,7 +503,13 @@ impl<'a> Ui<'a> {
                 (rec.closing(now, tokens, tier), rec.exit.as_ref())
             {
                 painter.enter_closing(rec.opts.layer, rec.tag);
+                if rec.disabled {
+                    painter.push_xform(disabled_xform());
+                }
                 exit(painter, p, transforms);
+                if rec.disabled {
+                    painter.pop_xform();
+                }
             }
         }
         let mut moving = false;
