@@ -29,6 +29,7 @@ use lune_ui::ui::{FrameConfig, Ui, UiStore, WidgetId};
 
 use crate::scenes::LegacyScene;
 use crate::scenes::{H, W};
+use crate::showcase::knobs::Knobs;
 
 /// One page of the gallery.
 #[derive(Debug, Clone, Copy)]
@@ -203,6 +204,11 @@ pub(crate) trait PageState {
     fn zoom(&self) -> f32 {
         1.0
     }
+
+    /// The page's knobs: one row per option of the component the page shows, each bound to a
+    /// field of the page, which the showcase draws at the top of its settings pane. A knob's
+    /// default is what the page draws without it. The default has none.
+    fn knobs(&mut self, _ui: &mut Ui<'_>, _panel: &mut Knobs<'_>) {}
 }
 
 /// What the page asks of the draw of a frame, besides the display list it makes.

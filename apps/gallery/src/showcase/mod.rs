@@ -15,6 +15,7 @@
 //! App code: it draws nothing of its own besides the chrome; no clock is read here (the frame's
 //! time comes from the caller).
 
+pub(crate) mod knobs;
 pub(crate) mod labs;
 mod nav;
 mod settings;
@@ -493,7 +494,8 @@ impl PageState for Showcase {
         // The settings pane has a fill of its own and is drawn after the page.
         let fill = ui.theme().surface_input;
         ui.painter().fill(lay.settings, 8.0, fill);
-        self.settings.pane(ui, lay.settings);
+        self.settings
+            .pane(ui, lay.settings, &mut *self.child, self.generation);
         if self.replay.is_none() && self.scene.is_some() {
             let t = *ui.theme();
             let spec = Spec::plain("live", Style::ui(t.font_s, t.fg_tertiary));
@@ -1024,6 +1026,17 @@ mod tests {
         assert_eq!(tier.get(), Some(MotionTier::Reduced));
     }
 
+    /// A page that draws nothing and keeps its knobs.
+    struct Silent(Box<dyn PageState>);
+
+    impl PageState for Silent {
+        fn draw(&mut self, _ui: &mut Ui<'_>, _stage: &Stage) {}
+
+        fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut knobs::Knobs<'_>) {
+            self.0.knobs(ui, panel);
+        }
+    }
+
     /// What the base and page layers of `scene` paint, each with the rect it can show in: a
     /// shape's own rect cut by its clip; a text's clip (its extent is not known here).
     fn painted(scene: &lune_ui::scene::Scene) -> Vec<(String, Rect)> {
@@ -1061,8 +1074,8 @@ mod tests {
 
     /// At a window as narrow as 1,040 the canvas is wider than its pane: nothing the hosted page
     /// paints may show over the settings pane, whatever page it is and whatever it does with the
-    /// layers. A hosted page's items are what a frame holds beyond the same frame with an empty
-    /// page.
+    /// layers. A hosted page's items are what a frame holds beyond the same frame with the page
+    /// drawing nothing.
     #[test]
     fn a_hosted_page_never_paints_over_the_settings_pane() {
         let window = (1040.0, 660.0);
@@ -1075,7 +1088,6 @@ mod tests {
             p.frame(&mut FakeText, 0, &[]).expect("frame");
             painted(&p.frame(&mut FakeText, 16, &[]).expect("frame").0)
         };
-        let base = frame(Box::new(Empty), 0);
         let mut bad = Vec::new();
         for (page_index, page) in PAGES.iter().enumerate() {
             let PageKind::Ui(ui_page) = page.kind else {
@@ -1087,7 +1099,9 @@ mod tests {
             let states = std::iter::once(("live", ui_page.state))
                 .chain(ui_page.scenes.iter().map(|s| (s.id, s.state)));
             for (which, state) in states {
-                let mut rest = base.clone();
+                // The same page with its drawing left out: what it leaves is the panes, with the
+                // page's knobs in the settings pane, which belong there.
+                let mut rest = frame(Box::new(Silent(state())), page_index);
                 for (key, shown) in frame(state(), page_index) {
                     if let Some(at) = rest.iter().position(|(k, _)| *k == key) {
                         rest.swap_remove(at);

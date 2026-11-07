@@ -22,7 +22,8 @@ use lune_ui::widgets::radio_group::{ROW_HEIGHT, RadioOption};
 use lune_ui::widgets::scroll_area::{Extent, ScrollOptions};
 use lune_ui::widgets::slider::SliderOptions;
 
-use crate::page::FrameTweaks;
+use super::knobs::Knobs;
+use crate::page::{FrameTweaks, PageState};
 use crate::scenes::{BLUR_SATURATION, BLUR_SIGMA};
 
 /// The theme the gallery starts under, and the five files of Lunegit it can load.
@@ -238,7 +239,13 @@ impl Settings {
     }
 
     /// Draws the pane in `rect`: a scrolling column of sections.
-    pub(crate) fn pane(&mut self, ui: &mut Ui<'_>, rect: Rect) {
+    pub(crate) fn pane(
+        &mut self,
+        ui: &mut Ui<'_>,
+        rect: Rect,
+        page: &mut dyn PageState,
+        generation: u64,
+    ) {
         let opts = ScrollOptions::default();
         ui.scroll_area("settings", rect, &opts, |ui, _| {
             let mut col = Col {
@@ -246,6 +253,14 @@ impl Settings {
                 w: rect.w - 16.0,
                 y: rect.y + 4.0,
             };
+            // The hosted page's own knobs come first, under a scope of the page's choice so a
+            // new page starts with fresh widgets.
+            col.section(ui, "KNOBS");
+            let mut knobs = Knobs::new(&mut col);
+            ui.scope(("knobs", generation), |ui| page.knobs(ui, &mut knobs));
+            if knobs.is_empty() {
+                col.note(ui, "This page has no knobs yet.");
+            }
             self.sections(ui, &mut col);
             let height = f64::from(col.y - rect.y + 8.0);
             ((), Extent::new(f64::from(rect.w), height))
@@ -458,10 +473,11 @@ impl Settings {
 }
 
 /// The column the sections stack down: its left edge, width and the next row's top.
-struct Col {
-    x: f32,
-    w: f32,
-    y: f32,
+#[derive(Debug)]
+pub(crate) struct Col {
+    pub(crate) x: f32,
+    pub(crate) w: f32,
+    pub(crate) y: f32,
 }
 
 /// A slider row's label width and value width.
@@ -480,7 +496,7 @@ impl Col {
         ui.painter().text(&spec, x, y);
     }
 
-    fn section(&mut self, ui: &mut Ui<'_>, title: &str) {
+    pub(crate) fn section(&mut self, ui: &mut Ui<'_>, title: &str) {
         self.y += 14.0;
         let t = *ui.theme();
         let spec = Spec::plain(title, Style::ui(t.font_s, t.fg_tertiary).medium());
@@ -488,20 +504,20 @@ impl Col {
         self.y += 22.0;
     }
 
-    fn label(&mut self, ui: &mut Ui<'_>, text: &str) {
+    pub(crate) fn label(&mut self, ui: &mut Ui<'_>, text: &str) {
         let t = *ui.theme();
         let spec = Spec::plain(text, Style::ui(t.font_base, t.fg_primary));
         ui.painter().text(&spec, self.x, self.y + 3.0);
         self.y += 24.0;
     }
 
-    fn note(&mut self, ui: &mut Ui<'_>, text: &str) {
+    pub(crate) fn note(&mut self, ui: &mut Ui<'_>, text: &str) {
         Self::text(ui, text, self.x, self.y, true);
         self.y += 20.0;
     }
 
     /// A radio group; true when the choice changed.
-    fn radio(
+    pub(crate) fn radio(
         &mut self,
         ui: &mut Ui<'_>,
         key: &str,
@@ -516,7 +532,7 @@ impl Col {
     }
 
     /// A labelled slider with its value to the right; true when the user moved it.
-    fn slider(
+    pub(crate) fn slider(
         &mut self,
         ui: &mut Ui<'_>,
         key: impl std::hash::Hash,
@@ -542,7 +558,7 @@ impl Col {
         changed
     }
 
-    fn toggle(&mut self, ui: &mut Ui<'_>, key: &str, label: &str, on: &mut bool) {
+    pub(crate) fn toggle(&mut self, ui: &mut Ui<'_>, key: &str, label: &str, on: &mut bool) {
         Self::text(ui, label, self.x, self.y + 4.0, false);
         let rect = Rect::new(self.x + self.w - 44.0, self.y, 40.0, 24.0);
         ui.toggle(key, rect, on, label);

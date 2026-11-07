@@ -7,13 +7,14 @@ use lune_ui::motion::MotionTier;
 use lune_ui::paint::{Rect, Xform};
 use lune_ui::ui::Ui;
 use lune_ui::widgets::button::{
-    ButtonKind, ButtonLook, ButtonOptions, ButtonState, IconButton, button_width, paint,
-    paint_icon, paint_with,
+    ButtonKind, ButtonLook, ButtonOptions, ButtonState, IconButton, button_width,
+    button_width_with, paint, paint_icon, paint_with,
 };
 
 use super::{caption, card, heading};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "button",
@@ -26,15 +27,42 @@ pub(crate) static PAGE: Page = Page {
 };
 
 fn live() -> Box<dyn PageState> {
-    Box::new(Live)
+    Box::new(Live::new())
 }
 
 fn specimens() -> Box<dyn PageState> {
     Box::new(Specimens)
 }
 
-/// Real buttons through the `Ui`.
-struct Live;
+/// The kinds the second button's knob offers, in the order shown.
+const KINDS: [(&str, ButtonKind); 3] = [
+    ("Primary", ButtonKind::Primary),
+    ("Secondary", ButtonKind::Secondary),
+    ("Ghost", ButtonKind::Ghost),
+];
+
+/// Real buttons through the `Ui`. The second one takes the knobs: its kind, label, size, glyph
+/// and whether it is enabled; the others stay as they are.
+struct Live {
+    /// An index into [`KINDS`].
+    kind: usize,
+    label: String,
+    small: bool,
+    icon: bool,
+    enabled: bool,
+}
+
+impl Live {
+    fn new() -> Self {
+        Self {
+            kind: 1,
+            label: "Secondary".to_owned(),
+            small: false,
+            icon: false,
+            enabled: true,
+        }
+    }
+}
 
 impl PageState for Live {
     fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
@@ -49,13 +77,20 @@ impl PageState for Live {
             "Primary",
             ButtonKind::Primary,
         );
-        let sw = button_width(ui.painter(), "Secondary");
-        ui.button(
-            "secondary",
-            Rect::new(x + pw + 8.0, by, sw, 32.0),
-            "Secondary",
-            ButtonKind::Secondary,
-        );
+        let options = ButtonOptions {
+            kind: KINDS[self.kind.min(KINDS.len() - 1)].1,
+            small: self.small,
+            icon: self.icon.then_some(icon::ADD),
+        };
+        let sw = button_width_with(ui.painter(), &self.label, &options);
+        ui.with_enabled(self.enabled, |ui| {
+            ui.button_with(
+                "secondary",
+                Rect::new(x + pw + 8.0, by, sw, 32.0),
+                &self.label,
+                &options,
+            );
+        });
         let dw = button_width(ui.painter(), "Disabled");
         ui.with_enabled(false, |ui| {
             ui.button(
@@ -65,6 +100,15 @@ impl PageState for Live {
                 ButtonKind::Secondary,
             );
         });
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let names: Vec<&str> = KINDS.iter().map(|(n, _)| *n).collect();
+        panel.choice(ui, "Kind", &names, &mut self.kind);
+        panel.text(ui, "Label", &mut self.label);
+        panel.toggle(ui, "Small", &mut self.small);
+        panel.toggle(ui, "Icon", &mut self.icon);
+        panel.toggle(ui, "Enabled", &mut self.enabled);
     }
 }
 

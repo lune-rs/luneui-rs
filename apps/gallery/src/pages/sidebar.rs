@@ -16,6 +16,7 @@ use lune_ui::widgets::tone::Tone;
 use super::{caption, card, heading};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "sidebar",
@@ -89,6 +90,8 @@ struct Live {
     /// The nav list of the error column keeps its own selection.
     selected_error: u64,
     step: usize,
+    /// The status footers show.
+    footer: bool,
 }
 
 impl Live {
@@ -98,6 +101,7 @@ impl Live {
             selected: 1,
             selected_error: 2,
             step: 1,
+            footer: true,
         }
     }
 }
@@ -137,7 +141,7 @@ impl PageState for Live {
                         entries: &entries,
                         selected: &mut self.selected,
                     },
-                    footer: Some(OK),
+                    footer: self.footer.then_some(OK),
                     name: "Main navigation",
                 },
             );
@@ -152,7 +156,7 @@ impl PageState for Live {
                         entries: &entries,
                         selected: &mut self.selected_error,
                     },
-                    footer: Some(STOPPED),
+                    footer: self.footer.then_some(STOPPED),
                     name: "Main navigation",
                 },
             );
@@ -167,7 +171,7 @@ impl PageState for Live {
                         labels: &STEPS,
                         current: self.step,
                     },
-                    footer: Some(OK),
+                    footer: self.footer.then_some(OK),
                     name: "Setup steps",
                 },
             );
@@ -200,7 +204,33 @@ impl PageState for Live {
             }
         }
     }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let names: Vec<&str> = SHOWS.iter().map(|(n, _)| *n).collect();
+        let mut at = SHOWS.iter().position(|(_, s)| *s == self.show).unwrap_or(0);
+        if panel.choice(ui, "Columns", &names, &mut at) {
+            self.show = SHOWS[at].1;
+        }
+        panel.toggle(ui, "Status footer", &mut self.footer);
+        let mut step = self.step as f32;
+        if panel.number(
+            ui,
+            "Wizard step",
+            &mut step,
+            (0.0, (STEPS.len() - 1) as f32, 1.0),
+        ) {
+            self.step = step.round() as usize;
+        }
+    }
 }
+
+/// The column sets, in the order the knob lists them.
+const SHOWS: [(&str, Show); 4] = [
+    ("All three", Show::All),
+    ("Main", Show::Main),
+    ("Footer error", Show::Error),
+    ("Wizard", Show::Wizard),
+];
 
 const SCENES: &[UiScene] = &[
     // Six nav items, one selected, the ok footer.

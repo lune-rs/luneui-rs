@@ -11,6 +11,7 @@ use lune_ui::widgets::toggle::{ToggleLook, ToggleState, paint};
 use super::{caption, card, heading};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 use lune_ui::input::NamedKey;
 
 pub(crate) static PAGE: Page = Page {
@@ -27,6 +28,9 @@ fn live() -> Box<dyn PageState> {
     Box::new(Live {
         off: false,
         on: true,
+        enabled: false,
+        third: false,
+        label: "On".to_owned(),
     })
 }
 
@@ -39,10 +43,16 @@ fn label(ui: &mut Ui<'_>, text: &str, x: f32, y: f32) {
     ui.painter().text(&spec, x, y + 3.0);
 }
 
-/// Two real switches through the `Ui`: the first starts off, the second on.
+/// Two real switches through the `Ui`: the first starts off, the second on; the third is
+/// disabled. The knobs set the values, the third's enabled flag and the second's label.
 struct Live {
     off: bool,
     on: bool,
+    /// The third switch takes input, and its value.
+    enabled: bool,
+    third: bool,
+    /// The second switch's label and accessible name.
+    label: String,
 }
 
 impl PageState for Live {
@@ -57,19 +67,26 @@ impl PageState for Live {
             "switch-on",
             Rect::new(x + 160.0, ty, 40.0, 24.0),
             &mut self.on,
-            "On",
+            &self.label,
         );
-        label(ui, "On", x + 212.0, ty);
-        let mut off = false;
-        ui.with_enabled(false, |ui| {
+        label(ui, &self.label, x + 212.0, ty);
+        let third = &mut self.third;
+        ui.with_enabled(self.enabled, |ui| {
             ui.toggle(
                 "disabled",
                 Rect::new(x + 320.0, ty, 40.0, 24.0),
-                &mut off,
+                third,
                 "Disabled",
             );
         });
         label(ui, "Disabled", x + 372.0, ty);
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.toggle(ui, "First on", &mut self.off);
+        panel.toggle(ui, "Second on", &mut self.on);
+        panel.toggle(ui, "Third enabled", &mut self.enabled);
+        panel.text(ui, "Second label", &mut self.label);
     }
 }
 

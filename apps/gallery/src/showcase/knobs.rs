@@ -1,0 +1,360 @@
+//! Knobs: the per-component controls at the top of the showcase's settings pane (D3).
+//!
+//! A page that has options worth turning overrides `PageState::knobs` and declares one row per
+//! option, each bound to a field of the page:
+//!
+//! ```ignore
+//! fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+//!     panel.choice(ui, "Kind", &["Primary", "Secondary"], &mut self.kind);
+//!     panel.toggle(ui, "Enabled", &mut self.enabled);
+//! }
+//! ```
+//!
+//! The pane draws after the page, so a turned knob shows in the next frame: a row asks for one
+//! when it changes. A knob's starting value is what the page draws without any knob, so a
+//! scene (which never draws the pane) and the live page agree until a knob is turned.
+
+use lune_ui::ui::Ui;
+use lune_ui::widgets::field::FieldOptions;
+use lune_ui::widgets::radio_group::RadioOption;
+
+use super::settings::Col;
+
+/// The rows of the page's knobs, drawn down the settings column.
+#[derive(Debug)]
+pub(crate) struct Knobs<'c> {
+    col: &'c mut Col,
+    rows: usize,
+}
+
+impl<'c> Knobs<'c> {
+    pub(crate) fn new(col: &'c mut Col) -> Self {
+        Self { col, rows: 0 }
+    }
+
+    /// Whether the page declared no knob.
+    pub(crate) fn is_empty(&self) -> bool {
+        self.rows == 0
+    }
+
+    /// A frame after a change, for the page to draw it.
+    fn turned(&mut self, ui: &mut Ui<'_>, changed: bool) -> bool {
+        self.rows += 1;
+        if changed {
+            ui.request_repaint_at(ui.time());
+        }
+        changed
+    }
+
+    /// A switch for a yes-or-no option. True when it was turned.
+    pub(crate) fn toggle(&mut self, ui: &mut Ui<'_>, label: &str, on: &mut bool) -> bool {
+        let before = *on;
+        self.col.toggle(ui, label, label, on);
+        self.turned(ui, *on != before)
+    }
+
+    /// One of `options`, by index into it. True when the choice changed.
+    pub(crate) fn choice(
+        &mut self,
+        ui: &mut Ui<'_>,
+        label: &str,
+        options: &[&str],
+        selected: &mut usize,
+    ) -> bool {
+        let rows: Vec<RadioOption<'_>> = options
+            .iter()
+            .enumerate()
+            .map(|(i, text)| RadioOption {
+                key: i as u64,
+                label: text,
+                enabled: true,
+            })
+            .collect();
+        let mut chosen = (*selected).min(options.len().saturating_sub(1)) as u64;
+        self.col.label(ui, label);
+        let changed = self.col.radio(ui, label, &rows, &mut chosen, label);
+        if changed {
+            *selected = chosen as usize;
+        }
+        self.turned(ui, changed)
+    }
+
+    /// A number in `min..=max`; a `step` of 1 or more shows whole numbers. True when moved.
+    pub(crate) fn number(
+        &mut self,
+        ui: &mut Ui<'_>,
+        label: &str,
+        value: &mut f32,
+        (min, max, step): (f32, f32, f32),
+    ) -> bool {
+        let whole = step >= 1.0;
+        let changed = self
+            .col
+            .slider(ui, label, label, value, (min, max, step), |v| {
+                if whole {
+                    format!("{v:.0}")
+                } else {
+                    format!("{v:.1}")
+                }
+            });
+        self.turned(ui, changed)
+    }
+
+    /// A line of text. True when it was edited.
+    pub(crate) fn text(&mut self, ui: &mut Ui<'_>, label: &str, value: &mut String) -> bool {
+        self.col.label(ui, label);
+        let rect = lune_ui::paint::Rect::new(self.col.x, self.col.y - 4.0, self.col.w, 28.0);
+        let options = FieldOptions {
+            label: Some(label),
+            ..FieldOptions::default()
+        };
+        let changed = ui
+            .text_field_with(label, rect, value, &options)
+            .response
+            .changed;
+        self.col.y += 32.0;
+        self.turned(ui, changed)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::{HOST, SCENE_LAYOUT, Showcase};
+    use crate::page::{Ev, Player};
+    use lune_ui::access::Role;
+    use lune_ui::input::{FrameOutput, Modifiers, Repaint};
+    use lune_ui::motion::MotionTier;
+    use lune_ui::paint::Rect;
+    use lune_ui::scene::Scene;
+    use lune_ui::testing::FakeText;
+
+    /// The shell on a 1,600 x 900 window with one page chosen, driven the way a window drives it:
+    /// the pointer moves and presses over the node a control draws.
+    struct Shell {
+        player: Player,
+        ms: u32,
+        last: (Scene, FrameOutput),
+    }
+
+    impl Shell {
+        fn open(page: &str) -> Shell {
+            let mut player = Player::new(
+                HOST,
+                Box::new(Showcase::new()),
+                (1600.0, 900.0),
+                1.0,
+                MotionTier::Full,
+            );
+            let first = player.frame(&mut FakeText, 0, &[]).expect("frame");
+            let mut shell = Shell {
+                player,
+                ms: 0,
+                last: first,
+            };
+            let cue: &'static str = Box::leak(format!("page {page}").into_boxed_str());
+            shell.frame(&[Ev::Cue(cue)]);
+            shell.settle();
+            shell
+        }
+
+        fn frame(&mut self, events: &[Ev]) {
+            self.ms += 16;
+            self.last = self
+                .player
+                .frame(&mut FakeText, self.ms, events)
+                .expect("frame");
+        }
+
+        /// Frames for 600 ms: every motion of the page and the pane is done.
+        fn settle(&mut self) {
+            for _ in 0..38 {
+                self.frame(&[]);
+            }
+        }
+
+        fn centre(&self, role: Role, name: &str) -> Option<(f32, f32)> {
+            self.last
+                .1
+                .tree
+                .nodes
+                .iter()
+                .find(|n| n.role == role && n.name == name)
+                .map(|n| (n.bounds.x + n.bounds.w / 2.0, n.bounds.y + n.bounds.h / 2.0))
+        }
+
+        /// Presses the control, leaving the frame of the press as the last but one; true when it
+        /// is there.
+        fn press(&mut self, role: Role, name: &str) -> bool {
+            let Some((x, y)) = self.centre(role, name) else {
+                return false;
+            };
+            self.frame(&[Ev::PointerAt(x, y)]);
+            self.frame(&[Ev::Click]);
+            true
+        }
+
+        /// Presses a control and lets the page draw what it made of it.
+        fn turn(&mut self, role: Role, name: &str) {
+            assert!(self.press(role, name), "no {role:?} named {name}");
+            self.settle();
+        }
+
+        /// What the hosted page draws: the items of the frame that lie in the content pane,
+        /// whatever the layer (a dialog is on another).
+        fn page(&self) -> Vec<String> {
+            let pane = SCENE_LAYOUT.pane;
+            let inside = |r: Rect| pane.contains((r.x + r.w / 2.0, r.y + r.h / 2.0));
+            let mut out = Vec::new();
+            for layer in &self.last.0.layers {
+                let g = &layer.geometry;
+                let acrylic = g.acrylic.iter().map(|a| &a.shape);
+                for s in g.under.iter().chain(&g.over).chain(acrylic) {
+                    let [x, y, w, h] = s.rect;
+                    if inside(Rect::new(x, y, w, h)) {
+                        out.push(format!("shape {:?} {:?} {:?}", s.rect, s.color, s.radii));
+                    }
+                }
+                for t in &layer.texts {
+                    if inside(Rect::new(t.x, t.y, 1.0, 1.0)) {
+                        out.push(format!("text {:?} {} {}", t.key, t.x, t.y));
+                    }
+                }
+            }
+            out
+        }
+    }
+
+    fn typed_into(shell: &mut Shell, field: &str, text: &'static str) {
+        let (x, y) = shell.centre(Role::TextInput, field).expect("the field");
+        shell.frame(&[Ev::PointerAt(x, y)]);
+        shell.frame(&[Ev::Click]);
+        let all = Modifiers {
+            logo: true,
+            ..Modifiers::default()
+        };
+        shell.frame(&[Ev::KeyChar("a", all)]);
+        shell.frame(&[Ev::Type(text)]);
+        shell.settle();
+    }
+
+    /// A page with knobs shows them at the top of the pane; a page with none shows none.
+    #[test]
+    fn a_page_with_knobs_shows_them_and_a_page_without_shows_none() {
+        let with = Shell::open("button");
+        for name in ["Small", "Icon", "Enabled"] {
+            assert!(with.centre(Role::Switch, name).is_some(), "{name}");
+        }
+        assert!(with.centre(Role::Radio, "Ghost").is_some());
+        assert!(with.centre(Role::TextInput, "Label").is_some());
+        let without = Shell::open("label");
+        assert!(without.centre(Role::Switch, "Small").is_none());
+        assert!(without.centre(Role::Radio, "Ghost").is_none());
+        // The global sections are still under the (empty) knobs.
+        assert!(without.centre(Role::Radio, "Reduced").is_some());
+    }
+
+    /// A turn asks for a frame, so the page draws it at once, not at the next input.
+    #[test]
+    fn a_turned_knob_asks_for_a_frame() {
+        let mut shell = Shell::open("button");
+        assert!(shell.press(Role::Switch, "Small"));
+        // The press is the last frame; the one before holds the click as well.
+        assert_ne!(shell.last.1.repaint, Repaint::Idle);
+    }
+
+    #[test]
+    fn the_button_knobs_change_the_button() {
+        let mut shell = Shell::open("button");
+        let rest = shell.page();
+        assert!(!rest.is_empty());
+        shell.turn(Role::Switch, "Small");
+        let small = shell.page();
+        assert_ne!(small, rest, "a small button");
+        shell.turn(Role::Switch, "Small");
+        assert_eq!(shell.page(), rest, "and back");
+        shell.turn(Role::Radio, "Primary");
+        assert_ne!(shell.page(), rest, "another kind");
+        shell.turn(Role::Radio, "Secondary");
+        shell.turn(Role::Switch, "Icon");
+        assert_ne!(shell.page(), rest, "a glyph");
+        shell.turn(Role::Switch, "Icon");
+        shell.turn(Role::Switch, "Enabled");
+        assert_ne!(shell.page(), rest, "disabled");
+        shell.turn(Role::Switch, "Enabled");
+        assert_eq!(shell.page(), rest);
+        // The label is a text knob: its text is the button's.
+        typed_into(&mut shell, "Label", "Go");
+        assert_ne!(shell.page(), rest, "a label");
+        assert!(shell.centre(Role::Button, "Go").is_some());
+    }
+
+    #[test]
+    fn the_toggle_knobs_change_the_switches() {
+        let mut shell = Shell::open("toggle");
+        let rest = shell.page();
+        shell.turn(Role::Switch, "Third enabled");
+        assert_ne!(shell.page(), rest, "the third is no longer faded");
+        shell.turn(Role::Switch, "Third enabled");
+        assert_eq!(shell.page(), rest);
+        shell.turn(Role::Switch, "First on");
+        assert_ne!(shell.page(), rest, "the first switch is on");
+        typed_into(&mut shell, "Second label", "Armed");
+        assert!(
+            shell.centre(Role::Switch, "Armed").is_some(),
+            "its name too"
+        );
+    }
+
+    #[test]
+    fn the_table_knobs_change_the_columns_and_the_rows() {
+        let mut shell = Shell::open("table");
+        let rest = shell.page();
+        assert!(shell.centre(Role::ColumnHeader, "Route").is_some() || !rest.is_empty());
+        shell.turn(Role::Radio, "Tones");
+        assert_ne!(shell.page(), rest, "other columns");
+        assert!(
+            shell.last.1.tree.nodes.iter().any(|n| n.name == "Strong"),
+            "the tones' columns"
+        );
+        shell.turn(Role::Radio, "Route data");
+        assert_eq!(shell.page(), rest, "back to the routes");
+        shell.turn(Role::Switch, "Enabled");
+        assert_ne!(shell.page(), rest, "a faded table");
+    }
+
+    /// A modal dialog blocks the whole window, the pane included: the variant is chosen while
+    /// it is closed, then Open shows that variant.
+    #[test]
+    fn the_dialog_knobs_choose_the_variant_and_open_it() {
+        let open_as = |variant: Option<&str>| {
+            let mut shell = Shell::open("dialog");
+            let closed = shell.page();
+            if let Some(v) = variant {
+                shell.turn(Role::Radio, v);
+                assert_eq!(shell.page(), closed, "a closed dialog draws nothing of it");
+            }
+            shell.turn(Role::Switch, "Open");
+            (closed, shell.page())
+        };
+        let (closed, confirm) = open_as(None);
+        assert_ne!(confirm, closed, "the dialog is up");
+        let (_, form) = open_as(Some("Form"));
+        assert_ne!(form, confirm, "the form variant");
+        let (_, disabled) = open_as(Some("Disabled confirm"));
+        assert_ne!(disabled, confirm, "a confirm button that is faded");
+    }
+
+    #[test]
+    fn the_sidebar_knobs_change_the_columns_the_footer_and_the_step() {
+        let mut shell = Shell::open("sidebar");
+        let all = shell.page();
+        shell.turn(Role::Switch, "Status footer");
+        assert_ne!(shell.page(), all, "no footers");
+        shell.turn(Role::Switch, "Status footer");
+        assert_eq!(shell.page(), all);
+        shell.turn(Role::Radio, "Wizard");
+        let wizard = shell.page();
+        assert_ne!(wizard, all, "one column");
+        assert!(wizard.len() < all.len());
+    }
+}

@@ -17,6 +17,7 @@ use lune_ui::widgets::virtual_list::{RowKey, SelectionMode};
 use super::{card, heading, on_card};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "table",
@@ -240,6 +241,7 @@ fn state(mode: Mode, count: usize) -> Live {
         seed: &[],
         seeded: false,
         enabled: true,
+        selection: 2,
         toggles: [true, false, true, true, false, true],
     }
 }
@@ -289,8 +291,25 @@ struct Live {
     seed: &'static [u64],
     seeded: bool,
     enabled: bool,
+    /// An index into [`SELECTIONS`].
+    selection: usize,
     toggles: [bool; 6],
 }
+
+/// The selection modes the table's knob offers, in the order shown (the default is `Multi`).
+const SELECTIONS: [(&str, SelectionMode); 3] = [
+    ("None", SelectionMode::None),
+    ("Single", SelectionMode::Single),
+    ("Multi", SelectionMode::Multi),
+];
+
+/// The column sets, in the order the knob lists them (a `Mode` each).
+const MODES: [(&str, Mode); 4] = [
+    ("Route data", Mode::Data),
+    ("Tones", Mode::Tones),
+    ("Controls", Mode::Controls),
+    ("Wrapping text", Mode::Wrap),
+];
 
 impl Live {
     /// Orders the rows by `sort` (a stable order: ties by id).
@@ -326,7 +345,7 @@ impl PageState for Live {
         let opts = TableOptions {
             columns,
             count: self.order.len(),
-            selection: SelectionMode::Multi,
+            selection: SELECTIONS[self.selection.min(SELECTIONS.len() - 1)].1,
             wrap: self.mode == Mode::Wrap,
             index_of: Some(&index_of),
             label: "Routes",
@@ -344,6 +363,17 @@ impl PageState for Live {
         if let Some(sort) = resp.sort {
             self.resort(sort);
         }
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let names: Vec<&str> = MODES.iter().map(|(n, _)| *n).collect();
+        let mut at = MODES.iter().position(|(_, m)| *m == self.mode).unwrap_or(0);
+        if panel.choice(ui, "Columns", &names, &mut at) {
+            self.mode = MODES[at].1;
+        }
+        let names: Vec<&str> = SELECTIONS.iter().map(|(n, _)| *n).collect();
+        panel.choice(ui, "Selection", &names, &mut self.selection);
+        panel.toggle(ui, "Enabled", &mut self.enabled);
     }
 }
 
