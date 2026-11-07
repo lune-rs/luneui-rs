@@ -1,4 +1,5 @@
-//! Device loss: `Gpu::is_lost` reports it, and drawing on a lost device does not panic.
+//! Device loss: `Gpu::is_lost` reports it, and a draw on a lost device never reports success (wgpu
+//! panics inside it).
 //!
 //! GPU test: with no adapter it prints `skipped: no GPU adapter` and passes, unless
 //! `LUNEUI_REQUIRE_GPU=1`, which makes a missing adapter a failure.

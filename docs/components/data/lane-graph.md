@@ -53,7 +53,7 @@ Conflicts: none. The lane layout (which lane each commit takes) is outside the c
 | lane continues below | lane line to the row's bottom | [L src/Lunegit.Desktop/Controls/GraphRowControl.cs:144-147] |
 | lane continues above | lane line from the row's top | [L src/Lunegit.Desktop/Controls/GraphRowControl.cs:144-147] |
 | cross-lane connection | curve between lanes, with a corner of radius up to 10 | [L src/Lunegit.Desktop/Controls/GraphRowControl.cs:112-135,215] |
-| node selected or hovered | not in the control; the owner draws it | open question |
+| node selected or hovered | n/a: not in the control; the owner draws it (a `virtual_list` row) | [D170] |
 
 ### Transitions
 

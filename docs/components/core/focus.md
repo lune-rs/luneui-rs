@@ -76,7 +76,7 @@ C4-only rule [core.ui].
 | focus-visible | 1 px `fg_secondary` outline (inset on buttons, offset 2 on toggles, checkboxes, radios) | [W docs/ui/mocks/css/components.css:125,130,174,197-198] |
 | focus-within (text input) | border `accent` | [W docs/ui/mocks/css/components.css:234,290,312] |
 | scope trapped | Tab cycles inside the modal; lower layers show no focus | [L src/Lunegit.Desktop/MainWindow.axaml:249] |
-| disabled | not a tab stop, no ring | [W docs/ui/components.md:295,297] |
+| disabled | not a tab stop, no ring: a focused widget that turns disabled reports no focus and no ring the next frame (scene `tree-view-disabled`, test `a_focused_widget_that_turns_disabled_shows_no_ring_the_next_frame`) | [W docs/ui/components.md:295,297] |
 
 ### Transitions
 

@@ -4743,8 +4743,6 @@ mod m10 {
                     name: "",
                 };
                 ui.flyout("fly", &fly);
-                let items = ["one"];
-                let _ = items;
                 let mut o =
                     PopoverOptions::new(Rect::new(20.0, 400.0, 100.0, 30.0), (200.0, 100.0));
                 o.surface = Surface::Glass;

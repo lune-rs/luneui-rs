@@ -47,7 +47,7 @@ Not read: `ToolbarView.axaml:82-220` (the centre and right groups, the branch an
 | rest | transparent | [L src/Lunegit.Desktop/App.axaml:465-468] |
 | hover | fill `surface_hover`, radius 6 | [L src/Lunegit.Desktop/App.axaml:469-472] |
 | pressed | fill `surface_active` | [L src/Lunegit.Desktop/App.axaml:473-476] |
-| focus-visible | not styled by Lunegit (Fluent default); open | [L src/Lunegit.Desktop/App.axaml:460-483] |
+| focus-visible | the button's ring (Lunegit styles none) | [L src/Lunegit.Desktop/App.axaml:460-483], [D128] |
 | disabled | transparent, opacity 0.4, inert | [L src/Lunegit.Desktop/App.axaml:477-483] |
 | branch disabled | disabled when the repository cannot be written | [L src/Lunegit.Desktop/Views/ToolbarView.axaml:79] |
 

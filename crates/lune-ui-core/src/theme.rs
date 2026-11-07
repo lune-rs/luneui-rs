@@ -409,8 +409,6 @@ pub mod lunegit_dark {
     };
 
     pub const CARD_CORNER_RADIUS: f32 = 8.0;
-    pub const TAB_HEADER_HEIGHT: f32 = 32.0;
-    pub const BODY_PADDING: f32 = 10.0;
 }
 
 #[cfg(test)]

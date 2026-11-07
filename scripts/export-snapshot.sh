@@ -135,6 +135,14 @@ fi
 
 printf '%s\n' "$sha" > "$stage/SNAPSHOT"
 
+# mktemp makes the stage 0700, and the swap-in moves it as it is: a consumer would get a root only
+# its owner can enter. Set the ordinary mode and assert it, before anything is replaced.
+chmod 755 "$stage"
+case "$(ls -ld "$stage")" in
+  drwxr-xr-x*) ;;
+  *) fail "the staged root is not mode 0755" ;;
+esac
+
 # ---- swap in -----------------------------------------------------------------------------------
 if [ -e "$dest" ]; then
   old="$(mktemp -d "$parent/.$(basename "$dest").old.XXXXXX")"

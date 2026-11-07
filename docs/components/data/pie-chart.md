@@ -46,7 +46,7 @@ Conflicts: none (no Wane or moved pie). The highlight alpha is 38 of 255 (about 
 | slices | one sector per slice with a positive size | [L src/Lunegit.Desktop/Controls/StoragePieChartControl.cs:91-102] |
 | empty (no slices or total ≤ 0) | nothing drawn | [L src/Lunegit.Desktop/Controls/StoragePieChartControl.cs:82,85] |
 | zero-size slice | skipped | [L src/Lunegit.Desktop/Controls/StoragePieChartControl.cs:93] |
-| single slice of the whole | the sweep is 2π; the arc from start to end at the same point is not checked | open question |
+| single slice of the whole | a full disc: `Painter::sector` at a sweep of 2π is one fan | Open questions |
 | hover a slice | none in the control | [L src/Lunegit.Desktop/Controls/StoragePieChartControl.cs:80-108] |
 
 ### Transitions

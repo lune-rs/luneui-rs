@@ -80,7 +80,7 @@ Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, r
   never names the layer. A widget in a `with_enabled(false, ..)` scope needs no rule of its own for its nodes (`Ui::node`
   marks them, D140), but it consumes its keys before it gates on `enabled` (`docs/architecture.md`, "Disabled keys", is the one list, D159); `testing::disabled_violations` checks a subtree.
 - Each seam has a fake and a contract test in `lune_ui_core::testing` (`RecordingRenderer`, `FakeText`
-  with `text_system_contract`, `FakeImages` with `image_store_contract`, `ScriptedInput`, `NullMaterial` with
+  with `text_system_contract`, `FakeImages` with `image_store_contract`, `ScriptedInput` with `scripted_input_contract`, `NullMaterial` with
   `backdrop_contract`); a new adapter
   passes the same suite. `docs/architecture.md` holds the module map, the seam table, the multi-window
   model and the pixel gates.

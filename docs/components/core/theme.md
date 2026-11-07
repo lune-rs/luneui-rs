@@ -11,7 +11,7 @@ summary: Theme token struct and the lunegit_dark preset with the WINDOW, PANEL a
 
 ## What it is
 
-`Theme` (tokens the widgets read) and the `lunegit_dark` module: `THEME`, `TINT`, `WINDOW`/`PANEL`/`CARD` layers, `CARD_CORNER_RADIUS`, `TAB_HEADER_HEIGHT`, `BODY_PADDING`.
+`Theme` (tokens the widgets read) and the `lunegit_dark` module: `THEME`, `TINT`, `WINDOW`/`PANEL`/`CARD` layers, `CARD_CORNER_RADIUS`.
 Since M10 the three glass layers also travel inside the theme: `Theme.glass: ThemeGlass { window, panel, card }` (preset: the three consts, which stay), so a theme file's tint and opacities load with the rest (D207). `Theme::from_json` loads a file over a base theme and `Theme::with_acrylic(AcrylicLevel)` scales the glass material opacities; see `infra.theme-hot-reload`. `COLOR_KEYS` and `Theme::color_key` expose the key table. Every glass surface (menu, list, popover, tooltip, toast, dialog and palette card) draws `menu_glass` and `menu_popup_border`; there is no toast or dialog fill of its own, so `ToastBackground`, `ToastBorder` and `BackdropDark` are unknown file keys (D8).
 
 ## Needs
@@ -35,7 +35,7 @@ Conflicts: the repo menu padding (6) and Lunegit's (MenuItem 10,6) differ; overl
 
 - `Theme` struct: colours (`fg_*`, `surface_*`, `border`, `tree_guide` (the tree view's guides, #FFFFFF14, a toolkit value with no file key, D271), `accent`, dialog and menu tokens) the font sizes (`font_s` 11, `font_base` 13, `font_m` 14) and the selection shape's `selection_radius` 3 and `selection_pad` 2 (toolkit values with no file key, D272) [R crates/lune-ui-core/src/theme.rs:11-41].
 - `DARK` = `lunegit_dark::THEME` [R crates/lune-ui-core/src/theme.rs:47].
-- Glass layers `WINDOW`, `PANEL`, `CARD` [R crates/lune-ui-core/src/theme.rs:91-109]; `CARD_CORNER_RADIUS` 8 [R crates/lune-ui-core/src/theme.rs:115]; `TAB_HEADER_HEIGHT` 32 [R crates/lune-ui-core/src/theme.rs:116]; `BODY_PADDING` 10 [R crates/lune-ui-core/src/theme.rs:117].
+- Glass layers `WINDOW`, `PANEL`, `CARD` [R crates/lune-ui-core/src/theme.rs:91-109]; `CARD_CORNER_RADIUS` 8 [R crates/lune-ui-core/src/theme.rs:115].
 - Motion tokens to add in M4 (SF5 names): durations `instant` 120, `fast` 180, `base` 250, `moderate` 350, `slow` 500 [L src/Lunegit.Desktop/App.axaml:151-155]; easings `linear`, `quad-out`, `quad-in`, `sine-in-out`, `back-out`, `cubic-out` (0.215, 0.61, 0.355, 1), `ease-in` (0.42, 0, 1, 1) [R crates/lune-ui-core/src/widgets/menu.rs:46-58]. Kinds are not theme values.
 - JSON theme (M10, done): `Theme::from_json` and the 50-key table in `theme.rs` (`COLOR_KEYS`), see `infra.theme-hot-reload`. Widgets still take their `GlassLayer` from their options; the app reads it from `theme.glass`.
 
@@ -92,7 +92,7 @@ n/a — no text.
 
 ## Open questions
 
-- Still open, a placement question: `TAB_HEADER_HEIGHT` and `BODY_PADDING` read as terminal-app values. Checked at M11: nothing in this repo reads either, so they affect no widget. They stay as the preset's constants; moving or dropping them is a public-API change no consumer has asked for (D237).
+- `TAB_HEADER_HEIGHT` and `BODY_PADDING` are gone ([D276]): they read as terminal-app values and nothing read either (checked at M11, D245). A public-API removal.
 
 ## Notes for the planner
 

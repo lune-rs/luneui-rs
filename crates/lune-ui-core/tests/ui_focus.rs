@@ -112,6 +112,31 @@ fn a_press_on_a_non_focusable_widget_leaves_focus_alone() {
     assert!(run(&mut h));
 }
 
+/// A widget that is focused with its ring showing, then drawn disabled: the next frame it reports
+/// neither the focus nor the ring (`core.focus`, "disabled"; the `tree-view-disabled` scene).
+#[test]
+fn a_focused_widget_that_turns_disabled_shows_no_ring_the_next_frame() {
+    let mut h = harness();
+    let run = |h: &mut UiHarness, enabled: bool| {
+        let mut r = None;
+        h.frame(|ui| r = Some(ui.with_enabled(enabled, |ui| stop(ui, "a", 0))));
+        r.expect("ran")
+    };
+    run(&mut h, true);
+    tab(&mut h);
+    let on = run(&mut h, true);
+    assert!(
+        on.enabled && on.focused && on.focus_visible,
+        "instrument: the ring shows"
+    );
+    let off = run(&mut h, false);
+    assert!(!off.enabled);
+    assert!(
+        !off.focused && !off.focus_visible,
+        "disabled: no focus, no ring: {off:?}"
+    );
+}
+
 fn modal() -> OverlayOptions {
     OverlayOptions {
         layer: LayerId::Modal,

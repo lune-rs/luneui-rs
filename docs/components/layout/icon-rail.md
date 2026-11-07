@@ -49,11 +49,11 @@ Conflicts: none. Wane and this repo have no icon rail.
 | rest | transparent button, icon `ForegroundMuted` | [L src/Lunegit.Desktop/Views/IconRailView.axaml:24-28] |
 | hover | background tween (Instant, linear) to the hover fill; the fill value is not read | [L src/Lunegit.Desktop/Themes/Animations.axaml:39-46] |
 | pressed | scale 0.98 | [L src/Lunegit.Desktop/Themes/Animations.axaml:59-60] |
-| panel active | not in the markup (the buttons toggle; no active class); open question | open question |
+| panel active | `surface_selected` fill, `fg_primary` glyph, `Pressed` in the node (the toolkit's addition: Lunegit's markup has no active class) | [D149] |
 | commit with uncommitted changes | dot shown | [L src/Lunegit.Desktop/Views/IconRailView.axaml:109] |
 | notifications with unread items | badge shown | [L src/Lunegit.Desktop/Views/IconRailView.axaml:46-53] |
-| focus-visible | not in the markup; open question | open question |
-| disabled | not in the markup; open question | open question |
+| focus-visible | the button's ring | [D149] |
+| disabled | n/a in Lunegit (no button is disabled); the toolkit draws a disabled item at 0.4 and inert, and the arrows skip it | [D149] |
 
 ### Transitions
 

@@ -73,7 +73,7 @@ No conflicts among sources.
 | hunk action, disabled | opacity 0.4 | [derived: Lunegit's disabled convention, App.axaml:482] |
 | word wrap on and off | wrapped lines, or a horizontal bar | [L src/Lunegit.Desktop/Views/UnifiedDiffView.axaml:49,143] |
 | empty | no rows; the app shows its empty state ("Select a file to view its diff") | [L src/Lunegit.Desktop/Views/CommitContentView.axaml:44-53], [L src/Lunegit.Desktop/Views/UnifiedDiffView.axaml:44-45] |
-| intra-line mark | stronger tint under the marked span | [derived: not in Lunegit; look open] |
+| intra-line mark | stronger tint under the marked span: the theme's `diff_added_mark` / `diff_removed_mark`, the fill's hue at alpha 0x40 | [D14] |
 
 ### Transitions
 
