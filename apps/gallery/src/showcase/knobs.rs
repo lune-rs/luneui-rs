@@ -439,6 +439,12 @@ mod tests {
         ),
         ("callout", Press(Role::Switch, "Show a sample")),
         ("row", Press(Role::Switch, "Descriptions")),
+        ("list-row", Press(Role::Switch, "Badge")),
+        ("form-field", Press(Role::Switch, "Inline")),
+        ("steps", Slide("Current step", 1.0)),
+        ("nav-item", Press(Role::Switch, "Glyphs")),
+        ("radio-group", Press(Role::Switch, "Last enabled")),
+        ("star-rating", Slide("Value", 1.0)),
     ];
 
     #[test]

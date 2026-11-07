@@ -10,6 +10,7 @@ use lune_ui::widgets::radio_group::{RadioLook, RadioOption, RadioState, paint};
 use super::{card, heading, on_card};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "radio-group",
@@ -22,7 +23,11 @@ pub(crate) static PAGE: Page = Page {
 };
 
 fn live() -> Box<dyn PageState> {
-    Box::new(Live { selected: 1 })
+    Box::new(Live {
+        selected: 1,
+        first_label: "Compact".to_owned(),
+        fourth_enabled: false,
+    })
 }
 
 fn specimens() -> Box<dyn PageState> {
@@ -40,9 +45,12 @@ const fn row(i: usize) -> (f32, f32) {
     (GROUP.x + 130.0, GROUP.y + 28.0 * i as f32 + 14.0)
 }
 
-/// A group of four: the last option is disabled.
+/// A group of four: the last option is disabled. The knobs set the choice, the first label and
+/// whether the last option is enabled.
 struct Live {
     selected: u64,
+    first_label: String,
+    fourth_enabled: bool,
 }
 
 impl PageState for Live {
@@ -53,7 +61,7 @@ impl PageState for Live {
         let options = [
             RadioOption {
                 key: 1,
-                label: "Compact",
+                label: &self.first_label,
                 enabled: true,
             },
             RadioOption {
@@ -69,7 +77,7 @@ impl PageState for Live {
             RadioOption {
                 key: 4,
                 label: "Custom (unavailable)",
-                enabled: false,
+                enabled: self.fourth_enabled,
             },
         ];
         ui.radio_group(
@@ -79,6 +87,15 @@ impl PageState for Live {
             &mut self.selected,
             "Density",
         );
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let mut selected = self.selected as f32;
+        if panel.number(ui, "Selected", &mut selected, (1.0, 4.0, 1.0)) {
+            self.selected = selected.round() as u64;
+        }
+        panel.text(ui, "First label", &mut self.first_label);
+        panel.toggle(ui, "Last enabled", &mut self.fourth_enabled);
     }
 }
 

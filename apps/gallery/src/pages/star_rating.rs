@@ -9,6 +9,7 @@ use lune_ui::widgets::star_rating::{MAX, StarLook, StarState, button_rect, paint
 use super::{caption, card, heading};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "star-rating",
@@ -21,11 +22,11 @@ pub(crate) static PAGE: Page = Page {
 };
 
 fn live() -> Box<dyn PageState> {
-    Box::new(Live { value: 3 })
+    Box::new(Live::of(3))
 }
 
 fn unrated() -> Box<dyn PageState> {
-    Box::new(Live { value: 0 })
+    Box::new(Live::of(0))
 }
 
 fn specimens() -> Box<dyn PageState> {
@@ -42,9 +43,22 @@ const fn star(n: u32) -> (f32, f32) {
     (AT.0 + 26.0 * (n - 1) as f32 + 12.0, AT.1 + 12.0)
 }
 
-/// A rating of five stars.
+/// A rating of five stars. The knobs set the value, the number of stars and whether it takes
+/// input.
 struct Live {
     value: u32,
+    max: u32,
+    enabled: bool,
+}
+
+impl Live {
+    fn of(value: u32) -> Self {
+        Self {
+            value,
+            max: MAX,
+            enabled: true,
+        }
+    }
 }
 
 impl PageState for Live {
@@ -52,13 +66,29 @@ impl PageState for Live {
         let card = card(ui, stage, "Star rating");
         let (ox, oy) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "STAR RATING", ox, oy);
-        ui.star_rating("stars", (ox, oy + 24.0), &mut self.value, MAX, "Rating");
+        let (value, max) = (&mut self.value, self.max);
+        ui.with_enabled(self.enabled, |ui| {
+            ui.star_rating("stars", (ox, oy + 24.0), value, max, "Rating");
+        });
         let text = if self.value == 0 {
             "Unrated".to_owned()
         } else {
-            format!("{} of {MAX}", self.value)
+            format!("{} of {}", self.value, self.max)
         };
         caption(ui, &text, ox, (oy + 24.0) + 36.0);
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let mut stars = self.max as f32;
+        if panel.number(ui, "Stars", &mut stars, (1.0, 10.0, 1.0)) {
+            self.max = stars.round() as u32;
+            self.value = self.value.min(self.max);
+        }
+        let mut value = self.value as f32;
+        if panel.number(ui, "Value", &mut value, (0.0, self.max as f32, 1.0)) {
+            self.value = value.round() as u32;
+        }
+        panel.toggle(ui, "Enabled", &mut self.enabled);
     }
 }
 
