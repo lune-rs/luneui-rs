@@ -10,6 +10,7 @@ use lune_ui::widgets::checkbox::{CheckboxLook, CheckboxState, paint};
 use super::{card, heading};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "checkbox",
@@ -22,16 +23,25 @@ pub(crate) static PAGE: Page = Page {
 };
 
 fn live() -> Box<dyn PageState> {
-    Box::new(Live { first: false })
+    Box::new(Live {
+        first: false,
+        second: true,
+        label: "Unchecked".to_owned(),
+        enabled: true,
+    })
 }
 
 fn specimens() -> Box<dyn PageState> {
     Box::new(Specimens)
 }
 
-/// Two real checkboxes through the `Ui`: the first starts unchecked, the second checked.
+/// Two real checkboxes through the `Ui`: the first starts unchecked, the second checked. The
+/// knobs set both values, the first one's label and whether it takes input.
 struct Live {
     first: bool,
+    second: bool,
+    label: String,
+    enabled: bool,
 }
 
 impl PageState for Live {
@@ -40,19 +50,23 @@ impl PageState for Live {
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "CHECKBOXES", x, y);
         let ty = y + 20.0;
-        ui.checkbox(
-            "box",
-            Rect::new(x, ty, 140.0, 24.0),
-            &mut self.first,
-            "Unchecked",
-        );
-        let mut on = true;
+        let (first, label) = (&mut self.first, &self.label);
+        ui.with_enabled(self.enabled, |ui| {
+            ui.checkbox("box", Rect::new(x, ty, 140.0, 24.0), first, label);
+        });
         ui.checkbox(
             "box-on",
             Rect::new(x, ty + 32.0, 140.0, 24.0),
-            &mut on,
+            &mut self.second,
             "Checked",
         );
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.toggle(ui, "First checked", &mut self.first);
+        panel.toggle(ui, "Second checked", &mut self.second);
+        panel.text(ui, "First label", &mut self.label);
+        panel.toggle(ui, "First enabled", &mut self.enabled);
     }
 }
 

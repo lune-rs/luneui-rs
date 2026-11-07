@@ -11,6 +11,7 @@ use lune_ui::widgets::combo::{ComboLook, ComboState, paint};
 use super::{caption, card, heading};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "combo",
@@ -23,7 +24,11 @@ pub(crate) static PAGE: Page = Page {
 };
 
 fn live() -> Box<dyn PageState> {
-    Box::new(Live { open: false })
+    Box::new(Live {
+        open: false,
+        value: "RznSans".to_owned(),
+        enabled: true,
+    })
 }
 
 fn specimens() -> Box<dyn PageState> {
@@ -31,9 +36,12 @@ fn specimens() -> Box<dyn PageState> {
 }
 
 /// Real combos through the `Ui`. The page plays the app: it keeps `open`, and a second click on
-/// an open combo closes it (the combo never closes itself).
+/// an open combo closes it (the combo never closes itself). The knobs set whether it is open,
+/// the text it shows and whether it takes input.
 struct Live {
     open: bool,
+    value: String,
+    enabled: bool,
 }
 
 impl PageState for Live {
@@ -41,13 +49,16 @@ impl PageState for Live {
         let card = card(ui, stage, "Combo");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "COMBO", x, y);
-        let r = ui.combo(
-            "combo",
-            Rect::new(x, y + 20.0, 210.0, 32.0),
-            "RznSans",
-            &mut self.open,
-            "Font",
-        );
+        let (value, open) = (&self.value, &mut self.open);
+        let r = ui.with_enabled(self.enabled, |ui| {
+            ui.combo(
+                "combo",
+                Rect::new(x, y + 20.0, 210.0, 32.0),
+                value,
+                open,
+                "Font",
+            )
+        });
         if r.clicked && !r.changed {
             self.open = false;
         }
@@ -61,6 +72,12 @@ impl PageState for Live {
                 "Disabled font",
             );
         });
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.text(ui, "Value", &mut self.value);
+        panel.toggle(ui, "Open", &mut self.open);
+        panel.toggle(ui, "Enabled", &mut self.enabled);
     }
 }
 

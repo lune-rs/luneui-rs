@@ -193,6 +193,27 @@ mod tests {
             true
         }
 
+        /// Presses the control `fraction` of the way along it (a slider's value follows).
+        fn press_along(&mut self, role: Role, name: &str, fraction: f32) -> bool {
+            let Some(n) = self
+                .last
+                .1
+                .tree
+                .nodes
+                .iter()
+                .find(|n| n.role == role && n.name == name)
+            else {
+                return false;
+            };
+            let (x, y) = (
+                n.bounds.x + n.bounds.w * fraction,
+                n.bounds.y + n.bounds.h / 2.0,
+            );
+            self.frame(&[Ev::PointerAt(x, y)]);
+            self.frame(&[Ev::Click]);
+            true
+        }
+
         /// Presses a control and lets the page draw what it made of it.
         fn turn(&mut self, role: Role, name: &str) {
             assert!(self.press(role, name), "no {role:?} named {name}");
@@ -356,5 +377,57 @@ mod tests {
         let wizard = shell.page();
         assert_ne!(wizard, all, "one column");
         assert!(wizard.len() < all.len());
+    }
+
+    /// One knob of a widget page turned in the shell.
+    enum Turn {
+        /// A press on the control.
+        Press(Role, &'static str),
+        /// A press on a slider, this far along it.
+        Slide(&'static str, f32),
+        /// Text typed into a field.
+        Type(&'static str, &'static str),
+    }
+
+    use Turn::{Press, Slide, Type};
+
+    /// Every widget page of this batch: turning the knob changes what the page draws.
+    const WIDGET_TURNS: &[(&str, Turn)] = &[
+        ("checkbox", Press(Role::Switch, "First checked")),
+        ("label", Type("Sample text", "Hello")),
+        ("stepper", Slide("Value", 0.9)),
+        ("combo", Press(Role::Switch, "Open")),
+        ("text-field", Press(Role::Radio, "Search")),
+        ("scrollbar", Slide("Lines", 0.0)),
+    ];
+
+    #[test]
+    fn a_knob_on_each_widget_page_changes_the_page() {
+        let mut unchanged = Vec::new();
+        for (page, turn) in WIDGET_TURNS {
+            let mut shell = Shell::open(page);
+            let rest = shell.page();
+            assert!(!rest.is_empty(), "{page} draws");
+            match turn {
+                Press(role, name) => assert!(shell.press(*role, name), "{page}: no {name}"),
+                Slide(name, at) => {
+                    assert!(
+                        shell.press_along(Role::Slider, name, *at),
+                        "{page}: no {name}"
+                    );
+                }
+                Type(field, text) => {
+                    typed_into(&mut shell, field, text);
+                }
+            }
+            shell.settle();
+            if shell.page() == rest {
+                unchanged.push(*page);
+            }
+        }
+        assert!(
+            unchanged.is_empty(),
+            "a turned knob changed nothing on {unchanged:?}"
+        );
     }
 }

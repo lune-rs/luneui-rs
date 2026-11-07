@@ -11,6 +11,7 @@ const FEW: u32 = 5;
 use super::{card, heading, on_card};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "scrollbar",
@@ -43,7 +44,15 @@ fn disabled() -> Box<dyn PageState> {
     })
 }
 
-/// A scroll area whose only point is its thumb.
+/// The bar modes the knobs offer, in the order shown.
+const BARS: [(&str, Bars); 3] = [
+    ("Auto", Bars::Auto),
+    ("Hidden", Bars::Hidden),
+    ("Disabled", Bars::Disabled),
+];
+
+/// A scroll area whose only point is its thumb. The knobs set how many lines it holds and each
+/// axis's bar.
 struct Live {
     lines: u32,
     bars: (Bars, Bars),
@@ -61,6 +70,22 @@ impl PageState for Live {
         ui.scroll_area("area", on_card(card, AREA), &opts, |ui, view| {
             ((), lines(ui, view, count))
         });
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let mut lines = self.lines as f32;
+        if panel.number(ui, "Lines", &mut lines, (1.0, 400.0, 1.0)) {
+            self.lines = lines.round() as u32;
+        }
+        let names: Vec<&str> = BARS.iter().map(|(n, _)| *n).collect();
+        let index = |b: Bars| BARS.iter().position(|(_, x)| *x == b).unwrap_or(0);
+        let (mut x, mut y) = (index(self.bars.0), index(self.bars.1));
+        if panel.choice(ui, "Horizontal bar", &names, &mut x) {
+            self.bars.0 = BARS[x].1;
+        }
+        if panel.choice(ui, "Vertical bar", &names, &mut y) {
+            self.bars.1 = BARS[y].1;
+        }
     }
 }
 

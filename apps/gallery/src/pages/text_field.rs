@@ -10,6 +10,7 @@ use lune_ui::widgets::field::{FieldLook, FieldOptions, FieldState, Variant, pain
 use super::{caption, card, heading};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
+use crate::showcase::knobs::Knobs;
 
 pub(crate) static PAGE: Page = Page {
     id: "text-field",
@@ -22,16 +23,12 @@ pub(crate) static PAGE: Page = Page {
 };
 
 fn live() -> Box<dyn PageState> {
-    Box::new(Live {
-        text: String::new(),
-    })
+    Box::new(Live::holding(""))
 }
 
 /// The live field holding "lune": the composing scene's start.
 fn lune() -> Box<dyn PageState> {
-    Box::new(Live {
-        text: "lune".to_owned(),
-    })
+    Box::new(Live::holding("lune"))
 }
 
 fn search() -> Box<dyn PageState> {
@@ -68,9 +65,40 @@ fn specimens() -> Box<dyn PageState> {
     Box::new(Specimens)
 }
 
-/// One real field through the `Ui`, empty at first.
+/// The variants the knob offers, in the order shown.
+const VARIANTS: [(&str, Variant); 5] = [
+    ("Plain", Variant::Plain),
+    ("Mono", Variant::Mono),
+    ("Password", Variant::Password),
+    ("Search", Variant::Search),
+    ("Date", Variant::Date),
+];
+
+/// One real field through the `Ui`, empty at first. The knobs set its variant, placeholder,
+/// size, error and read-only flags and whether it takes input.
 struct Live {
     text: String,
+    placeholder: String,
+    /// An index into [`VARIANTS`].
+    variant: usize,
+    small: bool,
+    error: bool,
+    read_only: bool,
+    enabled: bool,
+}
+
+impl Live {
+    fn holding(text: &str) -> Self {
+        Self {
+            text: text.to_owned(),
+            placeholder: "Search".to_owned(),
+            variant: 0,
+            small: false,
+            error: false,
+            read_only: false,
+            enabled: true,
+        }
+    }
 }
 
 impl PageState for Live {
@@ -78,13 +106,28 @@ impl PageState for Live {
         let card = card(ui, stage, "Text field");
         let (x, y) = (card.x + 24.0, card.y + 24.0);
         heading(ui, "TEXT FIELD", x, y);
-        ui.text_field(
-            "field",
-            Rect::new(x, y + 20.0, 210.0, 32.0),
-            &mut self.text,
-            "Search",
-            FieldState::default(),
-        );
+        let options = FieldOptions {
+            placeholder: &self.placeholder,
+            error: self.error,
+            variant: VARIANTS[self.variant.min(VARIANTS.len() - 1)].1,
+            small: self.small,
+            read_only: self.read_only,
+            ..FieldOptions::default()
+        };
+        let text = &mut self.text;
+        ui.with_enabled(self.enabled, |ui| {
+            ui.text_field_with("field", Rect::new(x, y + 20.0, 210.0, 32.0), text, &options);
+        });
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        let names: Vec<&str> = VARIANTS.iter().map(|(n, _)| *n).collect();
+        panel.choice(ui, "Variant", &names, &mut self.variant);
+        panel.text(ui, "Placeholder", &mut self.placeholder);
+        panel.toggle(ui, "Small", &mut self.small);
+        panel.toggle(ui, "Error", &mut self.error);
+        panel.toggle(ui, "Read only", &mut self.read_only);
+        panel.toggle(ui, "Enabled", &mut self.enabled);
     }
 }
 
