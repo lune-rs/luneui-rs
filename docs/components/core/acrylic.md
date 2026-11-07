@@ -94,7 +94,7 @@ n/a — no text.
 
 - Milestone: M11 (done standard; code exists).
 - Depends on: core.theme, render.frame, render.gpu.
-- Done (D47, M11): tests `crates/lune-ui-core/src/acrylic.rs::window_layer_matches_avalonia, crates/lune-ui-core/src/acrylic.rs::panel_layer_matches_avalonia, crates/lune-ui-core/src/acrylic.rs::card_layer_matches_avalonia, crates/lune-ui-core/src/acrylic.rs::white_tint_is_suppressed_to_twenty_percent, apps/gallery/src/scenes.rs::the_unfocused_scene_draws_the_window_fallback_and_no_glass_layer, crates/lune-ui-wgpu/tests/acrylic_fade.rs::fade_blends_between_the_base_and_the_card`; page n/a (a colour formula; drawn by the legacy scenes `acrylic`, `glass-off`, `unfocused`, `chrome`); unverified here: none (what the OS composites under the layers is `platform.material`).
+- Done (D47, M11): tests `crates/lune-ui-core/src/acrylic.rs::window_layer_matches_avalonia, crates/lune-ui-core/src/acrylic.rs::panel_layer_matches_avalonia, crates/lune-ui-core/src/acrylic.rs::card_layer_matches_avalonia, crates/lune-ui-core/src/acrylic.rs::white_tint_is_suppressed_to_twenty_percent, crates/lune-ui-wgpu/tests/acrylic_fade.rs::fade_blends_between_the_base_and_the_card`; page n/a (a colour formula; drawn by the legacy scenes `acrylic`, `glass-off`, `chrome`); unverified here: none (what the OS composites under the layers is `platform.material`).
 
 ## Open questions
 
