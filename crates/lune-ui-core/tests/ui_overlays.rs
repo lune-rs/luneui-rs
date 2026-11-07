@@ -1526,7 +1526,8 @@ fn a_dialog_popover_list_and_tooltip_are_four_layers_in_open_order() {
     let texts: Vec<usize> = layers.iter().map(|o| o.layer.texts.len()).collect();
     assert!(texts[0] >= 3, "{texts:?}");
     assert_eq!(texts[1..], [1, 3, 1]);
-    assert!(!layers[0].layer.geometry.acrylic.is_empty(), "the card");
+    let under = &layers[0].layer.geometry.under;
+    assert!(under.iter().any(|s| s.is_frost()), "the card");
 }
 
 #[test]

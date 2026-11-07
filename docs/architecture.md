@@ -275,7 +275,8 @@ Not checked, from reading only:
 
 ### Draw order
 
-Inside one layer, back to front (the contract in `scene.rs`): the acrylic shapes, the under shapes, the
+Inside one layer, back to front (the contract in `scene.rs`): the acrylic shapes (the fixed `Base` layer only: above it
+`Painter::acrylic` draws as `Painter::frost`, a premultiplied over-fill with noise among the under shapes, D258), the under shapes, the
 path fills (their own list, `LayerGeometry::fills`, drawn with the stroke pipeline so the order is
 explicit, D105), the custom items in record order, the images in record order (`Layer::images`), the
 text, the over shapes and the strokes. `Scene::in_order` is the order of the layers, and the one list every renderer
@@ -287,7 +288,8 @@ Everything of an older overlay draws before anything of a newer one on its fixed
 the frame, and an exit keeps its overlay's tag, so it draws under an overlay opened after it. A layer with
 `BackdropRequest`s (`Layer::backdrops`) is a stop: everything drawn before it is blurred, its requests draw over that,
 and the layer follows, so a glass surface blurs everything drawn before it, other glass included (a glass menu over
-a dialog with a blurred scrim frosts the dialog; D257). Every request stands. Requests of one layer share a blur per
+a dialog with a blurred scrim frosts the dialog; D257). A request replaces its region: `mix(sharp, blurred, coverage x
+alpha)` by an erase and an add, so nothing sharp stays in a translucent window (D258). Every request stands. Requests of one layer share a blur per
 distinct sigma, and each has its own uniforms. Up to the last stop, and at least to `Scene::floor` (the fixed layer
 `SCENE_LAYERS`, 2), the frame renders into the offscreen scene; a request below the floor stops at the floor. A frame
 with no request, or with one stop, runs the two passes and one blur it always ran. Consequences a widget author meets: text draws above every fill

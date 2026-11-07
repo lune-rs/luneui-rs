@@ -240,8 +240,8 @@ impl FrameTweaks {
         }
     }
 
-    /// Takes the noise off every acrylic of `scene` when it is off here. The flag is the last of
-    /// a shape's parameters, as `Painter::acrylic` wrote it.
+    /// Takes the noise off every acrylic and frost of `scene` when it is off here. The flag is the
+    /// last of a shape's parameters, as `Painter::acrylic` and `Painter::frost` wrote it.
     pub(crate) fn apply_noise(&self, scene: &mut Scene) {
         if self.noise {
             return;
@@ -250,6 +250,11 @@ impl FrameTweaks {
         for layer in scene.layers.iter_mut().chain(overlays) {
             for acrylic in &mut layer.geometry.acrylic {
                 acrylic.shape.params[3] = 0.0;
+            }
+            for shape in &mut layer.geometry.under {
+                if shape.is_frost() {
+                    shape.params[3] = 0.0;
+                }
             }
         }
     }

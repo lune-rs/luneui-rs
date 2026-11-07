@@ -83,7 +83,9 @@ pub(crate) struct Shared {
 pub(crate) struct Pipelines {
     copy: wgpu::RenderPipeline,
     blur: wgpu::RenderPipeline,
+    /// Adds the blurred picture, after `erase` made room for it.
     backdrop: wgpu::RenderPipeline,
+    erase: wgpu::RenderPipeline,
 }
 
 impl Shared {
@@ -198,17 +200,33 @@ impl Shared {
             wgpu::BlendState::REPLACE,
             false,
         );
+        let both = |src_factor, dst_factor| {
+            let c = wgpu::BlendComponent {
+                src_factor,
+                dst_factor,
+                operation: wgpu::BlendOperation::Add,
+            };
+            wgpu::BlendState { color: c, alpha: c }
+        };
         let backdrop = make(
             "blur backdrop",
             "vs_backdrop",
             "fs_backdrop",
-            wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING,
+            both(wgpu::BlendFactor::One, wgpu::BlendFactor::One),
+            true,
+        );
+        let erase = make(
+            "blur erase",
+            "vs_backdrop",
+            "fs_erase",
+            both(wgpu::BlendFactor::Zero, wgpu::BlendFactor::OneMinusSrcAlpha),
             true,
         );
         Pipelines {
             copy,
             blur,
             backdrop,
+            erase,
         }
     }
 }
@@ -358,7 +376,8 @@ impl Blur {
         pass.draw(0..3, 0..1);
     }
 
-    /// Draws request `request` of blur `blur` of the frame's plans inside its rect.
+    /// Draws request `request` of blur `blur` of the frame's plans inside its rect: what is under
+    /// it goes by coverage and alpha, and the blurred picture takes its place.
     pub(crate) fn draw_request(
         &self,
         pass: &mut wgpu::RenderPass<'_>,
@@ -367,8 +386,10 @@ impl Blur {
         request: usize,
     ) {
         let Some(t) = &self.targets else { return };
-        pass.set_pipeline(&p.backdrop);
         pass.set_bind_group(0, &t.blurs[blur].requests[request].group, &[]);
+        pass.set_pipeline(&p.erase);
+        pass.draw(0..4, 0..1);
+        pass.set_pipeline(&p.backdrop);
         pass.draw(0..4, 0..1);
     }
 }

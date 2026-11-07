@@ -1,5 +1,6 @@
-//! Faded acrylic: a Modal acrylic card over an opaque Base fill blends in as
-//! `opacity·card + (1 − opacity)·base` (opacity 1 is the plain replace, 0 leaves the base).
+//! Faded acrylic, on the window's `Base` layer where acrylic lives: a card over an opaque acrylic
+//! background blends in as `opacity·card + (1 − opacity)·base` (opacity 1 is the plain replace, 0
+//! leaves the base). Above `Base` an acrylic call is a frost, which blends over what is below.
 //!
 //! GPU test: with no adapter it prints `skipped: no GPU adapter` and passes, unless
 //! `LUNEUI_REQUIRE_GPU=1`, which makes a missing adapter a failure.
@@ -47,14 +48,13 @@ fn centre(i: usize) -> (usize, usize) {
     ((c.x + c.w / 2.0) as usize, (c.y + c.h / 2.0) as usize)
 }
 
-/// A Base fill and, on Modal, one acrylic card per entry of `alphas` (each under a transform
+/// A Base acrylic background and one acrylic card per entry of `alphas` (each under a transform
 /// with that alpha, or none for `None`).
 fn scene(alphas: &[Option<f32>]) -> Scene {
     let mut text = FakeText;
     let win = Rect::new(0.0, 0.0, SIZE.0 as f32, SIZE.1 as f32);
     let mut p: Painter<'_, u8> = Painter::new(1.0, win, &mut text, None, DARK);
-    p.fill(win, 0.0, BASE);
-    p.on(LayerId::Modal);
+    p.acrylic(win, 0.0, premul(BASE), [0.0; 4], false);
     for (i, a) in alphas.iter().enumerate() {
         p.set_xform(a.map(|alpha| Xform {
             origin: (0.0, 0.0),
@@ -119,7 +119,7 @@ fn fade_blends_between_the_base_and_the_card() {
 
     // Opacity 0: a hand-built record through the fade pipeline leaves the base.
     let mut zero = scene(&[None]);
-    zero.layers[LayerId::Modal as usize].geometry.acrylic[0].opacity = 0.0;
+    zero.layers[LayerId::Base as usize].geometry.acrylic[1].opacity = 0.0;
     let zero_img = render(&mut gpu, &zero);
     assert_eq!(px(&zero_img, centre(0)), base_px, "opacity 0 = base");
 
@@ -128,7 +128,7 @@ fn fade_blends_between_the_base_and_the_card() {
     let want = [0, 1, 2, 3].map(|c| (f32::from(card_px[c]) + f32::from(base_px[c])) / 2.0);
     near("opacity 0.5 painter", px(&half, centre(0)), want);
     let mut by_hand = scene(&[None]);
-    by_hand.layers[LayerId::Modal as usize].geometry.acrylic[0].opacity = 0.5;
+    by_hand.layers[LayerId::Base as usize].geometry.acrylic[1].opacity = 0.5;
     assert_eq!(
         render(&mut gpu, &by_hand),
         half,
@@ -149,4 +149,23 @@ fn draw_order_survives_mixed_opacities() {
     assert_eq!(px(&img, centre(2)), card_px);
     let want = [0, 1, 2, 3].map(|c| (f32::from(card_px[c]) + f32::from(base_px[c])) / 2.0);
     near("middle card", px(&img, centre(1)), want);
+}
+
+#[test]
+fn an_acrylic_call_above_base_blends_over_it_and_leaves_the_base_visible() {
+    let Some(mut gpu) = headless_gpu() else {
+        return;
+    };
+    let mut text = FakeText;
+    let win = Rect::new(0.0, 0.0, SIZE.0 as f32, SIZE.1 as f32);
+    let mut p: Painter<'_, u8> = Painter::new(1.0, win, &mut text, None, DARK);
+    p.fill(win, 0.0, BASE);
+    p.on(LayerId::Modal);
+    let glass = premul(DARK.menu_glass);
+    p.acrylic(card(0), 4.0, glass, [0.0; 4], false);
+    let img = render(&mut gpu, &p.scene);
+    let over = [0, 1, 2, 3].map(|c| glass[c] * 255.0 + f32::from(BASE[c]) * (1.0 - glass[3]));
+    near("the card over the base", px(&img, centre(0)), over);
+    assert_eq!(px(&img, centre(0))[3], 255, "no hole");
+    assert_eq!(px(&img, (2, 2)), BASE);
 }

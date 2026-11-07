@@ -162,6 +162,7 @@ enum Op {
     FillOver(Rect, f32, [f32; 4]),
     Ring(Rect, f32, f32, Rgba, bool),
     Acrylic(Rect, [f32; 4], [f32; 4], [f32; 4], bool),
+    Frost(Rect, [f32; 4], [f32; 4], bool),
     Backdrop(Rect, f32, f32, f32),
     Text(Spec, f32, f32),
     Stroke(Vec<[f32; 2]>, bool, StrokeStyle),
@@ -358,6 +359,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
                 Op::Acrylic(r, radii, c, under, noise) => {
                     self.acrylic_radii(*r, *radii, *c, *under, *noise);
                 }
+                Op::Frost(r, radii, c, noise) => self.frost_radii(*r, *radii, *c, *noise),
                 Op::Backdrop(r, radius, sigma, saturation) => {
                     self.backdrop_with(*r, *radius, *sigma, *saturation);
                 }
@@ -734,10 +736,15 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         }
     }
 
-    /// Acrylic layer with Skia `Src` semantics: replaces what is below, `under` only feeds the
-    /// antialiased edge. Colours premultiplied. The shape keeps `color` unfaded; the transform
-    /// stack's alpha travels as the record's `opacity`, which the renderer blends the layer in
-    /// with. Nothing is recorded when that opacity is not above zero.
+    /// The window's own background, on the fixed [`LayerId::Base`] layer: an acrylic layer with
+    /// Skia `Src` semantics, which replaces what is below (`under` only feeds the antialiased
+    /// edge). Colours premultiplied. The shape keeps `color` unfaded; the transform stack's alpha
+    /// travels as the record's `opacity`, which the renderer blends the layer in with. Nothing is
+    /// recorded when that opacity is not above zero.
+    ///
+    /// Anywhere else, on a fixed layer above `Base` or inside any overlay, it draws as
+    /// [`Self::frost`] with the same colour and ignores `under`: no draw inside a window replaces
+    /// what is below it, so none can open a hole to the desktop.
     pub fn acrylic(&mut self, r: Rect, radius: f32, color: [f32; 4], under: [f32; 4], noise: bool) {
         self.acrylic_radii(r, [radius; 4], color, under, noise);
     }
@@ -751,6 +758,11 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         under: [f32; 4],
         noise: bool,
     ) {
+        // The branch comes first: a call above the background records one op, the frost's.
+        if self.layer != LayerId::Base as usize || self.slot.is_some() {
+            self.frost_radii(r, radii, color, noise);
+            return;
+        }
         self.rec(|| Op::Acrylic(r, radii, color, under, noise));
         let opacity = self.alpha_k();
         if opacity.is_nan() || opacity <= 0.0 {
@@ -761,6 +773,27 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         shape.under = under;
         shape.params = [0.0, 0.0, 1.0, if noise { 1.0 } else { 0.0 }];
         self.geo().acrylic.push(Acrylic { shape, opacity });
+    }
+
+    /// The tint of a glass surface: premultiplied `color` over what is below, with the noise over
+    /// it when `noise` is set. It draws with the shapes under the text, in record order; a
+    /// [`Self::backdrop`] asked for first gives it something frosted to tint.
+    pub fn frost(&mut self, r: Rect, radius: f32, color: [f32; 4], noise: bool) {
+        self.frost_radii(r, [radius; 4], color, noise);
+    }
+
+    /// [`Self::frost`] with one radius per corner, in [`Self::fill_radii`]'s order.
+    pub fn frost_radii(&mut self, r: Rect, radii: [f32; 4], color: [f32; 4], noise: bool) {
+        self.rec(|| Op::Frost(r, radii, color, noise));
+        let alpha = self.alpha_k();
+        if alpha.is_nan() || alpha <= 0.0 {
+            return;
+        }
+        let mut shape = self.shape(r, radii, color);
+        // The colour stays unfaded and the alpha rides beside it, so the noise fades with it.
+        shape.color = color;
+        shape.params = [0.0, alpha, 2.0, if noise { 1.0 } else { 0.0 }];
+        self.geo().under.push(shape);
     }
 
     /// Records an app-owned draw (the renderer's `CustomDraw` number `slot`) on the

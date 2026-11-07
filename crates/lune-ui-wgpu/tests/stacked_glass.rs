@@ -4,8 +4,9 @@
 //! GPU test: with no adapter it prints `skipped: no GPU adapter` and passes, unless
 //! `LUNEUI_REQUIRE_GPU=1`, which makes a missing adapter a failure.
 
+use lune_ui_core::color::premul;
 use lune_ui_core::motion::{Kind, Motion};
-use lune_ui_core::paint::{LayerId, Painter, Rect};
+use lune_ui_core::paint::{LayerId, Painter, Rect, Xform};
 use lune_ui_core::scene::Scene;
 use lune_ui_core::testing::{FakeText, UiHarness};
 use lune_ui_core::theme::DARK;
@@ -310,4 +311,169 @@ fn one_renderer_grows_from_one_stop_to_three_and_back() {
     assert!(draw(&mut gpu, &mut renderer, &one) == want_one);
     assert!(draw(&mut gpu, &mut renderer, &three) == want_three);
     assert!(draw(&mut gpu, &mut renderer, &one) == want_one);
+}
+
+/// The lowest alpha of any pixel of `img`.
+fn lowest_alpha(img: &[u8]) -> u8 {
+    img.chunks_exact(4).map(|p| p[3]).min().unwrap_or(0)
+}
+
+const ABOVE_BASE: [LayerId; 5] = [
+    LayerId::Page,
+    LayerId::Popup,
+    LayerId::Modal,
+    LayerId::Raised,
+    LayerId::Toast,
+];
+
+#[test]
+fn no_draw_above_the_background_lowers_the_window_alpha() {
+    let Some(mut gpu) = headless_gpu() else {
+        return;
+    };
+    let panel = Rect::new(100.0, 40.0, 280.0, 80.0);
+    let glass = premul(DARK.menu_glass);
+    let rows: Vec<(String, Scene)> = ABOVE_BASE
+        .into_iter()
+        .map(|layer| {
+            let scene = scene_of(|p| {
+                p.on(layer);
+                p.acrylic(panel, 8.0, glass, [0.0; 4], true);
+            });
+            (format!("acrylic on {layer:?}"), scene)
+        })
+        .chain([
+            (
+                "frost".to_owned(),
+                scene_of(|p| {
+                    p.on(LayerId::Modal);
+                    p.frost(panel, 8.0, glass, true);
+                }),
+            ),
+            (
+                "a backdrop at alpha 1".to_owned(),
+                scene_of(|p| {
+                    bars(p, LayerId::Page);
+                    p.on(LayerId::Modal);
+                    p.backdrop(panel, 8.0);
+                }),
+            ),
+            (
+                "a backdrop at alpha 0.5".to_owned(),
+                scene_of(|p| {
+                    bars(p, LayerId::Page);
+                    p.on(LayerId::Modal);
+                    p.push_xform(half());
+                    p.backdrop(panel, 8.0);
+                    p.pop_xform();
+                }),
+            ),
+        ])
+        .collect();
+    for (name, scene) in rows {
+        let low = lowest_alpha(&render(&mut gpu, &scene));
+        assert!(low >= 254, "{name}: lowest alpha {low}");
+    }
+}
+
+/// A transform at alpha 0.5.
+fn half() -> Xform {
+    Xform {
+        origin: (0.0, 0.0),
+        scale: 1.0,
+        dx: 0.0,
+        dy: 0.0,
+        alpha: 0.5,
+    }
+}
+
+/// A half-transparent window with a bright bar in it, and a request over the whole of it.
+fn translucent(alpha: Option<Xform>) -> Scene {
+    let mut text = FakeText;
+    let mut p: Painter<'_, u8> = Painter::new(1.0, WIN, &mut text, None, DARK);
+    p.fill(WIN, 0.0, [20, 20, 20, 128]);
+    p.fill(Rect::new(220.0, 0.0, 40.0, SIZE.1 as f32), 0.0, WHITE);
+    if let Some(x) = alpha {
+        p.on(LayerId::Modal);
+        p.set_xform(Some(x));
+        p.backdrop(WIN, 0.0);
+        p.set_xform(None);
+    }
+    p.scene
+}
+
+/// The alpha channel along `ROW`.
+fn alphas(img: &[u8]) -> Vec<f32> {
+    let row = img[ROW * SIZE.0 as usize * 4..]
+        .chunks_exact(4)
+        .take(SIZE.0 as usize);
+    row.map(|p| f32::from(p[3])).collect()
+}
+
+#[test]
+fn a_full_request_in_a_translucent_window_leaves_no_sharp_residue() {
+    let Some(mut gpu) = headless_gpu() else {
+        return;
+    };
+    let full = Xform {
+        alpha: 1.0,
+        ..half()
+    };
+    let sharp = render(&mut gpu, &translucent(None));
+    let img = render(&mut gpu, &translucent(Some(full)));
+    assert!(steepest(&row(&sharp, 200, 280)) > 150.0, "the sharp edge");
+    assert!(steepest(&row(&img, 200, 280)) < 20.0, "no residue of it");
+    assert!(steepest(&alphas(&img)) < 20.0, "in the alpha either");
+    // Far from the bar the region is the window as it was, not the blur over the window.
+    let far = px(&img, 20);
+    assert!(
+        (i32::from(far[3]) - 128).abs() <= 2,
+        "alpha {} stays the window's",
+        far[3]
+    );
+}
+
+#[test]
+fn a_request_at_half_alpha_is_the_midpoint_of_sharp_and_blurred() {
+    let Some(mut gpu) = headless_gpu() else {
+        return;
+    };
+    let full = Xform {
+        alpha: 1.0,
+        ..half()
+    };
+    let sharp = render(&mut gpu, &translucent(None));
+    let blurred = render(&mut gpu, &translucent(Some(full)));
+    let mid = render(&mut gpu, &translucent(Some(half())));
+    for (i, ((s, b), m)) in sharp.iter().zip(&blurred).zip(&mid).enumerate() {
+        let want = (f32::from(*s) + f32::from(*b)) / 2.0;
+        assert!(
+            (f32::from(*m) - want).abs() <= 2.0,
+            "byte {i}: {m} vs ({s} + {b}) / 2"
+        );
+    }
+}
+
+#[test]
+fn a_frost_at_half_alpha_is_half_the_frost_noise_included() {
+    let Some(mut gpu) = headless_gpu() else {
+        return;
+    };
+    let frost = |alpha: f32| {
+        let mut text = FakeText;
+        let mut p: Painter<'_, u8> = Painter::new(1.0, WIN, &mut text, None, DARK);
+        p.set_xform(Some(Xform { alpha, ..half() }));
+        p.frost(WIN, 0.0, premul(DARK.menu_glass), true);
+        p.scene
+    };
+    let whole = render(&mut gpu, &frost(1.0));
+    let halved = render(&mut gpu, &frost(0.5));
+    assert!(
+        range(&row(&whole, 0, 480)) > 0.0,
+        "the noise shows (instrument check)"
+    );
+    for (i, (w, h)) in whole.iter().zip(&halved).enumerate() {
+        let want = f32::from(*w) / 2.0;
+        assert!((f32::from(*h) - want).abs() <= 1.0, "byte {i}: {h} of {w}");
+    }
 }

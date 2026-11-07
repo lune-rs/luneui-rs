@@ -4195,7 +4195,7 @@ mod m10 {
     struct Seen {
         fills: Vec<Rgb>,
         texts: Vec<Rgb>,
-        /// Every acrylic layer colour (premultiplied), which the glass recipe makes from a tint.
+        /// Every acrylic and frost colour (premultiplied), which the glass recipe makes from a tint.
         acrylics: Vec<[f32; 4]>,
     }
 
@@ -4218,12 +4218,13 @@ mod m10 {
                 colours.extend(g.strokes.iter().map(|v| v.color));
                 colours.extend(g.fills.iter().map(|v| v.color));
             }
-            self.acrylics.extend(
-                scene
-                    .in_order()
-                    .into_iter()
-                    .flat_map(|l| l.geometry.acrylic.iter().map(|a| a.shape.color)),
-            );
+            for layer in scene.in_order() {
+                let g = &layer.geometry;
+                self.acrylics
+                    .extend(g.acrylic.iter().map(|a| a.shape.color));
+                let frosts = g.under.iter().filter(|s| s.is_frost());
+                self.acrylics.extend(frosts.map(|s| s.color));
+            }
             self.fills.extend(colours.into_iter().filter_map(straight));
             self.texts.extend(rec.colours.iter().copied());
         }

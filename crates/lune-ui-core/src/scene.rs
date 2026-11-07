@@ -6,7 +6,8 @@
 //!   [`LayerId`]), followed by the overlays on it in tag order, which is open order. Everything of
 //!   an older overlay draws before anything of a newer one on the same fixed layer, however
 //!   their calls fell in the frame, so a kind never interleaves across overlays;
-//! - inside a layer: the acrylic shapes, the under shapes, the path fills, the custom items (in
+//! - inside a layer: the acrylic shapes (on the fixed `Base` layer only), the under shapes, a frost
+//!   among them ([`Shape::is_frost`]), the path fills, the custom items (in
 //!   record order), the images (in record order), the text, the over shapes, the strokes;
 //! - a layer with [`BackdropRequest`]s is a stop: everything drawn before it is blurred, its
 //!   requests draw over that, and the layer follows, so a glass surface blurs everything drawn
@@ -60,6 +61,14 @@ pub struct Shape {
     pub round_radius: f32,
 }
 
+impl Shape {
+    /// Whether this is a frost ([`Painter::frost`](crate::paint::Painter::frost)): the colour is
+    /// unfaded, `params[1]` its alpha, `params[3]` the noise flag.
+    pub fn is_frost(&self) -> bool {
+        self.params[2] > 1.5
+    }
+}
+
 /// One vertex of a tessellated, antialiased stroke (triangle list).
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct StrokeVertex {
@@ -75,7 +84,8 @@ pub struct StrokeVertex {
     pub round_radius: f32,
 }
 
-/// One acrylic layer. `shape.color` is the unfaded colour; `opacity` (0 to 1) is how much of the
+/// One acrylic layer, the window's own background: only the fixed [`LayerId::Base`] holds these,
+/// since nothing drawn in a window may replace what is below it. `shape.color` is the unfaded colour; `opacity` (0 to 1) is how much of the
 /// layer replaces what is below: the result is `opacity·layer + (1 − opacity)·below`, so 1.0 is a
 /// plain replace and a smaller value fades the layer in without punching a hole.
 #[derive(Debug, Clone, Copy, PartialEq)]

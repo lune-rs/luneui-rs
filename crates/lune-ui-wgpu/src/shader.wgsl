@@ -100,6 +100,12 @@ fn fs_shape(i: ShapeOut) -> @location(0) vec4<f32> {
         cov = clamp(0.5 - d, 0.0, 1.0);
     }
     cov = cov * round_clip(i.p, i.round, i.round_r);
+    if i.params.z > 1.5 {
+        // Frost, drawn with the ordinary over blend: the noise over the colour, and `params.y` is
+        // the transform's alpha, so the noise fades with the colour.
+        let n = textureSampleLevel(noise_tex, noise_samp, i.p / g.scale / 256.0, 0.0) * i.params.w;
+        return add_noise(i.color, n) * i.params.y * cov;
+    }
     if i.params.z > 0.5 {
         // Acrylic layer, drawn with REPLACE blending: Skia's `Src` + antialiasing is
         // lerp(dst, src, coverage), and dst here is the known layer underneath.

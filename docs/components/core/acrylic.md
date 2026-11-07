@@ -11,7 +11,7 @@ summary: Avalonia acrylic colour math with tests, and the noise opacity
 
 ## What it is
 
-`AcrylicColors` and `acrylic_colors` (Avalonia's acrylic formulas), `premultiplied`, and `NOISE_OPACITY`.
+`AcrylicColors` and `acrylic_colors` (Avalonia's acrylic formulas), `premultiplied`, and `NOISE_OPACITY`. A replacing acrylic exists only as the window's own background: `Painter::acrylic` on the fixed `Base` layer, with the structural panels that tint it. Above `Base`, or in an overlay, the call draws as `Painter::frost`, the same colour and noise as an over-fill, with `under` ignored [D258].
 
 ## Needs
 
@@ -41,6 +41,7 @@ Conflicts: none. The repo CARD layer (material 0.8) and Lunegit's content acryli
 | solid (Lunegit only) | black | 1.0 | 0.35 | [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:232-233] |
 
 - Noise opacity 0.0225 [R crates/lune-ui-core/src/acrylic.rs:16].
+- Frost: the noise over the premultiplied colour, times coverage, in the ordinary shape pipeline; both fade with the transform's alpha, so a frost at alpha k is k times the frost at alpha 1 [R crates/lune-ui-wgpu/src/shader.wgsl `fs_shape`].
 - Inactive window: `window_fallback` (#333333FF, the theme's `window_fallback`) instead of the layers [R crates/lune-ui-core/src/theme.rs:111-113]. The background still draws two acrylic items, the window and the card, both in `window_fallback` with noise off, so the card's corners antialias against the panel; it draws no glass layer's colour and no noise.
 - White tint suppressed to 20% (test `white_tint_is_suppressed_to_twenty_percent`, acrylic.rs:130).
 
@@ -88,6 +89,7 @@ n/a — no text.
 
 - Existing tests (by path, `crates/lune-ui-core/src/acrylic.rs`): `window_layer_matches_avalonia` (:106), `panel_layer_matches_avalonia` (:113), `card_layer_matches_avalonia` (:120 region), `white_tint_is_suppressed_to_twenty_percent` (:130 region).
 - The inactive fallback: `apps/gallery/src/scenes.rs`, module `tests`: `the_unfocused_scene_draws_the_window_fallback_and_no_glass_layer` (two acrylic items, both `premul(window_fallback)`, `params[3]` 0 for no noise; the focused background beside it is the glass layers with noise).
+- No hole: `crates/lune-ui-wgpu/tests/stacked_glass.rs::no_draw_above_the_background_lowers_the_window_alpha`, `a_frost_at_half_alpha_is_half_the_frost_noise_included`; `crates/lune-ui-core/tests/painter.rs::acrylic_above_base_is_a_frost_of_the_same_colour_and_under_is_ignored`, `one_acrylic_call_replays_as_one_draw`.
 - Pixel probes (`crates/lune-ui-wgpu/tests/acrylic_fade.rs::fade_blends_between_the_base_and_the_card`: opacity 1 replaces the base with the premultiplied card colour, within one level; `primitives.rs::acrylic_radii_cuts_only_the_corner_it_names`, scale 2) and the pixel gate on the `acrylic`, `glass-off`, `unfocused` and `chrome` scenes at zero delta (the orchestrator's gate; M11's pre-audit run held 413 of 413).
 
 ### Build

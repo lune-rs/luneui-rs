@@ -961,7 +961,7 @@ fn the_destructive_row_describes_itself_shows_a_tooltip_above_the_card_and_still
     );
     // Above the modal: on the Raised layer, not the Popup layer.
     let raised = &scene.merged(LayerId::Raised);
-    assert!(!raised.geometry.acrylic.is_empty() || !raised.geometry.under.is_empty());
+    assert!(!raised.geometry.under.is_empty());
     assert!(scene.merged(LayerId::Popup).geometry.under.is_empty());
     // It still reports the activation.
     h.input.press(P);
@@ -1016,10 +1016,11 @@ fn the_card_is_640_wide_and_the_results_stop_at_560_at_scale_two() {
     h.at_ms(1000);
     let (scene, out, _) = frame(&mut h, &mut q, &secs);
     let modal = &scene.merged(LayerId::Modal);
-    let acrylic = modal.geometry.acrylic[0];
-    assert_eq!(acrylic.shape.rect[2], 1280.0, "640 px wide");
-    assert!(acrylic.shape.rect[3] <= 1440.0, "at most 720 px high");
-    assert_eq!(acrylic.shape.radii, [16.0; 4]);
+    let card = modal.geometry.under.iter().find(|s| s.is_frost());
+    let card = card.expect("the card");
+    assert_eq!(card.rect[2], 1280.0, "640 px wide");
+    assert!(card.rect[3] <= 1440.0, "at most 720 px high");
+    assert_eq!(card.radii, [16.0; 4]);
     assert_eq!(CARD_W * 2.0, 1280.0);
     let area = out
         .tree
@@ -1294,7 +1295,7 @@ fn a_dialog_opened_from_an_activation_draws_above_and_takes_the_keys() {
     );
     let raised = &scene.merged(LayerId::Raised);
     assert!(
-        !raised.geometry.acrylic.is_empty(),
+        raised.geometry.under.iter().any(|s| s.is_frost()),
         "the dialog's card is on Raised"
     );
 }

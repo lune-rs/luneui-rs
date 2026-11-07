@@ -93,3 +93,12 @@ fn fs_backdrop(i: BackdropOut) -> @location(0) vec4<f32> {
     }
     return c * cov * b.alpha;
 }
+
+// A frosted region replaces what is under it, so nothing sharp stays in a translucent window:
+// this draw erases by coverage and `fs_backdrop` then adds, together mix(sharp, blurred, k).
+@fragment
+fn fs_erase(i: BackdropOut) -> @location(0) vec4<f32> {
+    let center = b.rect.xy + b.rect.zw * 0.5;
+    let cov = clamp(0.5 - sd_round_rect(i.px - center, b.rect.zw * 0.5, b.radius), 0.0, 1.0);
+    return vec4<f32>(0.0, 0.0, 0.0, cov * b.alpha);
+}

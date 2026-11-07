@@ -197,22 +197,25 @@ mod tests {
         let (scene, _) = p.frame(&mut FakeText, 16, &[]).expect("frame");
         let customs: usize = scene.in_order().into_iter().map(|l| l.customs.len()).sum();
         assert_eq!(customs, 1, "the custom-draw slot");
-        let windows = &scene.merged(LayerId::Popup).geometry.acrylic;
+        let popup = scene.merged(LayerId::Popup);
+        let windows: Vec<_> = popup
+            .geometry
+            .under
+            .iter()
+            .filter(|s| s.is_frost())
+            .collect();
         assert_eq!(windows.len(), 3);
         // Glass on shows the glass layer; glass off is opaque; unfocused is the solid fallback
         // without noise.
-        assert_eq!(windows[0].shape.color, THEME.glass.card.premultiplied());
+        assert_eq!(windows[0].color, THEME.glass.card.premultiplied());
         assert!(
-            (windows[1].shape.color[3] - 1.0).abs() < 1e-4,
+            (windows[1].color[3] - 1.0).abs() < 1e-4,
             "{:?}",
-            windows[1].shape.color
+            windows[1].color
         );
-        assert_eq!(
-            windows[2].shape.color,
-            premul(lunegit_dark::INACTIVE_FALLBACK)
-        );
-        assert_eq!(windows[2].shape.params[3], 0.0);
-        assert_eq!(windows[0].shape.params[3], 1.0);
+        assert_eq!(windows[2].color, premul(lunegit_dark::INACTIVE_FALLBACK));
+        assert_eq!(windows[2].params[3], 0.0);
+        assert_eq!(windows[0].params[3], 1.0);
     }
 
     /// A press on a tab moves the outline's gap under it.

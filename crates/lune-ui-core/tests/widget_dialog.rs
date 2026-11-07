@@ -163,8 +163,9 @@ fn at_rest_nothing_is_transparent_and_no_transform_is_pushed() {
     h.at_ms(2000);
     let (scene, _, _, _) = frame(&mut h, Some(&d));
     let modal = &scene.merged(LayerId::Modal);
-    assert!(modal.geometry.acrylic.iter().all(|a| a.opacity == 1.0));
     let g = &modal.geometry;
+    let frost = g.under.iter().find(|s| s.is_frost()).expect("the card");
+    assert_eq!(frost.params[1], 1.0, "at full alpha");
     assert!(g.under.iter().chain(&g.over).all(|s| s.color[3] > 0.0));
     assert!(modal.texts.iter().all(|t| t.scale == 1.0));
 }
@@ -402,10 +403,11 @@ fn pixel_probes_at_scale_two() {
     assert_eq!(DARK.dialog_backdrop, [0, 0, 0, 0x80]);
     assert_eq!(scrim.color, premul([0, 0, 0, 0x80]));
     // Card: 896 wide, corner radius 16.
-    let card = modal.geometry.acrylic[0];
-    assert_eq!(card.shape.rect[2], 896.0);
-    assert_eq!(card.shape.radii, [16.0; 4]);
-    assert_eq!(card.opacity, 1.0);
+    let card = modal.geometry.under.iter().find(|s| s.is_frost());
+    let card = card.expect("the card");
+    assert_eq!(card.rect[2], 896.0);
+    assert_eq!(card.radii, [16.0; 4]);
+    assert_eq!(card.params[1], 1.0);
     // Footer: 136 high, bottom corners 16.
     let footer = modal
         .geometry
@@ -762,8 +764,10 @@ fn the_form_scale_two_probes() {
     h.at_ms(1000);
     let (scene, _, _, _) = frame_with(&mut h, Some((&d, &FORM)));
     let modal = &scene.merged(LayerId::Modal);
-    assert_eq!(modal.geometry.acrylic[0].shape.rect[2], 1200.0);
-    assert_eq!(modal.geometry.acrylic[0].shape.radii, [16.0; 4]);
+    let card = modal.geometry.under.iter().find(|s| s.is_frost());
+    let card = card.expect("the card");
+    assert_eq!(card.rect[2], 1200.0);
+    assert_eq!(card.radii, [16.0; 4]);
 }
 
 #[test]
@@ -1155,7 +1159,7 @@ fn a_nested_dialog_draws_on_raised_over_the_dialog() {
     let (scene, _) = nest_frame(&mut h, true, &mut t);
     let raised = &scene.merged(LayerId::Raised);
     assert!(
-        !raised.geometry.acrylic.is_empty(),
+        raised.geometry.under.iter().any(|s| s.is_frost()),
         "the inner card is on Raised"
     );
     assert!(!raised.texts.is_empty());
