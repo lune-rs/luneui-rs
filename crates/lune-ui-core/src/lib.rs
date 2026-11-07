@@ -27,7 +27,7 @@
 //! - `ui` (the per-window frame: ids, retained state, layered hits, overlays, focus, semantic
 //!   nodes, `Response`, `FrameOutput`), `access` (the semantic tree and accessibility actions),
 //!   `motion` (the closed-form motion system and the time type), `strings` (the string table);
-//! - `backdrop` (the material seam: `GlassLayer`, `BackdropKind`, `Material` and the `Backdrop`
+//! - `backdrop` (the material seam: `GlassLayer`, `LuminosityCurve`, `BackdropKind`, `Material` and the `Backdrop`
 //!   capability);
 //! - `window` (edge resize, double click, caption buttons);
 //! - `tray` (the tray icon rasterised on the CPU, where its flyout and menu go, the click rules);
@@ -65,5 +65,5 @@ pub mod ui;
 pub mod widgets;
 pub mod window;
 
-pub use backdrop::{Backdrop, BackdropKind, GlassLayer};
+pub use backdrop::{Backdrop, BackdropKind, GlassLayer, LuminosityCurve};
 pub use theme::lunegit_dark;

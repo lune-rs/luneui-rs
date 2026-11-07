@@ -10,6 +10,7 @@
 //! caller lends, so dump, bench and the self-check tests all drive it the same way.
 
 use lune_ui::access::{AccessAction, Action};
+use lune_ui::acrylic::NOISE_OPACITY;
 use lune_ui::image::{ImageData, ImageId, ImageStore};
 use lune_ui::input::{
     FrameOutput, ImeEvent, Key, Keymap, Modifiers, NamedKey, PointerButton, RawInput, Repaint,
@@ -218,8 +219,8 @@ pub(crate) struct FrameTweaks {
     pub(crate) blur_sigma: f32,
     /// Saturation boost on the blurred backdrop.
     pub(crate) saturation: f32,
-    /// Acrylic carries the noise texture.
-    pub(crate) noise: bool,
+    /// Opacity of the noise texture on acrylic and frost; 0 is none.
+    pub(crate) noise: f32,
 }
 
 impl FrameTweaks {
@@ -227,7 +228,7 @@ impl FrameTweaks {
     pub(crate) const DEFAULT: FrameTweaks = FrameTweaks {
         blur_sigma: crate::scenes::BLUR_SIGMA,
         saturation: crate::scenes::BLUR_SATURATION,
-        noise: true,
+        noise: NOISE_OPACITY,
     };
 
     /// The renderer's frame parameters for a target of `size` physical pixels at scale `scale`.
@@ -237,25 +238,8 @@ impl FrameTweaks {
             scale,
             blur_sigma: self.blur_sigma,
             saturation: self.saturation,
-        }
-    }
-
-    /// Takes the noise off every acrylic and frost of `scene` when it is off here. The flag is the
-    /// last of a shape's parameters, as `Painter::acrylic` and `Painter::frost` wrote it.
-    pub(crate) fn apply_noise(&self, scene: &mut Scene) {
-        if self.noise {
-            return;
-        }
-        let overlays = scene.overlays.iter_mut().map(|o| &mut o.layer);
-        for layer in scene.layers.iter_mut().chain(overlays) {
-            for acrylic in &mut layer.geometry.acrylic {
-                acrylic.shape.params[3] = 0.0;
-            }
-            for shape in &mut layer.geometry.under {
-                if shape.is_frost() {
-                    shape.params[3] = 0.0;
-                }
-            }
+            noise_opacity: self.noise,
+            ..FrameParams::default()
         }
     }
 }

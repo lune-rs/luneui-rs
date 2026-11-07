@@ -7,7 +7,7 @@
 use lune_ui_core::color::premul;
 use lune_ui_core::motion::{Kind, Motion};
 use lune_ui_core::paint::{LayerId, Painter, Rect, Xform};
-use lune_ui_core::scene::Scene;
+use lune_ui_core::scene::{BlurLimits, Scene};
 use lune_ui_core::testing::{FakeText, UiHarness};
 use lune_ui_core::theme::DARK;
 use lune_ui_core::ui::OverlayOptions;
@@ -44,6 +44,7 @@ fn params() -> FrameParams {
         scale: 1.0,
         blur_sigma: 8.0,
         saturation: 1.0,
+        ..FrameParams::default()
     }
 }
 
@@ -612,4 +613,122 @@ fn a_real_dialog_over_an_opaque_background_keeps_the_window_alpha() {
     let img = render(&mut gpu, &scene);
     let low = lowest_alpha(&img);
     assert!(low >= 254, "lowest alpha {low}");
+}
+
+/// Bars under one request over `PANEL_RECT`, and `limits` as the frame's blur limits.
+const PANEL_RECT: Rect = Rect::new(100.0, 40.0, 280.0, 80.0);
+
+fn limited(limits: BlurLimits) -> FrameParams {
+    FrameParams {
+        blur: limits,
+        ..params()
+    }
+}
+
+fn limits(kernel_cap: f32, downsample: u32) -> BlurLimits {
+    BlurLimits {
+        kernel_cap,
+        downsample,
+    }
+}
+
+fn one_request(sigma: f32) -> Scene {
+    scene_of(|p| {
+        bars(p, LayerId::Modal);
+        p.on(LayerId::Raised);
+        p.backdrop_with(PANEL_RECT, 0.0, sigma, 1.0);
+    })
+}
+
+fn drawn(gpu: &mut Gpu, scene: &Scene, limits: BlurLimits) -> Vec<u8> {
+    let mut renderer = FrameRenderer::new(gpu, wgpu::TextureFormat::Rgba8Unorm);
+    draw_with(gpu, &mut renderer, scene, limited(limits))
+}
+
+#[test]
+fn a_finer_working_picture_blurs_less_at_one_sigma() {
+    let Some(mut gpu) = headless_gpu() else {
+        return;
+    };
+    let scene = one_request(4.0);
+    let at = |gpu: &mut Gpu, d| steepest(&row(&drawn(gpu, &scene, limits(48.0, d)), 110, 370));
+    let (d4, d8) = (at(&mut gpu, 4), at(&mut gpu, 8));
+    let sharp = steepest(&row(
+        &render(&mut gpu, &scene_of(|p| bars(p, LayerId::Modal))),
+        110,
+        370,
+    ));
+    assert!(
+        sharp > 200.0,
+        "the bars have an edge (instrument check): {sharp}"
+    );
+    assert!(
+        d4 > d8 * 1.1,
+        "downsample 4 is sharper than 8: {d4} vs {d8}"
+    );
+}
+
+#[test]
+fn a_bad_downsample_draws_as_8_and_the_renderer_follows_a_change() {
+    let Some(mut gpu) = headless_gpu() else {
+        return;
+    };
+    let scene = one_request(8.0);
+    let default = drawn(&mut gpu, &scene, BlurLimits::default());
+    assert_eq!(default, drawn(&mut gpu, &scene, limits(48.0, 8)));
+    for bad in [0, 1, 3, 5, 16, 1_000] {
+        assert_eq!(
+            drawn(&mut gpu, &scene, limits(48.0, bad)),
+            default,
+            "downsample {bad}"
+        );
+    }
+    // One renderer through 8, 4, 2 and back: the targets are rebuilt each time, and 8 again is 8.
+    let mut renderer = FrameRenderer::new(&mut gpu, wgpu::TextureFormat::Rgba8Unorm);
+    let mut go = |gpu: &mut Gpu, d| draw_with(gpu, &mut renderer, &scene, limited(limits(48.0, d)));
+    let first = go(&mut gpu, 8);
+    assert_eq!(first, default);
+    let four = go(&mut gpu, 4);
+    let two = go(&mut gpu, 2);
+    assert!(four != first && two != four, "each divisor draws its own");
+    assert_eq!(go(&mut gpu, 8), first, "back to 8");
+    assert_eq!(go(&mut gpu, 4), four, "and 4 again");
+}
+
+#[test]
+fn a_kernel_cap_cuts_the_kernel_and_a_bad_cap_draws_as_48() {
+    let Some(mut gpu) = headless_gpu() else {
+        return;
+    };
+    // Divisor 2 and sigma 16 make a kernel 24 texels to a side, which a cap of 8 cuts.
+    let scene = one_request(16.0);
+    let at = |gpu: &mut Gpu, cap| drawn(gpu, &scene, limits(cap, 2));
+    let (none, capped) = (at(&mut gpu, 48.0), at(&mut gpu, 8.0));
+    assert_ne!(capped, none, "the cap bites");
+    // A kernel cut short spreads less: the plan's wording said "softer", and the arithmetic says
+    // the opposite (a cut Gaussian renormalised is closer to a box of the cap's width).
+    let edge = |img: &[u8]| steepest(&row(img, 110, 370));
+    assert!(
+        edge(&capped) > edge(&none),
+        "capped {} vs uncapped {}",
+        edge(&capped),
+        edge(&none)
+    );
+    // Not a Gaussian that fits under the default cap: 24 < 48, so a cap of 24 or more changes nothing.
+    assert_eq!(at(&mut gpu, 24.0), none);
+    assert_eq!(at(&mut gpu, 100.0), none);
+    // Bad caps are 48, which is the default's.
+    for bad in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, 0.0, -3.0] {
+        assert_eq!(at(&mut gpu, bad), none, "cap {bad}");
+    }
+    // Over 128 is 128: a sigma wide enough that both 48 and 128 bite.
+    let wide = one_request(300.0);
+    let wide_at = |gpu: &mut Gpu, cap| drawn(gpu, &wide, limits(cap, 2));
+    let at_128 = wide_at(&mut gpu, 128.0);
+    assert_ne!(
+        at_128,
+        wide_at(&mut gpu, 48.0),
+        "128 is a wider kernel than 48"
+    );
+    assert_eq!(wide_at(&mut gpu, 1_000.0), at_128, "over 128 is 128");
 }

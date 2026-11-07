@@ -9,6 +9,42 @@ pub struct GlassLayer {
     pub tint: Rgba,
     pub tint_opacity: f32,
     pub material_opacity: f32,
+    /// How the tint's own luminosity suppresses its opacity.
+    pub curve: LuminosityCurve,
+}
+
+/// Avalonia's luminosity-to-opacity curve for an acrylic tint (`GetTintOpacityModifier`): a tint
+/// that is nearly white or black is made less opaque, so a light tint does not wash the glass out.
+/// `mid_point` is the brightness (HSV value, 0..=1) at which the tint keeps `mid_point_max_opacity`
+/// of its opacity; towards white the modifier falls to `white_max_opacity`, towards black to
+/// `black_max_opacity`, and a saturated tint is suppressed less.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LuminosityCurve {
+    /// The brightness at which the modifier is `mid_point_max_opacity`.
+    pub mid_point: f64,
+    /// The modifier at pure white.
+    pub white_max_opacity: f64,
+    /// The modifier at `mid_point`.
+    pub mid_point_max_opacity: f64,
+    /// The modifier at pure black.
+    pub black_max_opacity: f64,
+}
+
+impl LuminosityCurve {
+    /// Avalonia's values (`ExperimentalAcrylicMaterial`).
+    pub const AVALONIA: LuminosityCurve = LuminosityCurve {
+        mid_point: 0.5,
+        white_max_opacity: 0.2,
+        mid_point_max_opacity: 0.45,
+        black_max_opacity: 0.45,
+    };
+}
+
+impl Default for LuminosityCurve {
+    /// [`Self::AVALONIA`].
+    fn default() -> Self {
+        Self::AVALONIA
+    }
 }
 
 /// OS backdrop material requested for the window.

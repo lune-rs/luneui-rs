@@ -15,6 +15,7 @@
 //!   a request on one of them stops at the floor instead. Up to the last stop the frame renders
 //!   into an offscreen scene; that is then copied to the target and the rest draws there.
 
+use crate::acrylic::NOISE_OPACITY;
 use crate::image::{Fit, ImageAlign, ImageId};
 use crate::paint::Rect;
 use crate::text::TextKey;
@@ -280,7 +281,7 @@ impl Scene {
 }
 
 /// What one frame is drawn at, and how its glass backdrop is blurred.
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FrameParams {
     /// Target size in physical pixels.
     pub size: (u32, u32),
@@ -290,4 +291,137 @@ pub struct FrameParams {
     pub blur_sigma: f32,
     /// Saturation boost applied to the blurred backdrop.
     pub saturation: f32,
+    /// Opacity of the noise texture on acrylic and frost. [`NOISE_OPACITY`] is Avalonia's; 0 turns
+    /// the noise off. A value that is not finite or is negative draws as the default.
+    pub noise_opacity: f32,
+    /// The limits of the backdrop blur.
+    pub blur: BlurLimits,
+}
+
+impl Default for FrameParams {
+    /// A zero-sized frame with Avalonia's noise and the blur's default limits.
+    fn default() -> Self {
+        Self {
+            size: (0, 0),
+            scale: 0.0,
+            blur_sigma: 0.0,
+            saturation: 0.0,
+            noise_opacity: NOISE_OPACITY,
+            blur: BlurLimits::default(),
+        }
+    }
+}
+
+impl FrameParams {
+    /// [`Self::noise_opacity`] as the renderer draws it: a value that is not finite or is
+    /// negative is [`NOISE_OPACITY`], never clamped.
+    pub fn noise(&self) -> f32 {
+        if self.noise_opacity.is_finite() && self.noise_opacity >= 0.0 {
+            self.noise_opacity
+        } else {
+            NOISE_OPACITY
+        }
+    }
+}
+
+/// The limits of the backdrop blur: how coarse its working picture is and how wide its kernel may
+/// grow.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BlurLimits {
+    /// The widest the Gaussian kernel grows, in texels of the working picture on each side of the
+    /// centre. A kernel is three σ wide, so a larger σ needs a larger cap to stay a Gaussian; a
+    /// capped one is cut off and so spreads less.
+    pub kernel_cap: f32,
+    /// The working picture is the frame at `1 / downsample` of its size: 2, 4 or 8. A smaller
+    /// divisor keeps more detail and costs more.
+    pub downsample: u32,
+}
+
+impl BlurLimits {
+    /// The default kernel cap, in texels.
+    pub const KERNEL_CAP: f32 = 48.0;
+    /// The widest kernel cap [`Self::effective`] allows, in texels.
+    pub const KERNEL_CAP_MAX: f32 = 128.0;
+    /// The default divisor of the working picture.
+    pub const DOWNSAMPLE: u32 = 8;
+
+    /// The limits as the renderer uses them. A `downsample` other than 2, 4 or 8 is 8; a cap that
+    /// is not finite or not positive is 48, and one over 128 is 128.
+    pub fn effective(self) -> BlurLimits {
+        let downsample = match self.downsample {
+            d @ (2 | 4 | 8) => d,
+            _ => Self::DOWNSAMPLE,
+        };
+        let kernel_cap = if self.kernel_cap.is_finite() && self.kernel_cap > 0.0 {
+            self.kernel_cap.min(Self::KERNEL_CAP_MAX)
+        } else {
+            Self::KERNEL_CAP
+        };
+        BlurLimits {
+            kernel_cap,
+            downsample,
+        }
+    }
+}
+
+impl Default for BlurLimits {
+    /// Cap 48, divisor 8: what the toolkit blurred with before these were values.
+    fn default() -> Self {
+        Self {
+            kernel_cap: Self::KERNEL_CAP,
+            downsample: Self::DOWNSAMPLE,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_defaults_are_the_values_the_toolkit_drew_with() {
+        let p = FrameParams::default();
+        assert_eq!(p.noise_opacity, NOISE_OPACITY);
+        assert_eq!(p.noise_opacity, 0.0225);
+        assert_eq!((p.blur.kernel_cap, p.blur.downsample), (48.0, 8));
+        assert_eq!(
+            p.blur,
+            p.blur.effective(),
+            "the default is already effective"
+        );
+    }
+
+    #[test]
+    fn a_noise_that_is_not_a_strength_is_the_default_and_zero_is_none() {
+        let with = |noise_opacity| FrameParams {
+            noise_opacity,
+            ..FrameParams::default()
+        };
+        for bad in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -0.001, -1.0] {
+            assert_eq!(with(bad).noise(), NOISE_OPACITY, "noise {bad}");
+        }
+        assert_eq!(with(0.0).noise(), 0.0);
+        assert_eq!(with(0.05).noise(), 0.05);
+    }
+
+    #[test]
+    fn bad_blur_limits_fail_to_the_default_and_never_truncate() {
+        let with = |kernel_cap, downsample| BlurLimits {
+            kernel_cap,
+            downsample,
+        };
+        for d in [2, 4, 8] {
+            assert_eq!(with(48.0, d).effective().downsample, d);
+        }
+        for d in [0, 1, 3, 5, 6, 7, 9, 16, u32::MAX] {
+            assert_eq!(with(48.0, d).effective().downsample, 8, "downsample {d}");
+        }
+        for cap in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, 0.0, -0.0, -5.0] {
+            assert_eq!(with(cap, 8).effective().kernel_cap, 48.0, "cap {cap}");
+        }
+        assert_eq!(with(8.0, 8).effective().kernel_cap, 8.0);
+        assert_eq!(with(128.0, 8).effective().kernel_cap, 128.0);
+        assert_eq!(with(128.5, 8).effective().kernel_cap, 128.0);
+        assert_eq!(with(1.0e9, 8).effective().kernel_cap, 128.0);
+    }
 }

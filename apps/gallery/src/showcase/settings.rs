@@ -9,6 +9,7 @@
 //! luminosity constants, the blur kernel's cap) the control is a switch or stops at the limit.
 
 use lune_ui::access::{Node, Role, State};
+use lune_ui::acrylic::NOISE_OPACITY;
 use lune_ui::color::Rgba;
 use lune_ui::lunegit_dark::THEME;
 use lune_ui::material::Material;
@@ -258,7 +259,7 @@ impl Settings {
         FrameTweaks {
             blur_sigma: self.sigma,
             saturation: self.saturation,
-            noise: self.noise,
+            noise: if self.noise { NOISE_OPACITY } else { 0.0 },
         }
     }
 

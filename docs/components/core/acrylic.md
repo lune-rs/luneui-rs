@@ -11,7 +11,7 @@ summary: Avalonia acrylic colour math with tests, and the noise opacity
 
 ## What it is
 
-`AcrylicColors` and `acrylic_colors` (Avalonia's acrylic formulas), `premultiplied`, and `NOISE_OPACITY`. A replacing acrylic exists only as the window's own background: `Painter::acrylic` on the fixed `Base` layer, with the structural panels that tint it. Above `Base`, or in an overlay, the call draws as `Painter::frost`, the same colour and noise as an over-fill, with `under` ignored [D258].
+`AcrylicColors` and `acrylic_colors` (Avalonia's acrylic formulas), `premultiplied`, `NOISE_OPACITY` (the default of `FrameParams::noise_opacity`) and the `LuminosityCurve` a `GlassLayer` carries (`LuminosityCurve::AVALONIA` by default, D264). A replacing acrylic exists only as the window's own background: `Painter::acrylic` on the fixed `Base` layer, with the structural panels that tint it. Above `Base`, or in an overlay, the call draws as `Painter::frost`, the same colour and noise as an over-fill, with `under` ignored [D258].
 
 ## Needs
 
@@ -40,7 +40,7 @@ Conflicts: none. The repo CARD layer (material 0.8) and Lunegit's content acryli
 | card | black | 1.0 | 0.8 | [R crates/lune-ui-core/src/theme.rs:105-109], [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:229] |
 | solid (Lunegit only) | black | 1.0 | 0.35 | [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:232-233] |
 
-- Noise opacity 0.0225 [R crates/lune-ui-core/src/acrylic.rs:16].
+- Noise opacity 0.0225 [R crates/lune-ui-core/src/acrylic.rs:16] is the default of `FrameParams::noise_opacity` (a frame value, passed to the shader in `Globals`; 0 is no noise, a negative or non-finite value draws as the default). The tint's luminosity curve (mid point 0.5, white 0.2, mid 0.45, black 0.45) is `GlassLayer::curve`, `LuminosityCurve::AVALONIA` at the defaults (D264).
 - Frost: the noise over the premultiplied colour, times coverage, in the ordinary shape pipeline; both fade with the transform's alpha, so a frost at alpha k is k times the frost at alpha 1 [R crates/lune-ui-wgpu/src/shader.wgsl `fs_shape`].
 - Inactive window: nothing changes. No widget's surface depends on whether the window is focused (R13, D262): the background draws the glass layers whatever the window's state, and the old solid `window_fallback` fill is gone.
 - White tint suppressed to 20% (test `white_tint_is_suppressed_to_twenty_percent`, acrylic.rs:130).

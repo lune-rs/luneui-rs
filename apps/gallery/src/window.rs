@@ -363,8 +363,6 @@ impl App {
         bridge.update(&out, &root);
         let repaint = out.repaint;
         let tweaks = state.frame_params().unwrap_or(FrameTweaks::DEFAULT);
-        let mut display = display;
-        tweaks.apply_noise(&mut display);
         draw_with(r, &display, &view, tweaks.params(size, s))?;
         // The material is the page's to ask for; whether it took is the page's to hear.
         if let Some(wanted) = state.material().filter(|m| *m != self.material) {

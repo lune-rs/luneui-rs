@@ -293,6 +293,7 @@ fn a_fill_path_draws_under_text() {
         scale: 1.0,
         blur_sigma: 4.0,
         saturation: 1.0,
+        ..FrameParams::default()
     };
     let mut rec = RecordingRenderer::new();
     rec.render(&p.scene, &params);

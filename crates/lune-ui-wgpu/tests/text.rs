@@ -435,6 +435,7 @@ mod ink {
             scale: SCALE,
             blur_sigma: 4.0,
             saturation: 1.0,
+            ..FrameParams::default()
         };
         renderer
             .draw(gpu, text, &scene, &view, params)

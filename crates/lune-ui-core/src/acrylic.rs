@@ -10,6 +10,7 @@
 //! (for `BackgroundSource=Digger`), so each layer *replaces* what is under it rather than stacking.
 
 use crate::GlassLayer;
+use crate::backdrop::LuminosityCurve;
 use crate::color::Rgba;
 
 /// Opacity Avalonia applies to its 256×256 noise texture.
@@ -29,7 +30,7 @@ impl GlassLayer {
     /// (`PlatformTransparencyCompensationLevel` = 0, Avalonia's default).
     pub fn acrylic_colors(&self) -> AcrylicColors {
         let [r, g, b, a] = self.tint;
-        let modifier = tint_opacity_modifier(self.tint);
+        let modifier = tint_opacity_modifier(self.tint, &self.curve);
         let tint_alpha =
             (255.0 * ((255.0 / f64::from(a)) * f64::from(self.tint_opacity)) * modifier) as u8;
 
@@ -70,34 +71,37 @@ fn trim(value: f64) -> u8 {
     (value * 256.0).floor().clamp(0.0, 255.0) as u8
 }
 
-fn tint_opacity_modifier([r, g, b, _]: Rgba) -> f64 {
-    const MID_POINT: f64 = 0.5;
-    const WHITE_MAX_OPACITY: f64 = 0.2;
-    const MID_POINT_MAX_OPACITY: f64 = 0.45;
-    const BLACK_MAX_OPACITY: f64 = 0.45;
+fn tint_opacity_modifier([r, g, b, _]: Rgba, curve: &LuminosityCurve) -> f64 {
+    let LuminosityCurve {
+        mid_point,
+        white_max_opacity,
+        mid_point_max_opacity,
+        black_max_opacity,
+    } = *curve;
 
     let max = f64::from(r.max(g).max(b)) / 255.0;
     let min = f64::from(r.min(g).min(b)) / 255.0;
     let (v, s) = (max, if max == 0.0 { 0.0 } else { (max - min) / max });
 
-    if v == MID_POINT {
-        return MID_POINT_MAX_OPACITY;
+    if v == mid_point {
+        return mid_point_max_opacity;
     }
-    let (lowest, max_deviation) = if v > MID_POINT {
-        (WHITE_MAX_OPACITY, 1.0 - MID_POINT)
+    let (lowest, max_deviation) = if v > mid_point {
+        (white_max_opacity, 1.0 - mid_point)
     } else {
-        (BLACK_MAX_OPACITY, MID_POINT)
+        (black_max_opacity, mid_point)
     };
-    let mut suppression = MID_POINT_MAX_OPACITY - lowest;
-    let normalized = (v - MID_POINT).abs() / max_deviation;
+    let mut suppression = mid_point_max_opacity - lowest;
+    let normalized = (v - mid_point).abs() / max_deviation;
     if s > 0.0 {
         suppression *= (1.0 - s * 2.0).max(0.0);
     }
-    MID_POINT_MAX_OPACITY - suppression * normalized
+    mid_point_max_opacity - suppression * normalized
 }
 
 #[cfg(test)]
 mod tests {
+    use super::LuminosityCurve;
     use crate::GlassLayer;
     use crate::lunegit_dark::{CARD, PANEL, WINDOW};
 
@@ -133,7 +137,26 @@ mod tests {
             tint: [255, 255, 255, 255],
             tint_opacity: 1.0,
             material_opacity: 0.0,
+            curve: LuminosityCurve::AVALONIA,
         };
         assert_eq!(white.acrylic_colors().tint[3], 51);
+    }
+
+    #[test]
+    fn a_changed_white_max_opacity_changes_a_white_tint() {
+        let white = |white_max_opacity| GlassLayer {
+            tint: [255, 255, 255, 255],
+            tint_opacity: 1.0,
+            material_opacity: 0.0,
+            curve: LuminosityCurve {
+                white_max_opacity,
+                ..LuminosityCurve::AVALONIA
+            },
+        };
+        // 255 * 0.2 = 51; 255 * 0.4 = 102.
+        assert_eq!(white(0.2).acrylic_colors().tint[3], 51);
+        assert_eq!(white(0.4).acrylic_colors().tint[3], 102);
+        // The default curve is Avalonia's.
+        assert_eq!(LuminosityCurve::default(), LuminosityCurve::AVALONIA);
     }
 }

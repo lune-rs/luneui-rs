@@ -1300,6 +1300,7 @@ mod m7 {
         tint: [10, 20, 30, 255],
         tint_opacity: 0.8,
         material_opacity: 0.7,
+        curve: lune_ui_core::LuminosityCurve::AVALONIA,
     };
     const UNDER: [f32; 4] = [0.05, 0.06, 0.07, 1.0];
     const SPLIT_DEFAULT: f32 = 200.0;
@@ -2312,6 +2313,7 @@ mod m8 {
         tint: [10, 20, 30, 255],
         tint_opacity: 0.8,
         material_opacity: 0.7,
+        curve: lune_ui_core::LuminosityCurve::AVALONIA,
     };
 
     const ROUTE: u64 = 1;
@@ -5130,6 +5132,7 @@ mod m11 {
         tint: [10, 20, 30, 255],
         tint_opacity: 0.8,
         material_opacity: 0.7,
+        curve: lune_ui_core::LuminosityCurve::AVALONIA,
     };
     const UNDER: [f32; 4] = [0.05, 0.06, 0.07, 1.0];
 

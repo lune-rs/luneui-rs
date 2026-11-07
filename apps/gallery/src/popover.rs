@@ -338,6 +338,7 @@ impl PopoverHost {
             scale,
             blur_sigma: BLUR_SIGMA,
             saturation: BLUR_SATURATION,
+            ..FrameParams::default()
         };
         self.frame
             .draw_with(&mut r.gpu, &mut r.text, &display, &view, params, &mut [])?;

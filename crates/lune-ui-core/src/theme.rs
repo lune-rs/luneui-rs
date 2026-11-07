@@ -382,6 +382,7 @@ pub mod lunegit_dark {
         tint: TINT,
         tint_opacity: 1.0,
         material_opacity: 0.7,
+        curve: crate::LuminosityCurve::AVALONIA,
     };
 
     /// Panel layer (`GlassTintLightOpacity` 0.8, `GlassMaterialLightOpacity` 0.7).
@@ -389,6 +390,7 @@ pub mod lunegit_dark {
         tint: TINT,
         tint_opacity: 0.8,
         material_opacity: 0.7,
+        curve: crate::LuminosityCurve::AVALONIA,
     };
 
     /// Card and header-tint layer (tint 1, `GlassMaterialDarkHeaderOpacity` 0.8).
@@ -396,6 +398,7 @@ pub mod lunegit_dark {
         tint: TINT,
         tint_opacity: 1.0,
         material_opacity: 0.8,
+        curve: crate::LuminosityCurve::AVALONIA,
     };
 
     pub const CARD_CORNER_RADIUS: f32 = 8.0;
@@ -677,6 +680,7 @@ mod tests {
             tint: [0, 0, 0, 255],
             tint_opacity,
             material_opacity,
+            curve: crate::LuminosityCurve::AVALONIA,
         };
         assert_eq!(THEME.glass.window, layer(1.0, 0.7));
         assert_eq!(THEME.glass.card, layer(1.0, 0.8));

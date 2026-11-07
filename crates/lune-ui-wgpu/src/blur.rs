@@ -3,7 +3,7 @@
 
 use bytemuck::{Pod, Zeroable};
 
-use lune_ui_core::scene::BackdropRequest;
+use lune_ui_core::scene::{BackdropRequest, BlurLimits};
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
@@ -28,8 +28,8 @@ struct BackdropUniform {
 
 // The blur strength comes from Settings (`BlurLevel::sigma`). Luneium's CSS says `blur(30px)`, but
 // taken literally that erases text to flat grey; its real menus use the lighter native macOS blur.
-/// Blur runs at 1/8 resolution.
-const DOWNSCALE: u32 = 8;
+// The blur runs at `1 / downsample` of the frame, [`BlurLimits::downsample`]: 8 unless the frame
+// asks for 2 or 4.
 
 /// One blur a frame asks for: its sigma, and the requests that draw from it, each with its
 /// saturation.
@@ -61,10 +61,12 @@ struct BlurSlot {
 #[derive(Debug)]
 struct Targets {
     scene: wgpu::TextureView,
-    levels: [wgpu::TextureView; 3],
+    /// The scene at 1/2, 1/4, ... down to `1 / downsample`: `log2(downsample)` of them. The last
+    /// is what the blur reads.
+    levels: Vec<wgpu::TextureView>,
     pong: wgpu::TextureView,
-    /// Bind groups: scene, level0, level1.
-    groups: [wgpu::BindGroup; 3],
+    /// Bind groups, each reading the texture one step up: the scene, then every level but the last.
+    groups: Vec<wgpu::BindGroup>,
     /// Bound to these views, so a new size drops them; grown to the most blurs a frame has had.
     blurs: Vec<BlurSlot>,
 }
@@ -240,6 +242,8 @@ pub struct Blur {
     copy_params: wgpu::Buffer,
     copy_backdrop: wgpu::Buffer,
     size: (u32, u32),
+    /// The divisor the targets were made for.
+    downsample: u32,
     targets: Option<Targets>,
 }
 
@@ -258,28 +262,40 @@ impl Blur {
             copy_params: buffer("blur copy params", size_of::<Params>()),
             copy_backdrop: buffer("blur copy backdrop", size_of::<BackdropUniform>()),
             size: (0, 0),
+            downsample: BlurLimits::DOWNSAMPLE,
             targets: None,
         }
     }
 
-    /// (Re)creates the offscreen targets for the surface size; cheap when unchanged.
-    pub(crate) fn prepare(&mut self, device: &wgpu::Device, shared: &Shared, size: (u32, u32)) {
+    /// (Re)creates the offscreen targets for the surface size and the divisor `downsample` (2, 4
+    /// or 8; see [`BlurLimits::effective`]); cheap when neither changed.
+    pub(crate) fn prepare(
+        &mut self,
+        device: &wgpu::Device,
+        shared: &Shared,
+        size: (u32, u32),
+        downsample: u32,
+    ) {
         let (w, h) = (size.0.max(1), size.1.max(1));
-        let small = ((w / DOWNSCALE).max(1), (h / DOWNSCALE).max(1));
-        if self.size == (w, h) && self.targets.is_some() {
+        if self.size == (w, h) && self.downsample == downsample && self.targets.is_some() {
             return;
         }
         self.size = (w, h);
+        self.downsample = downsample;
         let texture = |label, tw, th| target_view(device, self.format, label, tw, th);
         let scene = texture("scene", w, h);
-        let levels = [
-            texture("blur 1/2", (w / 2).max(1), (h / 2).max(1)),
-            texture("blur 1/4", (w / 4).max(1), (h / 4).max(1)),
-            texture("blur 1/8", small.0, small.1),
-        ];
+        let count = downsample.max(2).ilog2();
+        let levels: Vec<_> = (1..=count)
+            .map(|k| {
+                let d = 1 << k;
+                texture("blur level", (w / d).max(1), (h / d).max(1))
+            })
+            .collect();
+        let small = ((w / downsample).max(1), (h / downsample).max(1));
         let pong = texture("blur pong", small.0, small.1);
         let group = |src| bind_group(device, shared, src, &self.copy_params, &self.copy_backdrop);
-        let groups = [group(&scene), group(&levels[0]), group(&levels[1])];
+        let mut groups = vec![group(&scene)];
+        groups.extend(levels[..levels.len() - 1].iter().map(group));
         self.targets = Some(Targets {
             scene,
             levels,
@@ -297,10 +313,12 @@ impl Blur {
         queue: &wgpu::Queue,
         shared: &Shared,
         scale: f32,
+        limits: BlurLimits,
         plans: &[BlurPlan],
     ) {
         let (w, h) = self.size;
-        let small = ((w / DOWNSCALE).max(1), (h / DOWNSCALE).max(1));
+        let downsample = self.downsample;
+        let small = ((w / downsample).max(1), (h / downsample).max(1));
         let format = self.format;
         let copy_params = &self.copy_params;
         let Some(t) = &mut self.targets else { return };
@@ -311,19 +329,19 @@ impl Blur {
                     shared,
                     format,
                     small,
-                    (&t.levels[2], &t.pong),
+                    (t.levels.last().unwrap_or(&t.scene), &t.pong),
                     (copy_params, &self.copy_backdrop),
                 );
                 t.blurs.push(slot);
             }
             let slot = &mut t.blurs[i];
-            let sigma = plan.sigma * scale / DOWNSCALE as f32;
+            let sigma = plan.sigma * scale / downsample as f32;
             for (buf, dir) in [(&slot.h_params, [1.0, 0.0]), (&slot.v_params, [0.0, 1.0])] {
                 let params = Params {
                     src_texel: [1.0 / small.0 as f32, 1.0 / small.1 as f32],
                     dir,
                     sigma,
-                    radius: (sigma * 3.0).ceil().min(48.0),
+                    radius: (sigma * 3.0).ceil().min(limits.kernel_cap),
                     _pad: [0.0; 2],
                 };
                 queue.write_buffer(buf, 0, bytemuck::bytes_of(&params));
@@ -352,12 +370,13 @@ impl Blur {
         self.targets.as_ref().map(|t| &t.scene)
     }
 
-    /// Downsamples the scene to 1/8, the source of [`Self::blur`]. Call after a scene pass.
+    /// Downsamples the scene by halves to `1 / downsample`, the source of [`Self::blur`]. Call after
+    /// a scene pass.
     pub(crate) fn downsample(&self, encoder: &mut wgpu::CommandEncoder, p: &Pipelines) {
         let Some(t) = &self.targets else { return };
-        step(encoder, &t.levels[0], &t.groups[0], &p.copy);
-        step(encoder, &t.levels[1], &t.groups[1], &p.copy);
-        step(encoder, &t.levels[2], &t.groups[2], &p.copy);
+        for (level, group) in t.levels.iter().zip(&t.groups) {
+            step(encoder, level, group, &p.copy);
+        }
     }
 
     /// Runs blur `i` of the frame's plans on what [`Self::downsample`] left, into its own result.
@@ -535,7 +554,10 @@ impl Blur {
     /// Debug: write the scene and the blurred 1/8 texture as PNGs (premultiplied, over black).
     pub fn dump(&self, device: &wgpu::Device, queue: &wgpu::Queue, dir: &std::path::Path) {
         let Some(t) = &self.targets else { return };
-        let blurred = t.blurs.first().map_or(&t.levels[2], |b| &b.result);
+        let blurred = t
+            .blurs
+            .first()
+            .map_or(t.levels.last().unwrap_or(&t.scene), |b| &b.result);
         for (name, view) in [("scene", &t.scene), ("blurred", blurred)] {
             let tex = view.texture();
             let path = dir.join(format!("{name}.png"));

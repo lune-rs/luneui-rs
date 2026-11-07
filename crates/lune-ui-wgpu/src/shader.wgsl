@@ -4,14 +4,12 @@
 struct Globals {
     size: vec2<f32>,
     scale: f32,
-    _pad: f32,
+    noise: f32,  // opacity of the noise texture on acrylic and frost
 };
 
 @group(0) @binding(0) var<uniform> g: Globals;
 @group(0) @binding(1) var noise_tex: texture_2d<f32>;
 @group(0) @binding(2) var noise_samp: sampler;
-
-const NOISE_OPACITY: f32 = 0.0225;
 
 fn to_ndc(p: vec2<f32>) -> vec4<f32> {
     return vec4<f32>(p.x / g.size.x * 2.0 - 1.0, 1.0 - p.y / g.size.y * 2.0, 0.0, 1.0);
@@ -83,7 +81,7 @@ fn round_clip(p: vec2<f32>, rc: vec4<f32>, r: f32) -> f32 {
 
 // Straight-alpha noise OVER a premultiplied colour (Skia's compose with SrcOver).
 fn add_noise(c: vec4<f32>, n: vec4<f32>) -> vec4<f32> {
-    let na = n.a * NOISE_OPACITY;
+    let na = clamp(n.a * g.noise, 0.0, 1.0);
     return vec4<f32>(n.rgb * na + c.rgb * (1.0 - na), na + c.a * (1.0 - na));
 }
 

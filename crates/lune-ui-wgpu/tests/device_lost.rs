@@ -60,6 +60,7 @@ fn a_destroyed_device_is_lost_a_draw_on_it_never_succeeds_and_a_rebuild_draws() 
         scale: 1.0,
         blur_sigma: 4.0,
         saturation: 1.0,
+        ..FrameParams::default()
     };
     // Instrument check: before the loss the same draw works and the device reports it healthy.
     let s = scene(&mut text);

@@ -15,14 +15,14 @@ use crate::text_cache::TextCache;
 use lune_ui_core::image::{ImageData, ImageError, ImageId, ImageStore};
 use lune_ui_core::scene::{ImageSource, Layer, Shape, StrokeVertex};
 
-/// The uniform block of the shape and stroke pipelines: the target size in physical px and the
-/// scale.
+/// The uniform block of the shape and stroke pipelines: the target size in physical px, the scale
+/// and the opacity of the noise texture.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 pub struct Globals {
     pub size: [f32; 2],
     pub scale: f32,
-    pub _pad: f32,
+    pub noise: f32,
 }
 
 /// GPU copy of [`Shape`]: same fields, same order.

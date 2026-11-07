@@ -299,6 +299,7 @@ fn images_draw_after_customs_and_before_text() {
         scale: 1.0,
         blur_sigma: 4.0,
         saturation: 1.0,
+        ..FrameParams::default()
     };
     let mut rec = RecordingRenderer::new();
     rec.render(&p.scene, &params);

@@ -158,7 +158,10 @@ impl FrameRenderer {
             scale: s,
             blur_sigma,
             saturation,
+            ..
         } = params;
+        let noise = params.noise();
+        let limits = params.blur.effective();
         let (stops, plans) = stops_of(&layers, floor, blur_sigma, saturation);
         // Disjoint borrows: the format's atlas and the rasterizer cache are the only shared state
         // this draw writes.
@@ -213,15 +216,16 @@ impl FrameRenderer {
             bytemuck::bytes_of(&Globals {
                 size: [size.0 as f32, size.1 as f32],
                 scale: s,
-                _pad: 0.0,
+                noise,
             }),
         );
         let gpu: &Gpu = gpu;
         let fs = &gpu.formats[self.format_index];
         let uploaded = gpu.upload(&layers);
-        self.blur.prepare(&gpu.device, &gpu.blur, size);
         self.blur
-            .plan(&gpu.device, &gpu.queue, &gpu.blur, s, &plans);
+            .prepare(&gpu.device, &gpu.blur, size, limits.downsample);
+        self.blur
+            .plan(&gpu.device, &gpu.queue, &gpu.blur, s, limits, &plans);
         let mut encoder = gpu.device.create_command_encoder(&Default::default());
         let pass_desc = |target: &wgpu::TextureView,
                          load: wgpu::LoadOp<wgpu::Color>,

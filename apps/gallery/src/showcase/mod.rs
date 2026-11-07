@@ -942,31 +942,8 @@ mod tests {
         assert_eq!((params.size, params.scale), ((200, 100), 2.0));
         assert!((params.blur_sigma - 12.0).abs() < f32::EPSILON);
         assert!((params.saturation - 2.5).abs() < f32::EPSILON);
-        // The noise flag of every acrylic goes off.
-        let mut scene = lune_ui::scene::Scene::default();
-        scene.overlays.push(lune_ui::scene::OverlayLayer {
-            on: LayerId::Modal,
-            tag: 1,
-            layer: lune_ui::scene::Layer::default(),
-        });
-        let overlays = scene.overlays.iter_mut().map(|o| &mut o.layer);
-        for layer in scene.layers.iter_mut().chain(overlays) {
-            layer.geometry.acrylic.push(lune_ui::scene::Acrylic {
-                shape: lune_ui::scene::Shape {
-                    params: [0.0, 0.0, 1.0, 1.0],
-                    ..Default::default()
-                },
-                opacity: 1.0,
-            });
-        }
-        tweaks.apply_noise(&mut scene);
-        assert!(
-            scene
-                .in_order()
-                .into_iter()
-                .all(|l| l.geometry.acrylic[0].shape.params[3] == 0.0)
-        );
-        assert_eq!(scene.layers[0].geometry.acrylic[0].shape.params[2], 1.0);
+        // Noise off is a strength of 0, which the renderer reads.
+        assert_eq!(params.noise_opacity, 0.0);
         // The material result lands in the pane's note.
         s.material_applied(Err("no compositor".to_owned()));
         assert!(

@@ -231,6 +231,7 @@ fn recording_renderer_carries_opacity() {
             scale: 2.0,
             blur_sigma: 4.0,
             saturation: 1.0,
+            ..FrameParams::default()
         },
     );
     let calls = &rr.last().expect("a frame").calls;

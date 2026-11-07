@@ -145,6 +145,7 @@ impl Window {
             scale: 1.0,
             blur_sigma: 4.0,
             saturation: 1.0,
+            ..FrameParams::default()
         };
         renderer
             .draw(gpu, &mut self.text, scene, &view, params)

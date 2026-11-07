@@ -11,7 +11,7 @@
 
 #![forbid(unsafe_code)]
 
-pub use lune_ui_core::{Backdrop, BackdropKind, GlassLayer};
+pub use lune_ui_core::{Backdrop, BackdropKind, GlassLayer, LuminosityCurve};
 pub use lune_ui_core::{
     acrylic, backdrop, chrome, code_doc, color, drag, icon, image, json, layout, motion, paint,
     scene, shortcuts, strings, testing, text_edit, theme, ui, widgets,

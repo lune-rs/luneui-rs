@@ -69,6 +69,11 @@ fn scene(alphas: &[Option<f32>]) -> Scene {
 }
 
 fn render(gpu: &mut Gpu, scene: &Scene) -> Vec<u8> {
+    render_with(gpu, scene, FrameParams::default())
+}
+
+/// `scene` drawn with `over`'s frame values; the size, scale and blur are the test's own.
+fn render_with(gpu: &mut Gpu, scene: &Scene, over: FrameParams) -> Vec<u8> {
     let mut text = TextCache::new(&fonts(), "RznSans", "RobotoMono Nerd Font Mono");
     let format = wgpu::TextureFormat::Rgba8Unorm;
     let mut renderer = FrameRenderer::new(gpu, format);
@@ -79,6 +84,8 @@ fn render(gpu: &mut Gpu, scene: &Scene) -> Vec<u8> {
         scale: 1.0,
         blur_sigma: 4.0,
         saturation: 1.0,
+        noise_opacity: over.noise_opacity,
+        blur: over.blur,
     };
     renderer
         .draw(gpu, &mut text, scene, &view, params)
@@ -168,4 +175,67 @@ fn an_acrylic_call_above_base_blends_over_it_and_leaves_the_base_visible() {
     near("the card over the base", px(&img, centre(0)), over);
     assert_eq!(px(&img, centre(0))[3], 255, "no hole");
     assert_eq!(px(&img, (2, 2)), BASE);
+}
+
+/// A Base acrylic fill of one colour, with the noise flag as given.
+fn flat(noise: bool) -> Scene {
+    let mut text = FakeText;
+    let win = Rect::new(0.0, 0.0, SIZE.0 as f32, SIZE.1 as f32);
+    let mut p: Painter<'_, u8> = Painter::new(1.0, win, &mut text, None, DARK);
+    p.acrylic(win, 0.0, premul(BASE), [0.0; 4], noise);
+    p.scene
+}
+
+fn with_noise(noise_opacity: f32) -> FrameParams {
+    FrameParams {
+        noise_opacity,
+        ..FrameParams::default()
+    }
+}
+
+/// The mean distance of the colour channels from the flat colour, over the whole target.
+fn deviation(img: &[u8]) -> f32 {
+    let sum: f32 = img
+        .chunks_exact(4)
+        .map(|p| {
+            (0..3)
+                .map(|c| (f32::from(p[c]) - f32::from(BASE[c])).abs())
+                .sum::<f32>()
+        })
+        .sum();
+    sum / (img.len() / 4) as f32 / 3.0
+}
+
+#[test]
+fn noise_zero_equals_the_flag_off_and_doubled_noise_doubles_the_deviation() {
+    let Some(mut gpu) = headless_gpu() else {
+        return;
+    };
+    let off = render(&mut gpu, &flat(false));
+    assert_eq!(deviation(&off), 0.0, "no noise leaves the flat colour");
+    let on = render(&mut gpu, &flat(true));
+    let d1 = deviation(&on);
+    assert!(d1 > 0.1, "the default noise shows (instrument check): {d1}");
+    let zero = render_with(&mut gpu, &flat(true), with_noise(0.0));
+    assert_eq!(zero, off, "noise 0 is the flag off");
+    // Doubling the strength doubles what the noise adds, to within the 8-bit rounding.
+    let default = FrameParams::default().noise_opacity;
+    let doubled = render_with(&mut gpu, &flat(true), with_noise(default * 2.0));
+    let d2 = deviation(&doubled);
+    assert!(
+        (d2 / d1 - 2.0).abs() < 0.2,
+        "deviation {d1} then {d2} when doubled"
+    );
+}
+
+#[test]
+fn a_noise_that_is_not_a_strength_draws_as_the_default() {
+    let Some(mut gpu) = headless_gpu() else {
+        return;
+    };
+    let default = render(&mut gpu, &flat(true));
+    for bad in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -0.5] {
+        let img = render_with(&mut gpu, &flat(true), with_noise(bad));
+        assert_eq!(img, default, "noise {bad}");
+    }
 }
