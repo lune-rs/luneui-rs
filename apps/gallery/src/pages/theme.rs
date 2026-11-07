@@ -83,6 +83,8 @@ struct Themed {
     theme: Theme,
     info: String,
     level: AcrylicLevel,
+    /// A press outside or a pick closed the menu.
+    menu_closed: bool,
     /// The window's pickers; the scenes draw without them.
     pickers: bool,
     /// The file the theme came from (an index into [`FILES`]).
@@ -97,6 +99,7 @@ impl Themed {
             info: describe(&file),
             theme: file.theme,
             level: AcrylicLevel::Default,
+            menu_closed: false,
             pickers,
             file: FILES
                 .iter()
@@ -305,7 +308,10 @@ impl PageState for Acrylic {
             panel.x + 24.0,
             panel.y + 44.0,
         );
-        ui.menu("menu", &MENU, (panel.x + 120.0, panel.y + 120.0));
+        if !self.menu_closed {
+            let m = ui.menu("menu", &MENU, (panel.x + 120.0, panel.y + 120.0));
+            self.menu_closed = m.picked.is_some() || m.dismissed;
+        }
     }
 
     fn theme(&self) -> Option<Theme> {

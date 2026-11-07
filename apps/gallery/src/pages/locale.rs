@@ -65,6 +65,8 @@ struct Locale {
     pseudo: bool,
     /// The dialog's own Cancel or Discard closed it.
     closed: bool,
+    /// A press outside or a pick closed the menu.
+    menu_closed: bool,
 }
 
 fn pseudo() -> Box<dyn PageState> {
@@ -72,6 +74,7 @@ fn pseudo() -> Box<dyn PageState> {
         controls: Controls::new(),
         pseudo: true,
         closed: false,
+        menu_closed: false,
     })
 }
 
@@ -104,7 +107,10 @@ impl PageState for Locale {
             })
             .collect();
         let (dx, dy) = card_shift(area);
-        ui.menu("menu", &menu_rows, (24.0 + dx, 350.0 + dy));
+        if !self.menu_closed {
+            let m = ui.menu("menu", &menu_rows, (24.0 + dx, 350.0 + dy));
+            self.menu_closed = m.picked.is_some() || m.dismissed;
+        }
 
         let title = t(ui, "app.dialog.title", "Discard changes");
         let message = t(

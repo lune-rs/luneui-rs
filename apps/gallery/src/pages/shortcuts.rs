@@ -65,7 +65,10 @@ fn rows(h: &Hints) -> [MenuRow<'_>; 4] {
 }
 
 /// Both menus, open from the start of the scene.
-struct Menus;
+struct Menus {
+    /// A press outside or a pick closed the menu.
+    closed: [bool; 2],
+}
 
 impl PageState for Menus {
     fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
@@ -76,13 +79,19 @@ impl PageState for Menus {
         let pc = hints(&Keymap::PC);
         caption(ui, "macOS: Keymap::MAC", x, y + 24.0);
         caption(ui, "Windows: Keymap::PC", x + 280.0, y + 24.0);
-        ui.menu("mac", &rows(&mac), (x, y + 48.0));
-        ui.menu("pc", &rows(&pc), (x + 280.0, y + 48.0));
+        if !self.closed[0] {
+            let m = ui.menu("mac", &rows(&mac), (x, y + 48.0));
+            self.closed[0] = m.picked.is_some() || m.dismissed;
+        }
+        if !self.closed[1] {
+            let m = ui.menu("pc", &rows(&pc), (x + 280.0, y + 48.0));
+            self.closed[1] = m.picked.is_some() || m.dismissed;
+        }
     }
 }
 
 fn menus() -> Box<dyn PageState> {
-    Box::new(Menus)
+    Box::new(Menus { closed: [false; 2] })
 }
 
 /// The menus open at time 0 (the open motion is 180 ms); the capture at 600 ms is settled.

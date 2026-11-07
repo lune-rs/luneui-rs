@@ -1216,4 +1216,29 @@ mod tests {
         let out = rig.frame();
         assert!(named(&out, "Cancel").is_none(), "the dialog closed");
     }
+
+    /// A press outside a page's menu closes it, in the page and in the panes above it.
+    #[test]
+    fn a_hosted_menu_closes_on_a_press_outside() {
+        let mid = |n: &lune_ui::access::Node| {
+            (n.bounds.x + n.bounds.w / 2.0, n.bounds.y + n.bounds.h / 2.0)
+        };
+        for outside in ["Off", "Green"] {
+            let mut rig = Rig::new();
+            rig.shell.cue("page ui");
+            rig.frame();
+            let out = rig.frame();
+            rig.click_at(mid(named(&out, "Menu").expect("the knob")));
+            rig.settle();
+            let out = rig.frame();
+            assert!(named(&out, "New Window").is_some(), "the menu is open");
+            rig.click_at(mid(named(&out, outside).expect("a target outside")));
+            rig.settle();
+            let out = rig.frame();
+            assert!(
+                named(&out, "New Window").is_none(),
+                "a press on {outside} closed it"
+            );
+        }
+    }
 }
