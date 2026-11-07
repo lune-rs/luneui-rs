@@ -510,6 +510,8 @@ struct ListMem {
     ended: f64,
     /// A height changed last frame, so this frame's rows move.
     relaid: bool,
+    /// The row the key focus is in (its key and last index), kept alive while it is out of view.
+    focus_row: Option<(RowKey, usize)>,
     /// What each row measured, by its key, in `Measured` mode: a row's height follows the row, so
     /// a sort or a replaced list places the rows it has seen at their own heights at once.
     known: BTreeMap<RowKey, f32>,
@@ -848,6 +850,46 @@ impl Ui<'_> {
         }
     }
 
+    /// Keeps the focused row alive while it is out of view and lets it go when the focus leaves it
+    /// or its row leaves the data (D23, D15). `found` is the built row that holds the focus now.
+    fn settle_row_focus(
+        &mut self,
+        mem: &mut ListMem,
+        rows: &Rows<'_>,
+        found: Option<(RowKey, usize)>,
+        built: &[RowKey],
+    ) {
+        let scope_of = |ui: &Self, key: RowKey| {
+            ui.id(RowScope {
+                epoch: mem.epoch,
+                key,
+            })
+        };
+        let Some((key, index)) = found else {
+            let Some((key, index)) = mem.focus_row else {
+                return;
+            };
+            let scope = scope_of(self, key);
+            // Built and not holding the focus: it left. Out of view: it stays while the focus is
+            // still in the row's scope and the row is still in the data.
+            let alive = !built.contains(&key)
+                && self.focus_within(scope)
+                && rows.locate(key, index).is_some();
+            if alive {
+                self.hold_focus_in(scope);
+            } else {
+                self.release_scope(scope);
+                mem.focus_row = None;
+            }
+            return;
+        };
+        if let Some((prev, _)) = mem.focus_row.filter(|(k, _)| *k != key) {
+            let scope = scope_of(self, prev);
+            self.release_scope(scope);
+        }
+        mem.focus_row = Some((key, index));
+    }
+
     /// One frame of the rows inside the area: registers them, applies their input, then draws.
     fn list_rows(
         &mut self,
@@ -971,6 +1013,8 @@ impl Ui<'_> {
 
         let enabled = response.enabled;
         let (mut relaid, mut shift) = (false, 0.0);
+        let mut focus_found = None;
+        let mut built_keys = Vec::with_capacity(built.len());
         for b in built {
             let mut ctx = b.ctx;
             // While the content moves a row snaps: skipping the animation also drops any in flight.
@@ -1016,9 +1060,23 @@ impl Ui<'_> {
             };
             // A margin row is built and clipped: nothing on it is a Tab stop.
             let hidden = ctx.rect.bottom() <= rect.y || ctx.rect.y >= rect.bottom();
+            // The row that holds the focus is drawn under a keep-alive scope, so what its widgets
+            // keep (an edit's caret) goes on while it is out of view.
+            let holds = mem.focus_row.is_some_and(|(k, _)| k == ctx.key);
             let height = self.off_tab_order(hidden, |ui| {
-                ui.node_container(node, |ui| ui.scope(scope, |ui| draw(ui, &ctx)))
+                ui.node_container(node, |ui| {
+                    if holds {
+                        ui.keep_alive(scope, |ui| draw(ui, &ctx))
+                    } else {
+                        ui.scope(scope, |ui| draw(ui, &ctx))
+                    }
+                })
             });
+            if self.focus_within(b.id) {
+                self.hold_focus_in(b.id);
+                focus_found = Some((ctx.key, ctx.index));
+            }
+            built_keys.push(ctx.key);
             if ctx.focus_visible {
                 focus_ring::paint(self.painter(), highlight, RingKind::Button, 1.0);
             }
@@ -1039,6 +1097,7 @@ impl Ui<'_> {
             }
             self.request_catch_up();
         }
+        self.settle_row_focus(mem, rows, focus_found, &built_keys);
         response
     }
 }

@@ -1817,3 +1817,151 @@ fn a_chord_on_the_lists_keys_stays_a_shortcut() {
         }
     }
 }
+
+// Focus in a row survives scrolling (D23).
+
+/// A list of rows that each hold a text field and a counter that lives while the row is kept.
+struct Fields {
+    texts: std::cell::RefCell<std::collections::BTreeMap<u64, String>>,
+}
+
+impl Fields {
+    fn new() -> Self {
+        Fields {
+            texts: Default::default(),
+        }
+    }
+
+    fn draw(&self, ui: &mut Ui<'_>, c: &RowCtx) -> f32 {
+        *ui.persistent::<u32>(ui.id("n")) += 1;
+        let mut texts = self.texts.borrow_mut();
+        let text = texts.entry(c.key.0).or_default();
+        let at = Rect::new(c.rect.x + 8.0, c.rect.y + 8.0, c.rect.w - 16.0, 28.0);
+        ui.text_field("f", at, text, "type", Default::default());
+        ROW
+    }
+
+    fn frame(&self, h: &mut UiHarness, count: usize) -> Run {
+        let o = opts(count);
+        run_with(h, &o, &key, &mut |ui, c| self.draw(ui, c))
+    }
+
+    /// A frame with a typed character queued: whether `id` holds the key focus in it (the frame's
+    /// output only names widgets that drew, and a row that is out of view did not).
+    fn holds_focus(&self, h: &mut UiHarness, count: usize, id: WidgetId) -> bool {
+        h.input.key_down(Key::Character("q".into()), Some("q"));
+        let (mut held, o) = (false, opts(count));
+        h.frame(|ui| {
+            ui.virtual_list("l", LIST, &o, key, |ui, c| self.draw(ui, c));
+            held = !ui.focus_events(id).is_empty();
+        });
+        held
+    }
+}
+
+fn field_id(k: u64) -> WidgetId {
+    row_id(k).with("f")
+}
+
+/// The pointer on row `k`'s field in a frame that drew it, pressed and released.
+fn click_field(h: &mut UiHarness, f: &Fields, count: usize, k: u64) {
+    let r = f.frame(h, count);
+    let c = r
+        .rows
+        .iter()
+        .find(|c| c.key.0 == k)
+        .expect("the row is built");
+    h.input
+        .pointer_to(c.rect.x + 20.0, c.rect.y + 20.0)
+        .click(P);
+    f.frame(h, count);
+}
+
+/// Scrolls the list far down (`down`) or back to the top, and lets frames pass.
+fn scroll_far(h: &mut UiHarness, f: &Fields, count: usize, down: bool) {
+    h.input
+        .pointer_to(LIST.x + 5.0, LIST.y + 5.0)
+        .scroll_pixels(0.0, if down { -4500.0 } else { 4500.0 });
+    for ms in 0..4 {
+        h.at_ms(100 + 100 * ms);
+        f.frame(h, count);
+    }
+}
+
+#[test]
+fn a_field_focused_in_a_row_keeps_the_focus_while_the_row_scrolls_away_and_back() {
+    let f = Fields::new();
+    let mut h = harness();
+    click_field(&mut h, &f, 200, 2);
+    assert_eq!(f.frame(&mut h, 200).out.focused, Some(field_id(2)));
+    scroll_far(&mut h, &f, 200, true);
+    let away = f.frame(&mut h, 200);
+    assert!(away.rows.iter().all(|c| c.index > 50), "row 2 is not built");
+    assert!(
+        f.holds_focus(&mut h, 200, field_id(2)),
+        "the focus is in the row that is out of view"
+    );
+    for ms in 0..30 {
+        h.at_ms(1000 + 100 * ms);
+        assert!(f.holds_focus(&mut h, 200, field_id(2)), "frame {ms}");
+    }
+    assert!(
+        away.out.focused.is_none(),
+        "instrument: the output names only what drew"
+    );
+    scroll_far(&mut h, &f, 200, false);
+    let back = f.frame(&mut h, 200);
+    assert!(back.rows.iter().any(|c| c.key.0 == 2));
+    assert_eq!(back.out.focused, Some(field_id(2)));
+    h.input.key_down(Key::Character("x".into()), Some("x"));
+    f.frame(&mut h, 200);
+    assert_eq!(f.texts.borrow()[&2], "x", "a typed character reaches it");
+}
+
+#[test]
+fn a_deleted_row_clears_the_focus_and_a_move_of_focus_lets_the_kept_row_go() {
+    // The row's counter is kept only while the row is: it is the observable of the keep-alive.
+    let counter = |h: &mut UiHarness| {
+        let mut n = 0;
+        h.frame(|ui| n = *ui.persistent::<u32>(row_id(2).with("n")));
+        n
+    };
+    // A focused row that is deleted while it is out of view.
+    let f = Fields::new();
+    let mut h = harness();
+    click_field(&mut h, &f, 200, 2);
+    scroll_far(&mut h, &f, 200, true);
+    assert!(f.holds_focus(&mut h, 200, field_id(2)), "instrument");
+    f.frame(&mut h, 2);
+    assert!(
+        !f.holds_focus(&mut h, 2, field_id(2)),
+        "row 2 is not in the data"
+    );
+
+    // The focus moves to another row: the kept one is let go, and what it kept goes with it.
+    for moves in [false, true] {
+        let f = Fields::new();
+        let mut h = harness();
+        click_field(&mut h, &f, 200, 2);
+        // One frame with the focus in the row: from it on the row is drawn under its keep-alive.
+        f.frame(&mut h, 200);
+        scroll_far(&mut h, &f, 200, true);
+        let r = f.frame(&mut h, 200);
+        let other = r
+            .rows
+            .iter()
+            .find(|c| c.rect.y >= LIST.y && c.rect.bottom() <= LIST.bottom())
+            .expect("a row in view")
+            .key
+            .0;
+        if moves {
+            click_field(&mut h, &f, 200, other);
+            assert_eq!(f.frame(&mut h, 200).out.focused, Some(field_id(other)));
+            f.frame(&mut h, 200);
+            assert_eq!(counter(&mut h), 0, "row 2's state went when the focus left");
+        } else {
+            f.frame(&mut h, 200);
+            assert!(counter(&mut h) > 0, "instrument: row 2's state is kept");
+        }
+    }
+}

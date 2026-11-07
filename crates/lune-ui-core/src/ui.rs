@@ -906,6 +906,27 @@ impl<'a> Ui<'a> {
         self.store.live_scopes.remove(&id);
     }
 
+    /// Whether the key focus is on a widget that last registered inside the id scope `scope`.
+    pub(crate) fn focus_within(&self, scope: WidgetId) -> bool {
+        let focus = &self.store.focus;
+        focus.focused.is_some() && focus.scope_path.contains(&scope)
+    }
+
+    /// Keeps the id scope `scope` live as the keep-alive scope of the focused widget inside it: it
+    /// stays live, and the focus survives the widget going undrawn (D15), until
+    /// [`Self::release_scope`].
+    pub(crate) fn hold_focus_in(&mut self, scope: WidgetId) {
+        self.store.live_scopes.insert(scope);
+        if !self.store.focus.chain.contains(&scope) {
+            self.store.focus.chain.push(scope);
+        }
+    }
+
+    /// [`Self::end_keep_alive`] for a scope given by id.
+    pub(crate) fn release_scope(&mut self, scope: WidgetId) {
+        self.store.live_scopes.remove(&scope);
+    }
+
     /// Registers `rect` as a hit region of `id` on the painter's current layer and returns the
     /// frame's reading of it. The region is clipped and transformed like `Painter::hit`.
     pub fn interact(&mut self, id: WidgetId, rect: Rect, sense: Sense) -> Response {
