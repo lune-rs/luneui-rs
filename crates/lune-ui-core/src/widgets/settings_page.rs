@@ -25,7 +25,7 @@ use std::hash::Hash;
 
 use crate::access::{Action, Live, Node, Role, State};
 use crate::backdrop::GlassLayer;
-use crate::color::Rgba;
+use crate::color::clear;
 use crate::icon;
 use crate::input::NamedKey;
 use crate::motion::{Easing, Kind, Motion, Reduce, Token};
@@ -84,11 +84,6 @@ pub struct SettingsPage<'a> {
 pub struct SettingsResponse {
     /// The banner's action was pressed this frame.
     pub restart: bool,
-}
-
-/// `c` with alpha 0, so a fade keeps its hue.
-fn clear(c: Rgba) -> Rgba {
-    [c[0], c[1], c[2], 0]
 }
 
 /// What the pointer and keyboard are doing to the action.

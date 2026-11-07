@@ -156,6 +156,11 @@ enum Content<'a> {
         glyph: &'a str,
         size: f32,
     },
+    /// The toolbar's glyph and elided text, drawn by `toolbar::paint_label`.
+    Toolbar {
+        glyph: &'a str,
+        text: &'a str,
+    },
 }
 
 /// Draws a button in `r` with `look`. `kind` is the look's own: [`ButtonLook::of`] already took it
@@ -255,6 +260,9 @@ fn paint_content<H: Copy + PartialEq>(
         }
         Content::Glyph { glyph, size } => {
             p.text_centered(&icon::glyph(glyph, size, look.label), r);
+        }
+        Content::Toolbar { glyph, text } => {
+            super::toolbar::paint_label(p, r, glyph, text, look.label);
         }
     }
     focus_ring::paint(p, r, ring(&t, radius), look.ring);
@@ -372,6 +380,28 @@ impl Ui<'_> {
             button.name,
             button.color,
             sense,
+        )
+    }
+
+    /// [`Ui::toolbar_label`]'s button: the ghost look at the theme's radius with `color` for the
+    /// glyph and text, the toolbar's own glyph and elided text as the content.
+    pub(super) fn toolbar_label_button(
+        &mut self,
+        key: impl Hash,
+        rect: Rect,
+        (glyph, text, name): (&str, &str, &str),
+        color: Rgba,
+    ) -> Response {
+        let radius = self.theme().item_radius;
+        self.button_inner_colored(
+            key,
+            rect,
+            radius,
+            Content::Toolbar { glyph, text },
+            ButtonKind::Ghost,
+            name,
+            Some(color),
+            Sense::CLICK_FOCUS,
         )
     }
 

@@ -25,7 +25,32 @@ pub fn over(top: [f32; 4], below: [f32; 4]) -> [f32; 4] {
     ]
 }
 
-/// `c` with its alpha scaled by `k`, rounded to the nearest step.
+/// `c` with its alpha scaled by `k` (clamped to 0 to 1), rounded to the nearest step.
 pub fn with_alpha(c: Rgba, k: f32) -> Rgba {
-    [c[0], c[1], c[2], (f32::from(c[3]) * k).round() as u8]
+    [
+        c[0],
+        c[1],
+        c[2],
+        (f32::from(c[3]) * k.clamp(0.0, 1.0)).round() as u8,
+    ]
+}
+
+/// `c` with its alpha set to `a`.
+pub fn with_alpha_byte(c: Rgba, a: u8) -> Rgba {
+    [c[0], c[1], c[2], a]
+}
+
+/// `c` with alpha 0: the same hue, invisible, so a fade keeps its colour.
+pub fn clear(c: Rgba) -> Rgba {
+    with_alpha_byte(c, 0)
+}
+
+/// `a` to `b` by `t` (clamped to 0 to 1), channel by channel and alpha included; exactly `a` at 0
+/// and `b` at 1.
+pub fn mix(a: Rgba, b: Rgba, t: f32) -> Rgba {
+    let t = t.clamp(0.0, 1.0);
+    std::array::from_fn(|i| {
+        let (x, y) = (f32::from(a[i]), f32::from(b[i]));
+        (x + (y - x) * t).round().clamp(0.0, 255.0) as u8
+    })
 }

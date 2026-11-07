@@ -10,7 +10,7 @@
 use std::hash::Hash;
 
 use crate::access::{Node, Role, State};
-use crate::color::Rgba;
+use crate::color::clear;
 use crate::motion::{Kind, Motion};
 use crate::paint::Rect;
 use crate::text::{Spec, Style};
@@ -55,11 +55,6 @@ pub struct SettingRow<'a> {
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct ItemRow<'a> {
     pub name: &'a str,
-}
-
-/// `c` with alpha 0, so a fade keeps its hue.
-fn clear(c: Rgba) -> Rgba {
-    [c[0], c[1], c[2], 0]
 }
 
 impl Ui<'_> {

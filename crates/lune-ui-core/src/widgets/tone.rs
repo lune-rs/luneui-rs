@@ -2,7 +2,7 @@
 //! progress read their colours here, so a tone looks the same everywhere. Which domain status
 //! maps to which tone is the app's choice.
 
-use crate::color::Rgba;
+use crate::color::{Rgba, with_alpha_byte};
 use crate::theme::Theme;
 
 /// Alpha of a tone's fill (the badge recipe: fill at 1A).
@@ -60,8 +60,4 @@ impl Tone {
             _ => self.color(theme),
         }
     }
-}
-
-fn with_alpha_byte(c: Rgba, a: u8) -> Rgba {
-    [c[0], c[1], c[2], a]
 }

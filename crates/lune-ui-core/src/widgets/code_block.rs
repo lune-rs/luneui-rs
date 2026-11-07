@@ -14,7 +14,7 @@ use super::code_editor::{CodeOptions, Look, TEXT_PAD};
 use super::text_lines::{HighlightSpan, Highlighter};
 use crate::access::{Live, Node, Role};
 use crate::code_doc::CodeDoc;
-use crate::color::Rgba;
+use crate::color::with_alpha;
 use crate::icon;
 use crate::motion::{Easing, Kind, Motion, Reduce, Time, Token};
 use crate::paint::Rect;
@@ -129,16 +129,6 @@ struct BlockMem {
     copied_at: Option<Time>,
 }
 
-/// `c` with its alpha scaled by `k` (0 to 1).
-fn faded(c: Rgba, k: f32) -> Rgba {
-    [
-        c[0],
-        c[1],
-        c[2],
-        (f32::from(c[3]) * k.clamp(0.0, 1.0)).round() as u8,
-    ]
-}
-
 /// A copy control: where it is, what it is called and says, and how plainly the idle icon shows.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct CopyControl<'a> {
@@ -180,7 +170,7 @@ impl Ui<'_> {
         let fade_id = self.scope_id().with("fade");
         let showing = copied_at.is_some();
         let mut mark = self.animate_f32(fade_id, f32::from(u8::from(showing)), &COPY_FADE);
-        let icon_color = faded(t.fg_tertiary, (1.0 - mark) * control.idle);
+        let icon_color = with_alpha(t.fg_tertiary, (1.0 - mark) * control.idle);
         let at = control.at;
         let pressed = self.with_enabled(control.enabled, |ui| {
             let button = IconButton {
@@ -199,7 +189,7 @@ impl Ui<'_> {
             mark = self.animate_f32(fade_id, 1.0, &COPY_FADE);
         }
         if mark > 0.0 {
-            let check = icon::glyph(icon::CHECK, ICON, faded(t.fg_primary, mark));
+            let check = icon::glyph(icon::CHECK, ICON, with_alpha(t.fg_primary, mark));
             self.painter().text_centered(&check, at);
         }
         if let Some(from) = *copied_at {

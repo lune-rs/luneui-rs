@@ -62,15 +62,8 @@ pub fn breath_mix(t: Time) -> f32 {
     ((breath_opacity(t) - BREATH_LOW) / (1.0 - BREATH_LOW)).clamp(0.0, 1.0)
 }
 
-/// `base` with `k` of `light` mixed in, each channel.
-pub fn mix(base: Rgba, light: Rgba, k: f32) -> Rgba {
-    let k = k.clamp(0.0, 1.0);
-    std::array::from_fn(|i| {
-        (f32::from(base[i]) + (f32::from(light[i]) - f32::from(base[i])) * k)
-            .round()
-            .clamp(0.0, 255.0) as u8
-    })
-}
+/// `base` with `k` of `light` mixed in, each channel: [`crate::color::mix`].
+pub use crate::color::mix;
 
 /// `spec` with every run's colour mixed `k` of the way to `light`.
 pub fn tinted(spec: &Spec, light: Rgba, k: f32) -> Spec {

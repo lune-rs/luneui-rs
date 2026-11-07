@@ -22,7 +22,7 @@ use super::shine;
 use super::tone::Tone;
 use crate::access::{Action, Node, Role, State};
 use crate::chrome::{self, TabSpan};
-use crate::color::Rgba;
+use crate::color::{Rgba, with_alpha};
 use crate::drag::{DropResult, Metrics, ReorderDrag, Strip};
 use crate::icon;
 use crate::input::NamedKey;
@@ -201,10 +201,6 @@ fn shine_light(p: &Painter<'_, WidgetId>, tone: Tone) -> Rgba {
     }
 }
 
-fn faded(c: Rgba, opacity: f32) -> Rgba {
-    [c[0], c[1], c[2], (f32::from(c[3]) * opacity).round() as u8]
-}
-
 /// Draws `treatment` over the loop `pts` around `center` at time `t`.
 fn paint_busy(
     p: &mut Painter<'_, WidgetId>,
@@ -217,14 +213,20 @@ fn paint_busy(
     match treatment {
         BusyCue::Sweep => {
             for (width, opacity) in SWEEP_PASSES {
-                p.stroke_sweep(pts, faded(color, opacity), width, travel_phase(t), center);
+                p.stroke_sweep(
+                    pts,
+                    with_alpha(color, opacity),
+                    width,
+                    travel_phase(t),
+                    center,
+                );
             }
         }
         BusyCue::Comet => {
             p.stroke_comet(pts, color, chrome::STROKE, COMET_FRACTION, travel_phase(t));
         }
         BusyCue::Breath => {
-            let style = StrokeStyle::solid(faded(color, breath_opacity(t)), chrome::STROKE);
+            let style = StrokeStyle::solid(with_alpha(color, breath_opacity(t)), chrome::STROKE);
             p.stroke(pts, true, style);
         }
     }
@@ -677,7 +679,7 @@ impl Ui<'_> {
     fn paint_tab(&mut self, tab: &Tab<'_>, item: &Item, rect: Rect, look: &TabLooks<'_>) {
         let t = *self.theme();
         let filled = item.hovered || look.lifted;
-        let target = faded(t.surface_hover, if filled { 1.0 } else { 0.0 });
+        let target = with_alpha(t.surface_hover, if filled { 1.0 } else { 0.0 });
         let fill = self.animate_color(item.id.with("hover"), target, &HOVER);
         let shown = if item.close { 1.0 } else { 0.0 };
         let close_alpha = self.animate_f32(item.id.with("close"), shown, &HOVER);

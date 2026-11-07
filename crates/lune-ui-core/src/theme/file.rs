@@ -9,7 +9,7 @@
 //! acrylic keys are below. The app reads the bytes and swaps the new theme in at a frame boundary
 //! (the toolkit reads no file and watches none).
 
-use crate::color::Rgba;
+use crate::color::{Rgba, with_alpha_byte};
 use crate::json::{JsonError, JsonErrorKind, Value, parse};
 
 use super::{Theme, color_slot};
@@ -195,24 +195,19 @@ fn acrylic_slot<'a>(theme: &'a mut Theme, key: &str) -> Option<&'a mut f32> {
     })
 }
 
-/// The same colour with another alpha.
-fn with_alpha(c: Rgba, a: u8) -> Rgba {
-    [c[0], c[1], c[2], a]
-}
-
 /// The fields with no key of their own, from the applied sources (D4).
 fn derive(t: &mut Theme, applied: &[&str]) {
     let has = |key: &str| applied.contains(&key);
     if has("AccentPrimaryColor") {
-        t.scroll_thumb = with_alpha(t.accent, 0x8C);
-        t.scroll_thumb_hover = with_alpha(t.accent, 0xE6);
-        t.text_selection = with_alpha(t.accent, 0x66);
+        t.scroll_thumb = with_alpha_byte(t.accent, 0x8C);
+        t.scroll_thumb_hover = with_alpha_byte(t.accent, 0xE6);
+        t.text_selection = with_alpha_byte(t.accent, 0x66);
     }
     if has("DiffAddedBackground") {
-        t.diff_added_mark = with_alpha(t.diff_added, 0x40);
+        t.diff_added_mark = with_alpha_byte(t.diff_added, 0x40);
     }
     if has("DiffRemovedBackground") {
-        t.diff_removed_mark = with_alpha(t.diff_removed, 0x40);
+        t.diff_removed_mark = with_alpha_byte(t.diff_removed, 0x40);
     }
     if has("ForegroundPrimary") {
         t.menu_text_primary = t.fg_primary;

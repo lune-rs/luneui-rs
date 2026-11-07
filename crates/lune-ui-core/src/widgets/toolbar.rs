@@ -13,14 +13,13 @@
 
 use std::hash::Hash;
 
-use super::button::{self, ButtonLook, ButtonState, FOCUS, HOVER, IconButton, PRESS};
-use super::focus_ring::{self, RingKind};
-use crate::access::{Action, Node, Role, State};
+use super::button::IconButton;
+use crate::access::{Node, Role};
 use crate::backdrop::GlassLayer;
+use crate::color::Rgba;
 use crate::icon;
-use crate::input::NamedKey;
-use crate::paint::{Rect, Xform};
-use crate::ui::{Response, Sense, Ui};
+use crate::paint::{Painter, Rect};
+use crate::ui::{Response, Ui};
 
 /// The padding of the bar: nothing on the left, 6 above and below, 8 on the right.
 pub const PAD_LEFT: f32 = 0.0;
@@ -138,63 +137,32 @@ impl Ui<'_> {
         text: &str,
         name: &str,
     ) -> Response {
-        let id = self.id(key);
-        let mut r = self.interact(id, rect, Sense::CLICK_FOCUS);
-        if self.activation_keys(id, r.enabled, &[NamedKey::Enter, NamedKey::Space]) {
-            r.clicked = true;
-        }
-        let theme = *self.theme();
-        let state = ButtonState {
-            hovered: r.hovered,
-            pressed: r.pressed,
-            focus_visible: r.focus_visible,
-        };
-        let target = ButtonLook::of(&theme, button::ButtonKind::Ghost, state);
-        let fill = self.animate_color(id.with("fill"), target.fill, &HOVER);
-        let scale = self.animate_f32(id.with("press"), target.scale, &PRESS);
-        let ring = self.animate_f32(id.with("ring"), target.ring, &FOCUS);
-
-        let color = theme.fg_subtle;
-        let p = self.painter();
-        let scaled = scale != 1.0;
-        if scaled {
-            p.push_xform(Xform {
-                origin: (rect.x + rect.w / 2.0, rect.y + rect.h / 2.0),
-                scale,
-                dx: 0.0,
-                dy: 0.0,
-                alpha: 1.0,
-            });
-        }
-        if fill[3] > 0 {
-            p.fill(rect, theme.item_radius, fill);
-        }
-        let glyph = icon::glyph(glyph, LABEL_GLYPH, color);
-        let gw = p.measure(&glyph).0;
-        let room = rect.w - 2.0 * LABEL_PAD_X - gw - LABEL_GAP;
-        let spec = p.elide(
-            &label_spec(&theme, text, color),
-            room.clamp(0.0, LABEL_MAX_WIDTH),
-        );
-        let x = rect.x + LABEL_PAD_X;
-        p.text_centered(&glyph, Rect::new(x, rect.y, gw, rect.h));
-        let tw = p.measure(&spec).0;
-        p.text_centered(&spec, Rect::new(x + gw + LABEL_GAP, rect.y, tw, rect.h));
-        focus_ring::paint(p, rect, RingKind::Button, ring.min(1.0));
-        if scaled {
-            p.pop_xform();
-        }
-
-        let mut node = Node::new(id, Role::Button, name, rect);
-        if r.enabled {
-            node.states.insert(State::Focusable);
-            node.actions.insert(Action::Default);
-        } else {
-            node.states.insert(State::Disabled);
-        }
-        self.node(node);
-        r
+        let color = self.theme().fg_subtle;
+        self.toolbar_label_button(key, rect, (glyph, text, name), color)
     }
+}
+
+/// Draws the label button's content in `r`: `glyph` and then `text`, elided to the room left (at
+/// most [`LABEL_MAX_WIDTH`]), both in `color`, centred on the rect's height.
+pub(super) fn paint_label<H: Copy + PartialEq>(
+    p: &mut Painter<'_, H>,
+    r: Rect,
+    glyph: &str,
+    text: &str,
+    color: Rgba,
+) {
+    let theme = p.theme;
+    let glyph = icon::glyph(glyph, LABEL_GLYPH, color);
+    let gw = p.measure(&glyph).0;
+    let room = r.w - 2.0 * LABEL_PAD_X - gw - LABEL_GAP;
+    let spec = p.elide(
+        &label_spec(&theme, text, color),
+        room.clamp(0.0, LABEL_MAX_WIDTH),
+    );
+    let x = r.x + LABEL_PAD_X;
+    p.text_centered(&glyph, Rect::new(x, r.y, gw, r.h));
+    let tw = p.measure(&spec).0;
+    p.text_centered(&spec, Rect::new(x + gw + LABEL_GAP, r.y, tw, r.h));
 }
 
 /// The label's text: the theme's medium size (`font_m`).
