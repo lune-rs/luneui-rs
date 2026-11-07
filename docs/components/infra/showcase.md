@@ -41,7 +41,7 @@ rows and the search), `settings.rs` (the global settings), `knobs.rs` (the knob 
 
 Theme (the preset and the five Lunegit files), Motion (tier, speed 0.1x to 2x, the five durations and the
 tooltip delay), Zoom (1x, 1.5x, 2x), Glass (per layer: tint, tint opacity, material opacity; the acrylic
-level; noise on or off), Blur (sigma to the kernel's cap, saturation), OS material (the five kinds), Reset.
+level; noise on or off; the floating surfaces' tint, opacity and border: `menu_glass` and `menu_popup_border`, D8), Blur (sigma to the kernel's cap, saturation), OS material (the five kinds), Reset.
 They outlive a change of page and go back only by Reset. The noise strength, the luminosity constants and the
 blur kernel's cap are fixed in the toolkit: the noise control is a switch and sigma stops at 16 (D246).
 

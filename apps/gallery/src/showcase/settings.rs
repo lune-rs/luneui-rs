@@ -106,6 +106,23 @@ pub(crate) struct LayerEdit {
     pub(crate) material_opacity: Option<f32>,
 }
 
+/// What the user changed about the one glass every floating surface draws (`menu_glass` and
+/// `menu_popup_border`, D8); `None` keeps the theme's.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub(crate) struct SurfaceEdit {
+    /// The tint's grey level, 0 to 255: the red, green and blue of `menu_glass`.
+    pub(crate) tint: Option<f32>,
+    /// The tint's opacity, 0 to 1: the alpha of `menu_glass`.
+    pub(crate) opacity: Option<f32>,
+    /// The ring's alpha, 0 to 255: the alpha of `menu_popup_border`.
+    pub(crate) border: Option<f32>,
+}
+
+/// A 0 to 255 slider value as a channel.
+fn channel(v: f32) -> u8 {
+    v.round().clamp(0.0, 255.0) as u8
+}
+
 /// Every global setting.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Settings {
@@ -121,6 +138,8 @@ pub(crate) struct Settings {
     pub(crate) acrylic: AcrylicLevel,
     /// Window, panel and card.
     pub(crate) layers: [LayerEdit; 3],
+    /// The glass of the floating surfaces.
+    pub(crate) surface: SurfaceEdit,
     /// The durations of [`DURATIONS`] in milliseconds; `None` keeps the theme's.
     pub(crate) durations: [Option<f32>; 6],
     pub(crate) noise: bool,
@@ -142,6 +161,7 @@ impl Default for Settings {
             zoom: 1.0,
             acrylic: AcrylicLevel::Default,
             layers: [LayerEdit::default(); 3],
+            surface: SurfaceEdit::default(),
             durations: [None; 6],
             noise: true,
             sigma: BLUR_SIGMA,
@@ -197,6 +217,16 @@ impl Settings {
             if let Some(v) = edit.material_opacity {
                 layer.material_opacity = v;
             }
+        }
+        if let Some(v) = self.surface.tint {
+            let g = channel(v);
+            theme.menu_glass[..3].fill(g);
+        }
+        if let Some(v) = self.surface.opacity {
+            theme.menu_glass[3] = channel(v * 255.0);
+        }
+        if let Some(v) = self.surface.border {
+            theme.menu_popup_border[3] = channel(v);
         }
         let m = &mut theme.motion;
         let ms = |v: f32| std::time::Duration::from_millis(v.max(0.0).round() as u64);
@@ -417,6 +447,52 @@ impl Settings {
         }
         col.toggle(ui, "noise", "Noise", &mut self.noise);
         col.note(ui, "The noise strength is fixed in the toolkit.");
+
+        col.label(ui, "Floating surfaces");
+        let current = self.leveled(self.base);
+        let mut v = self
+            .surface
+            .tint
+            .unwrap_or(f32::from(current.menu_glass[0]));
+        if col.slider(
+            ui,
+            "glass-tint",
+            "Glass tint",
+            &mut v,
+            (0.0, 255.0, 1.0),
+            |v| format!("{v:.0}"),
+        ) {
+            self.surface.tint = Some(v);
+        }
+        let mut v = self
+            .surface
+            .opacity
+            .unwrap_or(f32::from(current.menu_glass[3]) / 255.0);
+        if col.slider(
+            ui,
+            "glass-opacity",
+            "Glass opacity",
+            &mut v,
+            (0.0, 1.0, 0.0),
+            |v| format!("{v:.2}"),
+        ) {
+            self.surface.opacity = Some(v);
+        }
+        let mut v = self
+            .surface
+            .border
+            .unwrap_or(f32::from(current.menu_popup_border[3]));
+        if col.slider(
+            ui,
+            "glass-border",
+            "Glass border",
+            &mut v,
+            (0.0, 255.0, 1.0),
+            |v| format!("{v:.0}"),
+        ) {
+            self.surface.border = Some(v);
+        }
+        col.note(ui, "Menus, lists, tooltips, toasts, dialogs.");
 
         col.section(ui, "BLUR");
         col.slider(
@@ -676,6 +752,66 @@ mod tests {
     }
 
     #[test]
+    fn each_glass_slider_changes_its_own_token_and_only_that() {
+        let base = Settings::default().theme();
+        // Tint: the grey of `menu_glass`; its alpha stays.
+        let mut s = Settings::default();
+        s.surface.tint = Some(90.0);
+        let t = s.theme();
+        assert_eq!(t.menu_glass, [90, 90, 90, base.menu_glass[3]]);
+        assert_eq!(
+            Theme {
+                menu_glass: base.menu_glass,
+                ..t
+            },
+            base
+        );
+        // Opacity: the alpha of `menu_glass`; its grey stays.
+        let mut s = Settings::default();
+        s.surface.opacity = Some(0.25);
+        let t = s.theme();
+        assert_eq!(
+            t.menu_glass,
+            [
+                base.menu_glass[0],
+                base.menu_glass[1],
+                base.menu_glass[2],
+                64
+            ]
+        );
+        assert_eq!(
+            Theme {
+                menu_glass: base.menu_glass,
+                ..t
+            },
+            base
+        );
+        // Border: the alpha of `menu_popup_border`; its colour stays.
+        let mut s = Settings::default();
+        s.surface.border = Some(200.0);
+        let t = s.theme();
+        assert_eq!(t.menu_popup_border[3], 200);
+        assert_eq!(t.menu_popup_border[..3], base.menu_popup_border[..3]);
+        assert_eq!(
+            Theme {
+                menu_popup_border: base.menu_popup_border,
+                ..t
+            },
+            base
+        );
+    }
+
+    #[test]
+    fn a_page_theme_keeps_its_glass_and_the_sliders_go_over_it() {
+        let mut page = THEME;
+        page.menu_glass = [10, 20, 30, 100];
+        let mut s = Settings::default();
+        assert_eq!(s.compose(page), page, "the defaults change nothing");
+        s.surface.opacity = Some(1.0);
+        assert_eq!(s.compose(page).menu_glass, [10, 20, 30, 255]);
+    }
+
+    #[test]
     fn reset_restores_every_setting() {
         let mut s = Settings::default();
         s.set_theme(3);
@@ -686,6 +822,7 @@ mod tests {
         s.sigma = 12.0;
         s.material = Material::Opaque;
         s.durations[0] = Some(5.0);
+        s.surface.tint = Some(10.0);
         s.reset();
         assert_eq!(s, Settings::default());
     }
