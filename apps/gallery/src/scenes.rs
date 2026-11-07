@@ -241,7 +241,7 @@ pub(crate) fn card_in<H: Copy + PartialEq>(
     focused: bool,
     card: Rect,
 ) -> Rect {
-    p.on(LayerId::Base);
+    // No layer change: the host's clip is still on, and `Painter::on` would drop it.
     let (panel, card_fill, noise) = glass_fills(theme, glass, focused);
     p.acrylic(card, chrome::CARD_RADIUS, card_fill, panel, noise);
     card

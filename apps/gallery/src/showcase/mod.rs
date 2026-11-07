@@ -123,8 +123,8 @@ impl Layout {
     }
 }
 
-/// The scenes' card: the whole window of a scene, less its margin and title band.
-const SCENE_CARD: Rect = Rect::new(10.0, 34.0, 1020.0, 616.0);
+/// The scenes' card: the 1600 x 900 window of a `showcase-*` scene, less its margin and title band.
+const SCENE_CARD: Rect = Rect::new(10.0, 34.0, 1580.0, 856.0);
 const SCENE_LAYOUT: Layout = Layout::of(SCENE_CARD);
 
 const SEARCH: &[&str] = &["search"];
@@ -412,9 +412,7 @@ impl Showcase {
         let group = nav::group_of(self.page).map_or("", |g| nav::GROUPS[g].name);
         let mut title = format!("{group}  /  {}", page.title);
         if let Some(s) = self.scene {
-            if let Some(scene) = nav::scenes(page).get(s) {
-                title = format!("{title}  /  {}", scene.name());
-            }
+            title = format!("{title}  /  {}", nav::scene_label(page, s));
         }
         let spec = Spec::plain(title, Style::ui(t.font_base, t.fg_primary).medium());
         ui.painter().text(&spec, lay.head.x, lay.head.y + 4.0);
@@ -428,11 +426,19 @@ impl Showcase {
         };
         let (child, generation) = (&mut self.child, self.generation);
         let mut root = self.child_root;
-        ui.scroll_area("content", lay.pane, &opts, |ui, _| {
+        ui.scroll_area("content", lay.pane, &opts, |ui, view| {
+            // The pane clips the page. A page that changes layer loses the clip (`Painter::on`
+            // drops it) unless it gets it back through the stage, in the space it draws in.
+            let clip = Rect::new(
+                lay.pane.x + view.offset.0 as f32,
+                lay.pane.y + view.offset.1 as f32,
+                lay.pane.w,
+                lay.pane.h,
+            );
             ui.scope(("page", generation), |ui| {
                 ui.scope(page.id, |ui| {
                     root = ui.scope_id();
-                    child.draw(ui, &Stage::at(canvas));
+                    child.draw(ui, &Stage::at(canvas).clipped(clip));
                 });
             });
             ((), Extent::default())
@@ -465,6 +471,9 @@ impl PageState for Showcase {
         // (a Tab at its start) expects. The panes do not overlap, so the order draws the same.
         self.content(ui, &lay);
         self.sidebar(ui, &lay);
+        // The settings pane has a fill of its own and is drawn after the page.
+        let fill = ui.theme().surface_input;
+        ui.painter().fill(lay.settings, 8.0, fill);
         self.settings.pane(ui, lay.settings);
         if self.replay.is_none() && self.scene.is_some() {
             let t = *ui.theme();
@@ -994,6 +1003,91 @@ mod tests {
         );
         p.frame(&mut FakeText, 0, &[]).expect("frame");
         assert_eq!(tier.get(), Some(MotionTier::Reduced));
+    }
+
+    /// What the base and page layers of `scene` paint, each with the rect it can show in: a
+    /// shape's own rect cut by its clip; a text's clip (its extent is not known here).
+    fn painted(scene: &lune_ui::scene::Scene) -> Vec<(String, Rect)> {
+        let mut out = Vec::new();
+        let rect = |r: [f32; 4]| Rect::new(r[0], r[1], r[2], r[3]);
+        for layer in &scene.layers[..2] {
+            for t in &layer.texts {
+                out.push((
+                    format!("text {:.1},{:.1} in {:?}", t.x, t.y, t.clip),
+                    t.clip,
+                ));
+            }
+            let g = &layer.geometry;
+            let acrylic = g.acrylic.iter().map(|a| &a.shape);
+            for s in g.under.iter().chain(&g.over).chain(acrylic) {
+                let shown = if s.clip[2] > 0.0 {
+                    rect(s.rect).intersect(&rect(s.clip))
+                } else {
+                    rect(s.rect)
+                };
+                out.push((format!("shape {:?} in {:?}", s.rect, s.clip), shown));
+            }
+        }
+        out
+    }
+
+    fn overlaps(a: Rect, b: Rect) -> bool {
+        a.w > 0.0
+            && a.h > 0.0
+            && a.x < b.right()
+            && b.x < a.right()
+            && a.y < b.bottom()
+            && b.y < a.bottom()
+    }
+
+    /// At a window as narrow as 1,040 the canvas is wider than its pane: nothing the hosted page
+    /// paints may show over the settings pane, whatever page it is and whatever it does with the
+    /// layers. A hosted page's items are what a frame holds beyond the same frame with an empty
+    /// page.
+    #[test]
+    fn a_hosted_page_never_paints_over_the_settings_pane() {
+        let window = (1040.0, 660.0);
+        let settings = Layout::of(Rect::new(10.0, 34.0, window.0 - 20.0, window.1 - 44.0)).settings;
+        let frame = |child: Box<dyn PageState>, page: usize| {
+            let mut shell = Showcase::new();
+            shell.page = page;
+            shell.child = child;
+            let mut p = Player::new(HOST, Box::new(shell), window, 1.0, MotionTier::Full);
+            p.frame(&mut FakeText, 0, &[]).expect("frame");
+            painted(&p.frame(&mut FakeText, 16, &[]).expect("frame").0)
+        };
+        let base = frame(Box::new(Empty), 0);
+        let mut bad = Vec::new();
+        for (page_index, page) in PAGES.iter().enumerate() {
+            let PageKind::Ui(ui_page) = page.kind else {
+                continue;
+            };
+            if page.id == HOST {
+                continue;
+            }
+            let states = std::iter::once(("live", ui_page.state))
+                .chain(ui_page.scenes.iter().map(|s| (s.id, s.state)));
+            for (which, state) in states {
+                let mut rest = base.clone();
+                for (key, shown) in frame(state(), page_index) {
+                    if let Some(at) = rest.iter().position(|(k, _)| *k == key) {
+                        rest.swap_remove(at);
+                    } else if overlaps(shown, settings) {
+                        bad.push(format!("{}/{which}: {key}", page.id));
+                    }
+                }
+            }
+        }
+        assert!(
+            bad.is_empty(),
+            "{} items over the settings pane, e.g.\n  {}",
+            bad.len(),
+            bad.iter()
+                .take(12)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join("\n  ")
+        );
     }
 
     #[test]

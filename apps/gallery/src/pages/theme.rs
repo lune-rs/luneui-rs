@@ -260,7 +260,7 @@ impl PageState for Acrylic {
         let under = premul([0x70, 0x70, 0x70, 0xFF]);
         {
             let p = ui.painter();
-            p.on(LayerId::Base);
+            stage.on(p, LayerId::Base);
             for (i, c) in STRIPES.iter().enumerate() {
                 p.fill(
                     Rect::new(win.x + i as f32 * band, win.y, band, win.h),
@@ -269,7 +269,7 @@ impl PageState for Acrylic {
                 );
             }
             // Acrylic replaces what is below it within a layer, so the panel is above the stripes.
-            p.on(LayerId::Page);
+            stage.on(p, LayerId::Page);
             p.acrylic(panel, 8.0, theme.glass.panel.premultiplied(), under, true);
         }
         heading(ui, "PANEL GLASS", panel.x + 24.0, panel.y + 24.0);

@@ -65,18 +65,48 @@ pub(crate) struct UiPage {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct Stage {
     rect: Option<Rect>,
+    /// The clip the host holds over the page, in the space the page draws in. `Painter::on`
+    /// drops the clip, so a page that changes layer gets it back through [`Stage::on`].
+    clip: Option<Rect>,
 }
 
 impl Stage {
     /// The whole window: `card` paints the window glass, the title and the card, as always.
     pub(crate) const fn window() -> Self {
-        Self { rect: None }
+        Self {
+            rect: None,
+            clip: None,
+        }
     }
 
     /// A rect of the window: `card` paints the card there and no window glass or title.
     #[allow(dead_code)] // the showcase shell's stage (step 2); the tests use it now
     pub(crate) const fn at(rect: Rect) -> Self {
-        Self { rect: Some(rect) }
+        Self {
+            rect: Some(rect),
+            clip: None,
+        }
+    }
+
+    /// The stage with the host's clip `clip`, in the space the page draws in (a scrolled host's
+    /// is its pane moved by the offset).
+    #[must_use]
+    pub(crate) const fn clipped(mut self, clip: Rect) -> Self {
+        self.clip = Some(clip);
+        self
+    }
+
+    /// `Painter::on`, then the host's clip again: a page that draws on more than one layer goes
+    /// through here, or the clip around it would be lost at the first change.
+    pub(crate) fn on<H: Copy + PartialEq>(
+        &self,
+        p: &mut lune_ui::paint::Painter<'_, H>,
+        layer: lune_ui::scene::LayerId,
+    ) {
+        p.on(layer);
+        if let Some(clip) = self.clip {
+            p.set_clip(Some(clip));
+        }
     }
 
     /// The rect, when the page is not alone in the window.
@@ -283,13 +313,23 @@ impl UiScene {
         format!("{}@{}x", self.id, self.scale)
     }
 
+    /// The window the scene runs in, in logical pixels: the gallery's 1040 by 660, or for the
+    /// showcase's own scenes (`showcase-*`) the 1600 by 900 its window opens at.
+    pub(crate) fn window(&self) -> (u32, u32) {
+        if self.id.starts_with("showcase-") {
+            (1600, 900)
+        } else {
+            (W, H)
+        }
+    }
+
     /// The dump's size in physical pixels: the window times the scale, whole at 1.5 (1560 by 990).
     pub(crate) fn size(&self) -> (u32, u32) {
-        let (w, h) = (
-            (W as f32 * self.scale).round(),
-            (H as f32 * self.scale).round(),
-        );
-        (w as u32, h as u32)
+        let (w, h) = self.window();
+        (
+            (w as f32 * self.scale).round() as u32,
+            (h as f32 * self.scale).round() as u32,
+        )
     }
 }
 
@@ -553,10 +593,11 @@ impl Player {
 
     /// A player for the gallery's window size.
     pub(crate) fn for_scene(page: &'static str, scene: &UiScene) -> Self {
+        let (w, h) = scene.window();
         Self::new(
             page,
             (scene.state)(),
-            (W as f32, H as f32),
+            (w as f32, h as f32),
             scene.scale,
             scene.tier,
         )

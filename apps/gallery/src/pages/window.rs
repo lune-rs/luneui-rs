@@ -7,7 +7,7 @@ use lune_ui::chrome;
 use lune_ui::color::premul;
 use lune_ui::lunegit_dark::THEME;
 use lune_ui::motion::MotionTier;
-use lune_ui::paint::{LayerId, Rect, Xform};
+use lune_ui::paint::{LayerId, Rect};
 use lune_ui::text::{Spec, Style};
 use lune_ui::theme::Theme;
 use lune_ui::ui::Ui;
@@ -57,20 +57,15 @@ fn wane() -> Box<dyn PageState> {
 
 /// The caption buttons along the top right of `area`. The widget places them from the origin of
 /// the window it is given, so an area that is not at the window's origin moves them there with a
-/// translation (which carries their hit regions and nodes with it).
+/// translation (which carries their hit regions and nodes with it, and leaves the host's clip
+/// where it is on screen).
 fn caption_in(ui: &mut Ui<'_>, area: Rect, opts: CaptionOptions) -> Option<CaptionButton> {
     if area.x == 0.0 && area.y == 0.0 {
         return ui.caption_buttons("caption", area, opts);
     }
-    ui.painter().push_xform(Xform {
-        origin: (0.0, 0.0),
-        scale: 1.0,
-        dx: area.x,
-        dy: area.y,
-        alpha: 1.0,
-    });
+    ui.painter().push_translate(area.x, area.y);
     let clicked = ui.caption_buttons("caption", Rect::new(0.0, 0.0, area.w, area.h), opts);
-    ui.painter().pop_xform();
+    ui.painter().pop_translate();
     clicked
 }
 
@@ -164,7 +159,7 @@ impl PageState for Inactive {
             win.h - band - margin,
         ));
         let p = ui.painter();
-        p.on(LayerId::Base);
+        stage.on(p, LayerId::Base);
         let solid = premul(theme.window_fallback);
         if stage.rect().is_none() {
             p.acrylic(win, 0.0, solid, [0.0; 4], false);

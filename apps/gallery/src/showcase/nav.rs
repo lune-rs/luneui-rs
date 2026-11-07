@@ -152,6 +152,30 @@ pub(crate) fn group_of(page: usize) -> Option<usize> {
     GROUPS.iter().position(|g| g.pages.contains(&id))
 }
 
+/// The name a scene shows in the sidebar and the title: its id without the page's own name in
+/// front, in words and capitalised (`table-rows` on the table page is "Rows"). Two scenes of one
+/// page with the same id (the same look at two scales) say which scale in brackets.
+pub(crate) fn scene_label(page: &Page, scene: usize) -> String {
+    let list = scenes(page);
+    let Some(s) = list.get(scene) else {
+        return String::new();
+    };
+    let id = s.id;
+    let stripped = id
+        .strip_prefix(page.id)
+        .and_then(|rest| rest.strip_prefix('-'))
+        .unwrap_or(id);
+    let words = if id == page.id { "default" } else { stripped };
+    let mut text = words.replace('-', " ");
+    if let Some(first) = text.get(..1) {
+        text = first.to_uppercase() + &text[1..];
+    }
+    if list.iter().filter(|o| o.id == id).count() > 1 {
+        text = format!("{text} ({}x)", s.scale);
+    }
+    text
+}
+
 /// What a row of the tree is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Target {
@@ -220,7 +244,9 @@ pub(crate) fn rows(query: &str) -> Vec<Row> {
             let scenes: Vec<(usize, &UiScene)> = scenes(page)
                 .iter()
                 .enumerate()
-                .filter(|(_, s)| title_hit || matches(s.id, &query))
+                .filter(|(i, s)| {
+                    title_hit || matches(s.id, &query) || matches(&scene_label(page, *i), &query)
+                })
                 .collect();
             if !title_hit && scenes.is_empty() {
                 continue;
@@ -231,10 +257,10 @@ pub(crate) fn rows(query: &str) -> Vec<Row> {
                 text: page.title.to_owned(),
                 has_children: !scenes.is_empty(),
             });
-            out.extend(scenes.into_iter().map(|(s, scene)| Row {
+            out.extend(scenes.into_iter().map(|(s, _)| Row {
                 target: Target::Scene(p, s),
                 depth: 2,
-                text: scene.name(),
+                text: scene_label(page, s),
                 has_children: false,
             }));
         }
@@ -299,6 +325,29 @@ mod tests {
         assert!(missing.is_empty(), "pages in no group: {missing:?}");
     }
 
+    /// Scene names read as words, without the page's own name or a scale suffix; a look that is
+    /// listed at two scales says which.
+    #[test]
+    fn scene_labels_are_readable_and_distinct_within_a_page() {
+        let table = PAGES[index_of("table").expect("a page")];
+        let ids: Vec<&str> = scenes(table).iter().map(|s| s.id).collect();
+        let rows = ids
+            .iter()
+            .position(|id| *id == "table-rows")
+            .expect("a scene");
+        assert_eq!(scene_label(table, rows), "Rows");
+        for p in PAGES.iter().filter(|p| matches!(p.kind, PageKind::Ui(_))) {
+            let labels: Vec<String> = (0..scenes(p).len()).map(|i| scene_label(p, i)).collect();
+            let unique: BTreeSet<&String> = labels.iter().collect();
+            assert_eq!(unique.len(), labels.len(), "{}: {labels:?}", p.id);
+            assert!(
+                labels.iter().all(|l| !l.contains('@') && !l.contains('-')),
+                "{}: {labels:?}",
+                p.id
+            );
+        }
+    }
+
     #[test]
     fn row_keys_round_trip_and_do_not_collide() {
         let rows = rows("");
@@ -343,14 +392,17 @@ mod tests {
         // A scene id: the dialog page has a `dialog-form` scene.
         let hit = rows("dialog-form");
         assert!(pages(&hit).contains(&"Dialog"), "{:?}", pages(&hit));
-        let scene_texts: Vec<&str> = hit
+        let scene_ids: Vec<&str> = hit
             .iter()
-            .filter(|r| matches!(r.target, Target::Scene(..)))
-            .map(|r| r.text.as_str())
+            .filter_map(|r| match r.target {
+                Target::Scene(p, i) => Some(scenes(PAGES[p])[i].id),
+                _ => None,
+            })
             .collect();
+        assert!(!scene_ids.is_empty());
         assert!(
-            scene_texts.iter().all(|t| t.contains("dialog-form")),
-            "{scene_texts:?}"
+            scene_ids.iter().all(|id| id.contains("dialog-form")),
+            "{scene_ids:?}"
         );
         // A title match lists the page's scenes whole.
         let table = rows("table");
