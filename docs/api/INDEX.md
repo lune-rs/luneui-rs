@@ -12,7 +12,7 @@ Each crate has a page per module (`<crate>/<module path>.md`; the root is `index
 
 ### `lune-ui-core` (`lune_ui_core`)
 
-92 modules, 1083 items. Left out and counted: 3252 blanket impls, 4686 items of the omitted impls, 1250 items of the trait impls shown as one line, 2178 synthetic impls.
+92 modules, 1084 items. Left out and counted: 3252 blanket impls, 4686 items of the omitted impls, 1250 items of the trait impls shown as one line, 2178 synthetic impls.
 
 | Module | Items |
 | --- | --- |
@@ -39,7 +39,7 @@ Each crate has a page per module (`<crate>/<module path>.md`; the root is `index
 | [`lune_ui_core::text_edit`](lune-ui-core/text_edit.md) | 13 |
 | [`lune_ui_core::theme`](lune-ui-core/theme.md) | 8 |
 | [`lune_ui_core::theme::lunegit_dark`](lune-ui-core/theme/lunegit_dark.md) | 6 |
-| [`lune_ui_core::theme::near_black`](lune-ui-core/theme/near_black.md) | 12 |
+| [`lune_ui_core::theme::near_black`](lune-ui-core/theme/near_black.md) | 13 |
 | [`lune_ui_core::tray`](lune-ui-core/tray.md) | 11 |
 | [`lune_ui_core::ui`](lune-ui-core/ui.md) | 11 |
 | [`lune_ui_core::widgets`](lune-ui-core/widgets.md) | 0 |
@@ -793,6 +793,7 @@ Every top-level item of the four owning crates, by name.
 - [`MdTask`](lune-ui-core/widgets/markdown.md#struct.MdTask) - struct, `lune_ui_core::widgets::markdown`
 - [`menu`](lune-ui-core/widgets/menu.md#fn.menu) - function, `lune_ui_core::widgets::menu`
 - [`menu_close_anim`](lune-ui-core/widgets/menu.md#fn.menu_close_anim) - function, `lune_ui_core::widgets::menu`
+- [`MENU_GLASS`](lune-ui-core/theme/near_black.md#constant.MENU_GLASS) - constant, `lune_ui_core::theme::near_black`
 - [`MENU_IN`](lune-ui-core/widgets/menu.md#constant.MENU_IN) - constant, `lune_ui_core::widgets::menu`
 - [`menu_layout`](lune-ui-core/widgets/menu.md#fn.menu_layout) - function, `lune_ui_core::widgets::menu`
 - [`menu_layout_at`](lune-ui-core/widgets/menu.md#fn.menu_layout_at) - function, `lune_ui_core::widgets::menu`

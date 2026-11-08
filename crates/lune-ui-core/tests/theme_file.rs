@@ -552,7 +552,11 @@ fn a_file_built_from_the_near_black_constants_loads_as_near_black() {
         layer_json(&near_black::CARD),
         near_black_material_json(),
     );
-    let f = load(&with_glass(&glass));
+    let file = format!(
+        r#"{{"name":"t","colors":{{"MenuGlassBackground":{}}},"acrylic":{{}},"glass":{glass}}}"#,
+        colour_text(near_black::MENU_GLASS),
+    );
+    let f = load(&file);
     assert_eq!(f.skipped, []);
     assert_eq!(f.theme, near_black::THEME);
     assert_eq!(f.material, Some(near_black::MATERIAL));
