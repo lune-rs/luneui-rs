@@ -109,7 +109,7 @@ fit panel's clip, the nits F2 to F7 of M6 and M8, and the Library follow-ups the
 
 ## Next
 
-1. Dark glass: step 7 (`tools/api-docs` and the generated `docs/api/`, gate wired in), then the merge; the by-eye checks in Unverified here.
+1. Dark glass: the merge, then the by-eye checks in Unverified here. After any public API or doc-comment change run `scripts/gen-api-docs.sh` (the gate's `--check` fails on a stale `docs/api/`).
 2. The rest of a hands-on run of `cargo run -p gallery` (see Unverified here); the look values are settled.
 3. Luneterm's M9 adopts the toolkit through `docs/consuming.md`: vendor `scripts/export-snapshot.sh`'s output, switch crate by crate (version 0.2.0 lets the in-tree `lune-ui` and the snapshot stand
    in one lock), use the migration maps (the Luneterm one and "API changes of the library pass"); its own OS runs close `platform.material` and `render.surface`. Luneterm itself is not changed by this repo.
