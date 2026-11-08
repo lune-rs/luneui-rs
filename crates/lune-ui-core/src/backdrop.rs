@@ -71,6 +71,8 @@ pub enum Material {
     LiquidClear,
     /// Regular liquid glass (macOS) or tabbed Mica (Windows).
     LiquidRegular,
+    /// A material described as data, per OS: a new look needs no toolkit change.
+    Custom(OsMaterial),
     /// No OS material.
     Opaque,
 }
@@ -80,6 +82,183 @@ impl Material {
     pub fn is_glass(self) -> bool {
         self != Self::Opaque
     }
+
+    /// The per-OS descriptor this material stands for: `None` for [`Material::Opaque`], the
+    /// carried value for [`Material::Custom`], and for the four named forms the descriptor they
+    /// have always meant, so an adapter maps one type only.
+    pub fn os_material(self) -> Option<OsMaterial> {
+        let named = |macos, windows| {
+            Some(OsMaterial {
+                macos: Some(macos),
+                windows: Some(windows),
+            })
+        };
+        let vibrancy = |state| MacosMaterial::Vibrancy {
+            effect: VibrancyEffect::Light,
+            state,
+            appearance: None,
+        };
+        let liquid = |style| MacosMaterial::Liquid {
+            style,
+            tint: None,
+            opaque: None,
+        };
+        let acrylic = WindowsMaterial::Acrylic {
+            tint: None,
+            dark: None,
+        };
+        match self {
+            Self::Opaque => None,
+            Self::Custom(m) => Some(m),
+            Self::Vibrancy => named(vibrancy(MaterialState::Active), acrylic),
+            Self::VibrancyFollowsWindow => named(vibrancy(MaterialState::FollowsWindow), acrylic),
+            Self::LiquidClear => named(
+                liquid(LiquidStyle::Clear),
+                WindowsMaterial::Mica { dark: Some(true) },
+            ),
+            Self::LiquidRegular => named(
+                liquid(LiquidStyle::Regular),
+                WindowsMaterial::Tabbed { dark: Some(true) },
+            ),
+        }
+    }
+}
+
+/// An OS material as plain data, one optional description per OS. `None` means "no glass on this
+/// OS": applying it there is an `Err`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OsMaterial {
+    /// What to show on macOS.
+    pub macos: Option<MacosMaterial>,
+    /// What to show on Windows.
+    pub windows: Option<WindowsMaterial>,
+}
+
+/// A macOS window material.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MacosMaterial {
+    /// An `NSVisualEffectView` (vibrancy).
+    Vibrancy {
+        /// The effect view's material.
+        effect: VibrancyEffect,
+        /// Whether the effect is drawn active, inactive, or follows the window.
+        state: MaterialState,
+        /// Forces the effect view's appearance; `None` leaves the system's.
+        appearance: Option<MaterialAppearance>,
+    },
+    /// An `NSGlassEffectView` (liquid glass).
+    Liquid {
+        /// The glass style.
+        style: LiquidStyle,
+        /// A tint over the glass; `None` leaves it untinted.
+        tint: Option<Rgba>,
+        /// Whether the glass is opaque; `None` leaves the system's default.
+        opaque: Option<bool>,
+    },
+}
+
+/// The 19 `NSVisualEffectView` materials, under the names the platform crate uses.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VibrancyEffect {
+    /// Follows the system appearance (deprecated by macOS).
+    AppearanceBased,
+    /// A light material.
+    Light,
+    /// A dark material.
+    Dark,
+    /// The window title bar's material.
+    Titlebar,
+    /// The material of a selection.
+    Selection,
+    /// The material of a menu.
+    Menu,
+    /// The material of a popover.
+    Popover,
+    /// The material of a sidebar.
+    Sidebar,
+    /// A medium-light material (deprecated by macOS).
+    MediumLight,
+    /// A very dark material (deprecated by macOS).
+    UltraDark,
+    /// The material of a header view.
+    HeaderView,
+    /// The material of a sheet.
+    Sheet,
+    /// The material of a window background.
+    WindowBackground,
+    /// The material of a heads-up display window.
+    HudWindow,
+    /// The material of a full-screen UI.
+    FullScreenUI,
+    /// The material of a tooltip.
+    Tooltip,
+    /// The material of a content background.
+    ContentBackground,
+    /// The material under a window's background.
+    UnderWindowBackground,
+    /// The material under a page.
+    UnderPageBackground,
+}
+
+/// When a macOS effect view draws its material.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MaterialState {
+    /// Always drawn active.
+    Active,
+    /// Always drawn inactive.
+    Inactive,
+    /// Follows the window's active state.
+    FollowsWindow,
+}
+
+/// An appearance forced on a macOS effect view.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MaterialAppearance {
+    /// The dark (aqua) appearance.
+    Dark,
+    /// The light (aqua) appearance.
+    Light,
+}
+
+/// The style of a macOS liquid glass view.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LiquidStyle {
+    /// Clear glass.
+    Clear,
+    /// Regular glass.
+    Regular,
+}
+
+/// A Windows window material.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WindowsMaterial {
+    /// Acrylic.
+    Acrylic {
+        /// A tint over the acrylic. Honoured only on Windows builds 17763 to 22522; newer builds
+        /// ignore it.
+        tint: Option<Rgba>,
+        /// Asks DWM for the dark (`Some(true)`) or light variant. A `Some` stays on the window
+        /// until a later `Some` changes it: no clear and no later `apply` resets it. `None` does
+        /// not touch the flag, so it leaves whatever the window has (the system's, the app's own
+        /// or an earlier `Some`).
+        dark: Option<bool>,
+    },
+    /// Mica.
+    Mica {
+        /// Asks DWM for the dark (`Some(true)`) or light variant. A `Some` stays on the window
+        /// until a later `Some` changes it: no clear and no later `apply` resets it. `None` does
+        /// not touch the flag, so it leaves whatever the window has (the system's, the app's own
+        /// or an earlier `Some`).
+        dark: Option<bool>,
+    },
+    /// Tabbed Mica.
+    Tabbed {
+        /// Asks DWM for the dark (`Some(true)`) or light variant. A `Some` stays on the window
+        /// until a later `Some` changes it: no clear and no later `apply` resets it. `None` does
+        /// not touch the flag, so it leaves whatever the window has (the system's, the app's own
+        /// or an earlier `Some`).
+        dark: Option<bool>,
+    },
 }
 
 /// Applies an OS backdrop to a native window. One implementation per platform.

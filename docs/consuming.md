@@ -135,7 +135,7 @@ enums are `#[non_exhaustive]`: match with a wildcard), and `lune_ui::testing` ho
 
 ## API changes of the library pass
 
-The library pass after the gallery showcase (DECISIONS D255 to D282) changed the public API with no version bump (the plan's D24): no consumer had adopted 0.2.0, so
+The library pass after the gallery showcase (DECISIONS D255 to D282) changed the public API with no version bump (the plan's D24): Luneterm pins the toolkit by git rev (`lune-ui` at `5216931`, `Cargo.toml:16`), not by version, so
 the version stays and this list is the migration map for it. The log with the reasons is `docs/architecture.md`, "API changes since M1", "Since the library pass".
 A consumer that has not yet adopted the toolkit needs none of it. One that vendored a snapshot from before `1340d15` reads the rows below.
 
@@ -167,8 +167,52 @@ A consumer that has not yet adopted the toolkit needs none of it. One that vendo
 | `ScrollOptions { .. }` | add `bar_room: (f32, f32)` (`..Default::default()`) | the scroll bars keep clear of a control that shares their corner (D279) |
 | `RowHeights` of an edited document keep stale heights | `RowHeights::splice(at, removed, added)`; `EditLayout::extend_hit` is a provided method | D279, D280 |
 | a `Theme { .. }` literal | add `tree_guide`, `selection_radius`, `selection_pad`; drop the gone fields above | the theme file has 47 colour keys, `MenuGlassBackground` among them |
+| a `match` on `Material` with no wildcard | add an arm for `Material::Custom(OsMaterial)`, or a wildcard; `Material::os_material(self)` gives every variant's descriptor | additive: the five names keep their meaning (D285) |
+| a `match` on `Skip` with no wildcard | add arms for `UnknownGlass(String)`, `BadGlass(String)`, `BadMaterial(String)` | the theme file's `glass` section (D286) |
+| a `ThemeFile { .. }` literal | add `material: None` | `ThemeFile.material: Option<Material>` is the file's `glass.material`; it is not in `Theme` (D286) |
 
 Behaviour that changed with no signature change, worth a look when porting: the hold on `Raised` (an overlay drops to the layer it asked for when no older modal is
 left, D255) and one order for "above" (D263); a key that arrives before a release in one frame belongs to the press (D278); a hit inside a cluster of several glyphs
 goes by the cluster's midpoint (D280); an overlay opened in a disabled scope draws dimmed (D277); a ring's width follows the transform's scale (D277). Every scene
 the gate moved is listed with its reason in D282.
+
+## Your own glass look
+
+A look's glass is data (D285, D286): a theme file with a `glass` section is the whole look, and no toolkit change is needed for a new one. `Theme::from_json(bytes, &base)` returns a `ThemeFile`: `theme` is the drawing values, and `material` is the OS material of `glass.material`, which the app gives its window with `lune_ui::material::apply(window, material)` (or `WindowBackdrop`). The material is not in `Theme`.
+
+Schema. Keys are camelCase and case-sensitive; every `glass` member is optional; numbers are in [0, 1]; a colour is `#RRGGBB` or `#AARRGGBB`. The file around `glass` is the usual theme file, which requires `colors` and `acrylic` (empty objects are enough; `Theme::from_json` returns `Err(Missing("colors"))` without them).
+
+```json
+{
+  "name": "My look",
+  "colors": {},
+  "acrylic": {},
+  "glass": {
+    "window": { "tint": "#000000", "tintOpacity": 1, "materialOpacity": 0.1, "blackMaxOpacity": 0.6 },
+    "panel":  { "tint": "#000000", "tintOpacity": 1, "materialOpacity": 0.1, "blackMaxOpacity": 0.55 },
+    "card":   { "tint": "#000000", "tintOpacity": 1, "materialOpacity": 0.1, "blackMaxOpacity": 0.65 },
+    "material": {
+      "macos":   { "kind": "vibrancy", "effect": "UltraDark", "state": "Active" },
+      "windows": { "kind": "acrylic", "tint": "#A0000000", "dark": true }
+    }
+  }
+}
+```
+
+- A layer (`window`, `panel`, `card`) takes `tint`, `tintOpacity`, `materialOpacity`, and the luminosity curve: `midPoint`, `whiteMaxOpacity`, `midPointMaxOpacity`, `blackMaxOpacity`.
+- `material` is one of the strings `"Vibrancy"`, `"VibrancyFollowsWindow"`, `"LiquidClear"`, `"LiquidRegular"`, `"Opaque"`, or an object `{ macos?, windows? }`:
+  - `macos`: `{ "kind": "vibrancy", "effect", "state": "Active" | "Inactive" | "FollowsWindow", "appearance"?: "Dark" | "Light" }`, where `effect` is one of the names in `VIBRANCY_EFFECTS` (`crates/lune-ui-core/src/theme/file.rs`, e.g. `UltraDark`); or `{ "kind": "liquid", "style": "Clear" | "Regular", "tint"?, "opaque"? }`.
+  - `windows`: `{ "kind": "acrylic", "tint"?, "dark"? }`, `{ "kind": "mica", "dark"? }` or `{ "kind": "tabbed", "dark"? }`.
+- Faults are not fatal. A bad layer member is skipped and listed in `ThemeFile.skipped` by its path (`Skip::BadGlass("window.blackMaxOpacity")`, `Skip::UnknownGlass`); the other values apply. The material is all-or-nothing: any fault inside `glass.material` gives `material: None` and one `Skip::BadMaterial`, never a partial material. A file with no `glass` key loads as it did before.
+- Tuning the built-in look: `lune_ui::near_black` (`crates/lune-ui-core/src/theme/near_black.rs`) is the one file. Every constant has a comment that says which way raising it moves the look. Its tests pin the approved values; a deliberate retune edits them too.
+
+**Where no code changes stops.**
+
+- Covered as data: every macOS `NSVisualEffectMaterial` name, state and forced appearance; liquid style, tint and opacity; Windows acrylic tint and dark flag, Mica and Tabbed; each layer's tint, opacities and curve. The header tint is an app value (the gallery's `near_black::HEADER_TINT`), not a file key.
+- Still needs toolkit code: a macOS or Windows material `window-vibrancy` does not expose; a new blending mode; Windows `apply_blur` (not exposed; the Windows-10-era path); a new platform.
+- Not settable by anyone: macOS's blur strength (the OS fixes it per material); the tint on Windows builds 22523 and later (the OS ignores it). The app-drawn blur sigma is already a per-frame value the app passes.
+- A value a platform cannot honour is an `Err` from `apply` (the macOS or Windows arm is `None`, or the platform has no glass), never silently another material.
+
+**The fallback.** On `Err`, apply `Material::Opaque` and use an opaque theme. This is the path Luneterm takes today (`crates/luneterm/src/app.rs:312-325` in Luneterm), so a look that cannot be shown on a platform degrades to the opaque one with no extra code.
+
+**Unverified.** The macOS `UltraDark` look under a Light system appearance, and the Windows acrylic tint and dark flag on builds 22523 and later, have not been seen on a real machine (D285).

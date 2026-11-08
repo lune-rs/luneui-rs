@@ -17,6 +17,7 @@ pub use lune_ui_core::{
     scene, shortcuts, strings, testing, text_edit, theme, ui, widgets,
 };
 pub use theme::lunegit_dark;
+pub use theme::near_black;
 
 pub use lune_ui_wgpu::{blur, custom, dump, frame, gpu, surface};
 

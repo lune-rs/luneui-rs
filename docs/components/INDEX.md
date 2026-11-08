@@ -31,7 +31,7 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | [core.scene](core/scene.md) | Display list | done | any | Plain-data Scene the painter builds and a renderer consumes; the draw-order contract |
 | [core.tab-outline](core/tab-outline.md) | Tab outline geometry | done | luneterm | Tab-chrome outline loop geometry |
 | [core.testing](core/testing.md) | Seam fakes and contract suites | done | any | Public testing module: RecordingRenderer, FakeText, ScriptedInput, NullMaterial and the contract suites |
-| [core.theme](core/theme.md) | Theme tokens and Lunegit dark preset | done | luneterm | Theme token struct and the lunegit_dark preset with the WINDOW, PANEL and CARD glass layers |
+| [core.theme](core/theme.md) | Theme tokens and Lunegit dark preset | done | luneterm | Theme token struct, the lunegit_dark preset and the near_black glass look (its tunables file), with the WINDOW, PANEL and CARD glass layers |
 | [core.ui](core/ui.md) | Ui frame context | done | any | Immediate-mode Ui frame: ids, transient and persistent retained state, Response, layers and modality, Repaint |
 
 ## render

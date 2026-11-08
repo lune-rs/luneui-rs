@@ -4,15 +4,16 @@ title: Theme tokens and Lunegit dark preset
 area: core
 status: done
 consumers: luneterm
-source: crates/lune-ui-core/src/theme.rs, crates/lune-ui-core/src/theme/file.rs
+source: crates/lune-ui-core/src/theme.rs, crates/lune-ui-core/src/theme/file.rs, crates/lune-ui-core/src/theme/near_black.rs
 owner: —
-summary: Theme token struct and the lunegit_dark preset with the WINDOW, PANEL and CARD glass layers
+summary: Theme token struct, the lunegit_dark preset and the near_black glass look (its tunables file), with the WINDOW, PANEL and CARD glass layers
 ---
 
 ## What it is
 
 `Theme` (tokens the widgets read) and the `lunegit_dark` module: `THEME`, `TINT`, `WINDOW`/`PANEL`/`CARD` layers, `CARD_CORNER_RADIUS`.
-Since M10 the three glass layers also travel inside the theme: `Theme.glass: ThemeGlass { window, panel, card }` (preset: the three consts, which stay), so a theme file's tint and opacities load with the rest (D207). `Theme::from_json` loads a file over a base theme and `Theme::with_acrylic(AcrylicLevel)` scales the glass material opacities; see `infra.theme-hot-reload`. `COLOR_KEYS` and `Theme::color_key` expose the key table. Every glass surface (menu, list, popover, tooltip, toast, dialog and palette card) draws `menu_glass` and `menu_popup_border`; there is no toast or dialog fill of its own, so `ToastBackground`, `ToastBorder` and `BackdropDark` are unknown file keys (D8).
+Since M10 the three glass layers also travel inside the theme: `Theme.glass: ThemeGlass { window, panel, card }` (preset: the three consts, which stay), so a theme file's tint and opacities load with the rest (D207). `Theme::from_json` loads a file over a base theme and `Theme::with_acrylic(AcrylicLevel)` scales the glass material opacities; see `infra.theme-hot-reload`.
+`theme::near_black` (dark-glass, D285) is the approved near-black look as one value and one file: `THEME` is `DARK` with `GLASS` (three black glass layers, tints 60, 55 and 65% black), `MATERIAL` is the OS material it asks for (macOS `UltraDark`, Windows acrylic with a black tint), and `HEADER_TINT` is the tab header's band, which the app chooses (D131). Its top comment and its constants' doc comments say which way each tunable moves the look; `lunegit_dark` is unchanged. A theme file carries the same glass in its optional `glass` section (D286): the layers load into `Theme.glass`, and the material into `ThemeFile.material`, never into `Theme`. `COLOR_KEYS` and `Theme::color_key` expose the key table. Every glass surface (menu, list, popover, tooltip, toast, dialog and palette card) draws `menu_glass` and `menu_popup_border`; there is no toast or dialog fill of its own, so `ToastBackground`, `ToastBorder` and `BackdropDark` are unknown file keys (D8).
 
 ## Needs
 
@@ -21,7 +22,7 @@ Since M10 the three glass layers also travel inside the theme: `Theme.glass: The
 
 ## Existing code
 
-`crates/lune-ui-core/src/theme.rs:21` (`Theme`), `:135` (`ThemeGlass`), `:290` (`DARK`, the neutral alias), `:293` (`lunegit_dark`), `:298` (`THEME`); 802 lines, unit tests from `:421`; the JSON loader in `crates/lune-ui-core/src/theme/file.rs`.
+`crates/lune-ui-core/src/theme.rs:21` (`Theme`), `:135` (`ThemeGlass`), `:290` (`DARK`, the neutral alias), `:293` (`lunegit_dark`), `:298` (`THEME`); 802 lines, unit tests from `:421`; the JSON loader in `crates/lune-ui-core/src/theme/file.rs`; the near-black look in `crates/lune-ui-core/src/theme/near_black.rs` (its tests pin the approved values).
 
 ## Spec
 
@@ -38,6 +39,7 @@ Conflicts: the repo menu padding (6) and Lunegit's (MenuItem 10,6) differ; overl
 - Glass layers `WINDOW`, `PANEL`, `CARD` [R crates/lune-ui-core/src/theme.rs:91-109]; `CARD_CORNER_RADIUS` 8 [R crates/lune-ui-core/src/theme.rs:115].
 - Motion tokens to add in M4 (SF5 names): durations `instant` 120, `fast` 180, `base` 250, `moderate` 350, `slow` 500 [L src/Lunegit.Desktop/App.axaml:151-155]; easings `linear`, `quad-out`, `quad-in`, `sine-in-out`, `back-out`, `cubic-out` (0.215, 0.61, 0.355, 1), `ease-in` (0.42, 0, 1, 1) [R crates/lune-ui-core/src/widgets/menu.rs:46-58]. Kinds are not theme values.
 - JSON theme (M10, done): `Theme::from_json` and the 50-key table in `theme.rs` (`COLOR_KEYS`), see `infra.theme-hot-reload`. Widgets still take their `GlassLayer` from their options; the app reads it from `theme.glass`.
+- Theme file `glass` section (D286, optional): `window`, `panel` and `card` layers, each `tint`, `tintOpacity`, `materialOpacity`, `midPoint`, `whiteMaxOpacity`, `midPointMaxOpacity`, `blackMaxOpacity` (numbers in [0, 1]; a colour as `#RRGGBB` or `#AARRGGBB`), and `material`, which lands in `ThemeFile.material`, not in `Theme`. A bad member is skipped by path (`Skip::BadGlass`, `Skip::UnknownGlass`); the material is all-or-nothing (`Skip::BadMaterial`). The schema and the fallback are in `docs/consuming.md`, "Your own glass look".
 
 ### States
 
@@ -45,6 +47,8 @@ Conflicts: the repo menu padding (6) and Lunegit's (MenuItem 10,6) differ; overl
 |---|---|---|
 | dark (the only theme today) | `lunegit_dark::THEME` | [R crates/lune-ui-core/src/theme.rs:47,55] |
 | inactive window | the same glass layers (no fallback token, D262) | [D262] |
+| near-black (`near_black::THEME`) | `DARK` with `near_black::GLASS`: the window, panel and card layers at tint 1, material opacity 0.1, black max 0.60, 0.55 and 0.65; the OS material is `near_black::MATERIAL` (outside the theme) | [R crates/lune-ui-core/src/theme/near_black.rs] |
+| near-black, `with_acrylic(Opaque)` | opaque near-black: alpha 1 on each layer, every channel under `0x10` | [R crates/lune-ui-core/src/theme/near_black.rs, test `near_black_opaque_is_opaque_and_under_0x10`] |
 
 ### Transitions
 
@@ -82,6 +86,7 @@ n/a — no text.
 - The preset against Lunegit's `DarkTheme.axaml` (`crates/lune-ui-core/src/theme.rs`, module `tests`): `every_color_key_holds_the_dark_theme_axaml_value` (47 keys with a line cite each; `GlassTintColor`, `MenuGlassBackground` (the toolkit's own key for `menu_glass`, D8) and `PopupMenuOuterBorder` (the glass ring, white at 0x1F against Lunegit's 0x3A, D11) have none here, the last two are held by `the_glass_ring_and_tint_keys_hold_the_toolkits_values`; the file's brushes sit at `:7-159` and `:298-341`, the glass at `:226-235`), `the_glass_layers_hold_the_dark_theme_axaml_opacities`, `the_tokens_without_an_axaml_key_follow_their_decision_rows` (each field with no key of its own cites the row that sets it: D51, D14, D58, D207, D208), `the_status_and_surface_tokens_hold_their_values`, `the_font_sizes_hold_the_app_axaml_typography_scale` (`App.axaml:159-162`), `the_preset_glass_is_the_old_constants`.
 - The motion tokens with a test per token: `anim_duration_instant_is_120_ms`, `fast` 180, `base` 250, `moderate` 350, `slow` 500 (`App.axaml:151-155`); the easings are `motion.curves`.
 - The M10 JSON loader with a bounded reader (R-infra-6): `crates/lune-ui-core/tests/theme_file.rs` (`the_key_table_has_50_distinct_keys_each_of_which_resolves`, `the_preset_written_through_the_table_loads_back_equal`, `bad_colours_are_skipped_by_key_and_change_nothing`, `the_envelope_is_checked`, `nothing_panics_on_a_damaged_file`); a swap between two themes is a hard cut for colours (`a_swap_snaps_a_colour_that_is_mid_transition_and_one_whose_target_did_not_move`).
+- The near-black look (D285): `near_black_approved_values_are_pinned_retune_them_here` (the three layers, `HEADER_TINT`), `near_black_over_a_ten_percent_backdrop_reads_11_13_0f` (the rounded bytes `0x11`, `0x13`, `0x0F`, neutral, backdrop share within 0.2 points), `near_black_card_over_a_full_backdrop_is_at_least_0x50` (this look belongs with the dark material), `near_black_opaque_is_opaque_and_under_0x10`, `near_black_theme_is_dark_except_its_glass`, `near_black_header_tint_lifts_the_card_by_six_levels`; the file's loader test `a_file_built_from_the_near_black_constants_loads_as_near_black` (`crates/lune-ui-core/tests/theme_file.rs`) and the gallery's `selecting_near_black_sets_its_theme_and_material`.
 - Every widget takes its colours from the theme: `crates/lune-ui-core/tests/c4.rs` module `m10` (the frame under a theme of distinct colours; `UNREACHED` is empty).
 
 ### Build
@@ -92,6 +97,8 @@ n/a — no text.
 
 ## Open questions
 
+- Unverified here (D285): how the near-black look reads under a Light system appearance on macOS (the run was Dark; the fix if it fails is the descriptor's `appearance`, one constant), and the Windows acrylic tint and dark flag on builds 22523 and later. Both need a by-eye run on a real machine.
+- The header tint is an app value, not a theme key: a theme file cannot set it (D131). `tree_guide`, `selection_radius` and `selection_pad` have no file key either.
 - `TAB_HEADER_HEIGHT` and `BODY_PADDING` are gone ([D276]): they read as terminal-app values and nothing read either (checked at M11, D245). A public-API removal.
 
 ## Notes for the planner

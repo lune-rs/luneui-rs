@@ -1,7 +1,7 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-08 (library pass merged to main; published at github.com/lune-rs/luneui-rs)
+Last updated: 2026-11-09 (library pass merged to main; dark-glass steps 1 to 7 committed on `orch/dark-glass`, not merged; published at github.com/lune-rs/luneui-rs)
 
 ## Now
 
@@ -10,6 +10,8 @@ Program toolkit-v1 closed with M11 (merged at 10f503e); the gallery showcase tas
 the API with no bump). `apps/gallery` has 82 pages and 438 scene names (the first 14 are the legacy Painter-API scenes). The catalogue holds 97 entries: 91 `done`, 2 `in-progress`,
 4 `external`. Milestone merges to main: M4 d9fe71f, M5 1aeaf1b, M6 a75a708, M7 662d310, M8 2474248, M9 8f499d0, M10 55cfaaf, M11 10f503e (M1 to M3: the extraction, the seams and the catalogue).
 `docs/architecture.md` has the module map, the pages and "API changes since M1"; `docs/consuming.md` how an app vendors the toolkit and, for the library pass, the migration map of its API changes.
+
+Dark glass (task `luneui-rs/dark-glass`, D285 to D287; steps 1 to 7 committed on `orch/dark-glass`): the OS glass is data (`Material::Custom(OsMaterial)`, `Material::os_material`); a theme file may carry an optional `glass` section (layers, curve, material); `theme::near_black` is the approved near-black look as one file. The gallery lists it in the materials and themes panes, and its tab header uses `near_black::HEADER_TINT` under that glass. Lunegit's preset is unchanged. The pixel gate was not run (no component's drawing changed, D254): the five `showcase-*` scenes move by design and are checked by eye. Unverified here: `UltraDark` under a Light system appearance on macOS, and every Windows result (the Windows code compiles; nothing ran there). Step 7 added `docs/api/` (D287): the whole public API as generated Markdown, a page per module, from rustdoc JSON by `tools/api-docs`; `scripts/gen-api-docs.sh --check` is in the gate, so it cannot go stale. Start at `docs/api/INDEX.md`.
 
 The library pass (task `luneui-rs/library-pass`, DECISIONS D255 to D282, one milestone by the user's word) did, in order: real stacked glass (a draw layer per overlay, a blur per
 glass request, frost, and the window's own background as the only draw that replaces what is below; D255 to D259); `Ui::outside_modals` for a surface that stays outside a modal; one
@@ -103,16 +105,18 @@ fit panel's clip, the nits F2 to F7 of M6 and M8, and the Library follow-ups the
 - The showcase in a real window: clicks on the sidebar, the knobs and the settings, a live swap of the OS material, the feel of speed and zoom, Copy and Paste against the OS clipboard (`docs/components/infra/showcase.md`).
 - The library pass in a real window (the user's hands-on run of `cargo run -p gallery`): a dialog over a page, a list over the dialog, a tooltip and a toast; a click on the sidebar between dialog scenes (R7's path);
   an inactive window (R13); a tab in progress (R3, the feel of the shine); the glass sliders. OS glass and an inactive window are live-only.
+- Dark glass (D285, D286): the near-black look on a real macOS window in Light appearance (the fix if it fails is `appearance` in `near_black::MATERIAL`, one constant); the Windows acrylic tint and dark flag on builds 22523 and later; the tab header under the near-black glass (`near_black::HEADER_TINT`, a proposal for the user's eye).
 
 ## Next
 
-1. The rest of a hands-on run of `cargo run -p gallery` (see Unverified here); the look values are settled.
-2. Luneterm's M9 adopts the toolkit through `docs/consuming.md`: vendor `scripts/export-snapshot.sh`'s output, switch crate by crate (version 0.2.0 lets the in-tree `lune-ui` and the snapshot stand
+1. Dark glass: the merge, then the by-eye checks in Unverified here. After any public API or doc-comment change run `scripts/gen-api-docs.sh` (the gate's `--check` fails on a stale `docs/api/`).
+2. The rest of a hands-on run of `cargo run -p gallery` (see Unverified here); the look values are settled.
+3. Luneterm's M9 adopts the toolkit through `docs/consuming.md`: vendor `scripts/export-snapshot.sh`'s output, switch crate by crate (version 0.2.0 lets the in-tree `lune-ui` and the snapshot stand
    in one lock), use the migration maps (the Luneterm one and "API changes of the library pass"); its own OS runs close `platform.material` and `render.surface`. Luneterm itself is not changed by this repo.
-3. The Lunegit fixtures are licensed MIT OR Apache-2.0 (D284); the export still leaves them out.
-4. The user's calls, all reversible and taken at the recommended option: the final tray glyph (`platform.tray-icon`), column resize and reorder in the table (D163, Q15), and two taken calls to
+4. The Lunegit fixtures are licensed MIT OR Apache-2.0 (D284); the export still leaves them out.
+5. The user's calls, all reversible and taken at the recommended option: the final tray glyph (`platform.tray-icon`), column resize and reorder in the table (D163, Q15), and two taken calls to
    confirm: the Windows popover activates (D224, Q17), the tray icon is a CPU raster (D218, Q18).
-5. CI stays out (D15) until the user asks; the remote is `origin`, github.com/lune-rs/luneui-rs (public).
+6. CI stays out (D15) until the user asks; the remote is `origin`, github.com/lune-rs/luneui-rs (public).
 
 ## Blockers / open questions
 

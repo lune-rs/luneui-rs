@@ -31,8 +31,11 @@ use windows::apply as apply_os;
 #[cfg(target_os = "windows")]
 use windows::apply_rounded as apply_rounded_os;
 
-pub use crate::backdrop::Material;
 use crate::backdrop::{Backdrop, BackdropKind};
+pub use crate::backdrop::{
+    LiquidStyle, MacosMaterial, Material, MaterialAppearance, MaterialState, OsMaterial,
+    VibrancyEffect, WindowsMaterial,
+};
 
 /// Applies `material` to `window`, first clearing any material applied earlier.
 ///
