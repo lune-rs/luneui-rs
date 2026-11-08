@@ -132,3 +132,43 @@ Lines are the spike's, at 296cfdc.
 Not errors, but new since 296cfdc and worth a look when porting: `Theme` gained fields (a
 `Theme { .. }` literal outside the toolkit needs `glass`), `Event` gained the file-drop variants (the
 enums are `#[non_exhaustive]`: match with a wildcard), and `lune_ui::testing` holds the fakes.
+
+## API changes of the library pass
+
+The library pass after the gallery showcase (DECISIONS D255 to D282) changed the public API with no version bump (the plan's D24): no consumer had adopted 0.2.0, so
+the version stays and this list is the migration map for it. The log with the reasons is `docs/architecture.md`, "API changes since M1", "Since the library pass".
+A consumer that has not yet adopted the toolkit needs none of it. One that vendored a snapshot from before `1340d15` reads the rows below.
+
+| old | new | note |
+| --- | --- | --- |
+| `scene.layers[LayerId::Popup as usize]` and the other fixed layers hold every overlay's drawing | `scene.layers[id]` holds what was drawn outside any overlay; `Scene::overlays` holds each overlay's own `Layer`; `Scene::in_order()` is the draw list, `Scene::merged(id)` folds a fixed layer and its overlays | a renderer or recorder walks `in_order()` (D256) |
+| `LayerId::Toast` is 5, `LAYER_COUNT` 6 | `LayerId::Outside` is 5, `Toast` 6, `LAYER_COUNT` 7 | code that indexes by number moves; `Ui::outside_modals` runs a closure on `Outside` (D259) |
+| `Scene::backdrop`, `Scene::split`, `BackdropRequest::layer`; one blur a frame, the last request wins | `Layer::backdrops`, `Scene::backdrops()`, `Scene::floor()`; a blur per request at its layer, every request stands | D257 |
+| `Painter::acrylic` anywhere, replacing what is below | on the fixed `Base` layer only; anywhere else it draws as `Painter::frost` (`frost`, `frost_radii`) | a backdrop request now replaces its region (`mix(sharp, blurred, ..)`), so nothing opens a hole to the desktop (D258) |
+| `Painter::on` drops the clip stack | `Painter::on` changes only the layer; overlays (`enter`) still clear it | a `pop_clip` across a layer change restores what its push replaced (D265) |
+| `FrameParams { size, scale, blur_sigma, saturation }` | add `noise_opacity` and `blur: BlurLimits`, or start from `FrameParams::default()` | the noise strength and the blur's kernel cap and working size were constants (D264) |
+| `GlassLayer { .. }` literal | add `curve: LuminosityCurve::AVALONIA` | `GlassLayer::premultiplied()` keeps its signature (D264) |
+| `OutputState::apply(window, out)` | `OutputState::apply(window, out, ui_scale)` | the input-method area leaves in physical pixels (D266) |
+| `caption_rect` placing from x = 0, y = 0 | places from the window's own origin | the gallery's `caption_in` workaround (a translate) is gone (D266) |
+| `Ui::flyout_window(..)`, `Ui::menu_window(..)` in the painter's window | the same, plus `Ui::flyout_window_in(key, area, ..)` and `Ui::menu_window_in(key, area, ..)` for an area of the window | D266 |
+| a registration-order Tab sequence | `Ui::tab_scope(order, f)` | D267 |
+| `UiStore::prev_hits` (crate-private) | `testing::hit_regions(&UiStore) -> Vec<HitRegion>` | D266 |
+| `DialogGlass { fill, panel, noise }` | `DialogGlass { fill, noise }`, `DialogGlass::of(&Theme)` | D261 |
+| `DialogOptions::scrim_blur` false by default | true by default | D261 |
+| `Surface::Panel`, `popup_panel`, `DropdownOptions::glass`, `Theme::dropdown_bg`, `toast_bg`, `toast_border` | gone: `menu_glass` and `menu_popup_border` drive every floating surface (`popover::glass_surface`) | the keys `BackdropDark`, `ToastBackground` and `ToastBorder` load as unknown (in `skipped`) (D260, D261) |
+| `Theme::window_fallback`, `lunegit_dark::INACTIVE_FALLBACK`, `active` on `PageOptions`, `ToolbarOptions`, `SidePanelOptions`, `SettingsPage`, `BoardOptions` | gone: an inactive window stays glass | the key `WindowFallbackBackground` loads as unknown (D262) |
+| `RingKind::PrimaryButton`, `Edge::on_accent`, `Theme::on_accent_text`, `accent_hover` | gone | the buttons follow Lunegit's dialog buttons: primary on `surface_input`, secondary clear, press scale on the ghost only (D269) |
+| `lunegit_dark::TAB_HEADER_HEIGHT`, `BODY_PADDING` | gone | read by nothing in the repo (D276) |
+| `Tab::progress` draws a spinner; `SPINNER_SIZE`, `SPINNER_MARGIN` | `Tab::progress` shines the title in that tone; the constants are gone | the tab is no wider (D270) |
+| `TreeOptions { guides, .. }` | add `guide_style: GuideStyle`, `chevron: ChevronStyle` (`..Default::default()`) | `Theme::tree_guide` colours the guides (D271) |
+| a text selection drawn by each widget | `widgets::selection::paint(p, rows, open, color)` over `Painter::fill_joined`; `Theme::selection_radius`, `selection_pad` | D272 |
+| `KvOptions { .. }` | add `copy: bool` (off by default) | D275 |
+| `SidePanelOptions { .. }` | add `card_moves: bool` (off by default) | D281 |
+| `ScrollOptions { .. }` | add `bar_room: (f32, f32)` (`..Default::default()`) | the scroll bars keep clear of a control that shares their corner (D279) |
+| `RowHeights` of an edited document keep stale heights | `RowHeights::splice(at, removed, added)`; `EditLayout::extend_hit` is a provided method | D279, D280 |
+| a `Theme { .. }` literal | add `tree_guide`, `selection_radius`, `selection_pad`; drop the gone fields above | the theme file has 47 colour keys, `MenuGlassBackground` among them |
+
+Behaviour that changed with no signature change, worth a look when porting: the hold on `Raised` (an overlay drops to the layer it asked for when no older modal is
+left, D255) and one order for "above" (D263); a key that arrives before a release in one frame belongs to the press (D278); a hit inside a cluster of several glyphs
+goes by the cluster's midpoint (D280); an overlay opened in a disabled scope draws dimmed (D277); a ring's width follows the transform's scale (D277). Every scene
+the gate moved is listed with its reason in D282.

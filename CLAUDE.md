@@ -26,10 +26,10 @@ for the extraction; Luneterm's `docs/architecture.md` sections "lune-ui modules"
 - Gate (before every commit; must be green): `cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && cargo clippy -p lune-ui-winit --all-targets -- -D warnings && cargo test -p lune-ui-winit && scripts/check-boundaries.sh && scripts/gen-component-index.sh --check`
 - Showcase (the gallery's window; Cmd or Ctrl `]` and `[` walk the pages, Cmd or Ctrl `Q` quits): `cargo run -p gallery`
 - Pixel gate (a change to a component's drawing; gallery-only work is checked by eye, D254): `scripts/pixel-gate.sh [--base <rev>] [--allow <id>…] [--removed <id>…]` dumps
-  every scene `gallery --list` prints (431 at M11's close; the first 14 are the legacy Painter-API scenes) for `<rev>`
+  every scene `gallery --list` prints (438 at the library pass's close; the first 14 are the legacy Painter-API scenes) for `<rev>`
   (default `HEAD`) and for the working tree and compares them
   (`dump-compare`); zero delta unless the look change is intended: name its scenes with `--allow <id>`
-  and give the reason in a DECISIONS.md row in the same commit. A scene whose subject is gone is named with `--removed <id>` (D26): it must be in
+  and give the reason in a DECISIONS.md row in the same commit. A scene whose subject is gone is named with `--removed <id>` (D260): it must be in
   the base's dump and not in the candidate's list, and its base files move aside; any other missing scene fails. Exit 0 pass, 1 delta, 2 setup error.
   The working tree dumps headless (no window); a base from before M2 step 4 (`52b11d6` and older)
   opens a hidden window, so such a gate needs a logged-in macOS GUI session.
@@ -76,8 +76,12 @@ Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, r
   `no_widget_fills_a_selection_itself` walks every scene for it).
 - A wheel delta routes per axis: the topmost scroll region live on that axis takes it (D178). A composite with nothing to scroll on
   an axis disables that axis (`Bars::unless_fits`), so the delta reaches the area around it (D176).
-- An overlay that opens above an active modal is put on `LayerId::Raised` by `Ui::overlay`, once at open (D137): a widget
-  never names the layer. A widget in a `with_enabled(false, ..)` scope needs no rule of its own for its nodes (`Ui::node`
+- An overlay that opens above an active modal is put on `LayerId::Raised` by `Ui::overlay` and held there only while an older modal is on
+  the stack (D137, D255, D263): a widget never names the layer. Each overlay draws on a layer of its own in open order (`Scene::in_order`,
+  D256), so a later overlay hides an earlier one's text; every glass request blurs everything drawn before its layer, other glass included
+  (one blur per request, at its layer, D257); one routine, `popover::glass_surface`, frosts every floating surface (D260). A surface that
+  must stay live and undimmed under a modal goes through `Ui::outside_modals` (`LayerId::Outside`, D259). `Painter::on` changes only the
+  layer and keeps the clip stack (`enter`, the overlays, still clears it, D265). A widget in a `with_enabled(false, ..)` scope needs no rule of its own for its nodes (`Ui::node`
   marks them, D140), but it consumes its keys before it gates on `enabled` (`docs/architecture.md`, "Disabled keys", is the one list, D159); `testing::disabled_violations` checks a subtree.
 - Each seam has a fake and a contract test in `lune_ui_core::testing` (`RecordingRenderer`, `FakeText`
   with `text_system_contract`, `FakeImages` with `image_store_contract`, `ScriptedInput` with `scripted_input_contract`, `NullMaterial` with

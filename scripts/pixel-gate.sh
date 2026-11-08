@@ -102,11 +102,11 @@ done
 LIST="$(cd "$ROOT" && cargo run -q --locked -p gallery -- --list)" || die "candidate gallery --list failed"
 [ -n "$LIST" ] || die "candidate gallery --list printed nothing"
 for id in ${ALLOW[@]+"${ALLOW[@]}"}; do
-  printf '%s\n' "$LIST" | grep -q -x -E -- "$id@[0-9]+x" || die "--allow $id: not a scene of the candidate's gallery --list"
+  printf '%s\n' "$LIST" | grep -q -x -E -- "$id@[0-9.]+x" || die "--allow $id: not a scene of the candidate's gallery --list"
 done
 
 for id in ${REMOVED[@]+"${REMOVED[@]}"}; do
-  if printf '%s\n' "$LIST" | grep -q -E -- "^$id@[0-9]+x"; then
+  if printf '%s\n' "$LIST" | grep -q -E -- "^$id@[0-9.]+x"; then
     die "--removed $id: still a scene of the candidate's gallery --list"
   fi
 done

@@ -25,8 +25,8 @@ Keys: Cmd or Ctrl `]` and `[` walk the sidebar's pages, Cmd or Ctrl `Q` quits; e
 
 ## Needs
 
-None from a consumer: this is the gallery's own tool, not a toolkit component. It changes nothing under
-`crates/` (D246); what the toolkit would need to show more is in `docs/STATE.md`, Next.
+None from a consumer: this is the gallery's own tool, not a toolkit component. It changed nothing under
+`crates/` (D246); the follow-ups it found (noise and luminosity values, tray surfaces in an area, scoped tab order, `Painter::on` and the clip, numeric script keys, the IME area under zoom) were paid by the library pass (D264 to D268).
 
 ## Existing code
 
@@ -62,8 +62,7 @@ overlay come last: an open modal blocks the pane. Every page of the sidebar has 
 
 ### Labs
 
-Glass (the three layers over stripes and colour), Blur (a backdrop over moving content; it owns the frame's one
-backdrop), Effects (custom draw, glass off, the tab outline), Motion (the 15 kinds and 7 easings,
+Glass (the three layers over stripes and colour), Blur (a backdrop over moving content), Effects (custom draw, glass off, the tab outline), Motion (the 15 kinds and 7 easings,
 each replayed on a press), Tokens (every theme colour, size and radius), Clipboard (copy and paste on a press
 only), JSON (the bounded reader on typed text).
 
