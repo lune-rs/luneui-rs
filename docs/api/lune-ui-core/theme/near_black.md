@@ -14,6 +14,8 @@ it moves the look.
   blur; lower for darker glass with more blur.
 - `MATERIAL`: the OS material the window asks for. It is for a dark system appearance.
 - `HEADER_TINT`: the tab header's band over the card. Raise for a lighter header.
+- `MENU_GLASS`: the fill of every floating surface (menu, dropdown, popover, tooltip, toast,
+  dialog, palette). Lower its grey for darker surfaces; raise its alpha for less blur.
 
 The tests pin the approved values. A deliberate retune edits them too.
 
@@ -31,7 +33,7 @@ pub const CARD: GlassLayer;
 The card's glass layer. Its tint is the most opaque of the three, so the card shows the least
 backdrop.
 
-Source: `crates/lune-ui-core/src/theme/near_black.rs:67`
+Source: `crates/lune-ui-core/src/theme/near_black.rs:69`
 
 <a id="constant.CARD_BLACK_MAX"></a>
 ### Constant `CARD_BLACK_MAX`
@@ -43,7 +45,7 @@ pub const CARD_BLACK_MAX: f64 = 0.65;
 The card layer's tint opacity at pure black. Raise it for a blacker card with less blur;
 lower it for a lighter card with more blur.
 
-Source: `crates/lune-ui-core/src/theme/near_black.rs:40`
+Source: `crates/lune-ui-core/src/theme/near_black.rs:42`
 
 <a id="constant.GLASS"></a>
 ### Constant `GLASS`
@@ -54,7 +56,7 @@ pub const GLASS: ThemeGlass;
 
 The three glass layers of the near-black look.
 
-Source: `crates/lune-ui-core/src/theme/near_black.rs:78`
+Source: `crates/lune-ui-core/src/theme/near_black.rs:80`
 
 <a id="constant.HEADER_TINT"></a>
 ### Constant `HEADER_TINT`
@@ -66,7 +68,7 @@ pub const HEADER_TINT: Rgba;
 The tab header's band, drawn over the card: a 4% white wash. Raise it for a lighter header;
 0 alpha removes it, so the header matches the card.
 
-Source: `crates/lune-ui-core/src/theme/near_black.rs:107`
+Source: `crates/lune-ui-core/src/theme/near_black.rs:115`
 
 <a id="constant.MATERIAL"></a>
 ### Constant `MATERIAL`
@@ -79,7 +81,7 @@ The OS material the window asks for: macOS `UltraDark` vibrancy, active; Windows
 black tint of alpha 160, dark. The Windows tint is honoured only on builds 17763 to 22522; on
 later builds the layers above do the darkening, and `dark` asks for the dark variant.
 
-Source: `crates/lune-ui-core/src/theme/near_black.rs:93`
+Source: `crates/lune-ui-core/src/theme/near_black.rs:101`
 
 <a id="constant.MATERIAL_OPACITY"></a>
 ### Constant `MATERIAL_OPACITY`
@@ -91,7 +93,20 @@ pub const MATERIAL_OPACITY: f32 = 0.1;
 The grey luminosity layer under the black tint, in material opacity. Raise it for lighter
 glass with less blur showing; lower it for darker glass with more blur showing.
 
-Source: `crates/lune-ui-core/src/theme/near_black.rs:28`
+Source: `crates/lune-ui-core/src/theme/near_black.rs:30`
+
+<a id="constant.MENU_GLASS"></a>
+### Constant `MENU_GLASS`
+
+```rust
+pub const MENU_GLASS: Rgba;
+```
+
+The fill of every floating surface, which the toolkit frosts itself, so the OS material never
+reaches it: [`DARK`](../theme.md#constant.DARK)'s opacity over a near-black grey. Lower the grey for darker surfaces; raise
+the alpha for less blur.
+
+Source: `crates/lune-ui-core/src/theme/near_black.rs:89`
 
 <a id="constant.PANEL"></a>
 ### Constant `PANEL`
@@ -102,7 +117,7 @@ pub const PANEL: GlassLayer;
 
 The panel's glass layer.
 
-Source: `crates/lune-ui-core/src/theme/near_black.rs:55`
+Source: `crates/lune-ui-core/src/theme/near_black.rs:57`
 
 <a id="constant.PANEL_BLACK_MAX"></a>
 ### Constant `PANEL_BLACK_MAX`
@@ -114,7 +129,7 @@ pub const PANEL_BLACK_MAX: f64 = 0.55;
 The panel layer's tint opacity at pure black. Raise it for blacker panels with less blur;
 lower it for lighter panels with more blur.
 
-Source: `crates/lune-ui-core/src/theme/near_black.rs:36`
+Source: `crates/lune-ui-core/src/theme/near_black.rs:38`
 
 <a id="constant.THEME"></a>
 ### Constant `THEME`
@@ -123,9 +138,9 @@ Source: `crates/lune-ui-core/src/theme/near_black.rs:36`
 pub const THEME: Theme;
 ```
 
-The dark theme with the near-black glass. Every other value is [`DARK`](../theme.md#constant.DARK)'s.
+The dark theme with the near-black glass and floating surfaces. Every other value is [`DARK`](../theme.md#constant.DARK)'s.
 
-Source: `crates/lune-ui-core/src/theme/near_black.rs:85`
+Source: `crates/lune-ui-core/src/theme/near_black.rs:92`
 
 <a id="constant.TINT"></a>
 ### Constant `TINT`
@@ -137,7 +152,7 @@ pub const TINT: Rgba;
 The tint under every glass layer. Black, so the glass is neutral; a coloured tint would
 change the hue, not the darkness.
 
-Source: `crates/lune-ui-core/src/theme/near_black.rs:24`
+Source: `crates/lune-ui-core/src/theme/near_black.rs:26`
 
 <a id="constant.WINDOW"></a>
 ### Constant `WINDOW`
@@ -149,7 +164,7 @@ pub const WINDOW: GlassLayer;
 The window's glass layer, the window background. Its tint sits between the panel's and the
 card's.
 
-Source: `crates/lune-ui-core/src/theme/near_black.rs:44`
+Source: `crates/lune-ui-core/src/theme/near_black.rs:46`
 
 <a id="constant.WINDOW_BLACK_MAX"></a>
 ### Constant `WINDOW_BLACK_MAX`
@@ -161,5 +176,5 @@ pub const WINDOW_BLACK_MAX: f64 = 0.60;
 The window layer's tint opacity at pure black. Raise it for blacker glass with less blur;
 lower it for lighter glass with more blur.
 
-Source: `crates/lune-ui-core/src/theme/near_black.rs:32`
+Source: `crates/lune-ui-core/src/theme/near_black.rs:34`
 

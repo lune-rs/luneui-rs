@@ -8,6 +8,8 @@
 //!   blur; lower for darker glass with more blur.
 //! - `MATERIAL`: the OS material the window asks for. It is for a dark system appearance.
 //! - `HEADER_TINT`: the tab header's band over the card. Raise for a lighter header.
+//! - `MENU_GLASS`: the fill of every floating surface (menu, dropdown, popover, tooltip, toast,
+//!   dialog, palette). Lower its grey for darker surfaces; raise its alpha for less blur.
 //!
 //! The tests pin the approved values. A deliberate retune edits them too.
 
@@ -81,9 +83,15 @@ pub const GLASS: ThemeGlass = ThemeGlass {
     card: CARD,
 };
 
-/// The dark theme with the near-black glass. Every other value is [`DARK`]'s.
+/// The fill of every floating surface, which the toolkit frosts itself, so the OS material never
+/// reaches it: [`DARK`]'s opacity over a near-black grey. Lower the grey for darker surfaces; raise
+/// the alpha for less blur.
+pub const MENU_GLASS: Rgba = [10, 10, 10, 157];
+
+/// The dark theme with the near-black glass and floating surfaces. Every other value is [`DARK`]'s.
 pub const THEME: Theme = Theme {
     glass: GLASS,
+    menu_glass: MENU_GLASS,
     ..DARK
 };
 
@@ -108,7 +116,7 @@ pub const HEADER_TINT: Rgba = [0xFF, 0xFF, 0xFF, 0x0A];
 
 #[cfg(test)]
 mod tests {
-    use super::{CARD, GLASS, HEADER_TINT, PANEL, THEME, WINDOW};
+    use super::{CARD, GLASS, HEADER_TINT, MENU_GLASS, PANEL, THEME, WINDOW};
     use crate::GlassLayer;
     use crate::backdrop::LuminosityCurve;
     use crate::theme::{AcrylicLevel, DARK, Theme};
@@ -187,15 +195,25 @@ mod tests {
     }
 
     #[test]
-    fn near_black_theme_is_dark_except_its_glass() {
+    fn near_black_theme_is_dark_except_its_glass_and_floating_surfaces() {
         assert_eq!(
             Theme {
                 glass: DARK.glass,
+                menu_glass: DARK.menu_glass,
                 ..THEME
             },
             DARK
         );
         assert_ne!(THEME.glass, DARK.glass);
+    }
+
+    /// A floating surface draws `menu_glass` and never the OS material, so the theme must carry it.
+    #[test]
+    fn near_black_floating_surfaces_are_darker_at_the_same_opacity() {
+        assert_eq!(THEME.menu_glass, MENU_GLASS);
+        assert_eq!(MENU_GLASS, [10, 10, 10, 157]);
+        assert!(MENU_GLASS[0] < DARK.menu_glass[0]);
+        assert_eq!(MENU_GLASS[3], DARK.menu_glass[3]);
     }
 
     #[test]

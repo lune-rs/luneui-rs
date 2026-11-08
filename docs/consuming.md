@@ -205,6 +205,7 @@ Schema. Keys are camelCase and case-sensitive; every `glass` member is optional;
   - `windows`: `{ "kind": "acrylic", "tint"?, "dark"? }`, `{ "kind": "mica", "dark"? }` or `{ "kind": "tabbed", "dark"? }`.
 - Faults are not fatal. A bad layer member is skipped and listed in `ThemeFile.skipped` by its path (`Skip::BadGlass("window.blackMaxOpacity")`, `Skip::UnknownGlass`); the other values apply. The material is all-or-nothing: any fault inside `glass.material` gives `material: None` and one `Skip::BadMaterial`, never a partial material. A file with no `glass` key loads as it did before.
 - Tuning the built-in look: `lune_ui::near_black` (`crates/lune-ui-core/src/theme/near_black.rs`) is the one file. Every constant has a comment that says which way raising it moves the look. Its tests pin the approved values; a deliberate retune edits them too.
+- Using the built-in look: take the whole `near_black::THEME` and apply `near_black::MATERIAL` to the window. Setting only `theme.glass = near_black::GLASS` darkens the window, panels and cards but leaves menus, dropdowns, popovers, tooltips, toasts and dialogs grey, because they fill from `theme.menu_glass` (`near_black::MENU_GLASS`, D288). In a theme file that value is the colour key `MenuGlassBackground`, outside the `glass` section. A dialog or palette given its own `DialogGlass` keeps that value.
 
 **Where no code changes stops.**
 
