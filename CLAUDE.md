@@ -17,13 +17,13 @@ for the extraction; Luneterm's `docs/architecture.md` sections "lune-ui modules"
 
 - Build: `cargo build --workspace`
 - Test (all): `cargo test --workspace`
-- Test (one): `cargo test -p <crate> <name>`; crates: `lune-ui-core`, `lune-ui-wgpu`, `lune-ui-winit`, `lune-ui-platform`, `lune-ui` (facade), `gallery`, `dump-compare`. The GPU tests skip without an adapter; `LUNEUI_REQUIRE_GPU=1 cargo test -p lune-ui-wgpu` makes them fail instead
+- Test (one): `cargo test -p <crate> <name>`; crates: `lune-ui-core`, `lune-ui-wgpu`, `lune-ui-winit`, `lune-ui-platform`, `lune-ui` (facade), `gallery`, `dump-compare`, `api-docs`. The GPU tests skip without an adapter; `LUNEUI_REQUIRE_GPU=1 cargo test -p lune-ui-wgpu` makes them fail instead
 - Format: `cargo fmt --all`
 - Lint: `cargo clippy --workspace --all-targets -- -D warnings`
 - Boundaries: `scripts/check-boundaries.sh`
 - Catalogue index (regenerate after adding or editing a component file): `scripts/gen-component-index.sh`
 - Acceptance bench (milestone acceptance only; a recorded reading that no gate, merge or fix waits on, and is not re-run to settle load noise, D235; runnable on a busy machine, D85: each run judged on its own p99 <= 16.6 ms and worst frame <= 33 ms, a page OVER only in at least half its runs, the self-test spread and load printed beside every verdict; exit 0): `cargo run --release -p gallery -- --bench` (`--runs 5` is the default; `--size 3456x2234` is report-only)
-- Gate (before every commit; must be green): `cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && cargo clippy -p lune-ui-winit --all-targets -- -D warnings && cargo test -p lune-ui-winit && scripts/check-boundaries.sh && scripts/gen-component-index.sh --check`
+- Gate (before every commit; must be green): `cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && cargo clippy -p lune-ui-winit --all-targets -- -D warnings && cargo test -p lune-ui-winit && scripts/check-boundaries.sh && scripts/gen-component-index.sh --check && scripts/gen-api-docs.sh --check`
 - Showcase (the gallery's window; Cmd or Ctrl `]` and `[` walk the pages, Cmd or Ctrl `Q` quits): `cargo run -p gallery`
 - Pixel gate (a change to a component's drawing; gallery-only work is checked by eye, D254): `scripts/pixel-gate.sh [--base <rev>] [--allow <id>…] [--removed <id>…]` dumps
   every scene `gallery --list` prints (438 at the library pass's close; the first 14 are the legacy Painter-API scenes) for `<rev>`
@@ -40,7 +40,8 @@ for the extraction; Luneterm's `docs/architecture.md` sections "lune-ui modules"
   version Luneterm's lock lacks, and fails by design from M10 on: `arboard` and its tree are new, D213)
 - Cross-target (Windows clippy, Linux in Docker; skips Linux when Docker is not running): `scripts/check-targets.sh`
 - Snapshot export for an app that vendors the toolkit (D239; exit 0 done, 1 a check failed, 2 usage or setup; reads `git archive <rev>`, never the working tree; `docs/consuming.md` says how it is used): `scripts/export-snapshot.sh <dest> [--rev <rev>]`
-- Docs (every public function, method, type, trait and module has a doc comment, D242; must build clean): `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --exclude gallery --exclude dump-compare`
+- API reference (D287; a Markdown page per module of the five library crates, generated from rustdoc JSON by `tools/api-docs`, so it cannot go stale: signatures, doc comments, fields, variants, methods, trait impls; regenerate after any public API or doc-comment change; `--check` is in the gate; exit 0 done or current, 1 stale, 2 setup or a failed completeness check): `scripts/gen-api-docs.sh [--check]`; start at `docs/api/INDEX.md`. It sets `RUSTC_BOOTSTRAP=1` for the rustdoc runs only; a toolchain bump that moves the JSON format exits 2 until the exact `rustdoc-types` pin in `tools/api-docs/Cargo.toml` moves
+- Docs (every public function, method, type, trait and module has a doc comment, D242; must build clean): `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --exclude gallery --exclude dump-compare --exclude api-docs`
 
 Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, resolver 3: in
 `rust-toolchain.toml` and the root manifest.
@@ -128,6 +129,7 @@ Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, r
 - `docs/STATE.md` - current work and next steps
 - `docs/DECISIONS.md` - decisions and what was rejected
 - `docs/requirements.md` - what the toolkit must provide (requirement ids `R-<area>-<n>`)
+- `docs/api/INDEX.md` - generated reference of the whole public API (signature, docs, source line of every item, a page per module); open it to find an item by name
 - `docs/components/INDEX.md` - generated catalogue index; open a component's file under
   `docs/components/<area>/<slug>.md` for its detail; `docs/components/README.md` explains how to add one
 - `docs/architecture.md` - crates, seams, module map, extension points, pixel gates

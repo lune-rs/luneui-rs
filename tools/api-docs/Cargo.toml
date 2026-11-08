@@ -1,0 +1,17 @@
+[package]
+name = "api-docs"
+description = "Generates docs/api/ (a Markdown reference of the public API) from rustdoc JSON; dev-only, never a dependency of a library crate"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+# Exact pin: the JSON format is versioned by rustdoc, and FORMAT_VERSION of this crate is checked
+# against the file at run time (a toolchain bump that moves the format exits 2 until the pin moves).
+rustdoc-types = "=0.56.0"
+serde_json = "1"
+
+[lints]
+workspace = true

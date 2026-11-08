@@ -1,7 +1,7 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-08 (library pass merged to main; dark-glass steps 1 to 6 committed on `orch/dark-glass`, not merged; published at github.com/lune-rs/luneui-rs)
+Last updated: 2026-11-09 (library pass merged to main; dark-glass steps 1 to 7 committed on `orch/dark-glass`, not merged; published at github.com/lune-rs/luneui-rs)
 
 ## Now
 
@@ -11,7 +11,7 @@ the API with no bump). `apps/gallery` has 82 pages and 438 scene names (the firs
 4 `external`. Milestone merges to main: M4 d9fe71f, M5 1aeaf1b, M6 a75a708, M7 662d310, M8 2474248, M9 8f499d0, M10 55cfaaf, M11 10f503e (M1 to M3: the extraction, the seams and the catalogue).
 `docs/architecture.md` has the module map, the pages and "API changes since M1"; `docs/consuming.md` how an app vendors the toolkit and, for the library pass, the migration map of its API changes.
 
-Dark glass (task `luneui-rs/dark-glass`, D285, D286; steps 1 to 6 committed on `orch/dark-glass`, step 7 next): the OS glass is data (`Material::Custom(OsMaterial)`, `Material::os_material`); a theme file may carry an optional `glass` section (layers, curve, material); `theme::near_black` is the approved near-black look as one file. The gallery lists it in the materials and themes panes, and its tab header uses `near_black::HEADER_TINT` under that glass. Lunegit's preset is unchanged. The pixel gate was not run (no component's drawing changed, D254): the five `showcase-*` scenes move by design and are checked by eye. Unverified here: `UltraDark` under a Light system appearance on macOS, and every Windows result (the Windows code compiles; nothing ran there).
+Dark glass (task `luneui-rs/dark-glass`, D285 to D287; steps 1 to 7 committed on `orch/dark-glass`): the OS glass is data (`Material::Custom(OsMaterial)`, `Material::os_material`); a theme file may carry an optional `glass` section (layers, curve, material); `theme::near_black` is the approved near-black look as one file. The gallery lists it in the materials and themes panes, and its tab header uses `near_black::HEADER_TINT` under that glass. Lunegit's preset is unchanged. The pixel gate was not run (no component's drawing changed, D254): the five `showcase-*` scenes move by design and are checked by eye. Unverified here: `UltraDark` under a Light system appearance on macOS, and every Windows result (the Windows code compiles; nothing ran there). Step 7 added `docs/api/` (D287): the whole public API as generated Markdown, a page per module, from rustdoc JSON by `tools/api-docs`; `scripts/gen-api-docs.sh --check` is in the gate, so it cannot go stale. Start at `docs/api/INDEX.md`.
 
 The library pass (task `luneui-rs/library-pass`, DECISIONS D255 to D282, one milestone by the user's word) did, in order: real stacked glass (a draw layer per overlay, a blur per
 glass request, frost, and the window's own background as the only draw that replaces what is below; D255 to D259); `Ui::outside_modals` for a surface that stays outside a modal; one

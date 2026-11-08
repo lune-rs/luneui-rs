@@ -8,6 +8,11 @@ them by id (`R-<area>-<n>`).
 here. Never edit it by hand. The gate runs `scripts/gen-component-index.sh --check`, which fails
 when `INDEX.md` is stale.
 
+The **public API itself** (every item's signature, doc comment, fields, variants, methods and trait
+implementations, a page per module) is generated from rustdoc JSON into `../api/`; start at
+[`../api/INDEX.md`](../api/INDEX.md). It is not edited here either: `scripts/gen-api-docs.sh`
+writes it and the gate runs its `--check`.
+
 ## Add a component
 
 1. Copy `_template.md` to `docs/components/<area>/<slug>.md`.
