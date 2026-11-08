@@ -71,7 +71,7 @@ app passes time, sizes, fonts, theme, scale and hit values in), so frames are de
 | `text_edit` (`text_edit.rs`) | The pure text editing engine: caret, selection, undo, clipboard commands, preedit; offsets in chars (D95) | `TextEdit` (`takes`), `EditCommand`, `EditOutcome`, `EditFlags`, `EditLayout` (`lines_near`), `SpecLayout`; since M9 the engine edits through `EditText` and `EditBuffer`, implemented for `str`, `String` and `CodeDoc` (D180) |
 | `code_doc` (`code_doc.rs`) | The code editor's document (D179): one `String` and a line index, verbatim, with `\n`, `\r\n` and a lone `\r` ending a line; an edit costs O(log lines) | `CodeDoc` (`new`, `text`, `set_text`, `line_count`, `line`, `line_of`), implements `EditText` and `EditBuffer` |
 | `drag` (`drag.rs`) | The in-window drag machines and their `Ui` glue (D89, D104) | `ReorderDrag`, `FreeDrag` (with `pressed`), `Metrics`, `Strip`, `Column`, `DropResult`, `FreeResult`, `paint_drop_line`, `edge_step` (the auto-scroll zone math, shared by the strip and the board; D168) |
-| `backdrop` (`backdrop.rs`) | The material seam | `Backdrop`, `Material`, `BackdropKind`, `GlassLayer` |
+| `backdrop` (`backdrop.rs`) | The material seam; `Material::Custom(OsMaterial)` is the data-driven OS glass (D285), `Material::os_material` gives every variant's descriptor | `Backdrop`, `Material`, `OsMaterial`, `MacosMaterial`, `WindowsMaterial`, `VibrancyEffect`, `MaterialState`, `MaterialAppearance`, `LiquidStyle`, `BackdropKind`, `GlassLayer` |
 | `window` (`window.rs`) | Edge resize, double click, the caption buttons' Painter form and their shared geometry (no windowing type) | `ResizeEdge`, `edge_at`, `DoubleClick`, `caption_buttons`, `CAPTION_BUTTON_WIDTH` |
 | `widgets::caption` (`widgets/caption.rs`) | The caption buttons through the `Ui` (D240): hover through the `hover` kind, `caption_close_hover`, nodes named from `luneui.window.*`, no Tab stop; the app turns the answer into a `WindowCommand` | `Ui::caption_buttons`, `CaptionButton`, `CaptionOptions` |
 | `icon` (`icon.rs`) | Codicon codepoints as Nerd Font glyphs; no font file bundled | `glyph`, `ADD`, `GEAR`, `CHECK`, ... |
@@ -356,7 +356,7 @@ only with the feature; the gate runs the crate both ways).
 
 | Module (file) | Purpose | Key items |
 |---|---|---|
-| `material` (`material.rs`, `material/{macos,windows,other}.rs`) | OS backdrop per platform | `apply`, `apply_rounded`, `WindowBackdrop`, `Material` (re-export) |
+| `material` (`material.rs`, `material/{macos,windows,other}.rs`) | OS backdrop per platform; the adapters map the `OsMaterial` descriptor (`macos.rs` `effect_of`, `state_of`; `windows.rs`), D285 | `apply`, `apply_rounded`, `WindowBackdrop`, `Material` and the descriptor types (re-exports) |
 | `tray` (`tray.rs`) | The tray item: image, tooltip, rect, clicks; `Unsupported` where there is no tray (D222) | `Tray`, `TrayImage`, `TrayRect`, `TrayButton`, `TrayEvent`, `TrayError`, `set_event_handler` |
 | `popover` (`popover.rs`) | The guard of a tray surface's window (D223, D224) | `PopoverWindow`, `frontmost_app` |
 | `platform` (private; `platform.rs`, `platform/{item,macos,windows,other}.rs`) | The OS half of both: `item.rs` is the `tray-icon` wrapper macOS and Windows share, `macos.rs` the panel class swap. With `material/macos.rs`, the only `unsafe` | `Panel`, `TrayItem` |
