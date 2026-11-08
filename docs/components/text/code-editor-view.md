@@ -86,7 +86,7 @@ n/a — typing, caret movement, selection, scrolling and line bands are high-fre
 - The caret starts at the document's top, not at its end as a field's does: a document opens there. A new `identity` is another document: caret, selection, undo, composition and pending paste go with the old one (D201). A pane of a `scroll_group` that opens one takes nothing from the group in that frame and takes the group to the top with it, whether the others open one too or not; a pane drawn for the first time joins the group where it stands (D203).
 - Composition: on one line in place (`text.ime`). A selection on the line is replaced in the drawing; across lines the first line is cut at the selection and later lines stay as they are until the commit, a stated simplification. The spans of the composing line are asked for the shown text.
 - Layer: the host's; overlay anchors above it on the same layer in call order [core.ui]. No focus scope.
-- Word motions: the document is a `CodeDoc` (D179), and a word motion reads the lines either side of the caret's, one line further where the line past that edge holds text. It crosses one blank line as a `String` does; across two or more blank lines it stops at the blank line, a stated difference from `text.text-edit` on a `String` (D180).
+- Word motions: the document is a `CodeDoc` (D179), and a word motion reads the lines either side of the caret's, then the windows past that edge until it finds a word or reaches the text's edge. It lands where it does on a `String`, across any run of blank lines, at a cost of the lines it crosses (D180, D279).
 
 ### Retained state
 
@@ -113,7 +113,7 @@ n/a — typing, caret movement, selection, scrolling and line bands are high-fre
 - `code-editor-view-highlighted`: the same with keyword, string and comment spans, settled.
 - `code-editor-view-editable`: caret on line 3, settled.
 - `code-editor-view-disabled`: the editable view in a disabled scope (0.4 opacity), a click on line 3 and a typed letter: no caret, the text unchanged, settled.
-- `code-editor-view-selection`: a selection across lines 3 to 5, settled.
+- `code-editor-view-selection` (at 2x, 1x and 1.5x): a selection across lines 3 to 5 as one joined shape (D272), settled.
 - `code-editor-view-wrapped`: a long line wrapped, no gutter (the note editor), settled.
 - `code-editor-view-bands`: lines 4 to 6 added, 9 modified, 12 conflicted, settled.
 - `code-editor-view-bands-clamped`: band sets with lines 0 and 9999, clamped, settled.

@@ -37,16 +37,16 @@ macro_rules! colours {
 
 colours! {
     fg_primary, fg_secondary, fg_tertiary, surface_input, surface_hover, surface_selected,
-    border, border_subtle, accent, accent_hover, scroll_thumb, scroll_thumb_hover,
-    text_selection, on_accent, on_accent_text, dropdown_bg, dialog_backdrop, dialog_footer,
+    border, border_subtle, tree_guide, accent, scroll_thumb, scroll_thumb_hover,
+    text_selection, on_accent, dialog_backdrop, dialog_footer,
     menu_text_primary, menu_text_tertiary, menu_text_quaternary, menu_popup_border,
     menu_item_hover, menu_separator, menu_glass, menu_item_pressed, menu_text_disabled,
-    toast_bg, toast_border, toast_info, toast_success, toast_warning, toast_error,
+    toast_info, toast_success, toast_warning, toast_error,
     toast_log_bg, toast_log_fg, dirty_indicator, count_badge, caption_close_hover,
     caption_close_fg, fg_muted, fg_subtle, fg_bright, fg_quaternary, fg_dim, fg_faint,
     surface_overlay, surface_active, surface_separator, surface_divider, ok, warn, err,
     status_warning, status_warning_light, status_error_light, status_error,
-    status_warning_dark, data, data_hi, gold, paused, window_fallback, link, code_inline,
+    status_warning_dark, data, data_hi, gold, paused, link, code_inline,
     diff_added, diff_removed, diff_added_mark, diff_removed_mark,
 }
 
@@ -182,11 +182,11 @@ mod tests {
     }
 
     /// The list is every colour of the struct, none twice and none made up. The reader finds the
-    /// struct's 68 colours (a count that holds the instrument, not only the comparison).
+    /// struct's 63 colours (a count that holds the instrument, not only the comparison).
     #[test]
     fn every_colour_of_the_theme_is_listed() {
         let in_struct = colour_fields_of_the_struct();
-        assert_eq!(in_struct.len(), 68, "the reader of the struct");
+        assert_eq!(in_struct.len(), 63, "the reader of the struct");
         let listed: Vec<&str> = colours(&THEME).iter().map(|(n, _)| *n).collect();
         let (a, b): (BTreeSet<&str>, BTreeSet<&str>) = (
             in_struct.iter().map(String::as_str).collect(),

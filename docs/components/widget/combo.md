@@ -42,7 +42,7 @@ Conflicts: (1) Wane text inset is 9 px [W docs/ui/components.md:380]; the moved 
 - Fill: `surface_input` at rest, `surface_hover` when hovered [R crates/lune-ui-core/src/widgets/input_box.rs:29-34]; Wane fill `--surface-input` [W docs/ui/components.md:380].
 - Value text: 13 px UI text `fg_primary`, left 10 px, clipped 30 px short of the right edge, centred vertically [R crates/lune-ui-core/src/widgets/combo.rs:52-91].
 - Chevron: `CHEVRON_DOWN` glyph 12 px in `fg_secondary`, in a 20 px slot ending 8 px from the right edge [R crates/lune-ui-core/src/widgets/combo.rs:52-91]; Wane chevron 12 px at right 7 [W docs/ui/components.md:380].
-- Dropdown surface: `dropdown_bg` #F0000000 [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:278], [R crates/lune-ui-core/src/theme.rs:68]; dropdown rows hover `SurfaceHover`, selected `SurfaceSelected` [L src/Lunegit.Desktop/App.axaml:736-741] (the list itself is `overlay.dropdown`).
+- Dropdown surface: the glass surface (`menu_glass` frost over the blurred scene, D8); Lunegit's `BackdropDark` #F0000000 [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:278] is no longer read; dropdown rows hover `SurfaceHover`, selected `SurfaceSelected` [L src/Lunegit.Desktop/App.axaml:736-741] (the list itself is `overlay.dropdown`).
 
 ### States
 

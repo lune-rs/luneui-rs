@@ -1,6 +1,6 @@
-//! The `toolbar` page: the bar over the window glass with four actions and a labelled button, a
-//! switch for the window's active state and one for an action's enabled flag. The glass layer is
-//! the page's choice (the widget names no preset); inactive, the bar draws the fallback fill.
+//! The `toolbar` page: the bar over the window glass with four actions and a labelled button and a
+//! switch for an action's enabled flag. The glass layer is the page's choice (the widget names no
+//! preset).
 
 use lune_ui::icon;
 use lune_ui::input::NamedKey;
@@ -27,16 +27,12 @@ pub(crate) static PAGE: Page = Page {
 };
 
 fn live() -> Box<dyn PageState> {
-    Box::new(Live::of(true, true))
-}
-
-fn inactive() -> Box<dyn PageState> {
-    Box::new(Live::of(false, true))
+    Box::new(Live::of(true))
 }
 
 /// The push action disabled.
 fn push_disabled() -> Box<dyn PageState> {
-    Box::new(Live::of(true, false))
+    Box::new(Live::of(false))
 }
 
 /// The actions: key, glyph, and the name that is also the tooltip.
@@ -48,10 +44,9 @@ const ACTIONS: [(&str, &str, &str); 3] = [
 
 const BRANCH: &str = "feature/glass-toolbar";
 
-/// The toolbar and two switches for the window being active and the push action being enabled.
-/// The knobs set the branch label and whether the other two actions are enabled.
+/// The toolbar and a switch for the push action being enabled. The knobs set the branch label and
+/// whether the other two actions are enabled.
 struct Live {
-    active: bool,
     push_enabled: bool,
     branch: String,
     fetch_enabled: bool,
@@ -59,9 +54,8 @@ struct Live {
 }
 
 impl Live {
-    fn of(active: bool, push_enabled: bool) -> Self {
+    fn of(push_enabled: bool) -> Self {
         Self {
-            active,
             push_enabled,
             branch: BRANCH.to_owned(),
             fetch_enabled: true,
@@ -77,7 +71,6 @@ impl PageState for Live {
         heading(ui, "MAIN TOOLBAR", x, y);
         let bar = Rect::new(card.x, y + 24.0, card.w, 52.0);
         let opts = ToolbarOptions {
-            active: self.active,
             glass: WINDOW,
             under: CARD.premultiplied(),
             name: "Main toolbar",
@@ -109,19 +102,12 @@ impl PageState for Live {
             ui.painter().text(&spec, x, y + 3.0);
         };
         ui.toggle(
-            "active",
-            Rect::new(x, ty, 40.0, 24.0),
-            &mut self.active,
-            "Window active",
-        );
-        label(ui, "Window active", x + 52.0, ty);
-        ui.toggle(
             "push-enabled",
-            Rect::new(x + 240.0, ty, 40.0, 24.0),
+            Rect::new(x, ty, 40.0, 24.0),
             &mut self.push_enabled,
             "Push enabled",
         );
-        label(ui, "Push enabled", x + 292.0, ty);
+        label(ui, "Push enabled", x + 52.0, ty);
     }
 
     fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
@@ -154,16 +140,6 @@ const SCENES: &[UiScene] = &[
             },
         ],
         capture_ms: 1200,
-        expect: Expect::Settled,
-    },
-    // The window is inactive: the fallback fill replaces the glass.
-    UiScene {
-        id: "toolbar-inactive",
-        scale: 2.0,
-        tier: MotionTier::Full,
-        state: inactive,
-        script: &[],
-        capture_ms: 0,
         expect: Expect::Settled,
     },
     // The push action is disabled (0.4 opacity, transparent) and the pointer rests on it: no hover

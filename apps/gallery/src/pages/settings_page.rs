@@ -1,8 +1,7 @@
 //! The `settings-page` page: the settings page frame (`layout.settings-page`) with a section of
 //! three setting rows (a toggle, a combo with its list and a stepper) and the restart banner.
 //! Changing the toggle sets the restart flag, as an app would for a setting that needs one; the
-//! banner's action clears it. The glass layer is the page's choice (the widget names no preset);
-//! inactive, the page is the solid fallback.
+//! banner's action clears it. The glass layer is the page's choice (the widget names no preset).
 
 use std::time::Duration;
 
@@ -47,32 +46,27 @@ const STEPS: StepRange = StepRange {
 };
 
 fn live() -> Box<dyn PageState> {
-    Box::new(Live::new(false, true, None))
+    Box::new(Live::new(false, None))
 }
 
 /// The first row inside `with_enabled(false, ..)`.
 fn row_disabled() -> Box<dyn PageState> {
-    let mut live = Live::new(false, true, None);
+    let mut live = Live::new(false, None);
     live.row_disabled = true;
     Box::new(live)
 }
 
 fn restart() -> Box<dyn PageState> {
-    Box::new(Live::new(true, true, None))
-}
-
-fn inactive() -> Box<dyn PageState> {
-    Box::new(Live::new(false, false, None))
+    Box::new(Live::new(true, None))
 }
 
 /// The flag rises at 200 ms.
 fn restart_later() -> Box<dyn PageState> {
-    Box::new(Live::new(false, true, Some(Duration::from_millis(200))))
+    Box::new(Live::new(false, Some(Duration::from_millis(200))))
 }
 
 struct Live {
     restart: bool,
-    active: bool,
     restart_at: Option<Duration>,
     updates: bool,
     font: usize,
@@ -83,10 +77,9 @@ struct Live {
 }
 
 impl Live {
-    fn new(restart: bool, active: bool, restart_at: Option<Duration>) -> Live {
+    fn new(restart: bool, restart_at: Option<Duration>) -> Live {
         Live {
             restart,
-            active,
             restart_at,
             updates: true,
             font: 0,
@@ -106,7 +99,6 @@ impl PageState for Live {
             self.restart_at = None;
         }
         let page = SettingsPage {
-            active: self.active,
             glass: PANEL,
             under: CARD.premultiplied(),
             restart: self.restart,
@@ -204,7 +196,6 @@ impl PageState for Live {
 
     fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
         panel.toggle(ui, "Restart notice", &mut self.restart);
-        panel.toggle(ui, "Window active", &mut self.active);
         let mut first = !self.row_disabled;
         if panel.toggle(ui, "First row enabled", &mut first) {
             self.row_disabled = !first;
@@ -285,16 +276,6 @@ const SCENES: &[UiScene] = &[
             },
         ],
         capture_ms: 600,
-        expect: Expect::Settled,
-    },
-    // The window is inactive: the solid fallback replaces the glass.
-    UiScene {
-        id: "settings-page-inactive",
-        scale: 2.0,
-        tier: MotionTier::Full,
-        state: inactive,
-        script: &[],
-        capture_ms: 0,
         expect: Expect::Settled,
     },
 ];

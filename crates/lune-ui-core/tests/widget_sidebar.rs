@@ -588,7 +588,7 @@ fn a_focused_row_turned_disabled_keeps_its_keys_and_leaves_its_chords() {
 fn the_sidebar_draws_only_on_the_layer_it_is_called_on() {
     let mut h = UiHarness::new(WIN);
     let out = settled(&mut h, &mut case());
-    for (i, l) in out.scene.layers.iter().enumerate().skip(1) {
+    for (i, l) in out.scene.in_order().into_iter().enumerate().skip(1) {
         assert!(
             l.texts.is_empty() && l.geometry.under.is_empty(),
             "layer {i}"

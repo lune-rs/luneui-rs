@@ -9,7 +9,7 @@
 //! acrylic keys are below. The app reads the bytes and swaps the new theme in at a frame boundary
 //! (the toolkit reads no file and watches none).
 
-use crate::color::Rgba;
+use crate::color::{Rgba, with_alpha_byte};
 use crate::json::{JsonError, JsonErrorKind, Value, parse};
 
 use super::{Theme, color_slot};
@@ -61,8 +61,7 @@ impl Theme {
     /// the fields derived from them follow (below), everything else keeps the base value.
     ///
     /// Derived fields, each only when its source key was applied (so the preset's values are
-    /// reproduced exactly by a file that sets the preset's sources): `accent_hover` (each channel
-    /// of the accent plus 0x10, saturating), `scroll_thumb`, `scroll_thumb_hover` and
+    /// reproduced exactly by a file that sets the preset's sources): `scroll_thumb`, `scroll_thumb_hover` and
     /// `text_selection` (the accent at alpha 0x8C, 0xE6, 0x66), `diff_added_mark` and
     /// `diff_removed_mark` (the line fill at alpha 0x40), and the three `menu_text_*` colours (the
     /// matching `fg_*`).
@@ -196,25 +195,19 @@ fn acrylic_slot<'a>(theme: &'a mut Theme, key: &str) -> Option<&'a mut f32> {
     })
 }
 
-/// The same colour with another alpha.
-fn with_alpha(c: Rgba, a: u8) -> Rgba {
-    [c[0], c[1], c[2], a]
-}
-
 /// The fields with no key of their own, from the applied sources (D4).
 fn derive(t: &mut Theme, applied: &[&str]) {
     let has = |key: &str| applied.contains(&key);
     if has("AccentPrimaryColor") {
-        t.accent_hover = t.accent.map(|c| c.saturating_add(0x10));
-        t.scroll_thumb = with_alpha(t.accent, 0x8C);
-        t.scroll_thumb_hover = with_alpha(t.accent, 0xE6);
-        t.text_selection = with_alpha(t.accent, 0x66);
+        t.scroll_thumb = with_alpha_byte(t.accent, 0x8C);
+        t.scroll_thumb_hover = with_alpha_byte(t.accent, 0xE6);
+        t.text_selection = with_alpha_byte(t.accent, 0x66);
     }
     if has("DiffAddedBackground") {
-        t.diff_added_mark = with_alpha(t.diff_added, 0x40);
+        t.diff_added_mark = with_alpha_byte(t.diff_added, 0x40);
     }
     if has("DiffRemovedBackground") {
-        t.diff_removed_mark = with_alpha(t.diff_removed, 0x40);
+        t.diff_removed_mark = with_alpha_byte(t.diff_removed, 0x40);
     }
     if has("ForegroundPrimary") {
         t.menu_text_primary = t.fg_primary;

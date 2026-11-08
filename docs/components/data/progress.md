@@ -47,10 +47,10 @@ Conflicts:
 | state | look | cite |
 |---|---|---|
 | determinate | fill to the value fraction; the fill has a square leading edge and the rounded track clips it (a full bar keeps the track's ends) | [W docs/ui/components.md:627-640], the mock's `.c-progress__track` (Lunegit sets no fill shape; visual batch 2, C7) |
-| warn | warn fill (colour open) | [W docs/ui/components.md:627-640] |
-| err | err fill (colour open) | [W docs/ui/components.md:627-640] |
+| warn | `warn` fill | [W docs/ui/components.md:627-640] |
+| err | `err` fill | [W docs/ui/components.md:627-640] |
 | indeterminate | moving bar (Lunegit); not mocked in Wane | [L src/Lunegit.Desktop/Views/StartupRepositoryLoadingView.axaml:40-43] |
-| disabled | not in the sources | open question |
+| disabled | n/a: not in the sources and not built; a `with_enabled(false)` scope dims the bar like any widget | Open questions |
 
 ### Transitions
 

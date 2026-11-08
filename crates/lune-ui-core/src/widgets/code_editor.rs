@@ -25,6 +25,7 @@ use super::field::{
 };
 use super::focus_ring::{self, RingKind};
 use super::scroll_area::{Bars, Extent, Reveal, ScrollOptions, ScrollView, reveal_offset};
+use super::selection;
 use super::text_lines::{Highlighter, PlainHighlighter, line_spec, range_boxes};
 use super::virtual_list::{Heights, RowHeights};
 use crate::access::{AccessValue, Node, Role, TextValue, Value};
@@ -166,6 +167,9 @@ pub(super) struct Look {
     /// pointer's reach, the wheel's and the bar's place. The viewport lies inside it; the extent
     /// is made so that the last column ends at the viewport's right edge when scrolled fully.
     pub frame: Option<Rect>,
+    /// The room the horizontal bar leaves at its right end for a control in that corner
+    /// ([`ScrollOptions::bar_room`]).
+    pub bar_room: f32,
 }
 
 impl Look {
@@ -178,6 +182,7 @@ impl Look {
             skip_tab: false,
             ring: None,
             frame: None,
+            bar_room: 0.0,
         }
     }
 }
@@ -468,7 +473,13 @@ impl EditHost for DocHost<'_> {
         let (keymap, now) = (ui.keymap(), ui.time());
         if !geometric(&cmd) {
             let doc = &mut *self.doc;
+            let since = doc.fingerprint();
             let out = Self::segmenting(ui, |l| edit.apply(cmd, doc, l, keymap, now));
+            // A measured height follows its line: the lines an edit inserts or deletes move the
+            // heights below them, not the last ones.
+            if let Some(e) = self.doc.line_edit(since) {
+                self.tops.heights.splice(e.at, e.removed, e.added);
+            }
             self.sync_heights();
             return out;
         }
@@ -699,6 +710,8 @@ fn draw_lines(
     ui.painter().push_clip(clip);
     let mut bar = None;
     let caret_line = host.doc.line_of(d.caret);
+    // The selected part of each visual row in view, top to bottom, drawn as one shape below.
+    let mut rows: Vec<Rect> = Vec::new();
     for b in &built {
         let composing = d.compose.filter(|c| c.line == b.line);
         let chars = host.doc.line(b.line).chars().count();
@@ -707,17 +720,26 @@ fn draw_lines(
         } else {
             line_selection(host.doc, b.line, chars, &d.selection)
         };
+        let at = rows.len();
+        rows.extend(
+            range_boxes(ui, &b.spec, &range)
+                .into_iter()
+                .map(|r| Rect::new(x + r.x, b.y + r.y, r.w, r.h)),
+        );
         if past_end {
+            // The line end's sliver widens the line's last row, or is a row of its own.
             let pos = caret_at(ui, &b.spec, chars);
             let sliver = Rect::new(x + pos.x, b.y + pos.y, SLIVER, pos.height);
-            ui.painter().fill(sliver, 0.0, t.text_selection);
+            match rows[at..].last_mut() {
+                Some(last) if (last.y - sliver.y).abs() <= 0.5 => {
+                    let (x0, x1) = (last.x.min(sliver.x), last.right().max(sliver.right()));
+                    *last = Rect::new(x0, last.y, x1 - x0, last.h.max(sliver.h));
+                }
+                _ => rows.push(sliver),
+            }
         }
         let own_caret = d.caret_on && d.compose.is_none() && b.line == caret_line;
         if composing.is_none() && !own_caret {
-            for r in range_boxes(ui, &b.spec, &range) {
-                let r = Rect::new(x + r.x, b.y + r.y, r.w, r.h);
-                ui.painter().fill(r, 0.0, t.text_selection);
-            }
             ui.painter().text(&b.spec, x, b.y);
             continue;
         }
@@ -731,11 +753,24 @@ fn draw_lines(
                 c.caret,
                 c.focus_at,
             ),
-            None => Shown::line(b.spec.clone(), range, None, None, Some(local), local),
+            // The selection is in `rows`, drawn with the other lines'.
+            None => Shown::line(b.spec.clone(), 0..0, None, None, Some(local), local),
         };
         let area = draw_shown_inked(ui, &shown, (x, b.y), d.caret_on, t.fg_primary);
         bar = Some(screen_area(ui, area, clip));
     }
+    // Open where the selection runs on to a line out of view (its sliver at least).
+    let sel = &d.selection;
+    let live = d.compose.is_none() && !sel.is_empty();
+    let open = (
+        live && built
+            .first()
+            .is_some_and(|b| sel.start < host.doc.line_start(b.line)),
+        live && built
+            .last()
+            .is_some_and(|b| b.line + 1 < count && sel.end > host.doc.line_start(b.line + 1)),
+    );
+    selection::paint(ui.painter(), &rows, open, t.text_selection);
     ui.painter().pop_clip();
 
     if d.opts.gutter {
@@ -763,6 +798,71 @@ fn draw_lines(
         }
     }
     (shown, seen_w, bar)
+}
+
+/// Measures `line` as the view wraps it.
+fn measure_line(ui: &mut Ui<'_>, host: &mut DocHost<'_>, line: usize, wrap: f32) {
+    let spec = query_spec(host.doc.line(line), host.style, Some(wrap));
+    let h = ui.painter().measure(&spec).1;
+    host.tops.note(line, h);
+}
+
+/// The area's Page keys and End on a wrapped read-only view, pending for `id`, move by heights:
+/// where a line they cross is still an estimate, the move would land off by what it measures
+/// when drawn. Those lines are measured first: a viewport above the view's top `at` for each Page
+/// Up, a viewport below it for each Page Down, the last viewport for End. A line above the view
+/// shifts the area as any does, so the view stays where it is until the key moves it. The cost is
+/// the lines the keys cross, on a key press only.
+fn measure_crossed(
+    ui: &mut Ui<'_>,
+    host: &mut DocHost<'_>,
+    wrap: f32,
+    at: f64,
+    vh: f64,
+    id: WidgetId,
+) {
+    let (mut ups, mut downs, mut end) = (0.0, 0.0, false);
+    for (_, ev) in ui.focus_events(id) {
+        let FocusEvent::Key {
+            key: Key::Named(k),
+            modifiers,
+            ..
+        } = ev
+        else {
+            continue;
+        };
+        if modifiers.control || modifiers.alt || modifiers.logo {
+            continue;
+        }
+        match k {
+            NamedKey::PageUp => ups += vh,
+            NamedKey::PageDown => downs += vh,
+            NamedKey::End => end = true,
+            _ => {}
+        }
+    }
+    let count = host.doc.line_count();
+    let first = host.tops.heights.row_at(at);
+    // The part of the first line above the view's top: measuring lines moves no part of it.
+    let cut = at - host.tops.heights.top(first);
+    let (mut l, mut span) = (first, cut);
+    while l > 0 && span < ups {
+        l -= 1;
+        measure_line(ui, host, l, wrap);
+        span += host.tops.heights.height(l);
+    }
+    let (mut l, mut span) = (first, -cut);
+    while l < count && span <= downs && downs > 0.0 {
+        measure_line(ui, host, l, wrap);
+        span += host.tops.heights.height(l);
+        l += 1;
+    }
+    let (mut l, mut span) = (count, 0.0);
+    while end && l > 0 && span < vh {
+        l -= 1;
+        measure_line(ui, host, l, wrap);
+        span += host.tops.heights.height(l);
+    }
 }
 
 impl Ui<'_> {
@@ -906,6 +1006,13 @@ impl Ui<'_> {
             }
             (line, pos)
         });
+        if let Some(wrap) = host.wrap
+            && opts.read_only
+            && focused
+        {
+            let at = drawn.1 + self.scroll_pending_shift(AREA);
+            measure_crossed(self, &mut host, wrap, at, vh, id);
+        }
         if host.tops.shift != 0.0 {
             self.scroll_shift(AREA, std::mem::take(&mut host.tops.shift));
         }
@@ -971,6 +1078,7 @@ impl Ui<'_> {
             ),
             extent: Some(extent),
             identity: opts.identity,
+            bar_room: (look.bar_room, 0.0),
             ..ScrollOptions::default()
         };
 

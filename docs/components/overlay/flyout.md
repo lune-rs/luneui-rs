@@ -22,7 +22,7 @@ Windows tray left-click surface: header, stats, route list, action rows. Named b
 
 ## Existing code
 
-`crates/lune-ui-core/src/widgets/flyout.rs` (`Flyout`, `Ui::flyout`, `flyout_size`, `flyout_body`) over `Ui::popover` with `Surface::Glass`, `menu_rows` (the menu's row frame), `Ui::stat_strip` and `Ui::kv_list` [D145]; tests in `crates/lune-ui-core/tests/widget_flyout.rs`. M10 step 7 added `Ui::flyout_window`, the same body in a window of its own (the card fills the window, `tray::place_surface` places the window; D220). Before M7 there was none in luneui-rs or Luneterm's `lune-ui` (Wane: partial: the glass popup surface exists (popup_panel widgets/mod.rs:200; menu glass widgets/menu.rs:109); the stats block and the separate window are missing). Design source (not code to move): Luneterm crates/lune-ui/src/widgets/menu.rs:109-111 (backdrop, glass fill, ring); Luneium src/renderer/shell/components/Popup.css:2; docs/mockups/Tray.dc.html (content).
+`crates/lune-ui-core/src/widgets/flyout.rs` (`Flyout`, `Ui::flyout`, `flyout_size`, `flyout_body`) over `Ui::popover` with `Surface::Glass`, `menu_rows` (the menu's row frame), `Ui::stat_strip` and `Ui::kv_list` [D145]; tests in `crates/lune-ui-core/tests/widget_flyout.rs`. M10 step 7 added `Ui::flyout_window`, the same body in a window of its own (the card fills the window, `tray::place_surface` places the window; D220). Before M7 there was none in luneui-rs or Luneterm's `lune-ui` (Wane: partial: the glass popup surface exists (`glass_panel`, widgets/popover.rs); the stats block and the separate window are missing). Design source (not code to move): Luneterm crates/lune-ui/src/widgets/menu.rs:109-111 (backdrop, glass fill, ring); Luneium src/renderer/shell/components/Popup.css:2; docs/mockups/Tray.dc.html (content).
 
 ## Spec
 
@@ -101,7 +101,7 @@ None of its own: the header, stats, route and action labels are app text (Wane m
 - `flyout-closed` (new): nothing drawn over the controls scene, settled.
 - `flyout-opening` (new): t = 90 ms (half of fast, 180 ms).
 - `flyout-closing` (new): t = 60 ms (half of instant, 120 ms).
-- `tray-flyout-window` (M10, `platform.tray-icon`): `Ui::flyout_window`, the same body filling a window of its own from its corner, over a flat stand-in for the desktop, settled.
+- `tray-flyout-window` (M10, `platform.tray-icon`): `Ui::flyout_window` (and `Ui::flyout_window_in` for an area of the window), the same body filling a window of its own from its corner, over a flat stand-in for the desktop, settled.
 
 ### Painter primitives
 
@@ -120,7 +120,7 @@ None of its own: the header, stats, route and action labels are app text (Wane m
 ### Build
 
 - Milestone: M7 step 4 built the surface (header, stats strip, routes, action rows, open and close motion, drawn from the app's anchor point; `flyout_body` is the body M10 runs in its own window) and M10 (placement from the tray icon's rect and the separate glass window, with `platform.tray-icon`). M7 uses `data.stat` and `data.kv-list` (both M6) and `overlay.menu` (M7).
-- Depends on: overlay.popup-panel, overlay.menu, data.stat, data.kv-list, platform.tray-icon, platform.window, render.blur.
+- Depends on: overlay.popover, overlay.menu, data.stat, data.kv-list, platform.tray-icon, platform.window, render.blur.
 - Done (D47, M11): tests `crates/lune-ui-core/tests/widget_flyout.rs::escape_an_outside_press_and_focus_loss_dismiss, crates/lune-ui-core/tests/widget_flyout.rs::focus_lands_on_the_first_row_and_enter_and_space_pick_once, crates/lune-ui-core/tests/widget_flyout.rs::arrows_wrap_and_skip_a_disabled_row, crates/lune-ui-core/tests/widget_flyout.rs::the_size_is_the_drawn_card_at_the_three_states, crates/lune-ui-core/tests/widget_flyout.rs::pixel_probes_at_scale_2, crates/lune-ui-core/tests/widget_flyout.rs::the_curves_are_the_menus_under_every_tier, crates/lune-ui-core/tests/widget_flyout.rs::the_nodes_are_a_menu_a_status_and_two_groups, crates/lune-ui-core/tests/widget_flyout.rs::a_window_flyout_card_fills_the_window_at_the_three_states`; page `flyout`; unverified here: the OS glass window behind the tray, a real tray click (`platform.tray-icon`).
 
 ## Open questions

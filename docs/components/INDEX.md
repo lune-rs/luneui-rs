@@ -13,9 +13,9 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | planned | 0 |
 | stub | 0 |
 | in-progress | 2 |
-| done | 92 |
+| done | 91 |
 | external | 4 |
-| **total** | **98** |
+| **total** | **97** |
 
 ## core
 
@@ -91,12 +91,11 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
 | [overlay.command-palette](overlay/command-palette.md) | Command palette | done | lunegit | 640 px search dialog over commits, branches, tags, stash, reflog, repos, settings and commands, with prefix filters |
-| [overlay.dialog](overlay/dialog.md) | Modal dialog | done | luneterm, wane | Modal dialog card: dim backdrop, 448 px acrylic card, darker footer, app-supplied body |
+| [overlay.dialog](overlay/dialog.md) | Modal dialog | done | luneterm, wane | Modal dialog card: dim blurred backdrop, 448 px frosted glass card, darker footer, app-supplied body |
 | [overlay.dropdown](overlay/dropdown.md) | Drop-down list | done | luneterm, wane | Combo drop-down option list that flips above its anchor near the window bottom |
 | [overlay.flyout](overlay/flyout.md) | Tray flyout | done | wane | Windows tray left-click surface: header, stats, route list, action rows |
 | [overlay.menu](overlay/menu.md) | Glass context menu | done | luneterm, wane | Glass context menu with open and close motion |
 | [overlay.popover](overlay/popover.md) | Anchored popover | done | any | Anchored overlay placement and lifecycle: flip and shift inside the window, dismiss on outside click, Escape and focus loss, Popup layer, focus scope |
-| [overlay.popup-panel](overlay/popup-panel.md) | Popup panel surface | done | luneterm | Shared popup surface: radius-8 fill and 1 px ring, colours passed by the caller (used by the drop-down list) |
 | [overlay.toast-notifications](overlay/toast-notifications.md) | Toasts and notification history | done | lunegit | Bottom-right toast stack (max 3, timed dismissal, loading and prompt toasts) and a 50-item notification history |
 | [overlay.tooltip](overlay/tooltip.md) | Tooltips | done | lunegit, wane | Hover tooltip: glass shell radius 8, padding 10 by 8, one 800 ms show delay, text or small rich content, also on disabled controls |
 

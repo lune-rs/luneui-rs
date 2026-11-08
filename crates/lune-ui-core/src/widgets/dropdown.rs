@@ -3,9 +3,9 @@
 
 use std::hash::Hash;
 
+use super::label;
 use super::popover::{PlaceAlign, PlaceRequest, Side, glass_panel, place};
 use super::scroll_area::{Bars, Extent, Reveal, ScrollOptions, Target, centre_target};
-use super::{label, popup_panel};
 use crate::access::{Action, Node, Role, State};
 use crate::icon;
 use crate::input::NamedKey;
@@ -41,31 +41,25 @@ pub fn row_rect(panel: Rect, i: usize) -> Rect {
     )
 }
 
-/// Draws the panel: the default surface, or the glass menu's (`glass`).
-fn paint_panel<H: Copy + PartialEq>(p: &mut Painter<'_, H>, panel: Rect, glass: bool) {
-    if glass {
-        glass_panel(p, panel);
-    } else {
-        let t = p.theme;
-        popup_panel(p, panel, t.dropdown_bg, t.border);
-    }
-}
-
-/// Draws the rows of a list whose panel is `panel`.
+/// Draws the rows of a list whose panel is `panel`, with the menu's row look: radius 4,
+/// `menu_item_hover` on a hot row, `menu_item_pressed` on the one `pressed` names.
 fn paint_rows<H: Copy + PartialEq, S: AsRef<str>>(
     p: &mut Painter<'_, H>,
     panel: Rect,
     options: &[(S, bool)],
     selected: usize,
     hot: &[bool],
+    pressed: Option<usize>,
 ) {
     let t = p.theme;
     for (i, (text, enabled)) in options.iter().enumerate() {
         let r = row_rect(panel, i);
-        if i == selected {
+        if *enabled && pressed == Some(i) {
+            p.fill(r, 4.0, t.menu_item_pressed);
+        } else if i == selected {
             p.fill(r, 4.0, t.surface_selected);
         } else if *enabled && hot.get(i).copied().unwrap_or(false) {
-            p.fill(r, 4.0, t.surface_hover);
+            p.fill(r, 4.0, t.menu_item_hover);
         }
         let color = if *enabled {
             t.fg_primary
@@ -89,8 +83,8 @@ pub fn paint<H: Copy + PartialEq, S: AsRef<str>>(
     selected: usize,
     hot: &[bool],
 ) {
-    paint_panel(p, panel, false);
-    paint_rows(p, panel, options, selected, hot);
+    glass_panel(p, panel);
+    paint_rows(p, panel, options, selected, hot, None);
 }
 
 /// A list of options under (or, near the window's bottom edge, over) `anchor`. `options` pairs
@@ -167,9 +161,6 @@ fn step(options: &[bool], from: usize, down: bool) -> usize {
 /// How [`Ui::dropdown_with`] differs from [`Ui::dropdown`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct DropdownOptions {
-    /// The panel is the glass menu's surface (radius 9, `menu_glass`, the blurred scene under it)
-    /// instead of the opaque `dropdown_bg`.
-    pub glass: bool,
     /// At most this many rows show (at least one); a longer list scrolls. `None` shows them all.
     pub max_rows: Option<usize>,
 }
@@ -199,7 +190,7 @@ impl<'a> Ui<'a> {
         )
     }
 
-    /// [`Self::dropdown`] with the glass surface and the row cap `opts` ask for. A list longer
+    /// [`Self::dropdown`] with the row cap `opts` asks for. A list longer
     /// than `max_rows` scrolls (the wheel, the thumb and the keys): it opens with the selected row
     /// in view, and a key that moves the highlight brings that row into view.
     pub fn dropdown_with<S: AsRef<str>>(
@@ -219,7 +210,6 @@ impl<'a> Ui<'a> {
         let panel = panel_rect(self.painter(), anchor, shown);
         let viewport = Rect::new(panel.x, panel.y + 4.0, panel.w, shown as f32 * ITEM_H);
         let scroll_key = id.with("scroll");
-        let glass = opts.glass;
         let name = self
             .previous_tree()
             .get(anchor_id)
@@ -243,7 +233,7 @@ impl<'a> Ui<'a> {
             |ui, _| {
                 // The list takes focus (and the keys); the rows are click targets above it.
                 let list = ui.interact(list_id, panel, Sense::CLICK_FOCUS);
-                paint_panel(ui.painter(), panel, glass);
+                glass_panel(ui.painter(), panel);
                 let rows_body = |ui: &mut Ui<'a>| {
                     let enabled: Vec<bool> = options.iter().map(|(_, e)| *e).collect();
                     let mut rows = Vec::with_capacity(n);
@@ -262,6 +252,9 @@ impl<'a> Ui<'a> {
                     let clicked = rows
                         .iter()
                         .position(|r| r.as_ref().is_some_and(|r| r.clicked));
+                    let pressed = rows
+                        .iter()
+                        .position(|r| r.as_ref().is_some_and(|r| r.pressed));
                     // Taken in a disabled scope too, so no shortcut gets them; they pick nothing.
                     let down = ui.activation_keys(list_id, list.enabled, &[NamedKey::ArrowDown]);
                     let up = ui.activation_keys(list_id, list.enabled, &[NamedKey::ArrowUp]);
@@ -288,7 +281,7 @@ impl<'a> Ui<'a> {
                         ui.scroll_to(scroll_key, target, Reveal::Nearest);
                     }
                     let hot: Vec<bool> = (0..n).map(|i| i == row).collect();
-                    paint_rows(ui.painter(), panel, options, selected, &hot);
+                    paint_rows(ui.painter(), panel, options, selected, &hot, pressed);
                     for (i, (text, on)) in options.iter().enumerate() {
                         let mut node = Node::new(
                             list_id.with(i.to_string()),

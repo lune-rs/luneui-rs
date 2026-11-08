@@ -1,5 +1,6 @@
 //! The tree view (`layout.tree-view`, D151): the app's pre-order rows with depths, a keyboard
-//! cursor, single selection, guide lines and one block of rows in expand motion, on a
+//! cursor, single selection, guide lines, a disclosure mark and one block of rows in expand
+//! motion, on a
 //! [`scroll area`](super::scroll_area) that knows the whole extent.
 //!
 //! State is sets of keys ([`TreeState`], persistent), so expansion and selection outlive a rebuilt
@@ -20,6 +21,14 @@
 //! below sit at a closed-form distance, and the extent follows. When the block settles it stops
 //! existing, so the frame after is the frame of the same state with no motion. Under a tier with
 //! no expand motion it never exists.
+//!
+//! The disclosure mark (a solid triangle, or a thin chevron: [`ChevronStyle`]) is drawn by the
+//! tree, not as a glyph, and turns about its centre from 0 deg (closed, pointing right) to 90 deg
+//! (open, pointing down). Its angle is the block's own fraction, so it lands with the rows and
+//! needs no second animation: with no block (Reduced, Off, an app change of several rows) it is
+//! exactly 0 or 90 deg and nothing is rotated. A press changes `expanded` after the walk, so the
+//! mark turns from the next frame with the block. The guides ([`GuideStyle`]) are quiet
+//! (`Theme::tree_guide`); `OnHover` fades them in while the pointer is over the tree.
 
 use std::collections::BTreeSet;
 use std::hash::Hash;
@@ -45,17 +54,30 @@ pub const ROW_RADIUS: f32 = 6.0;
 pub const PAD_LEFT: f32 = 8.0;
 /// The indent of one depth.
 pub const INDENT: f32 = 16.0;
-/// The chevron slot, present on every row when any row has children; also the glyph's size.
+/// The mark's slot, present on every row when any row has children; also a glyph's size.
 pub const CHEVRON: f32 = 14.0;
 /// The space after the chevron slot, and after a glyph.
 pub const CHEVRON_GAP: f32 = 4.0;
 pub const GLYPH_GAP: f32 = 6.0;
-/// Where a guide column's line sits inside its indent.
-pub const COLUMN_CENTRE: f32 = 8.0;
+/// Where a guide column's line sits inside its indent: under the centre of the mark slot of the
+/// row it comes from, so a line drops from the middle of its parent's triangle or chevron.
+pub const COLUMN_CENTRE: f32 = PAD_LEFT + CHEVRON / 2.0;
+/// The space between the end of a short elbow stub and the row's content ([`GuideStub::Short`]).
+pub const STUB_GAP: f32 = 1.0;
+/// The space between the end of a long stub and the label it points at ([`GuideStub::Label`]).
+pub const LABEL_GAP: f32 = 4.0;
 /// The guide's width.
 pub const GUIDE_WIDTH: f32 = 1.0;
 /// The elbow's corner radius.
 pub const ELBOW_RADIUS: f32 = 3.5;
+/// The triangle's ink box when closed (pointing right): width, height.
+pub const TRIANGLE: (f32, f32) = (5.5, 7.5);
+/// The chevron's arm when closed: half its width and half its height, to the stroke's centre line.
+pub const CHEVRON_ARM: (f32, f32) = (2.5, 4.0);
+/// The chevron's stroke width.
+pub const CHEVRON_STROKE: f32 = 1.25;
+/// How far below the row's centre the mark's centre sits: the label's x-height centre line.
+pub const MARK_DROP: f32 = 1.25;
 /// The child block's clip height: `expand` kind, `base`, `sine-in-out`, snapped in Reduced.
 pub const EXPAND: Motion = Motion::of(Kind::Expand);
 
@@ -65,6 +87,13 @@ const ELBOW_STEPS: usize = 6;
 const AREA: &str = "area";
 /// The expand motion's key, under the tree's id.
 const MOTION: &str = "expand";
+/// The `OnHover` guides' fade key, under the tree's id.
+const FADE: &str = "guides";
+/// The `OnHover` guides' fade in and out: `hover` kind, instant, linear; Reduced keeps the fade
+/// and Off snaps (`docs/motion.md`, "tree guide fade").
+pub const GUIDE_FADE: Motion = Motion::of(Kind::Hover);
+/// The `Chevron` mark's brightening on row hover: the same `hover` kind.
+pub const MARK_HOVER: Motion = Motion::of(Kind::Hover);
 
 /// One row, in pre-order: a row's children follow it, each one depth deeper.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -81,6 +110,40 @@ pub struct TreeRow<'a> {
     pub has_children: bool,
 }
 
+/// How the guide lines of the rows are drawn.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum GuideStyle {
+    /// A trunk through each ancestor's column and a rounded elbow into the row.
+    #[default]
+    Elbow,
+    /// One faint vertical line per depth, whether or not the ancestor is the last child.
+    Straight,
+    /// The elbow lines, at an opacity that fades in while the pointer is over the tree.
+    OnHover,
+}
+
+/// How far an elbow's stub reaches into a row with no mark of its own, in a tree that keeps a
+/// mark slot on every row. A row with a mark always stops its stub before the mark's slot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum GuideStub {
+    /// Across the empty mark slot, to [`LABEL_GAP`] before the glyph or text, so the line
+    /// points at the label.
+    #[default]
+    Label,
+    /// To [`STUB_GAP`] before the mark slot, as on a row with a mark; the empty slot stays bare.
+    Short,
+}
+
+/// How the disclosure mark of a row with children is drawn.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ChevronStyle {
+    /// A small solid triangle, as a file manager's list view.
+    #[default]
+    Triangle,
+    /// A thin `>` stroke, brighter while the row is hovered.
+    Chevron,
+}
+
 /// What a tree is given besides its rect.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TreeOptions<'a> {
@@ -88,8 +151,15 @@ pub struct TreeOptions<'a> {
     pub rows: &'a [TreeRow<'a>],
     /// The tree's accessible name.
     pub label: &'a str,
-    /// Draw the guide lines.
+    /// Draw the guide lines; off wins over `guide_style`.
     pub guides: bool,
+    /// How the guide lines look.
+    pub guide_style: GuideStyle,
+    /// How the disclosure mark looks.
+    pub chevron: ChevronStyle,
+    /// How far the elbow's stub reaches into a row with no mark ([`GuideStyle::Elbow`] and
+    /// [`GuideStyle::OnHover`]; `Straight` has no stub).
+    pub stub: GuideStub,
     /// A press anywhere on a row with children toggles it, not only on its chevron.
     pub toggle_on_row: bool,
 }
@@ -163,8 +233,13 @@ impl TreeState {
 /// height line per column in `ancestors` (column `k` is the line of the rows at depth `k + 1`),
 /// then the row's own. Not last: a trunk through the row and a branch off it. Last: one line that
 /// turns into the stub. A row at depth 0 has no guide of its own.
-pub fn guide_paths(depth: u16, last: bool, ancestors: &[u16], height: f32) -> Vec<Vec<[f32; 2]>> {
-    let column = |k: u16| (f32::from(k) * INDENT + COLUMN_CENTRE).floor() + 0.5;
+pub fn guide_paths(
+    depth: u16,
+    last: bool,
+    ancestors: &[u16],
+    height: f32,
+    stub: f32,
+) -> Vec<Vec<[f32; 2]>> {
     let mut paths: Vec<Vec<[f32; 2]>> = ancestors
         .iter()
         .map(|k| vec![[column(*k), 0.0], [column(*k), height]])
@@ -173,7 +248,6 @@ pub fn guide_paths(depth: u16, last: bool, ancestors: &[u16], height: f32) -> Ve
         return paths;
     }
     let x = column(depth - 1);
-    let stub = f32::from(depth) * INDENT;
     let cy = height / 2.0;
     let r = elbow_radius(x, stub, cy);
     let mut branch: Vec<[f32; 2]> = (0..=ELBOW_STEPS)
@@ -187,6 +261,34 @@ pub fn guide_paths(depth: u16, last: bool, ancestors: &[u16], height: f32) -> Ve
     }
     paths.push(branch);
     paths
+}
+
+/// The lines of one row's guide in [`GuideStyle::Straight`]: a full height vertical line in the
+/// column of every depth above the row's own (column `k` is the line of the rows at depth
+/// `k + 1`, as in [`guide_paths`]). A row at depth 0 has none.
+pub fn straight_paths(depth: u16, height: f32) -> Vec<Vec<[f32; 2]>> {
+    (0..depth)
+        .map(|k| vec![[column(k), 0.0], [column(k), height]])
+        .collect()
+}
+
+/// Where the elbow's stub of a row at `depth` ends, from the row's left edge. `bare` is a row
+/// with no mark in a tree that keeps a mark slot: [`GuideStub::Label`] carries its stub across
+/// the empty slot to [`LABEL_GAP`] before the label; otherwise it ends [`STUB_GAP`] before the
+/// row's content.
+pub fn stub_end(depth: u16, bare: bool, stub: GuideStub) -> f32 {
+    if bare && stub == GuideStub::Label {
+        content_x(depth) + CHEVRON + CHEVRON_GAP - LABEL_GAP
+    } else {
+        content_x(depth) - STUB_GAP
+    }
+}
+
+/// The x of guide column `k`, from the row's left edge: the centre of the mark slot at depth `k`,
+/// snapped to a pixel's centre so the 1 px line is crisp. The mark of a row at depth `k` is
+/// centred here too, so the line meets its tip.
+pub fn column(k: u16) -> f32 {
+    (f32::from(k) * INDENT + COLUMN_CENTRE).floor() + 0.5
 }
 
 fn elbow_radius(x: f32, stub: f32, cy: f32) -> f32 {
@@ -212,19 +314,39 @@ fn clear_of_trunk(branch: &[[f32; 2]], x: f32) -> Vec<[f32; 2]> {
     out
 }
 
-/// Draws the guide of a row in `slot`. The stroke has square ends, so the stub's free end gets its
+/// How a row's guide is drawn: the lines' shape and their colour (the opacity of a fade is in it).
+#[derive(Debug, Clone, Copy)]
+struct GuideLook {
+    straight: bool,
+    color: Rgba,
+    /// The stub's reach, and whether the tree keeps a mark slot on every row.
+    stub: GuideStub,
+    slot: bool,
+}
+
+/// Draws the guide of a row in `slot`. The stroke has square ends, so the elbow's stub gets its
 /// round cap as a half disc past it.
 fn paint_guide<H: Copy + PartialEq>(
     p: &mut Painter<'_, H>,
     slot: Rect,
-    depth: u16,
+    row: &TreeRow<'_>,
     guide: &RowGuide,
+    look: GuideLook,
 ) {
-    let color = p.theme.border;
+    let depth = row.depth;
+    let color = look.color;
     let style = StrokeStyle::solid(color, GUIDE_WIDTH);
-    let paths = guide_paths(depth, guide.last, &guide.ancestors, slot.h);
-    let own_branch = (depth > 0 && !guide.last).then(|| paths.len() - 1);
     let at = |q: &[f32; 2]| [slot.x + q[0], slot.y + q[1]];
+    if look.straight {
+        for path in straight_paths(depth, slot.h) {
+            let pts: Vec<[f32; 2]> = path.iter().map(at).collect();
+            p.stroke(&pts, false, style);
+        }
+        return;
+    }
+    let stub = stub_end(depth, look.slot && !row.has_children, look.stub);
+    let paths = guide_paths(depth, guide.last, &guide.ancestors, slot.h, stub);
+    let own_branch = (depth > 0 && !guide.last).then(|| paths.len() - 1);
     for (i, path) in paths.iter().enumerate() {
         let path = if own_branch == Some(i) {
             clear_of_trunk(path, path[0][0])
@@ -236,9 +358,53 @@ fn paint_guide<H: Copy + PartialEq>(
     }
     if depth > 0 {
         let half = GUIDE_WIDTH / 2.0;
-        let (x, y) = (slot.x + f32::from(depth) * INDENT, slot.y + slot.h / 2.0);
+        let (x, y) = (slot.x + stub, slot.y + slot.h / 2.0);
         let cap = Rect::new(x, y - half, half, GUIDE_WIDTH);
         p.fill_radii(cap, [0.0, half, half, 0.0], color);
+    }
+}
+
+/// `pts`, offsets from a centre, turned `turn` of a quarter turn clockwise (0 closed, 1 open). The
+/// two ends are exact, with no trigonometry: a settled mark is never a rotated one.
+fn turned(pts: &[[f32; 2]], turn: f32) -> Vec<[f32; 2]> {
+    if turn <= 0.0 {
+        return pts.to_vec();
+    }
+    if turn >= 1.0 {
+        return pts.iter().map(|q| [-q[1], q[0]]).collect();
+    }
+    let (sin, cos) = (turn * std::f32::consts::FRAC_PI_2).sin_cos();
+    pts.iter()
+        .map(|q| [q[0] * cos - q[1] * sin, q[0] * sin + q[1] * cos])
+        .collect()
+}
+
+/// The disclosure mark of a row with children, centred in the slot at `centre`: a solid triangle
+/// or a thin chevron, pointing right at `turn` 0 and down at 1.
+fn paint_mark<H: Copy + PartialEq>(
+    p: &mut Painter<'_, H>,
+    centre: [f32; 2],
+    style: ChevronStyle,
+    turn: f32,
+    color: Rgba,
+) {
+    let at = |pts: Vec<[f32; 2]>| -> Vec<[f32; 2]> {
+        pts.iter()
+            .map(|q| [centre[0] + q[0], centre[1] + q[1]])
+            .collect()
+    };
+    match style {
+        ChevronStyle::Triangle => {
+            let (w, h) = (TRIANGLE.0 / 2.0, TRIANGLE.1 / 2.0);
+            let pts = [[-w, -h], [w, 0.0], [-w, h]];
+            p.fill_path(&at(turned(&pts, turn)), color);
+        }
+        ChevronStyle::Chevron => {
+            let (w, h) = CHEVRON_ARM;
+            let pts = [[-w, -h], [w, 0.0], [-w, h]];
+            let stroke = StrokeStyle::solid(color, CHEVRON_STROKE);
+            p.stroke(&at(turned(&pts, turn)), false, stroke);
+        }
     }
 }
 
@@ -251,13 +417,16 @@ fn content_x(depth: u16) -> f32 {
 #[derive(Debug, Clone, Copy)]
 struct RowLook<'a> {
     row: &'a TreeRow<'a>,
-    /// The tree has a chevron slot.
+    /// The tree has a mark slot.
     slot: bool,
-    open: bool,
+    /// How far the mark has turned, 0 closed to 1 open.
+    turn: f32,
+    /// The mark's style and colour.
+    mark: (ChevronStyle, Rgba),
     selected: bool,
 }
 
-/// Draws the chevron, the glyph and the text of a row in `slot`, the text cut to fit.
+/// Draws the mark, the glyph and the text of a row in `slot`, the text cut to fit.
 fn paint_content<H: Copy + PartialEq>(
     p: &mut Painter<'_, H>,
     theme: &Theme,
@@ -267,13 +436,11 @@ fn paint_content<H: Copy + PartialEq>(
     let mut x = slot.x + content_x(look.row.depth);
     if look.slot {
         if look.row.has_children {
-            let glyph = if look.open {
-                icon::CHEVRON_DOWN
-            } else {
-                icon::CHEVRON_RIGHT
-            };
-            let spec = icon::glyph(glyph, CHEVRON, theme.fg_tertiary);
-            p.text_centered(&spec, Rect::new(x, slot.y, CHEVRON, slot.h));
+            let centre = [
+                slot.x + column(look.row.depth),
+                slot.y + slot.h / 2.0 + MARK_DROP,
+            ];
+            paint_mark(p, centre, look.mark.0, look.turn, look.mark.1);
         }
         x += CHEVRON + CHEVRON_GAP;
     }
@@ -649,6 +816,8 @@ struct Frame<'r, 'a> {
     id: WidgetId,
     rect: Rect,
     opts: &'r TreeOptions<'a>,
+    /// How much of the guides' colour shows: 1, or the `OnHover` fade.
+    fade: f32,
 }
 
 impl<'r, 'a> Frame<'r, 'a> {
@@ -685,7 +854,13 @@ impl Ui<'_> {
         cells: &mut dyn FnMut(&mut Self, &TreeRowCtx),
     ) -> TreeResponse {
         let id = self.scope_id();
-        let frame = Frame { id, rect, opts };
+        let fade = self.guide_fade(id, rect, opts);
+        let frame = Frame {
+            id,
+            rect,
+            opts,
+            fade,
+        };
         let mut mem = std::mem::take(self.persistent::<TreeMem>(id));
         let mut st = std::mem::take(self.persistent::<TreeState>(id));
         let mut out = Outcome::default();
@@ -733,6 +908,18 @@ impl Ui<'_> {
             toggled: out.toggled,
             context: out.context,
         }
+    }
+
+    /// How much of the guides' colour shows this frame: 1, except in `OnHover`, where it follows
+    /// the pointer over the tree's rect (the rows are inside it) and is read against the last
+    /// frame's regions. A disabled tree has no pointer.
+    fn guide_fade(&mut self, id: WidgetId, rect: Rect, opts: &TreeOptions<'_>) -> f32 {
+        if opts.guide_style != GuideStyle::OnHover || !opts.guides {
+            return 1.0;
+        }
+        let over = self.is_enabled() && self.pointer_in(rect);
+        let target = if over { 1.0 } else { 0.0 };
+        self.animate_f32(id.with(FADE), target, &GUIDE_FADE)
     }
 
     /// The walk: reads what changed in `expanded` since the last one, decides the block's fate and
@@ -979,11 +1166,32 @@ impl Ui<'_> {
         let ring = ring && focused == Some(id);
         let theme = *self.theme();
         let any_children = rows.iter().any(|r| r.has_children);
-        let guides = if f.opts.guides {
+        let guides = if f.opts.guides && f.fade > 0.0 {
             lay.guides(rows, &view)
         } else {
             Vec::new()
         };
+        let guide_look = GuideLook {
+            straight: f.opts.guide_style == GuideStyle::Straight,
+            color: {
+                let mut c = theme.tree_guide;
+                c[3] = (f32::from(c[3]) * f.fade.clamp(0.0, 1.0)).round() as u8;
+                c
+            },
+            stub: f.opts.stub,
+            slot: any_children,
+        };
+        // The mark's turn: the block's own fraction on its row, else the state the last walk saw
+        // (a press changes `expanded` after the walk, so its mark turns from the next frame, with
+        // its block).
+        let turn_of = |index: usize, key: u64| -> f32 {
+            match lay.moving {
+                Some(m) if lay.shown[m.at] == index => m.f as f32,
+                _ if mem.seen.as_ref().is_some_and(|s| s.contains(&key)) => 1.0,
+                _ => 0.0,
+            }
+        };
+        let style = f.opts.chevron;
         let mut built = Vec::with_capacity(slots.len());
         for (n, index, row_id, slot, hovered) in slots {
             let key = rows[index].key;
@@ -1014,7 +1222,8 @@ impl Ui<'_> {
                 let l = RowLook {
                     row,
                     slot: any_children,
-                    open: row.has_children && st.expanded.contains(&row.key),
+                    turn: turn_of(lay.shown[v.at], row.key),
+                    mark: (style, theme.fg_tertiary),
                     selected: st.selected.contains(&row.key),
                 };
                 if l.selected {
@@ -1022,7 +1231,7 @@ impl Ui<'_> {
                         .fill(slot, ROW_RADIUS, row_fill(&theme, false, true));
                 }
                 if let Some(g) = guides.get(n) {
-                    paint_guide(self.painter(), slot, row.depth, g);
+                    paint_guide(self.painter(), slot, row, g, guide_look);
                 }
                 paint_content(self.painter(), &theme, slot, &l);
             }
@@ -1048,12 +1257,26 @@ impl Ui<'_> {
                 self.painter().fill(b.slot, ROW_RADIUS, fill);
             }
             if let Some(g) = guides.get(b.view) {
-                paint_guide(self.painter(), b.slot, row.depth, g);
+                paint_guide(self.painter(), b.slot, row, g, guide_look);
+            }
+            let mut mark = theme.fg_tertiary;
+            if style == ChevronStyle::Chevron && row.has_children {
+                let target = if b.hovered {
+                    theme.fg_secondary
+                } else {
+                    theme.fg_tertiary
+                };
+                mark = if still {
+                    self.animate_color(b.id.with("mark"), target, &MARK_HOVER)
+                } else {
+                    target
+                };
             }
             let l = RowLook {
                 row,
                 slot: any_children,
-                open: b.open,
+                turn: turn_of(b.index, row.key),
+                mark: (style, mark),
                 selected: b.selected,
             };
             paint_content(self.painter(), &theme, b.slot, &l);
@@ -1086,10 +1309,7 @@ impl Ui<'_> {
             };
             self.node_container(node, |ui| ui.scope(row.key, |ui| cells(ui, &ctx)));
             if b.cursor && ring {
-                let kind = RingKind::Edge {
-                    radius: ROW_RADIUS,
-                    on_accent: false,
-                };
+                let kind = RingKind::Edge { radius: ROW_RADIUS };
                 focus_ring::paint(self.painter(), b.slot, kind, 1.0);
             }
         }

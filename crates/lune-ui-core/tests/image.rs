@@ -251,7 +251,7 @@ fn bad_images_draw_nothing() {
         (0.0, 0.0),
         f32::NAN,
     );
-    assert!(p.scene.layers.iter().all(|l| l.images.is_empty()));
+    assert!(p.scene.in_order().into_iter().all(|l| l.images.is_empty()));
     // An alpha above 1 is clamped, not refused.
     p.image(ok, id, f, a, 7.0);
     assert_eq!(p.scene.layers[0].images[0].alpha, 1.0);
@@ -299,6 +299,7 @@ fn images_draw_after_customs_and_before_text() {
         scale: 1.0,
         blur_sigma: 4.0,
         saturation: 1.0,
+        ..FrameParams::default()
     };
     let mut rec = RecordingRenderer::new();
     rec.render(&p.scene, &params);

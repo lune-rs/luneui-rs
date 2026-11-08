@@ -52,12 +52,12 @@ C4-only rule [core.ui].
 ### Anatomy
 
 - Focus identity: the focused `WidgetId` of the window, held in the retained store; `ui.interact(id, rect, Sense::focusable)` registers a tab stop in call order [core.ui].
-- Tab order: Tab moves to the next tab stop in call order within the current focus scope, Shift+Tab to the previous; the order wraps inside a scope [derived: C4 "Tab order follows call order within the current focus scope"; the wrap follows Lunegit's `Cycle` on the dialog card, `src/Lunegit.Desktop/MainWindow.axaml:249`].
+- Tab order: Tab moves to the next tab stop in call order within the current focus scope (ascending `Ui::tab_scope` order first, call order among stops of one order, D267), Shift+Tab to the previous; the order wraps inside a scope [derived: C4 "Tab order follows call order within the current focus scope"; the wrap follows Lunegit's `Cycle` on the dialog card, `src/Lunegit.Desktop/MainWindow.axaml:249`].
 - Focus scopes: a stack. The base scope is the window; an overlay pushes a scope on open. A modal scope traps Tab: it cycles inside the overlay and never reaches a lower layer [derived: C4], [L src/Lunegit.Desktop/MainWindow.axaml:249], [W docs/ui/components.md:563].
 - Initial focus on open: the overlay names the widget to focus (a text field for a search or form dialog), else its first tab stop; Lunegit focuses the first text box when a dialog attaches [L src/Lunegit.Desktop/Views/Dialogs/GlobalSearchDialogView.axaml.cs:15-16], [L src/Lunegit.Desktop/Views/Dialogs/AddWorktreeDialogView.axaml.cs:19].
 - Restore on close: popping the scope returns focus to the widget focused before the overlay opened, or to the overlay's anchor widget when that is gone [core.ui]. Scopes are a stack ([D83]): closing an overlay whose scope is not the active one (focus is in a later overlay still open) moves no focus, a later overlay whose saved focus was inside the closing one inherits the closing one's saved focus, and a restore never lands under an open modal. A passive overlay with no stop leaves focus where it is on open ([D82]).
 - Focus-visible: the ring shows after keyboard navigation (Tab, Shift+Tab, arrow keys, a key press on the widget) and hides after a pointer press; Wane styles the ring on `:focus-visible` [W docs/ui/mocks/css/components.css:125,174,197]. A text input shows its focus as an accent border at all times (focus-within) [W docs/ui/mocks/css/components.css:234,290], matching the moved field and combo [R crates/lune-ui-core/src/widgets/input_box.rs:29-34].
-- Ring look: button and ghost button: 1 px `fg_secondary` outline, offset -1 (inset); primary button: outline `on_accent_text`; toggle, checkbox and radio: 1 px `fg_secondary` outline at offset 2; fields, steppers and the open combo: border `accent` [W docs/ui/mocks/css/components.css:125,130,174,197-198,234,290,312], theme fields [R crates/lune-ui-core/src/theme.rs:13,20-25].
+- Ring look: button and ghost button: 1 px `fg_secondary` outline, offset -1 (inset); the primary button's is the same (D269); toggle, checkbox and radio: 1 px `fg_secondary` outline at offset 2; fields, steppers and the open combo: border `accent` [W docs/ui/mocks/css/components.css:125,130,174,197-198,234,290,312], theme fields [R crates/lune-ui-core/src/theme.rs:13,20-25].
 - Pointer: a press on a focusable widget focuses it; a press on a non-focusable widget leaves focus alone; clicking a form label focuses its control [W docs/ui/components.md:451].
 - Keys: routed to the focused widget; keys it does not consume go to the shortcut registry; Tab and Shift+Tab are consumed here unless the focused widget keeps Tab as text (a code editor) [infra.shortcut-routing], [derived: no source says whether a text field keeps Tab; Wane lists Tab among its behaviours, docs/ui/components.md:353 is not a ruling].
 - Activation keys: Enter and Space activate a button; Space toggles a toggle and a checkbox; Enter, Space and Down open a combo, Esc closes it; Up, Down and Enter pick in a dropdown [W docs/ui/components.md:297,311,325,381,535].
@@ -73,10 +73,10 @@ C4-only rule [core.ui].
 |---|---|---|
 | not focused | no ring | [core.focus] |
 | focused by pointer | no ring on buttons, toggles, checkboxes and radios; accent border on text inputs | [W docs/ui/mocks/css/components.css:125,234] |
-| focus-visible | 1 px `fg_secondary` outline (inset on buttons, offset 2 on toggles, checkboxes, radios); `on_accent_text` on a primary button | [W docs/ui/mocks/css/components.css:125,130,174,197-198] |
+| focus-visible | 1 px `fg_secondary` outline (inset on buttons, offset 2 on toggles, checkboxes, radios) | [W docs/ui/mocks/css/components.css:125,130,174,197-198] |
 | focus-within (text input) | border `accent` | [W docs/ui/mocks/css/components.css:234,290,312] |
 | scope trapped | Tab cycles inside the modal; lower layers show no focus | [L src/Lunegit.Desktop/MainWindow.axaml:249] |
-| disabled | not a tab stop, no ring | [W docs/ui/components.md:295,297] |
+| disabled | not a tab stop, no ring: a focused widget that turns disabled reports no focus and no ring the next frame (scene `tree-view-disabled`, test `a_focused_widget_that_turns_disabled_shows_no_ring_the_next_frame`) | [W docs/ui/components.md:295,297] |
 
 ### Transitions
 

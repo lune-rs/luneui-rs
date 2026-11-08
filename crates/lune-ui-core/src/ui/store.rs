@@ -43,6 +43,9 @@ pub struct UiStore {
     pub(crate) persistent: BTreeMap<(WidgetId, TypeId), Entry>,
     /// Keep-alive scopes the app opened and has not ended (D6).
     pub(crate) live_scopes: BTreeSet<WidgetId>,
+    /// Scopes a widget holds for this frame only (a list's focused row): it renews them each frame
+    /// it draws, `begin` clears them, so one that stops drawing lets go on the next frame.
+    pub(crate) held_scopes: BTreeSet<WidgetId>,
     pub(crate) anim_f32: BTreeMap<WidgetId, Anim<f32>>,
     pub(crate) anim_color: BTreeMap<WidgetId, Anim<[f32; 4]>>,
     /// The tier of the previous frame, `None` before the first.
@@ -76,6 +79,7 @@ impl std::fmt::Debug for UiStore {
             .field("transient", &self.transient.len())
             .field("persistent", &self.persistent.len())
             .field("live_scopes", &self.live_scopes)
+            .field("held_scopes", &self.held_scopes)
             .field("animations", &(self.anim_f32.len() + self.anim_color.len()))
             .field("overlays", &self.overlays)
             .field("focus", &self.focus)
@@ -114,9 +118,10 @@ impl UiStore {
     /// persistent entries unless a live keep-alive scope is on their chain.
     pub(crate) fn collect(&mut self, frame: u64) {
         self.transient.retain(|_, e| e.used == frame);
-        let live = &self.live_scopes;
-        self.persistent
-            .retain(|_, e| e.used == frame || e.chain.iter().any(|s| live.contains(s)));
+        let (live, held) = (&self.live_scopes, &self.held_scopes);
+        self.persistent.retain(|_, e| {
+            e.used == frame || e.chain.iter().any(|s| live.contains(s) || held.contains(s))
+        });
         self.anim_f32.retain(|_, a| a.used == frame);
         self.anim_color.retain(|_, a| a.used == frame);
     }

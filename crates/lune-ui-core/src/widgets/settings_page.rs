@@ -1,9 +1,9 @@
 //! The settings page frame (`layout.settings-page`, D152): glass with a top-left radius, a 20 px
 //! content host that scrolls, and a restart banner docked below it.
 //!
-//! [`Ui::settings_page`] draws the glass over the rect it is given (the app's glass layer while the
-//! window is active, the theme's `window_fallback` fill when it is not, both with the corner
-//! radius of 8 at the top left only: D128, the widget names no preset), then runs `content` once
+//! [`Ui::settings_page`] draws the glass over the rect it is given (the app's glass layer, whatever the
+//! window's state, with the corner radius of 8 at the top left only: R13, the widget names no
+//! preset), then runs `content` once
 //! in the host: a vertical [`scroll_area`](super::scroll_area) inset [`HOST_PAD`] from the page's
 //! left, top and right, and from the banner (or the page's bottom) below. `content` draws in the
 //! viewport's rect and returns its height. The rows are [`Ui::setting_row`]; the section nav is the
@@ -25,7 +25,7 @@ use std::hash::Hash;
 
 use crate::access::{Action, Live, Node, Role, State};
 use crate::backdrop::GlassLayer;
-use crate::color::Rgba;
+use crate::color::clear;
 use crate::icon;
 use crate::input::NamedKey;
 use crate::motion::{Easing, Kind, Motion, Reduce, Token};
@@ -68,9 +68,7 @@ pub const REVEAL: Motion = Motion {
 /// What [`Ui::settings_page`] is given besides its rect.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SettingsPage<'a> {
-    /// The window is active: the glass shows. Inactive, the solid fallback replaces it.
-    pub active: bool,
-    /// The glass layer drawn while active.
+    /// The glass layer the page draws.
     pub glass: GlassLayer,
     /// What the page is composed over (premultiplied); see
     /// [`ToolbarOptions::under`](super::toolbar::ToolbarOptions::under).
@@ -86,11 +84,6 @@ pub struct SettingsPage<'a> {
 pub struct SettingsResponse {
     /// The banner's action was pressed this frame.
     pub restart: bool,
-}
-
-/// `c` with alpha 0, so a fade keeps its hue.
-fn clear(c: Rgba) -> Rgba {
-    [c[0], c[1], c[2], 0]
 }
 
 /// What the pointer and keyboard are doing to the action.
@@ -118,11 +111,7 @@ impl Ui<'_> {
         let t = *self.theme();
         let radii = [RADIUS, 0.0, 0.0, 0.0];
         let p = self.painter();
-        if page.active {
-            p.acrylic_radii(rect, radii, page.glass.premultiplied(), page.under, true);
-        } else {
-            p.fill_radii(rect, radii, t.window_fallback);
-        }
+        p.acrylic_radii(rect, radii, page.glass.premultiplied(), page.under, true);
 
         // The reveal runs every frame so a hide has somewhere to start from; the banner is on
         // screen while it is set or still fading.
@@ -265,7 +254,6 @@ impl Ui<'_> {
             at,
             RingKind::Edge {
                 radius: ACTION_RADIUS,
-                on_accent: false,
             },
             ring,
         );

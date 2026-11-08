@@ -40,7 +40,7 @@ Conflicts: none (no Wane kanban; this repo has no board code).
 
 - Sizes (`kanban_board.rs` constants): margin 12, header 28 and gap 10; column 272 with 1 px border, gap 10, padding 10, header 24 and gap 8, card list at most 640; card 250 wide, title wraps at 228, padding 10, gap 6, radius 6, stack spacing 6; tag text 9, radius 4, padding 6,1, room 2 above and 4 right; icon buttons 24 square, radius 6 [L src/Lunegit.Desktop/Views/Scratchpad/ScratchpadBoardView.axaml:10-52,97-110,127-204,215-250]. SemiBold text is `.medium()`: the bundled faces are Regular and Medium.
 - A column hugs its cards up to 640 and the room left, then its list scrolls; every card keeps the gap under it. A card's footer row always has its place in the stack, so a card with no assignee and no note keeps the stack's 6 under its last row, as the source's empty dock does.
-- Frame: acrylic at radius 8 while the window is active [L src/Lunegit.Desktop/Views/Scratchpad/ScratchpadBoardView.axaml:61]; solid fallback while inactive [L src/Lunegit.Desktop/Views/Scratchpad/ScratchpadBoardView.axaml:71].
+- Frame: acrylic at radius 8, whatever the window's state [L src/Lunegit.Desktop/Views/Scratchpad/ScratchpadBoardView.axaml:61]; Lunegit's solid fallback while inactive [L src/Lunegit.Desktop/Views/Scratchpad/ScratchpadBoardView.axaml:71] is not ported (R13, D262).
 - Toolbar margin 12 [L src/Lunegit.Desktop/Views/Scratchpad/ScratchpadBoardView.axaml:97].
 - Columns: a horizontal scroll (auto horizontal, no vertical) of an items control of columns [L src/Lunegit.Desktop/Views/Scratchpad/ScratchpadBoardView.axaml:115-116].
 - Column header: title, card count, an add control (15 px glyph in the toolbar, 14 px in the column), and an ellipsis menu (14 px) for rename and delete [L src/Lunegit.Desktop/Views/Scratchpad/ScratchpadBoardView.axaml:104,133,156] [L src/Lunegit.Desktop/STRUCTURE.md:319].
@@ -56,11 +56,11 @@ Conflicts: none (no Wane kanban; this repo has no board code).
 | error (corrupt or newer board) | only the warning, title, message and raw path; any drag and landing end | [L src/Lunegit.Desktop/Views/Scratchpad/ScratchpadBoardView.axaml:75-93], [L src/Lunegit.Desktop/STRUCTURE.md:319], [D167] |
 | card hover | fill `surface_hover` | [L src/Lunegit.Desktop/Views/Scratchpad/ScratchpadBoardView.axaml:33-35] |
 | card pressed (drag candidate) | captured; drag starts at 4 px | [L src/Lunegit.Desktop/Views/Scratchpad/ScratchpadBoardView.axaml.cs:56] |
-| dragging | source in place at `DIM_ALPHA`; a ghost at the pointer, one layer group up, over an opaque `window_fallback`; target column `surface_hover`; `paint_drop_line` in the 6 px gap of the slot, nothing pushed aside | [D168] |
+| dragging | source in place at `DIM_ALPHA`; a ghost at the pointer, one layer group up, on glass (a blurred scene under it and `menu_glass` frosted over that), so text under it does not read through; target column `surface_hover`; `paint_drop_line` in the 6 px gap of the slot, nothing pushed aside | [D168] |
 | no target | pointer between or past the columns, or above or below the viewport: no fill, no line | [D168] |
 | landing | the ghost alone, on its way to the slot the model now gives the card; the body is back when it arrives | [D168] |
 | empty column | the hint, `fg_faint`, 2 and 6 from the list's top left | [L src/Lunegit.Desktop/Views/Scratchpad/ScratchpadBoardView.axaml:257-262] |
-| inactive window | solid `window_fallback` | [L src/Lunegit.Desktop/Views/Scratchpad/ScratchpadBoardView.axaml:71] |
+| inactive window | the same glass (no `active` option) | [D262] |
 | focus-visible | `RingKind::Edge` on the card at its radius; the ghost carries it while landing | [D169] |
 | disabled | drawn at 0.4; no drag, no key acts, no landing | [D140] |
 
@@ -117,7 +117,6 @@ Every way a card's position could jump is one path: an accepted drop, a refused 
 - `kanban-board-dragging` (new): one card dragged between columns with the drop slot shown, settled.
 - `kanban-board-error` (new): the corrupt-board error state, settled.
 - `kanban-board-focus` (new): the cards' stop with its ring, settled.
-- `kanban-board-inactive` (new): the fallback fill, settled.
 - `kanban-board-empty` (new): three empty columns with their hints, settled.
 - `kanban-board-disabled` (new): the board at 0.4 opacity after a drag attempt from the first card to the second column and a Tab: no ghost, no landing slot, no ring, the cards where they were, settled.
 - `kanban-board-settle-mid` (new): a card landing half way, in motion.

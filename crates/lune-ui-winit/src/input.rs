@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use winit::dpi::{LogicalPosition, LogicalSize, PhysicalSize};
+use winit::dpi::{PhysicalPosition, PhysicalSize};
 use winit::event::{ElementState, Ime, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::event_loop::ControlFlow;
 use winit::keyboard::{Key as WKey, ModifiersState, NamedKey as WNamed};
@@ -343,6 +343,18 @@ pub fn control_flow(repaint: Repaint, origin: Instant) -> (ControlFlow, bool) {
     }
 }
 
+/// The IME area `area`, which the frame measured in the units of the UI's own scale, as the window
+/// takes it: `(x, y, w, h)` in physical pixels, `area * ui_scale`. `None` when the area or the
+/// scale is not finite, or the scale is not above 0: nothing is sent for it.
+///
+/// The UI's scale is the display's scale times the page's zoom, so under a zoom the area is not
+/// in the window's own logical units; physical pixels are the one unit both agree on.
+pub fn ime_area_physical(area: Rect, ui_scale: f32) -> Option<(f32, f32, f32, f32)> {
+    let [x, y, w, h] = [area.x, area.y, area.w, area.h].map(|v| v * ui_scale);
+    let finite = [x, y, w, h].iter().all(|v| v.is_finite());
+    (finite && ui_scale > 0.0).then_some((x, y, w, h))
+}
+
 /// What [`OutputState::apply`] does with the IME for a frame.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ImePlan {
@@ -401,9 +413,10 @@ impl OutputState {
         self.ime_area = out.ime_area;
     }
 
-    /// Applies `out` to `window`. Returns true when the frame asked to close the window (the app
-    /// closes it).
-    pub fn apply(&mut self, window: &Window, out: &FrameOutput) -> bool {
+    /// Applies `out` to `window`. `ui_scale` is the scale the frame was laid out at (the display's
+    /// scale times the page's zoom): the IME area leaves in physical pixels, [`ime_area_physical`].
+    /// Returns true when the frame asked to close the window (the app closes it).
+    pub fn apply(&mut self, window: &Window, out: &FrameOutput, ui_scale: f32) -> bool {
         let plan = self.plan_output(out);
         if let Some(icon) = plan.cursor {
             window.set_cursor(cursor_icon(icon));
@@ -414,10 +427,10 @@ impl OutputState {
                 if enable {
                     window.set_ime_allowed(true);
                 }
-                window.set_ime_cursor_area(
-                    LogicalPosition::new(r.x, r.y),
-                    LogicalSize::new(r.w, r.h),
-                );
+                if let Some((x, y, w, h)) = ime_area_physical(r, ui_scale) {
+                    window
+                        .set_ime_cursor_area(PhysicalPosition::new(x, y), PhysicalSize::new(w, h));
+                }
             }
             ImePlan::Disable => window.set_ime_allowed(false),
         }

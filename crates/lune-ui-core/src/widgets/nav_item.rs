@@ -10,7 +10,7 @@ use std::hash::Hash;
 
 use super::focus_ring::{self, RingKind};
 use crate::access::{Action, Node, Role, State};
-use crate::color::Rgba;
+use crate::color::{Rgba, mix};
 use crate::icon;
 use crate::input::NamedKey;
 use crate::motion::{Kind, Motion};
@@ -81,16 +81,6 @@ pub struct NavLook {
     pub medium: bool,
     /// Focus ring opacity.
     pub focus: f32,
-}
-
-/// `a` to `b` by `t` (0 to 1), channel by channel; exactly `a` at 0 and `b` at 1.
-fn mix(a: Rgba, b: Rgba, t: f32) -> Rgba {
-    let t = t.clamp(0.0, 1.0);
-    let ch = |i: usize| {
-        let (x, y) = (f32::from(a[i]), f32::from(b[i]));
-        (x + (y - x) * t).round().clamp(0.0, 255.0) as u8
-    };
-    [ch(0), ch(1), ch(2), ch(3)]
 }
 
 impl NavLook {

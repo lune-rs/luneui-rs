@@ -1,6 +1,6 @@
 //! The blur lab: a glass panel over content that moves, so what the backdrop blur does to edges
 //! and colour is visible frame by frame. Sigma and saturation are the frame's, set in the
-//! settings pane. The lab owns the frame's one backdrop; the shell asks for none.
+//! settings pane. The lab owns the frame's backdrop; the shell asks for none.
 
 use std::time::Duration;
 
@@ -146,16 +146,16 @@ impl PageState for Blur {
         let panel = panel_in(area, pointer, self.panel);
         {
             let p = ui.painter();
-            stage.on(p, LayerId::Page);
+            p.on(LayerId::Page);
             content(p, area, self.phase, t.fg_primary, t.font_m);
             // The popup layer is the first above the scene layers: it blurs the page under it.
-            stage.on(p, LayerId::Popup);
+            p.on(LayerId::Popup);
             p.backdrop(stage.visible(panel), 9.0);
             p.fill(panel, 9.0, t.menu_glass);
             p.ring(panel, 9.0, 1.0, t.menu_popup_border, false);
             let label = Spec::plain("Backdrop blur", Style::ui(t.font_m, t.menu_text_primary));
             p.text_centered(&label, panel);
-            stage.on(p, LayerId::Base);
+            p.on(LayerId::Base);
         }
         caption(
             ui,
@@ -182,16 +182,12 @@ mod tests {
     use lune_ui::testing::FakeText;
 
     #[test]
-    fn the_panel_asks_for_the_frames_one_backdrop_over_the_page() {
+    fn the_panel_asks_for_a_backdrop_over_the_page() {
         let mut p = player("lab-blur", live());
         p.frame(&mut FakeText, 0, &[]).expect("frame");
         let (scene, out) = p.frame(&mut FakeText, 16, &[]).expect("frame");
-        let b = scene.backdrop.expect("a backdrop");
-        assert_eq!(
-            b.layer,
-            LayerId::Popup as usize,
-            "everything below is blurred"
-        );
+        // On Popup: everything below is blurred.
+        let b = scene.merged(LayerId::Popup).backdrops[0];
         // The region is the panel, inside the canvas.
         let (x, y, w, h) = (b.rect[0], b.rect[1], b.rect[2], b.rect[3]);
         assert!(

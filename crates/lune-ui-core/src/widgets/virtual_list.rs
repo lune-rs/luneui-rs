@@ -14,11 +14,15 @@
 //! Frame order: the keys move the cursor before anything draws, so the reveal request reaches the
 //! area this frame. Inside the area, every built row registers its region and takes its input, and
 //! only then do the rows draw: a click moves the selection of all rows in the same frame, and a
-//! child widget's region lands above its row's. A measured height takes effect on the next frame
-//! (one catch-up frame); a change above the first visible row shifts the offset by as much, so
-//! that row stays where it is on screen.
+//! child widget's region lands above its row's. A height measured for the first time takes effect
+//! on the next frame (one catch-up frame); a change above the first visible row shifts the offset
+//! by as much, so that row stays where it is on screen. A row's height follows the row, not its
+//! index: what each row measured is kept by its [`RowKey`], and before the rows are placed those
+//! in the window take the height they were measured at, so a sort or a replaced list places them
+//! as a settled frame does and asks for no catch-up for rows already seen. A row never measured
+//! stays on the estimate.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::hash::{Hash, Hasher};
 
 use crate::access::{Action, Node, Role, State};
@@ -324,6 +328,29 @@ impl RowHeights {
         }
     }
 
+    /// Rows `at..at + removed` give way to `added` rows not measured yet, and the rows after them
+    /// keep their heights: an edit of a document that inserts or deletes lines, so a measured
+    /// height follows its line. The tree is rebuilt from `at`, O(rows from `at`), on such an edit
+    /// only: nothing calls it per frame. A range past the end is cut at the end.
+    pub fn splice(&mut self, at: usize, removed: usize, added: usize) {
+        let at = at.min(self.count);
+        let removed = removed.min(self.count - at);
+        if removed == 0 && added == 0 {
+            return;
+        }
+        self.count = self.count - removed + added;
+        if !self.measured {
+            return;
+        }
+        let end = (at + removed).min(self.own.len());
+        self.own
+            .splice(at.min(end)..end, std::iter::repeat_n(0.0, added));
+        self.own.resize(self.count, 0.0);
+        // Node `i` sums rows below `i` only, so nodes up to `at` stand.
+        self.tree.truncate(at + 1);
+        self.grow_tree();
+    }
+
     /// Computes the tree's missing nodes: each adds its row's difference and the child nodes it
     /// covers, an amortised O(1) each.
     fn grow_tree(&mut self) {
@@ -506,6 +533,11 @@ struct ListMem {
     ended: f64,
     /// A height changed last frame, so this frame's rows move.
     relaid: bool,
+    /// The row the key focus is in (its key and last index), kept alive while it is out of view.
+    focus_row: Option<(RowKey, usize)>,
+    /// What each row measured, by its key, in `Measured` mode: a row's height follows the row, so
+    /// a sort or a replaced list places the rows it has seen at their own heights at once.
+    known: BTreeMap<RowKey, f32>,
     /// The content moved last frame: this frame's hover is still that movement's result.
     was_moved: bool,
     /// The row whose press this list already handled, until the release.
@@ -548,6 +580,54 @@ impl ListMem {
         self.relaid = false;
         self.was_moved = moved;
         still
+    }
+
+    /// Gives the rows in the window at `offset` the heights they were measured at, whatever index
+    /// they held then, so they are placed as a settled frame places them. Returns the change in
+    /// the height above the first row in view (the offset shifts by it) and in the whole, and
+    /// whether any row changed. A row never measured stays on the estimate.
+    fn apply_known(&mut self, rows: &Rows<'_>, offset: f64) -> (f64, f64, bool) {
+        if !self.heights.measured || self.known.is_empty() {
+            return (0.0, 0.0, false);
+        }
+        let viewport = f64::from(rows.rect.h);
+        let first = self.heights.row_at(offset);
+        let (mut above, mut total, mut any) = (0.0, 0.0, false);
+        // A change moves the window: until it stops, bounded by what a window can hold.
+        for _ in 0..4 {
+            let mut changed = false;
+            for index in self.heights.window(offset + above, viewport) {
+                let Some(&h) = self.known.get(&(rows.key)(index)) else {
+                    continue;
+                };
+                if self.heights.own.get(index) == Some(&h) {
+                    continue;
+                }
+                let change = self.heights.set(index, h);
+                changed = true;
+                any = true;
+                total += change;
+                if index < first {
+                    above += change;
+                }
+            }
+            if !changed {
+                break;
+            }
+        }
+        (above, total, any)
+    }
+
+    /// Remembers what row `key` measured; a table of a million rows keeps at most a few times
+    /// `count` of them.
+    fn remember(&mut self, key: RowKey, h: f32, count: usize) {
+        if !self.heights.measured || !h.is_finite() {
+            return;
+        }
+        if self.known.len() > 4 * count + 256 {
+            self.known.clear();
+        }
+        self.known.insert(key, h.max(MIN_ROW));
     }
 }
 
@@ -793,6 +873,46 @@ impl Ui<'_> {
         }
     }
 
+    /// Keeps the focused row alive while it is out of view and lets it go when the focus leaves it
+    /// or its row leaves the data (D23, D15). `found` is the built row that holds the focus now.
+    fn settle_row_focus(
+        &mut self,
+        mem: &mut ListMem,
+        rows: &Rows<'_>,
+        found: Option<(RowKey, usize)>,
+        built: &[RowKey],
+    ) {
+        let scope_of = |ui: &Self, key: RowKey| {
+            ui.id(RowScope {
+                epoch: mem.epoch,
+                key,
+            })
+        };
+        let Some((key, index)) = found else {
+            let Some((key, index)) = mem.focus_row else {
+                return;
+            };
+            let scope = scope_of(self, key);
+            // Built and not holding the focus: it left. Out of view: it stays while the focus is
+            // still in the row's scope and the row is still in the data.
+            let alive = !built.contains(&key)
+                && self.focus_within(scope)
+                && rows.locate(key, index).is_some();
+            if alive {
+                self.hold_focus_in(scope);
+            } else {
+                self.release_scope(scope);
+                mem.focus_row = None;
+            }
+            return;
+        };
+        if let Some((prev, _)) = mem.focus_row.filter(|(k, _)| *k != key) {
+            let scope = scope_of(self, prev);
+            self.release_scope(scope);
+        }
+        mem.focus_row = Some((key, index));
+    }
+
     /// One frame of the rows inside the area: registers them, applies their input, then draws.
     fn list_rows(
         &mut self,
@@ -804,8 +924,21 @@ impl Ui<'_> {
         out: &mut Outcome,
     ) -> Response {
         let (id, rect, style) = (rows.id, rows.rect, rows.style);
-        let (scroll_x, offset) = (view_offset.0 as f32, view_offset.1);
+        let (scroll_x, mut offset) = (view_offset.0 as f32, view_offset.1);
         let response = self.interact(id, rect, Sense::CLICK_FOCUS);
+        // Rows already measured take their own heights before anything is placed; one that moved
+        // the rows above the first in view moves the offset by as much, as a measure would.
+        let (above, total, relaid) = mem.apply_known(rows, offset);
+        if relaid {
+            mem.relaid = true;
+            if above != 0.0 {
+                self.scroll_shift(AREA, above);
+                offset += above;
+            }
+            if above != 0.0 || total != 0.0 {
+                self.request_catch_up();
+            }
+        }
         let still = mem.still(offset, rect);
         let viewport = f64::from(rect.h);
         let window = mem.heights.window(offset, viewport);
@@ -903,6 +1036,8 @@ impl Ui<'_> {
 
         let enabled = response.enabled;
         let (mut relaid, mut shift) = (false, 0.0);
+        let mut focus_found = None;
+        let mut built_keys = Vec::with_capacity(built.len());
         for b in built {
             let mut ctx = b.ctx;
             // While the content moves a row snaps: skipping the animation also drops any in flight.
@@ -948,13 +1083,30 @@ impl Ui<'_> {
             };
             // A margin row is built and clipped: nothing on it is a Tab stop.
             let hidden = ctx.rect.bottom() <= rect.y || ctx.rect.y >= rect.bottom();
+            // The row that holds the focus is drawn under a scope held for this frame, so what its
+            // widgets keep (an edit's caret) goes on while it is out of view; the list renews the
+            // hold each frame it draws and it lapses when the list is not drawn.
+            let holds = mem.focus_row.is_some_and(|(k, _)| k == ctx.key);
             let height = self.off_tab_order(hidden, |ui| {
-                ui.node_container(node, |ui| ui.scope(scope, |ui| draw(ui, &ctx)))
+                ui.node_container(node, |ui| {
+                    if holds {
+                        let id = ui.id(scope);
+                        ui.hold_alive(id, |ui| draw(ui, &ctx))
+                    } else {
+                        ui.scope(scope, |ui| draw(ui, &ctx))
+                    }
+                })
             });
+            if self.focus_within(b.id) {
+                self.hold_focus_in(b.id);
+                focus_found = Some((ctx.key, ctx.index));
+            }
+            built_keys.push(ctx.key);
             if ctx.focus_visible {
                 focus_ring::paint(self.painter(), highlight, RingKind::Button, 1.0);
             }
 
+            mem.remember(ctx.key, height, rows.count());
             let change = mem.heights.set(ctx.index, height);
             if change != 0.0 {
                 relaid = true;
@@ -970,6 +1122,7 @@ impl Ui<'_> {
             }
             self.request_catch_up();
         }
+        self.settle_row_focus(mem, rows, focus_found, &built_keys);
         response
     }
 }
@@ -987,6 +1140,62 @@ mod tests {
     use crate::theme::DARK;
 
     const WIN: (f32, f32) = (500.0, 300.0);
+
+    #[test]
+    fn a_splice_keeps_each_rows_height_with_the_row_and_agrees_with_a_plain_model() {
+        let heights = Heights::Measured { estimate: 20.0 };
+        let mut t = RowHeights::default();
+        let mut rows: Vec<f64> = Vec::new();
+        let mut seed = 11u64;
+        let mut next = |below: usize| {
+            seed = seed
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            ((seed >> 33) as usize) % below
+        };
+        t.sync(50, heights);
+        rows.resize(50, 20.0);
+        for round in 0..300 {
+            // Measure a few rows, then insert or delete some.
+            for _ in 0..4 {
+                let i = next(rows.len());
+                let h = 20.0 * (1 + next(4)) as f32;
+                t.set(i, h);
+                rows[i] = f64::from(h);
+            }
+            let at = next(rows.len() + 1);
+            let removed = next(4).min(rows.len() - at);
+            let added = next(4);
+            t.splice(at, removed, added);
+            rows.splice(at..at + removed, std::iter::repeat_n(20.0, added));
+            if rows.is_empty() {
+                t.splice(0, 0, 1);
+                rows.push(20.0);
+            }
+            t.sync(rows.len(), heights);
+            assert_eq!(t.count(), rows.len(), "round {round}");
+            let mut top = 0.0;
+            for (i, h) in rows.iter().enumerate() {
+                assert_eq!(t.top(i), top, "round {round}: top of row {i}");
+                assert_eq!(t.height(i), *h, "round {round}: height of row {i}");
+                top += h;
+            }
+            assert_eq!(t.total(), top, "round {round}");
+        }
+    }
+
+    #[test]
+    fn a_splice_of_fixed_rows_only_counts_and_past_the_end_is_cut() {
+        let mut t = RowHeights::default();
+        t.sync(10, Heights::Fixed(20.0));
+        t.splice(4, 2, 5);
+        assert_eq!((t.count(), t.total()), (13, 260.0));
+        let mut m = RowHeights::default();
+        m.sync(3, Heights::Measured { estimate: 20.0 });
+        m.set(0, 40.0);
+        m.splice(2, 9, 0);
+        assert_eq!((m.count(), m.total()), (2, 60.0));
+    }
     const RECT: Rect = Rect::new(20.0, 20.0, 200.0, 100.0);
     const RIGHT: Rect = Rect::new(260.0, 20.0, 200.0, 100.0);
     const ROW: f32 = 20.0;
@@ -1051,8 +1260,8 @@ mod tests {
 
     fn shapes(scene: &Scene) -> usize {
         scene
-            .layers
-            .iter()
+            .in_order()
+            .into_iter()
             .map(|l| l.geometry.under.len() + l.geometry.over.len())
             .sum()
     }
@@ -1060,8 +1269,8 @@ mod tests {
     fn fills_of(scene: &Scene, colors: &[Rgba]) -> usize {
         let cs: Vec<_> = colors.iter().map(|c| premul(*c)).collect();
         scene
-            .layers
-            .iter()
+            .in_order()
+            .into_iter()
             .flat_map(|l| l.geometry.under.iter())
             .filter(|s| cs.contains(&s.color))
             .count()
@@ -1127,7 +1336,11 @@ mod tests {
             let selected = s.rows.iter().find(|r| r.selected).expect("a selected row");
             assert_ne!(selected.fill[3], 0, "the row is still given its fill");
             assert!(s.rows.iter().any(|r| r.focus_visible), "the ring shows");
-            let strokes: usize = scene.layers.iter().map(|l| l.geometry.over.len()).sum();
+            let strokes: usize = scene
+                .in_order()
+                .into_iter()
+                .map(|l| l.geometry.over.len())
+                .sum();
             result.push((fills_of(&scene, &tones), strokes));
         }
         assert!(result[0].0 > 0, "the instrument sees the fill: {result:?}");

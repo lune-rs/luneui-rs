@@ -29,6 +29,7 @@ const GLASS: GlassLayer = GlassLayer {
     tint: [10, 20, 30, 255],
     tint_opacity: 0.8,
     material_opacity: 0.7,
+    curve: lune_ui_core::LuminosityCurve::AVALONIA,
 };
 const UNDER: [f32; 4] = [0.05, 0.06, 0.07, 1.0];
 const BASE: u64 = 250;
@@ -47,7 +48,6 @@ fn id(key: &str) -> WidgetId {
 #[derive(Clone, Copy)]
 struct Cfg {
     rect: Rect,
-    active: bool,
     restart: bool,
     enabled: bool,
     /// The section's height; large enough to scroll with `tall`.
@@ -59,7 +59,6 @@ impl Cfg {
     fn new() -> Cfg {
         Cfg {
             rect: RECT,
-            active: true,
             restart: false,
             enabled: true,
             content_h: 300.0,
@@ -92,7 +91,6 @@ fn frame_with(h: &mut UiHarness, c: &Cfg, app: &mut App, rows: bool) -> Out {
     let mut resp = SettingsResponse::default();
     let (scene, out) = h.frame(|ui| {
         let page = SettingsPage {
-            active: c.active,
             glass: GLASS,
             under: UNDER,
             restart: c.restart,
@@ -246,28 +244,6 @@ fn the_glass_is_the_acrylic_with_one_round_corner() {
     assert_eq!(a.color, GLASS.premultiplied());
     assert_eq!(a.under, UNDER);
     assert_eq!(out.out.repaint, Repaint::Idle);
-}
-
-#[test]
-fn inactive_draws_the_fallback_with_the_same_corner_and_no_acrylic() {
-    let mut h = UiHarness::new(WIN);
-    let out = settled(
-        &mut h,
-        &Cfg {
-            active: false,
-            ..Cfg::new()
-        },
-    );
-    let g = &out.scene.layers[0].geometry;
-    assert!(g.acrylic.is_empty());
-    assert_eq!(DARK.window_fallback, [0x33, 0x33, 0x33, 0xFF]);
-    let fill = g
-        .under
-        .iter()
-        .find(|s| s.rect == [0.0, 0.0, 900.0, 600.0])
-        .expect("the page fill");
-    assert_eq!(fill.color, premul(DARK.window_fallback));
-    assert_eq!(fill.radii, [RADIUS, 0.0, 0.0, 0.0]);
 }
 
 #[test]
@@ -984,7 +960,7 @@ fn a_combos_list_draws_above_the_page() {
     let _ = out;
     let beta = Spec::plain("Beta", Style::ui(DARK.font_base, DARK.fg_primary));
     let _ = beta;
-    let popup = &out2.scene.layers[LayerId::Popup as usize];
+    let popup = &out2.scene.merged(LayerId::Popup);
     assert!(
         !popup.texts.is_empty() || !popup.geometry.under.is_empty(),
         "the list is on the popup layer"
@@ -992,7 +968,7 @@ fn a_combos_list_draws_above_the_page() {
     // The page itself drew nothing there before the list.
     let mut h = UiHarness::new(WIN);
     let closed = frame_with(&mut h, &c, &mut App::default(), true);
-    let popup = &closed.scene.layers[LayerId::Popup as usize];
+    let popup = &closed.scene.merged(LayerId::Popup);
     assert!(popup.texts.is_empty() && popup.geometry.under.is_empty());
 }
 
@@ -1006,7 +982,7 @@ fn the_page_draws_on_the_layer_it_is_called_on() {
             ..Cfg::new()
         },
     );
-    for (i, l) in out.scene.layers.iter().enumerate() {
+    for (i, l) in out.scene.in_order().into_iter().enumerate() {
         if i != LayerId::Base as usize {
             assert!(
                 l.texts.is_empty() && l.geometry.under.is_empty(),

@@ -55,14 +55,10 @@ fn the_accent_brings_its_derived_tokens() {
     let f = load(&with_colors(r##""AccentPrimaryColor":"#FF71B0F7""##));
     let mut want = DARK;
     want.accent = [0x71, 0xB0, 0xF7, 0xFF];
-    want.accent_hover = [0x81, 0xC0, 0xFF, 0xFF];
     want.scroll_thumb = [0x71, 0xB0, 0xF7, 0x8C];
     want.scroll_thumb_hover = [0x71, 0xB0, 0xF7, 0xE6];
     want.text_selection = [0x71, 0xB0, 0xF7, 0x66];
     assert_eq!(f.theme, want);
-    // Saturating, per channel.
-    let f = load(&with_colors(r##""AccentPrimaryColor":"#F0FFF8EF""##));
-    assert_eq!(f.theme.accent_hover, [0xFF; 4]);
 }
 
 #[test]
@@ -103,8 +99,8 @@ fn an_empty_file_returns_the_base_unchanged() {
 }
 
 #[test]
-fn the_key_table_has_50_distinct_keys_each_of_which_resolves() {
-    assert_eq!(COLOR_KEYS.len(), 50);
+fn the_key_table_has_47_distinct_keys_each_of_which_resolves() {
+    assert_eq!(COLOR_KEYS.len(), 47);
     let mut seen = std::collections::BTreeSet::new();
     for k in COLOR_KEYS {
         assert!(seen.insert(*k), "{k} twice");
@@ -151,7 +147,6 @@ fn the_preset_written_through_the_table_loads_back_equal() {
         base = f.map(|f| f.theme).unwrap_or(base);
     }
     for field in [
-        &mut base.accent_hover,
         &mut base.scroll_thumb,
         &mut base.scroll_thumb_hover,
         &mut base.text_selection,
@@ -283,6 +278,45 @@ fn each_skip_kind_is_reported_in_file_order() {
     ));
     assert!(f.skipped.is_empty());
     assert_eq!(f.theme.glass.window.material_opacity, 0.0);
+}
+
+#[test]
+fn the_window_fallback_key_is_gone() {
+    // An inactive window stays glass (R13): no widget has a solid fill by window state, so
+    // `WindowFallbackBackground` is an unknown key.
+    let f = load(&with_colors(r##""WindowFallbackBackground":"#FF333333""##));
+    assert_eq!(
+        f.skipped,
+        [Skip::UnknownColor("WindowFallbackBackground".to_string())]
+    );
+    assert_eq!(f.theme, DARK);
+}
+
+#[test]
+fn the_toast_fill_and_border_keys_are_gone() {
+    // The toast card is the glass surface (D8): `menu_glass` and `menu_popup_border` draw it.
+    let f = load(&with_colors(
+        r##""ToastBackground":"#E6181818","ToastBorder":"#33FFFFFF""##,
+    ));
+    assert_eq!(
+        f.skipped,
+        [
+            Skip::UnknownColor("ToastBackground".to_string()),
+            Skip::UnknownColor("ToastBorder".to_string())
+        ]
+    );
+    assert_eq!(f.theme, DARK);
+}
+
+#[test]
+fn a_dropdown_fill_key_is_gone_and_the_glass_tint_has_a_key() {
+    // `BackdropDark` fed the opaque list panel (D8); every list is glass now, so it is unknown.
+    let f = load(&with_colors(r##""BackdropDark":"#F0000000""##));
+    assert_eq!(f.skipped, [Skip::UnknownColor("BackdropDark".to_string())]);
+    assert_eq!(f.theme, DARK);
+    let f = load(&with_colors(r##""MenuGlassBackground":"#80102030""##));
+    assert!(f.skipped.is_empty(), "{:?}", f.skipped);
+    assert_eq!(f.theme.menu_glass, [0x10, 0x20, 0x30, 0x80]);
 }
 
 // --- Envelope -------------------------------------------------------------------------------
@@ -641,7 +675,6 @@ mod closing {
                         cancel: Cancel::Default,
                     };
                     let glass = DialogGlass {
-                        panel: [0.1, 0.1, 0.12, 1.0],
                         fill: [0.2, 0.2, 0.2, 0.62],
                         noise: true,
                     };

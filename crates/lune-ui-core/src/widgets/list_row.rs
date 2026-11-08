@@ -9,7 +9,7 @@
 //! content for a specimen.
 
 use crate::access::{Node, Role, Value};
-use crate::color::Rgba;
+use crate::color::{Rgba, mix};
 use crate::motion::{Kind, Motion};
 use crate::paint::{Painter, Rect};
 use crate::text::{Spec, Style};
@@ -143,20 +143,6 @@ struct Mem {
     y: Option<f32>,
 }
 
-fn lerp(a: Rgba, b: Rgba, k: f32) -> Rgba {
-    let mix = |a: u8, b: u8| {
-        (f32::from(a) + (f32::from(b) - f32::from(a)) * k)
-            .round()
-            .clamp(0.0, 255.0) as u8
-    };
-    [
-        mix(a[0], b[0]),
-        mix(a[1], b[1]),
-        mix(a[2], b[2]),
-        mix(a[3], b[3]),
-    ]
-}
-
 impl Ui<'_> {
     /// The content of `row` inside the virtual list's `draw` for `ctx`; returns the height to
     /// report. The list has painted the fill and the ring and made the `ListItem` node; this adds
@@ -177,7 +163,7 @@ impl Ui<'_> {
         } else {
             self.animate_f32(id, want, &SELECTION)
         };
-        let color = lerp(t.fg_secondary, t.fg_bright, amount);
+        let color = mix(t.fg_secondary, t.fg_bright, amount);
         let h = paint(self.painter(), ctx.rect, row, padding, color);
 
         let mut name = Node::new(id.with("text"), Role::StaticText, row.name, ctx.rect);

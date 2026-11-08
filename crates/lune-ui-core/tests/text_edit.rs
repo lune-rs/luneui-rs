@@ -529,6 +529,50 @@ fn a_point_places_and_extends() {
     assert_eq!(ed.sel(), (0, 0));
 }
 
+/// A drag at `pos` over `text` cut into two rows at 20 px (four chars of 5 px, 20 px rows), from
+/// the caret `from`; the selection it leaves, and the caret a click at `pos` leaves.
+fn drag_over(
+    text: &str,
+    wrap: Option<f32>,
+    from: usize,
+    pos: (f32, f32),
+) -> ((usize, usize), usize) {
+    let mut sp = spec(text);
+    sp.wrap = wrap;
+    let mut system = FakeText;
+    let mut run = |edit: &mut TextEdit, text: &mut String, cmd| {
+        let mut layout = SpecLayout::new(&mut system, &sp, 1.0);
+        edit.apply(cmd, text, &mut layout, Keymap::PC, Duration::ZERO);
+    };
+    let mut text = text.to_owned();
+    let mut drag = TextEdit::new();
+    drag.set_selection(from, from);
+    run(&mut drag, &mut text, EditCommand::ExtendTo(pos));
+    let mut click = TextEdit::new();
+    run(&mut click, &mut text, EditCommand::PlaceCaret(pos));
+    let sel = drag.selection();
+    ((sel.start, sel.end), click.caret())
+}
+
+#[test]
+fn a_drag_right_of_a_cut_row_takes_its_last_grapheme() {
+    // "abcdefgh" in rows "abcd" and "efgh" that run into each other: offset 4 shows on row 2.
+    let cut = Some(20.0);
+    let (sel, click) = drag_over("abcdefgh", cut, 0, (400.0, 5.0));
+    assert_eq!(sel, (0, 4), "the drag reaches the row's end");
+    assert_eq!(click, 3, "a click keeps its caret on its row");
+    // In the left half of the last grapheme, the drag stops before it; in the right half, past it.
+    assert_eq!(drag_over("abcdefgh", cut, 0, (17.0, 5.0)).0, (0, 3));
+    assert_eq!(drag_over("abcdefgh", cut, 0, (18.0, 5.0)).0, (0, 4));
+    // A drag that starts on the second row, back over the first.
+    assert_eq!(drag_over("abcdefgh", cut, 6, (400.0, 5.0)).0, (4, 6));
+    // The last row ends at the text's end whatever the point.
+    assert_eq!(drag_over("abcdefgh", cut, 0, (400.0, 25.0)).0, (0, 8));
+    // A hard break stays out of a drag, and so does a row that is not cut.
+    assert_eq!(drag_over("abcd\nefgh", None, 0, (400.0, 5.0)).0, (0, 4));
+    assert_eq!(drag_over("abcd", cut, 0, (400.0, 5.0)).0, (0, 4));
+}
+
 #[test]
 fn a_point_inside_a_cluster_snaps_down() {
     let mut ed = Ed::new("e\u{301}x");

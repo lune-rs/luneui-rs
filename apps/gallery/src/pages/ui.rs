@@ -226,7 +226,7 @@ mod tests {
         // Every other name keeps its integer form.
         assert_eq!(SCENES[1].name(), "ui-modal-capture@2x");
         let (display, _) = run_scene("ui", scene, &mut FakeText).expect("runs");
-        assert!(display.layers.iter().any(|l| !l.texts.is_empty()));
+        assert!(display.in_order().into_iter().any(|l| !l.texts.is_empty()));
     }
 
     /// Under a modal dialog the pointer over a page button changes nothing: the scene equals the

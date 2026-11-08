@@ -27,9 +27,13 @@ pub(crate) struct HitRecord {
     /// The axes a scroll region is live on, `(x, y)`: a wheel delta on an axis goes only to a region
     /// live on it (D178). Both for every other region.
     pub(crate) scroll_axes: (bool, bool),
+    /// The [`Ui::tab_scope`](super::Ui::tab_scope) order the region was registered in: 0 outside
+    /// any scope.
+    pub(crate) order: i32,
 }
 
-/// The topmost region of `hits` at `pos` that `eligible` admits: highest layer, then latest call.
+/// The topmost region of `hits` at `pos` that `eligible` admits: highest layer, then the overlay opened last (tag 0, the base, is below every overlay of a
+/// layer), then latest call.
 pub(crate) fn topmost<'h>(
     hits: &'h [HitRecord],
     pos: (f32, f32),
@@ -38,7 +42,7 @@ pub(crate) fn topmost<'h>(
     hits.iter()
         .enumerate()
         .filter(|(_, h)| eligible(h) && h.rect.contains(pos))
-        .max_by_key(|(i, h)| (h.layer, *i))
+        .max_by_key(|(i, h)| (h.layer, h.tag, *i))
         .map(|(_, h)| h)
 }
 
@@ -313,7 +317,12 @@ impl PointerState {
 
     /// Whether a press holds a widget's capture now, at this point in the frame's event batch.
     pub(crate) fn captured(&self) -> bool {
-        self.press.is_some_and(|p| p.id.is_some())
+        self.held().is_some()
+    }
+
+    /// The widget a press holds the capture of now, at this point in the frame's event batch.
+    pub(crate) fn held(&self) -> Option<WidgetId> {
+        self.press.and_then(|p| p.id)
     }
 
     /// Releases a capture whose id `lost` says can no longer hold it (it fell under a modal).

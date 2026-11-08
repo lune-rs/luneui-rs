@@ -26,6 +26,7 @@ use crate::text::{Spec, Style};
 use crate::theme::Theme;
 use crate::ui::{Response, RoveAxis, Sense, Ui, WidgetId};
 
+use super::button::FOCUS;
 use super::focus_ring::{self, RingKind};
 use super::virtual_list::{
     Heights, ListOptions, ListState, ListStyle, RowCtx, RowKey, SelectionMode,
@@ -484,6 +485,12 @@ impl Ui<'_> {
         response: Option<&Response>,
     ) {
         let level = |on: bool| if on { 1.0 } else { 0.0 };
+        // The ring fades like every other ring, under this cell's own id.
+        let ring_level = self.animate_f32(
+            kid.with("ring"),
+            level(response.is_some_and(|r| r.focus_visible)),
+            &FOCUS,
+        );
         let (color, arrow) = if col.sortable {
             let to = if sorted.is_some() {
                 theme.fg_secondary
@@ -534,13 +541,10 @@ impl Ui<'_> {
                 p.text_centered(&g, Rect::new(at, cell.y, ARROW, cell.h));
             }
         }
-        if response.is_some_and(|r| r.focus_visible) {
-            let ring = RingKind::Edge {
-                radius: theme.item_radius,
-                on_accent: false,
-            };
-            focus_ring::paint(p, cell.inset(1.0, 2.0), ring, 1.0);
-        }
+        let ring = RingKind::Edge {
+            radius: theme.item_radius,
+        };
+        focus_ring::paint(p, cell.inset(1.0, 2.0), ring, ring_level);
     }
 
     /// One body row, inside its slot: the cells, then the hairline. Returns the row's height.
@@ -629,6 +633,26 @@ impl Ui<'_> {
             let p = self.painter();
             let (tw, th) = p.measure(&spec);
             let y = slot.y + (height - th) / 2.0;
+            // A wrapped number column right-aligns each visual line: the text system has no
+            // alignment, so every line is drawn on its own against the cell's right edge.
+            if opts.columns[i].num && wraps {
+                let text: String = spec.runs.iter().map(|(t, _)| t.as_str()).collect();
+                let style = spec.runs.first().map(|(_, s)| *s);
+                if let Some(style) = style {
+                    for line in p.text_lines(&spec) {
+                        let Some(row) = text.get(line.start..line.end).map(str::trim) else {
+                            continue;
+                        };
+                        if row.is_empty() {
+                            continue;
+                        }
+                        let row = Spec::plain(row, style);
+                        let rw = p.measure(&row).0;
+                        p.text(&row, rect.right() - rw, y + line.y);
+                    }
+                    continue;
+                }
+            }
             let x = if opts.columns[i].num && !wraps {
                 rect.right() - tw
             } else {

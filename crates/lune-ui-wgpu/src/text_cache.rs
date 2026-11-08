@@ -313,6 +313,39 @@ fn glyph_range(glyphs: &[glyphon::LayoutGlyph]) -> (usize, usize) {
     (start, end)
 }
 
+/// The offset `Buffer::hit` should answer at `x` inside a cluster that shaped to several glyphs, in
+/// the run's line: the cluster's start left of its midpoint and its end right of it (mirrored for
+/// a right-to-left glyph). `Buffer::hit` halves each glyph on its own, and the glyphs of one
+/// cluster all carry the whole cluster's bytes, so the answer jumps to the end in the first glyph's
+/// right half and back to the start in the second glyph's left half. `None` when `x` is in no such
+/// cluster. Only a glyph under `x` looks for its siblings, so a row of `n` glyphs costs `O(n)` a
+/// call, not `O(n^2)`; an `x` in a gap between two glyphs of one cluster is left to `Buffer::hit`.
+fn cluster_hit(run: &glyphon::LayoutRun, x: f32) -> Option<usize> {
+    run.glyphs.iter().find_map(|g| {
+        if x < g.x || x > g.x + g.w {
+            return None;
+        }
+        let mut edges = run
+            .glyphs
+            .iter()
+            .filter(|o| (o.start, o.end) == (g.start, g.end))
+            .map(|o| (o.x, o.x + o.w));
+        let first = edges.next()?;
+        // One glyph is `Buffer::hit`'s own case.
+        edges.clone().next()?;
+        let (left, right) = edges.fold(first, |a, b| (a.0.min(b.0), a.1.max(b.1)));
+        if x < left || x > right || right <= left {
+            return None;
+        }
+        let right_half = x >= (left + right) / 2.0;
+        Some(if right_half != g.level.is_rtl() {
+            g.end
+        } else {
+            g.start
+        })
+    })
+}
+
 impl Row {
     /// The caret's x for `off`, an offset this row owns. At a wrap cosmic-text drops the whitespace
     /// that does not fit, so an offset can be in none of the row's glyphs: after them, or before
@@ -493,8 +526,13 @@ impl TextSystem for TextCache {
         let Some(row) = rows.iter().rfind(|r| r.top <= y).or(rows.first()) else {
             return 0;
         };
+        let run = row.run.and_then(|i| entry.buffer.layout_runs().nth(i));
         let cursor = row.run.and_then(|_| entry.buffer.hit(x, row.top));
-        let at = cursor.map_or(row.start, |c| row.base + c.index);
+        let local = run
+            .as_ref()
+            .and_then(|r| cluster_hit(r, x))
+            .or(cursor.map(|c| c.index));
+        let at = local.map_or(row.start, |i| row.base + i);
         clamp_to_boundary(&text, at.clamp(row.start, row.last))
     }
 

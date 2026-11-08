@@ -231,6 +231,7 @@ fn recording_renderer_carries_opacity() {
             scale: 2.0,
             blur_sigma: 4.0,
             saturation: 1.0,
+            ..FrameParams::default()
         },
     );
     let calls = &rr.last().expect("a frame").calls;
@@ -314,40 +315,68 @@ fn text_queries_forward_to_the_text_system() {
 }
 
 fn backdrop_of(f: impl Fn(&mut P<'_>)) -> Option<BackdropRequest> {
-    scene_of(f).backdrop
+    scene_of(f).backdrops().next().copied()
 }
 
 const LOW: Rect = Rect::new(10.0, 10.0, 40.0, 30.0);
 const HIGH: Rect = Rect::new(60.0, 10.0, 40.0, 30.0);
 
 #[test]
-fn of_two_backdrops_the_lower_layer_keeps_it_in_either_draw_order() {
-    let low_first = backdrop_of(|p| {
+fn backdrops_on_two_layers_both_stand_in_draw_order_whichever_came_first() {
+    let low_first = scene_of(|p| {
         p.on(LayerId::Popup);
         p.backdrop(LOW, 4.0);
         p.on(LayerId::Raised);
         p.backdrop(HIGH, 4.0);
     });
-    let high_first = backdrop_of(|p| {
+    let high_first = scene_of(|p| {
         p.on(LayerId::Raised);
         p.backdrop(HIGH, 4.0);
         p.on(LayerId::Popup);
         p.backdrop(LOW, 4.0);
     });
-    let want = LOW.phys(2.0);
-    assert_eq!(low_first.expect("one").rect, want);
-    assert_eq!(low_first, high_first);
-    assert_eq!(low_first.expect("one").layer, LayerId::Popup as usize);
+    for scene in [low_first, high_first] {
+        let rects: Vec<_> = scene.backdrops().map(|b| b.rect).collect();
+        assert_eq!(rects, [LOW.phys(2.0), HIGH.phys(2.0)]);
+        assert_eq!(scene.layers[LayerId::Popup as usize].backdrops.len(), 1);
+        assert_eq!(scene.layers[LayerId::Raised as usize].backdrops.len(), 1);
+    }
 }
 
 #[test]
-fn on_one_layer_the_last_backdrop_wins() {
-    let b = backdrop_of(|p| {
+fn backdrops_on_one_layer_both_stand_in_record_order() {
+    let scene = scene_of(|p| {
         p.on(LayerId::Popup);
         p.backdrop(LOW, 4.0);
         p.backdrop(HIGH, 4.0);
     });
-    assert_eq!(b.expect("one").rect, HIGH.phys(2.0));
+    let rects: Vec<_> = scene.backdrops().map(|b| b.rect).collect();
+    assert_eq!(rects, [LOW.phys(2.0), HIGH.phys(2.0)]);
+}
+
+#[test]
+fn a_backdrop_that_shows_nothing_records_nothing_but_still_replays() {
+    let invisible = xf((0.0, 0.0), 1.0, 0.0, 0.0);
+    let scene = scene_of(|p| {
+        p.backdrop(Rect::new(10.0, 10.0, 0.0, 30.0), 4.0);
+        p.backdrop(Rect::new(10.0, 10.0, 30.0, 0.0), 4.0);
+        p.push_xform(invisible);
+        p.backdrop(LOW, 4.0);
+        p.pop_xform();
+    });
+    assert_eq!(scene.backdrops().count(), 0);
+    // The op stays in a recording: it shows when replayed where it is visible.
+    let mut t1 = FakeText;
+    let mut rec = painter(&mut t1);
+    rec.push_xform(invisible);
+    rec.start_recording();
+    rec.backdrop(LOW, 4.0);
+    let ops = rec.take_recording();
+    assert_eq!(rec.scene.backdrops().count(), 0);
+    let mut t2 = FakeText;
+    let mut replayed = painter(&mut t2);
+    replayed.replay(&ops);
+    assert_eq!(replayed.scene.backdrops().count(), 1);
 }
 
 #[test]
@@ -358,12 +387,11 @@ fn a_backdrop_carries_the_current_layer_and_its_own_numbers() {
         LayerId::Raised,
         LayerId::Toast,
     ] {
-        let plain = backdrop_of(|p| {
+        let scene = scene_of(|p| {
             p.on(layer);
             p.backdrop(LOW, 4.0);
-        })
-        .expect("asked");
-        assert_eq!(plain.layer, layer as usize);
+        });
+        let plain = scene.layers[layer as usize].backdrops[0];
         assert_eq!((plain.sigma, plain.saturation), (0.0, 0.0), "the frame's");
     }
     let own = backdrop_of(|p| p.backdrop_with(LOW, 4.0, 8.0, 1.5)).expect("asked");
@@ -386,8 +414,8 @@ fn a_replayed_backdrop_is_the_same_request() {
     let mut t2 = FakeText;
     let mut replayed = painter(&mut t2);
     replayed.replay(&ops);
-    assert!(rec.scene.backdrop.is_some());
-    assert_eq!(rec.scene.backdrop, replayed.scene.backdrop);
+    assert_eq!(rec.scene.backdrops().count(), 1);
+    assert!(rec.scene.backdrops().eq(replayed.scene.backdrops()));
 }
 
 /// Where the backdrop falls in the recorded calls: the layers drawn before it and after it.
@@ -414,6 +442,7 @@ fn every_layer(p: &mut P<'_>) {
         LayerId::Popup,
         LayerId::Modal,
         LayerId::Raised,
+        LayerId::Outside,
         LayerId::Toast,
     ];
     for l in layers {
@@ -423,7 +452,7 @@ fn every_layer(p: &mut P<'_>) {
 }
 
 #[test]
-fn the_recording_renderer_puts_the_backdrop_at_the_split() {
+fn the_recording_renderer_puts_a_backdrop_before_its_layer_and_no_lower_than_the_floor() {
     let at = |layer: LayerId| {
         around_backdrop(&scene_of(|p| {
             every_layer(p);
@@ -431,10 +460,11 @@ fn the_recording_renderer_puts_the_backdrop_at_the_split() {
             p.backdrop(LOW, 4.0);
         }))
     };
-    assert_eq!(at(LayerId::Base), (vec![0, 1], vec![2, 3, 4, 5]));
-    assert_eq!(at(LayerId::Popup), (vec![0, 1], vec![2, 3, 4, 5]));
-    assert_eq!(at(LayerId::Modal), (vec![0, 1, 2], vec![3, 4, 5]));
-    assert_eq!(at(LayerId::Raised), (vec![0, 1, 2, 3], vec![4, 5]));
+    assert_eq!(at(LayerId::Base), (vec![0, 1], vec![2, 3, 4, 5, 6]));
+    assert_eq!(at(LayerId::Popup), (vec![0, 1], vec![2, 3, 4, 5, 6]));
+    assert_eq!(at(LayerId::Modal), (vec![0, 1, 2], vec![3, 4, 5, 6]));
+    assert_eq!(at(LayerId::Raised), (vec![0, 1, 2, 3], vec![4, 5, 6]));
+    assert_eq!(at(LayerId::Outside), (vec![0, 1, 2, 3, 4], vec![5, 6]));
 }
 
 #[test]
@@ -494,7 +524,7 @@ fn image_lands_on_the_current_layer_under_the_clip_and_xform() {
         );
     });
     // Only the Popup layer holds it.
-    for (i, l) in scene.layers.iter().enumerate() {
+    for (i, l) in scene.in_order().into_iter().enumerate() {
         assert_eq!(l.images.len(), usize::from(i == POPUP), "layer {i}");
     }
     let it = scene.layers[POPUP].images[0];
@@ -525,7 +555,7 @@ fn text_rotated_lands_on_the_current_layer_under_the_clip_and_xform() {
         popup_under_clip_and_xform(p);
         p.text_rotated(&spec, (50.0, 40.0), 0.5);
     });
-    for (i, l) in scene.layers.iter().enumerate() {
+    for (i, l) in scene.in_order().into_iter().enumerate() {
         assert_eq!(l.images.len(), usize::from(i == POPUP), "layer {i}");
         assert!(
             l.texts.is_empty(),
@@ -562,7 +592,7 @@ fn fills_rings_and_backdrops_take_the_layer_clip_scale_and_alpha_of_the_xform() 
         p.ring(MOVED, 1.0, 1.0, WHITE, true);
         p.backdrop(MOVED, 1.0);
     });
-    for (i, l) in scene.layers.iter().enumerate() {
+    for (i, l) in scene.in_order().into_iter().enumerate() {
         let n = usize::from(i == POPUP) * 2;
         assert_eq!(
             (l.geometry.under.len(), l.geometry.over.len()),
@@ -580,10 +610,10 @@ fn fills_rings_and_backdrops_take_the_layer_clip_scale_and_alpha_of_the_xform() 
     assert_eq!(g.under[0].radii, [4.0, 8.0, 12.0, 16.0]);
     assert_eq!(g.over[0].radii, [4.0; 4]);
     assert_eq!((g.under[1].radii, g.over[1].radii), ([4.0; 4], [4.0; 4]));
-    let b = scene.backdrop.expect("asked");
+    let b = scene.layers[POPUP].backdrops[0];
     assert_eq!(
-        (b.rect, b.radius, b.alpha, b.layer),
-        ([86.0, 128.0, 40.0, 32.0], 4.0, 0.5, POPUP)
+        (b.rect, b.radius, b.alpha),
+        ([86.0, 128.0, 40.0, 32.0], 4.0, 0.5)
     );
 }
 
@@ -599,7 +629,7 @@ fn strokes_fans_and_polygons_take_the_layer_clip_scale_and_alpha_of_the_xform() 
         p.fill_path(&[[20.0, 30.0], [30.0, 30.0], [30.0, 38.0]], WHITE);
         p.sector([20.0, 30.0], 5.0, 0.0, std::f32::consts::FRAC_PI_2, WHITE);
     });
-    for (i, l) in scene.layers.iter().enumerate() {
+    for (i, l) in scene.in_order().into_iter().enumerate() {
         let on = i == POPUP;
         assert_eq!(!l.geometry.strokes.is_empty(), on, "strokes, layer {i}");
         assert_eq!(!l.geometry.fills.is_empty(), on, "fills, layer {i}");
@@ -640,7 +670,7 @@ fn text_takes_the_layer_clip_scale_and_alpha_of_the_xform() {
         popup_under_clip_and_xform(p);
         p.text(&spec, 20.0, 30.0);
     });
-    for (i, l) in scene.layers.iter().enumerate() {
+    for (i, l) in scene.in_order().into_iter().enumerate() {
         assert_eq!(l.texts.len(), usize::from(i == POPUP), "layer {i}");
     }
     let it = scene.layers[POPUP].texts[0];
@@ -672,5 +702,139 @@ fn an_arc_radius_takes_the_xform_scale() {
     for q in v {
         let d = ((q.pos[0] - 86.0).powi(2) + (q.pos[1] - 128.0).powi(2)).sqrt();
         assert!((17.0 - 0.3..=23.0 + 0.3).contains(&d), "{d}");
+    }
+}
+
+const ABOVE_BASE: [LayerId; 5] = [
+    LayerId::Page,
+    LayerId::Popup,
+    LayerId::Modal,
+    LayerId::Raised,
+    LayerId::Toast,
+];
+
+#[test]
+fn acrylic_above_base_is_a_frost_of_the_same_colour_and_under_is_ignored() {
+    let colour = [0.1, 0.2, 0.3, 0.6];
+    for layer in ABOVE_BASE {
+        let scene = scene_of(|p| {
+            p.on(layer);
+            p.acrylic(LOW, 4.0, colour, [0.9; 4], true);
+        });
+        let g = &scene.layers[layer as usize].geometry;
+        assert!(g.acrylic.is_empty(), "{layer:?}");
+        assert_eq!(g.under.len(), 1, "{layer:?}");
+        assert!(g.under[0].is_frost());
+        assert_eq!(g.under[0].color, colour);
+        assert_eq!(g.under[0].under, [0.0; 4]);
+    }
+    let on_base = scene_of(|p| p.acrylic(LOW, 4.0, colour, [0.9; 4], true));
+    assert_eq!(on_base.layers[0].geometry.acrylic.len(), 1);
+    assert!(on_base.layers[0].geometry.under.is_empty());
+}
+
+#[test]
+fn acrylic_inside_an_overlay_on_any_layer_is_a_frost() {
+    use lune_ui_core::testing::UiHarness;
+    use lune_ui_core::ui::OverlayOptions;
+    let mut h = UiHarness::new((200.0, 100.0));
+    let motion = lune_ui_core::motion::Motion::of(lune_ui_core::motion::Kind::Appear);
+    for layer in [LayerId::Base, LayerId::Popup, LayerId::Raised] {
+        let options = OverlayOptions {
+            layer,
+            modal: false,
+            dismiss_on_escape: false,
+            dismiss_on_outside_press: false,
+            dismiss_on_focus_loss: false,
+            anchor: None,
+            initial_focus: None,
+            open: motion,
+            close: motion,
+        };
+        let (scene, _) = h.frame(|ui| {
+            ui.overlay(
+                ("o", layer as usize),
+                &options,
+                |_, _, _| {},
+                |ui, _| ui.painter().acrylic(LOW, 4.0, [0.1; 4], [0.0; 4], true),
+            );
+        });
+        let drawn = scene.merged(layer);
+        assert!(drawn.geometry.acrylic.is_empty(), "{layer:?}");
+        assert!(drawn.geometry.under.iter().any(|s| s.is_frost()));
+    }
+}
+
+/// How many frosts and acrylics `ops` draw when replayed on `layer`.
+fn replayed_on(layer: LayerId, ops: &lune_ui_core::paint::Ops) -> (usize, usize) {
+    let mut text = FakeText;
+    let mut p = painter(&mut text);
+    p.on(layer);
+    p.replay(ops);
+    let g = &p.scene.layers[layer as usize].geometry;
+    let frosts = g.under.iter().filter(|s| s.is_frost()).count();
+    (frosts, g.acrylic.len())
+}
+
+#[test]
+fn one_acrylic_call_replays_as_one_draw() {
+    let recorded_on = |layer: LayerId| {
+        let mut text = FakeText;
+        let mut p = painter(&mut text);
+        p.on(layer);
+        p.start_recording();
+        p.acrylic(LOW, 4.0, [0.1; 4], [0.0; 4], true);
+        p.take_recording()
+    };
+    let above = recorded_on(LayerId::Modal);
+    assert_eq!(replayed_on(LayerId::Modal, &above), (1, 0));
+    assert_eq!(replayed_on(LayerId::Base, &above), (1, 0), "an op of frost");
+    let on_base = recorded_on(LayerId::Base);
+    assert_eq!(replayed_on(LayerId::Modal, &on_base), (1, 0));
+    assert_eq!(replayed_on(LayerId::Base, &on_base), (0, 1));
+}
+
+#[test]
+fn a_frost_at_alpha_k_carries_k_and_keeps_its_colour() {
+    let colour = [0.1, 0.2, 0.3, 0.6];
+    let scene = scene_of(|p| {
+        p.push_xform(xf((0.0, 0.0), 1.0, 0.0, 0.25));
+        p.frost(LOW, 4.0, colour, true);
+        p.pop_xform();
+        p.push_xform(xf((0.0, 0.0), 1.0, 0.0, 0.0));
+        p.frost(LOW, 4.0, colour, true);
+        p.pop_xform();
+    });
+    let under = &scene.layers[0].geometry.under;
+    assert_eq!(under.len(), 1, "alpha 0 draws nothing");
+    assert_eq!(under[0].color, colour);
+    assert_eq!(under[0].params, [0.0, 0.25, 2.0, 1.0]);
+}
+
+/// A ring's width is a width like a stroke's: a transform's scale scales it (the radius and the
+/// rect already follow it).
+#[test]
+fn a_ring_under_a_scale_transform_is_scaled_like_everything_else() {
+    for (device, scale) in [(1.0_f32, 0.9_f32), (2.0, 0.5), (1.5, 2.0)] {
+        let mut t = FakeText;
+        let mut p: P<'_> = Painter::new(
+            device,
+            Rect::new(0.0, 0.0, 400.0, 300.0),
+            &mut t,
+            None,
+            THEME,
+        );
+        p.ring(Rect::new(10.0, 10.0, 50.0, 30.0), 4.0, 1.0, WHITE, false);
+        p.push_xform(xf((30.0, 25.0), scale, 0.0, 1.0));
+        p.ring(Rect::new(10.0, 10.0, 50.0, 30.0), 4.0, 1.0, WHITE, false);
+        p.pop_xform();
+        let under = &p.scene.layers[0].geometry.under;
+        assert_eq!(under.len(), 2);
+        assert_eq!(under[0].params[1], device, "the plain ring is 1 logical px");
+        assert!(
+            (under[1].params[1] - device * scale).abs() < 1e-5,
+            "scale {scale} at {device}: {}",
+            under[1].params[1]
+        );
     }
 }

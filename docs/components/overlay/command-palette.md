@@ -11,7 +11,7 @@ summary: 640 px search dialog over commits, branches, tags, stash, reflog, repos
 
 ## What it is
 
-Lunegit's global search dialog, renamed to the command palette (D11, D42): a 640 px dialog with one search box and grouped result sections; a footer lists the keys [L src/Lunegit.Desktop/Views/Dialogs/GlobalSearchDialogView.axaml:10-16,77,127,179,238,298]. `Ui::command_palette(key, query, &Palette, glass) -> PaletteResponse` is generic [D147]: the app passes the sections and rows it found for the query, a placeholder, the footer's left text and an error line, and reads `changed`, `activated`, `show_more` and `dismissed`. Prefixes, debounce and date parsing are the app's (Lunegit's `GlobalSearchService`), not the toolkit's. It sits on `dialog::modal_host`, so it opens, closes and traps focus as the dialog does.
+Lunegit's global search dialog, renamed to the command palette (D11, D42): a 640 px dialog with one search box and grouped result sections; a footer lists the keys [L src/Lunegit.Desktop/Views/Dialogs/GlobalSearchDialogView.axaml:10-16,77,127,179,238,298]. `Ui::command_palette(key, query, &Palette, glass) -> PaletteResponse` is generic [D147]: the app passes the sections and rows it found for the query, a placeholder, the footer's left text and an error line, and reads `changed`, `activated`, `show_more` and `dismissed`. Prefixes, debounce and date parsing are the app's (Lunegit's `GlobalSearchService`), not the toolkit's. It sits on `dialog::modal_host`, so it opens, closes and traps focus as the dialog does, and it draws the dialog's glass: a blurred scrim by default, the card `frost` of `DialogGlass.fill` with the `menu_popup_border` ring (D8, D9).
 
 ## Needs
 

@@ -1,6 +1,6 @@
 //! The `dropdown` page: a combo and the options list it opens, through the `Ui`. The legacy
 //! `dropdown` and `dropdown-flipped` scenes keep the Painter API; this page adds the hover and
-//! disabled-row scenes, the glass surface and a long list that scrolls.
+//! disabled-row scenes and a long list that scrolls.
 
 use lune_ui::input::NamedKey;
 use lune_ui::motion::MotionTier;
@@ -49,21 +49,9 @@ fn opened() -> Box<dyn PageState> {
     Box::new(Live::new(true, 0, DropdownOptions::default()))
 }
 
-/// The glass surface of the menu, open.
-fn glass() -> Box<dyn PageState> {
-    let options = DropdownOptions {
-        glass: true,
-        ..DropdownOptions::default()
-    };
-    Box::new(Live::new(true, 0, options))
-}
-
 /// Thirty options, eight rows, the selection low in the list.
 fn scrolling() -> Box<dyn PageState> {
-    let options = DropdownOptions {
-        glass: true,
-        max_rows: Some(8),
-    };
+    let options = DropdownOptions { max_rows: Some(8) };
     let mut page = Live::new(true, LONG_SELECTED, options);
     page.items = self::options(true);
     Box::new(page)
@@ -120,7 +108,6 @@ impl PageState for Live {
     }
 
     fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
-        panel.toggle(ui, "Glass surface", &mut self.options.glass);
         let mut rows = self.options.max_rows.unwrap_or(0) as f32;
         if panel.number(ui, "Rows shown (0: all)", &mut rows, (0.0, 12.0, 1.0)) {
             self.options.max_rows = (rows >= 1.0).then_some(rows as usize);
@@ -160,16 +147,6 @@ const SCENES: &[UiScene] = &[
         scale: 2.0,
         tier: MotionTier::Full,
         state: opened,
-        script: &[],
-        capture_ms: 300,
-        expect: Expect::Settled,
-    },
-    // The glass surface: the blurred page shows through the fill.
-    UiScene {
-        id: "dropdown-glass",
-        scale: 2.0,
-        tier: MotionTier::Full,
-        state: glass,
         script: &[],
         capture_ms: 300,
         expect: Expect::Settled,

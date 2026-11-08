@@ -1,4 +1,4 @@
-//! The page card (`layout.page` acceptance): the glass card and the solid inactive fill, the
+//! The page card (`layout.page` acceptance): the glass card, the
 //! margin and radius probes at scale 2, the header, the scrolling body that clamps, the pinned
 //! footer, tab order, the keyed swap in three tiers (restarting from the current look), hidden
 //! slots, a resize, keep-alive, the text limit near the rounded corners, the semantic nodes and the
@@ -29,6 +29,7 @@ const GLASS: GlassLayer = GlassLayer {
     tint: [10, 20, 30, 255],
     tint_opacity: 0.8,
     material_opacity: 0.7,
+    curve: lune_ui_core::LuminosityCurve::AVALONIA,
 };
 const UNDER: [f32; 4] = [0.05, 0.06, 0.07, 1.0];
 const MODERATE: u64 = 350;
@@ -45,7 +46,6 @@ fn id(key: &str) -> WidgetId {
 struct Cfg {
     rect: Rect,
     key: u64,
-    active: bool,
     footer: bool,
     actions_w: f32,
     body_h: f32,
@@ -59,7 +59,6 @@ impl Cfg {
         Cfg {
             rect: RECT,
             key: 1,
-            active: true,
             footer: true,
             actions_w: 80.0,
             body_h: 1200.0,
@@ -90,7 +89,6 @@ fn frame(h: &mut UiHarness, c: &Cfg) -> Out {
         let opts = PageOptions {
             title: c.title,
             subtitle: c.subtitle.then_some("Last 30 days"),
-            active: c.active,
             glass: GLASS,
             under: UNDER,
             actions_w: c.actions_w,
@@ -245,28 +243,6 @@ fn pixel_probes_at_scale_two() {
         .expect("title");
     // Text positions are logical: 16 px from the card's left and top is 32 px at this scale.
     assert_eq!((t.x - 6.0, t.y), (16.0, 16.0));
-}
-
-#[test]
-fn inactive_draws_the_fallback_fill_and_no_acrylic() {
-    let mut h = UiHarness::new(WIN);
-    let out = settled(
-        &mut h,
-        &Cfg {
-            active: false,
-            ..Cfg::new()
-        },
-    );
-    let g = &out.scene.layers[0].geometry;
-    assert!(g.acrylic.is_empty());
-    assert_eq!(DARK.window_fallback, [0x33, 0x33, 0x33, 0xFF]);
-    let fill = g
-        .under
-        .iter()
-        .find(|s| s.rect == [6.0, 0.0, 884.0, 590.0])
-        .expect("the card fill");
-    assert_eq!(fill.color, premul([0x33, 0x33, 0x33, 0xFF]));
-    assert_eq!(fill.radii, [RADIUS; 4]);
 }
 
 #[test]
@@ -464,7 +440,6 @@ fn the_nodes_are_a_group_a_scroll_area_and_a_footer_group() {
         let opts = PageOptions {
             title: "Overview",
             subtitle: None,
-            active: true,
             glass: GLASS,
             under: UNDER,
             actions_w: 0.0,
@@ -523,7 +498,6 @@ fn the_scroll_offset_survives_keep_alive() {
                     let opts = PageOptions {
                         title: "T",
                         subtitle: None,
-                        active: true,
                         glass: GLASS,
                         under: UNDER,
                         actions_w: 0.0,
@@ -792,7 +766,6 @@ fn the_body_is_cut_by_the_rounded_clip_at_the_cards_rect() {
         let opts = PageOptions {
             title: "T",
             subtitle: None,
-            active: true,
             glass: GLASS,
             under: UNDER,
             actions_w: 0.0,
@@ -905,7 +878,7 @@ fn the_layer_is_the_one_the_app_draws_on() {
     // The page draws nowhere but the layer it is called on.
     let mut h = UiHarness::new(WIN);
     let out = settled(&mut h, &Cfg::new());
-    for (i, l) in out.scene.layers.iter().enumerate() {
+    for (i, l) in out.scene.in_order().into_iter().enumerate() {
         if i != LayerId::Base as usize {
             assert!(
                 l.texts.is_empty() && l.geometry.under.is_empty(),

@@ -1,5 +1,4 @@
-//! The toolbar (`widget.toolbar` acceptance): glass while active and the solid fallback when not,
-//! the columns, each action running once and a disabled one not, the tooltip after the delay,
+//! The toolbar (`widget.toolbar` acceptance): the glass layer, the columns, each action running once and a disabled one not, the tooltip after the delay,
 //! pixel probes at scale 2, press and hover motion per tier, the labelled button's elision, and
 //! the semantic nodes.
 
@@ -30,6 +29,7 @@ const GLASS: GlassLayer = GlassLayer {
     tint: [10, 20, 30, 255],
     tint_opacity: 0.8,
     material_opacity: 0.7,
+    curve: lune_ui_core::LuminosityCurve::AVALONIA,
 };
 const UNDER: [f32; 4] = [0.05, 0.06, 0.07, 1.0];
 const NAMES: [&str; 4] = ["Fetch", "Pull", "Push", "Branch"];
@@ -55,9 +55,8 @@ fn centre(r: Rect) -> (f32, f32) {
     (r.x + r.w / 2.0, r.y + r.h / 2.0)
 }
 
-fn opts(active: bool) -> ToolbarOptions<'static> {
+fn opts() -> ToolbarOptions<'static> {
     ToolbarOptions {
-        active,
         glass: GLASS,
         under: UNDER,
         name: "Main toolbar",
@@ -73,10 +72,10 @@ struct Out {
 }
 
 /// The bar with four actions (the third disabled when `third_enabled` is false).
-fn frame(h: &mut UiHarness, active: bool, third_enabled: bool) -> Out {
+fn frame(h: &mut UiHarness, third_enabled: bool) -> Out {
     let mut clicked = Vec::new();
     let (scene, out) = h.frame(|ui| {
-        ui.toolbar("bar", BAR, &opts(active), |ui, _cols| {
+        ui.toolbar("bar", BAR, &opts(), |ui, _cols| {
             for (i, name) in NAMES.iter().enumerate() {
                 let key = name.to_lowercase();
                 let enabled = i != 2 || third_enabled;
@@ -95,18 +94,19 @@ fn frame(h: &mut UiHarness, active: bool, third_enabled: bool) -> Out {
     }
 }
 
-fn settled(h: &mut UiHarness, active: bool) -> Out {
-    frame(h, active, true);
+fn settled(h: &mut UiHarness) -> Out {
+    frame(h, true);
     h.at_ms(10);
-    frame(h, active, true);
+    frame(h, true);
     h.at_ms(2000);
-    frame(h, active, true)
+    frame(h, true)
 }
 
 #[test]
-fn active_draws_the_glass_layer_and_no_fallback_fill() {
+fn the_bar_draws_its_glass_layer_and_nothing_else() {
+    // There is no `active` option (R13): the bar is glass whatever the window's state.
     let mut h = UiHarness::new(WIN);
-    let out = settled(&mut h, true);
+    let out = settled(&mut h);
     let g = &out.scene.layers[0].geometry;
     assert_eq!(g.acrylic.len(), 1);
     let a = g.acrylic[0].shape;
@@ -114,18 +114,6 @@ fn active_draws_the_glass_layer_and_no_fallback_fill() {
     assert_eq!(a.color, GLASS.premultiplied());
     assert_eq!(a.under, UNDER);
     assert!(g.under.is_empty(), "nothing else is filled at rest");
-}
-
-#[test]
-fn inactive_draws_the_window_fallback_fill_and_no_acrylic() {
-    let mut h = UiHarness::new(WIN);
-    let out = settled(&mut h, false);
-    let g = &out.scene.layers[0].geometry;
-    assert!(g.acrylic.is_empty());
-    assert_eq!(g.under.len(), 1);
-    assert_eq!(g.under[0].color, premul(DARK.window_fallback));
-    assert_eq!(g.under[0].rect, [0.0, 0.0, 900.0, 52.0]);
-    assert_eq!(DARK.window_fallback, [0x33, 0x33, 0x33, 0xFF]);
     assert_eq!(out.repaint, Repaint::Idle);
 }
 
@@ -134,7 +122,7 @@ fn the_columns_are_the_padded_grid_with_a_zero_wide_middle() {
     let mut cols = None;
     let mut h = UiHarness::new(WIN);
     h.frame(|ui| {
-        cols = Some(ui.toolbar("bar", BAR, &opts(true), |_, c| c));
+        cols = Some(ui.toolbar("bar", BAR, &opts(), |_, c| c));
     });
     let c = cols.expect("ran");
     // Padding 0 left, 6 top and bottom, 8 right: the inner box is 892 by 40 at (0, 6).
@@ -148,35 +136,35 @@ fn the_columns_are_the_padded_grid_with_a_zero_wide_middle() {
 fn each_action_runs_once_by_click_and_by_key() {
     for i in 0..NAMES.len() {
         let mut h = UiHarness::new(WIN);
-        frame(&mut h, true, true);
+        frame(&mut h, true);
         let (x, y) = centre(action_rect(i));
         h.input.pointer_to(x, y).click(PointerButton::Primary);
         h.at_ms(10);
-        assert_eq!(frame(&mut h, true, true).clicked, vec![i], "click {i}");
+        assert_eq!(frame(&mut h, true).clicked, vec![i], "click {i}");
         h.at_ms(20);
-        assert!(frame(&mut h, true, true).clicked.is_empty(), "once");
+        assert!(frame(&mut h, true).clicked.is_empty(), "once");
     }
     // Tab to the first action, Enter then Space.
     for key in [NamedKey::Enter, NamedKey::Space] {
         let mut h = UiHarness::new(WIN);
-        frame(&mut h, true, true);
+        frame(&mut h, true);
         h.input.key_down(Key::Named(NamedKey::Tab), None);
         h.at_ms(10);
-        frame(&mut h, true, true);
+        frame(&mut h, true);
         h.input.key_down(Key::Named(key), None);
         h.at_ms(20);
-        assert_eq!(frame(&mut h, true, true).clicked, vec![0], "{key:?}");
+        assert_eq!(frame(&mut h, true).clicked, vec![0], "{key:?}");
     }
 }
 
 #[test]
 fn a_disabled_action_does_not_run_and_is_marked_disabled() {
     let mut h = UiHarness::new(WIN);
-    frame(&mut h, true, false);
+    frame(&mut h, false);
     let (x, y) = centre(action_rect(2));
     h.input.pointer_to(x, y).click(PointerButton::Primary);
     h.at_ms(10);
-    let out = frame(&mut h, true, false);
+    let out = frame(&mut h, false);
     assert!(out.clicked.is_empty());
     let node = out.tree.get(id("push")).expect("node");
     assert!(node.states.contains(State::Disabled));
@@ -184,35 +172,32 @@ fn a_disabled_action_does_not_run_and_is_marked_disabled() {
     assert!(!node.actions.contains(Action::Default));
     // Tab skips it and the others still work.
     let mut h = UiHarness::new(WIN);
-    frame(&mut h, true, false);
+    frame(&mut h, false);
     for _ in 0..3 {
         h.input.key_down(Key::Named(NamedKey::Tab), None);
         h.at_ms(10);
-        frame(&mut h, true, false);
+        frame(&mut h, false);
     }
     h.input.key_down(Key::Named(NamedKey::Enter), None);
     h.at_ms(20);
-    assert_eq!(frame(&mut h, true, false).clicked, vec![3], "Push skipped");
+    assert_eq!(frame(&mut h, false).clicked, vec![3], "Push skipped");
 }
 
 fn shown(scene: &Scene) -> bool {
-    !scene.layers[LayerId::Popup as usize]
-        .geometry
-        .under
-        .is_empty()
+    !scene.merged(LayerId::Popup).geometry.under.is_empty()
 }
 
 #[test]
 fn a_tooltip_shows_after_the_delay_and_names_the_action() {
     let mut h = UiHarness::new(WIN);
-    frame(&mut h, true, true);
+    frame(&mut h, true);
     let (x, y) = centre(action_rect(1));
     h.input.pointer_to(x, y);
     h.at_ms(10);
-    frame(&mut h, true, true);
+    frame(&mut h, true);
     // The hover tween has settled by 300 ms: only the dwell is pending.
     h.at_ms(300);
-    let pending = frame(&mut h, true, true);
+    let pending = frame(&mut h, true);
     assert!(!shown(&pending.scene));
     assert_eq!(
         pending.repaint,
@@ -220,9 +205,9 @@ fn a_tooltip_shows_after_the_delay_and_names_the_action() {
         "waiting for the dwell, not moving"
     );
     h.at_ms(809);
-    assert!(!shown(&frame(&mut h, true, true).scene), "809 ms");
+    assert!(!shown(&frame(&mut h, true).scene), "809 ms");
     h.at_ms(810);
-    let at = frame(&mut h, true, true);
+    let at = frame(&mut h, true);
     assert!(shown(&at.scene), "after the delay");
     let node = at.tree.get(id("pull")).expect("node");
     assert_eq!(node.name, "Pull");
@@ -230,34 +215,34 @@ fn a_tooltip_shows_after_the_delay_and_names_the_action() {
     // Leaving hides it.
     h.input.pointer_to(700.0, 150.0);
     h.at_ms(1000);
-    frame(&mut h, true, true);
+    frame(&mut h, true);
     h.at_ms(1200);
-    assert!(!shown(&frame(&mut h, true, true).scene));
+    assert!(!shown(&frame(&mut h, true).scene));
 }
 
 #[test]
 fn a_disabled_action_still_shows_its_tooltip() {
     let mut h = UiHarness::new(WIN);
-    frame(&mut h, true, false);
+    frame(&mut h, false);
     let (x, y) = centre(action_rect(2));
     h.input.pointer_to(x, y);
     h.at_ms(10);
-    frame(&mut h, true, false);
+    frame(&mut h, false);
     h.at_ms(900);
-    assert!(shown(&frame(&mut h, true, false).scene));
+    assert!(shown(&frame(&mut h, false).scene));
 }
 
 #[test]
 fn pixel_probes_at_scale_two() {
     let mut h = UiHarness::new(WIN);
     h.input.set_scale(2.0);
-    frame(&mut h, true, true);
+    frame(&mut h, true);
     let (x, y) = centre(action_rect(1));
     h.input.pointer_to(x, y);
     h.at_ms(10);
-    frame(&mut h, true, true);
+    frame(&mut h, true);
     h.at_ms(2000);
-    let out = frame(&mut h, true, true);
+    let out = frame(&mut h, true);
     let under = &out.scene.layers[0].geometry.under;
     assert_eq!(under.len(), 1, "the hover fill");
     // 80 by 80 px, radius 12 px.
@@ -292,16 +277,16 @@ fn press_and_hover_conform_and_reduced_snaps_only_the_scale() {
     let scale_at = |tier: MotionTier, ms: u64| {
         let mut h = UiHarness::new(WIN);
         h.tier = tier;
-        frame(&mut h, true, true);
+        frame(&mut h, true);
         let (x, y) = centre(action_rect(0));
         h.input.pointer_to(x, y);
         h.at_ms(10);
-        frame(&mut h, true, true);
+        frame(&mut h, true);
         h.input.press(PointerButton::Primary);
         h.at_ms(20);
-        frame(&mut h, true, true);
+        frame(&mut h, true);
         h.at_ms(20 + ms);
-        let out = frame(&mut h, true, true);
+        let out = frame(&mut h, true);
         let under = &out.scene.layers[0].geometry.under;
         (under[0].rect[2] / ACTION_SIZE, out.repaint)
     };
@@ -325,7 +310,7 @@ const LABEL_RECT: Rect = Rect::new(300.0, 6.0, 200.0, 40.0);
 fn label_frame(h: &mut UiHarness, rect: Rect, text: &str) -> (Scene, bool, SemanticTree) {
     let mut clicked = false;
     let (scene, out) = h.frame(|ui| {
-        ui.toolbar("bar", BAR, &opts(true), |ui, _| {
+        ui.toolbar("bar", BAR, &opts(), |ui, _| {
             clicked = ui
                 .toolbar_label("branch", rect, icon::SYNC, text, "Branch")
                 .clicked;
@@ -425,7 +410,7 @@ fn label_width_fits_the_content_and_caps_the_text() {
 #[test]
 fn the_bar_is_a_toolbar_node_holding_the_named_actions() {
     let mut h = UiHarness::new(WIN);
-    let out = frame(&mut h, true, true);
+    let out = frame(&mut h, true);
     let bar = out.tree.get(bar_id()).expect("toolbar node");
     assert_eq!(
         (bar.role, bar.name.as_str()),

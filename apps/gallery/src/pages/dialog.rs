@@ -1,7 +1,7 @@
 //! The `dialog` page: a row of buttons over the gallery background, one of which opens a modal
 //! dialog through `Ui::dialog`. The scenes freeze it closed, half way through the open, and half
 //! way through the close (the app stops calling the dialog, the Ui keeps drawing it); then the
-//! variants (`Ui::dialog_with`: the form width, the blurred scrim, a disabled confirm) and the
+//! variants (`Ui::dialog_with`: the form width, the plain scrim, a disabled confirm) and the
 //! overlays a dialog's body opens, which draw and take input above it: a combo's list, a popover,
 //! a tooltip, a glass menu and a nested dialog.
 
@@ -44,8 +44,8 @@ enum Variant {
     Confirm,
     /// The 600 px form width, a body in two columns.
     Form,
-    /// The confirm dialog over a blurred scrim.
-    Blur,
+    /// The confirm dialog over a plain, unblurred scrim.
+    Plain,
     /// The confirm dialog with its confirm button disabled.
     Disabled,
     /// A combo in the body, its list open.
@@ -65,7 +65,7 @@ impl Variant {
     const ALL: [(&'static str, Variant); 9] = [
         ("Confirm", Variant::Confirm),
         ("Form", Variant::Form),
-        ("Blurred scrim", Variant::Blur),
+        ("Plain scrim", Variant::Plain),
         ("Disabled confirm", Variant::Disabled),
         ("Combo list", Variant::Combo),
         ("Popover", Variant::Popover),
@@ -93,6 +93,9 @@ struct Dialogs {
     child: bool,
     /// The form's four fields.
     values: [String; 4],
+    /// A scene's fixture: the two captions the overlay of a variant lands on (R7). The live page
+    /// does not draw them.
+    fixture: bool,
 }
 
 /// The form's starting values, in the order of [`FORM_FIELDS`].
@@ -107,6 +110,7 @@ fn variant(variant: Variant) -> Box<dyn PageState> {
         stop_at: None,
         child: variant.has_child(),
         values: form_values(),
+        fixture: true,
     })
 }
 
@@ -117,6 +121,7 @@ fn live() -> Box<dyn PageState> {
         stop_at: None,
         child: false,
         values: form_values(),
+        fixture: false,
     })
 }
 
@@ -133,6 +138,7 @@ fn closing() -> Box<dyn PageState> {
             stop_at: None,
             child: false,
             values: form_values(),
+            fixture: true,
         }
     })
 }
@@ -142,7 +148,11 @@ fn form() -> Box<dyn PageState> {
 }
 
 fn blur() -> Box<dyn PageState> {
-    variant(Variant::Blur)
+    variant(Variant::Confirm)
+}
+
+fn plain() -> Box<dyn PageState> {
+    variant(Variant::Plain)
 }
 
 fn disabled() -> Box<dyn PageState> {
@@ -170,11 +180,7 @@ fn nested() -> Box<dyn PageState> {
 }
 
 fn glass() -> DialogGlass {
-    DialogGlass {
-        panel: lunegit_dark::PANEL.premultiplied(),
-        fill: lunegit_dark::WINDOW.premultiplied(),
-        noise: true,
-    }
+    DialogGlass::of(&lunegit_dark::THEME)
 }
 
 impl PageState for Dialogs {
@@ -184,10 +190,11 @@ impl PageState for Dialogs {
         heading(ui, "A DIALOG OVER THE PAGE", x, y);
         let by = y + 20.0;
         let mut bx = x;
+        // Secondaries on the left, the primary on their right.
         for (key, text, kind) in [
-            ("open", "Open dialog", ButtonKind::Primary),
             ("other", "Page action", ButtonKind::Secondary),
             ("more", "Another", ButtonKind::Secondary),
+            ("open", "Open dialog", ButtonKind::Primary),
         ] {
             let w = button_width(ui.painter(), text);
             let r = ui.button(key, Rect::new(bx, by, w, 32.0), text, kind);
@@ -207,6 +214,7 @@ impl PageState for Dialogs {
             let kind = self.variant;
             let child = &mut self.child;
             let values = &mut self.values;
+            let fixture = self.fixture;
             let d = dialog_of(kind);
             let options = DialogOptions {
                 width: if kind == Variant::Form {
@@ -214,11 +222,11 @@ impl PageState for Dialogs {
                 } else {
                     DialogWidth::Confirm
                 },
-                scrim_blur: kind == Variant::Blur,
+                scrim_blur: kind != Variant::Plain,
                 confirm_enabled: kind != Variant::Disabled,
             };
             let r = ui.dialog_with("dialog", &d, &options, &glass(), |ui, bx, by, bw| {
-                body(ui, kind, child, values, bx, by, bw);
+                body(ui, kind, child, values, fixture, (bx, by, bw));
             });
             if r.confirmed || r.cancelled {
                 self.open = false;
@@ -246,7 +254,7 @@ impl PageState for Dialogs {
 /// What each variant says.
 fn dialog_of(kind: Variant) -> Dialog<'static> {
     match kind {
-        Variant::Confirm | Variant::Blur | Variant::Disabled => Dialog {
+        Variant::Confirm | Variant::Plain | Variant::Disabled => Dialog {
             title: "Discard changes",
             message: "The document has unsaved changes. Closing it will discard them.",
             extra_h: 28.0,
@@ -278,16 +286,15 @@ fn body(
     kind: Variant,
     child: &mut bool,
     values: &mut [String; 4],
-    bx: f32,
-    by: f32,
-    bw: f32,
+    fixture: bool,
+    (bx, by, bw): (f32, f32, f32),
 ) {
     match kind {
-        Variant::Confirm | Variant::Blur | Variant::Disabled => {
+        Variant::Confirm | Variant::Plain | Variant::Disabled => {
             caption(ui, "3 files changed since the last save.", bx, by + 12.0);
         }
         Variant::Form => form_body(ui, values, bx, by, bw),
-        _ => anchored(ui, kind, child, bx, by),
+        _ => anchored(ui, kind, child, fixture, bx, by),
     }
 }
 
@@ -346,17 +353,19 @@ const MENU_ROWS: [MenuRow<'static>; 3] = [
     },
 ];
 
-/// An anchor, two captions under it, and the overlay the variant opens over them: the overlay
-/// lands on the captions, so the picture shows which one is on top.
-fn anchored(ui: &mut Ui<'_>, kind: Variant, child: &mut bool, bx: f32, by: f32) {
+/// An anchor and the overlay the variant opens; in a scene (`fixture`) two captions sit under
+/// the anchor, so the overlay lands on them and the picture shows which one is on top.
+fn anchored(ui: &mut Ui<'_>, kind: Variant, child: &mut bool, fixture: bool, bx: f32, by: f32) {
     let anchor = Rect::new(bx, by + 4.0, 160.0, 28.0);
-    caption(
-        ui,
-        "3 files changed since the last save.",
-        bx + 40.0,
-        by + 46.0,
-    );
-    caption(ui, "Review them first.", bx + 70.0, by + 72.0);
+    if fixture {
+        caption(
+            ui,
+            "3 files changed since the last save.",
+            bx + 40.0,
+            by + 46.0,
+        );
+        caption(ui, "Review them first.", bx + 70.0, by + 72.0);
+    }
     match kind {
         Variant::Combo => {
             let c = ui.combo("branch", anchor, "main", child, "Branch");
@@ -482,9 +491,11 @@ const SCENES: &[UiScene] = &[
         expect: Expect::Moving,
     },
     settled("dialog-form", form),
-    // The scrim blurs the window content at sigma 8; the page behind has a heading, buttons and
+    // The scrim blurs what is behind it at sigma 8; the page behind has a heading, buttons and
     // a caption to show it.
     settled("dialog-scrim-blur", blur),
+    // `scrim_blur: false`: the plain scrim, no request anywhere (D26).
+    settled("dialog-scrim-plain", plain),
     settled("dialog-confirm-disabled", disabled),
     // The overlays below open in the dialog's body and draw above the dialog's own text.
     settled("dialog-combo-open", combo),
@@ -558,14 +569,14 @@ mod tests {
     /// dialog's own layer (logical px; the scenes run at scale 2): the overlay's surface is above
     /// the dialog's text.
     fn covers_dialog_text(scene: &Scene, layer: LayerId) -> bool {
-        let over = &scene.layers[layer as usize];
+        let over = &scene.merged(layer);
         let shapes = over
             .geometry
             .under
             .iter()
             .map(|s| s.rect)
             .chain(over.geometry.acrylic.iter().map(|a| a.shape.rect));
-        let texts = &scene.layers[LayerId::Modal as usize].texts;
+        let texts = &scene.merged(LayerId::Modal).texts;
         shapes.into_iter().any(|r| {
             texts.iter().any(|t| {
                 let (x, y) = (t.x * 2.0, t.y * 2.0);
@@ -593,10 +604,7 @@ mod tests {
                 "{id}: fill above the text"
             );
             assert!(
-                scene.layers[LayerId::Popup as usize]
-                    .geometry
-                    .under
-                    .is_empty(),
+                scene.merged(LayerId::Popup).geometry.under.is_empty(),
                 "{id}: nothing on Popup"
             );
             match role {
@@ -631,10 +639,17 @@ mod tests {
             .expect("dialog")
             .bounds;
         assert_eq!(card.w, 600.0);
-        assert!(form.backdrop.is_none());
+        assert!(
+            form.backdrops().next().is_some(),
+            "the scrim blurs by default"
+        );
         let (blur, _) = run("dialog-scrim-blur");
-        let b = blur.backdrop.expect("blur");
-        assert_eq!((b.layer, b.sigma), (LayerId::Modal as usize, 8.0));
+        assert_eq!(blur.merged(LayerId::Modal).backdrops[0].sigma, 8.0);
+        let (plain, _) = run("dialog-scrim-plain");
+        assert!(
+            plain.backdrops().next().is_none(),
+            "the plain scrim asks for none"
+        );
         let (_, out) = run("dialog-confirm-disabled");
         let confirm = out
             .tree

@@ -1,5 +1,5 @@
 //! The `kanban-board` page: a live board of three columns on a model the page changes, its error,
-//! empty and inactive states, a card being dragged and a card landing.
+//! empty state, a card being dragged and a card landing.
 
 use lune_ui::input::NamedKey;
 use lune_ui::lunegit_dark::{CARD, WINDOW};
@@ -105,17 +105,15 @@ const ERROR: BoardError<'static> = BoardError {
 struct Board {
     columns: Vec<Col>,
     error: bool,
-    active: bool,
     added: u64,
     /// Draw the board inside `with_enabled(false, ..)`.
     disabled: bool,
 }
 
-fn board(columns: Vec<Col>, error: bool, active: bool) -> Box<dyn PageState> {
+fn board(columns: Vec<Col>, error: bool) -> Box<dyn PageState> {
     Box::new(Board {
         columns,
         error,
-        active,
         added: 100,
         disabled: false,
     })
@@ -125,28 +123,23 @@ fn disabled() -> Box<dyn PageState> {
     Box::new(Board {
         columns: model(),
         error: false,
-        active: true,
         added: 100,
         disabled: true,
     })
 }
 
 fn live() -> Box<dyn PageState> {
-    board(model(), false, true)
+    board(model(), false)
 }
 
 fn errored() -> Box<dyn PageState> {
-    board(model(), true, true)
-}
-
-fn inactive() -> Box<dyn PageState> {
-    board(model(), false, false)
+    board(model(), true)
 }
 
 fn empty() -> Box<dyn PageState> {
     let mut columns = model();
     columns.iter_mut().for_each(|c| c.cards.clear());
-    board(columns, false, true)
+    board(columns, false)
 }
 
 impl Board {
@@ -201,7 +194,6 @@ impl PageState for Board {
             title: "Roadmap",
             columns: &columns,
             error: self.error.then_some(&ERROR),
-            active: self.active,
             glass: WINDOW,
             under: CARD.premultiplied(),
             name: "",
@@ -228,7 +220,6 @@ impl PageState for Board {
     }
 
     fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
-        panel.toggle(ui, "Window active", &mut self.active);
         panel.toggle(ui, "Error view", &mut self.error);
         let mut enabled = !self.disabled;
         if panel.toggle(ui, "Enabled", &mut enabled) {
@@ -336,15 +327,6 @@ const SCENES: &[UiScene] = &[
         expect: Expect::Settled,
     },
     UiScene {
-        id: "kanban-board-inactive",
-        scale: 2.0,
-        tier: MotionTier::Full,
-        state: inactive,
-        script: &[],
-        capture_ms: 0,
-        expect: Expect::Settled,
-    },
-    UiScene {
         id: "kanban-board-empty",
         scale: 2.0,
         tier: MotionTier::Full,
@@ -433,7 +415,7 @@ mod tests {
             .find(|n| n.name == "Sketch the release notes");
         assert!(source.expect("a card").states.contains(State::Dragging));
         assert_eq!(items(&out), 6);
-        let ghost = &scene.layers[LayerId::Popup as usize].geometry.under;
+        let ghost = &scene.merged(LayerId::Popup).geometry.under;
         assert!(!ghost.is_empty(), "the ghost is above the board");
         let line = scene.layers[LayerId::Base as usize].geometry.under.iter();
         let accent = premul(THEME.accent);
@@ -451,11 +433,6 @@ mod tests {
         let focused = out.focused.and_then(|f| out.tree.get(f)).expect("a focus");
         assert_eq!(focused.name, "Sketch the release notes");
 
-        let (scene, _) = run("kanban-board-inactive");
-        let shapes = scene.layers[LayerId::Base as usize].geometry.under.iter();
-        let fallback = premul(THEME.window_fallback);
-        assert_eq!(shapes.filter(|s| s.color == fallback).count(), 1);
-
         let (_, out) = run("kanban-board-empty");
         assert_eq!(items(&out), 0);
         let hints = out.tree.nodes.iter().filter(|n| n.name == "No cards yet.");
@@ -469,7 +446,7 @@ mod tests {
             "the model moved"
         );
         // Device px at scale 2; it left at the pointer's place, the grab point behind it.
-        let ghost = scene.layers[LayerId::Popup as usize].geometry.under[0].rect[0] / 2.0;
+        let ghost = scene.merged(LayerId::Popup).geometry.under[0].rect[0] / 2.0;
         let left_at = SECOND.0 - (FIRST.0 - 45.0);
         assert!(ghost > second && ghost < left_at, "half way: {ghost}");
     }
@@ -479,7 +456,6 @@ mod tests {
         let mut b = Board {
             columns: model(),
             error: false,
-            active: true,
             added: 100,
             disabled: false,
         };

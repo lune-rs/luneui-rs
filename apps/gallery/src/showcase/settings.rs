@@ -5,15 +5,18 @@
 //! The showcase answers the `PageState` hooks from it, and the window applies them. The settings
 //! belong to the shell, not to a page: they survive a change of page and go back only by Reset.
 //!
-//! Everything here is the gallery's. Where the library fixes a value (the noise strength, the
-//! luminosity constants, the blur kernel's cap) the control is a switch or stops at the limit.
+//! Everything here is the gallery's. The frame values the library takes (the noise strength, the
+//! luminosity curve, the blur kernel's cap and divisor) each have a control that reaches the frame
+//! through [`FrameTweaks`] or the composed theme.
 
 use lune_ui::access::{Node, Role, State};
+use lune_ui::acrylic::NOISE_OPACITY;
 use lune_ui::color::Rgba;
 use lune_ui::lunegit_dark::THEME;
 use lune_ui::material::Material;
 use lune_ui::motion::MotionTier;
 use lune_ui::paint::Rect;
+use lune_ui::scene::BlurLimits;
 use lune_ui::text::{Spec, Style};
 use lune_ui::theme::{AcrylicLevel, DARK, Theme, ThemeGlass};
 use lune_ui::ui::{Sense, Ui};
@@ -59,9 +62,17 @@ pub(crate) const ZOOMS: [(&str, f32); 3] = [("1x", 1.0), ("1.5x", 1.5), ("2x", 2
 /// The speed range: 0.1x to 2x of real time.
 pub(crate) const SPEED: (f32, f32) = (0.1, 2.0);
 
-/// The blur kernel stops growing at 48 px (`radius = ceil(3 sigma)`, capped), so past sigma 16
-/// the picture does not change. The slider stops there.
-pub(crate) const SIGMA_MAX: f32 = 16.0;
+/// The most blur sigma the slider offers, in physical pixels. The kernel is `ceil(3 sigma /
+/// downsample)` texels a side, capped: at the default divisor 8 and cap 48 it stops growing at
+/// sigma 128, and at the finest divisor 2 and the widest cap 128 at sigma 85, so the slider
+/// never runs past what the limits can show.
+pub(crate) const SIGMA_MAX: f32 = 64.0;
+/// The strongest noise the slider offers; the default is `NOISE_OPACITY` and 0 is none.
+pub(crate) const NOISE_MAX: f32 = 0.1;
+/// The kernel cap the slider offers, in texels: 4 up to the toolkit's own limit.
+pub(crate) const KERNEL_CAP: (f32, f32) = (4.0, BlurLimits::KERNEL_CAP_MAX);
+/// The divisors of the blur's working picture, finest first.
+pub(crate) const DOWNSAMPLES: [u32; 3] = [2, 4, 8];
 /// The most saturation the slider offers.
 pub(crate) const SATURATION_MAX: f32 = 3.0;
 
@@ -106,6 +117,40 @@ pub(crate) struct LayerEdit {
     pub(crate) material_opacity: Option<f32>,
 }
 
+/// What the user changed about the luminosity curve of the glass layers (all three share it);
+/// `None` keeps the theme's. The values are in 0 to 1.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub(crate) struct CurveEdit {
+    pub(crate) mid_point: Option<f32>,
+    pub(crate) white_max_opacity: Option<f32>,
+    pub(crate) mid_point_max_opacity: Option<f32>,
+    pub(crate) black_max_opacity: Option<f32>,
+}
+
+/// What the user changed about the one glass every floating surface draws (`menu_glass` and
+/// `menu_popup_border`, D8); `None` keeps the theme's.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub(crate) struct SurfaceEdit {
+    /// The tint's grey level, 0 to 255: the red, green and blue of `menu_glass`.
+    pub(crate) tint: Option<f32>,
+    /// The tint's opacity, 0 to 1: the alpha of `menu_glass`.
+    pub(crate) opacity: Option<f32>,
+    /// The ring's alpha, 0 to 255: the alpha of `menu_popup_border`.
+    pub(crate) border: Option<f32>,
+}
+
+/// The blur kernel's half width in texels at scale 1: `ceil(3 sigma / downsample)`, capped.
+pub(crate) fn kernel_radius(sigma: f32, kernel_cap: f32, downsample: u32) -> f32 {
+    (3.0 * sigma / downsample.max(1) as f32)
+        .ceil()
+        .min(kernel_cap)
+}
+
+/// A 0 to 255 slider value as a channel.
+fn channel(v: f32) -> u8 {
+    v.round().clamp(0.0, 255.0) as u8
+}
+
 /// Every global setting.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Settings {
@@ -121,10 +166,18 @@ pub(crate) struct Settings {
     pub(crate) acrylic: AcrylicLevel,
     /// Window, panel and card.
     pub(crate) layers: [LayerEdit; 3],
+    /// The glass of the floating surfaces.
+    pub(crate) surface: SurfaceEdit,
     /// The durations of [`DURATIONS`] in milliseconds; `None` keeps the theme's.
     pub(crate) durations: [Option<f32>; 6],
-    pub(crate) noise: bool,
+    /// The luminosity curve of the three glass layers.
+    pub(crate) curve: CurveEdit,
+    /// The opacity of the noise texture; 0 is none.
+    pub(crate) noise: f32,
     pub(crate) sigma: f32,
+    /// The blur kernel's cap, in texels, and the divisor of its working picture.
+    pub(crate) kernel_cap: f32,
+    pub(crate) downsample: u32,
     pub(crate) saturation: f32,
     pub(crate) material: Material,
     /// What came of the last attempt to put `material` on the window.
@@ -142,9 +195,13 @@ impl Default for Settings {
             zoom: 1.0,
             acrylic: AcrylicLevel::Default,
             layers: [LayerEdit::default(); 3],
+            surface: SurfaceEdit::default(),
             durations: [None; 6],
-            noise: true,
+            curve: CurveEdit::default(),
+            noise: NOISE_OPACITY,
             sigma: BLUR_SIGMA,
+            kernel_cap: BlurLimits::KERNEL_CAP,
+            downsample: BlurLimits::DOWNSAMPLE,
             saturation: BLUR_SATURATION,
             // The material the window is created with.
             material: Material::Vibrancy,
@@ -197,6 +254,28 @@ impl Settings {
             if let Some(v) = edit.material_opacity {
                 layer.material_opacity = v;
             }
+            let curve = &mut layer.curve;
+            let c = self.curve;
+            for (slot, edit) in [
+                (&mut curve.mid_point, c.mid_point),
+                (&mut curve.white_max_opacity, c.white_max_opacity),
+                (&mut curve.mid_point_max_opacity, c.mid_point_max_opacity),
+                (&mut curve.black_max_opacity, c.black_max_opacity),
+            ] {
+                if let Some(v) = edit {
+                    *slot = f64::from(v);
+                }
+            }
+        }
+        if let Some(v) = self.surface.tint {
+            let g = channel(v);
+            theme.menu_glass[..3].fill(g);
+        }
+        if let Some(v) = self.surface.opacity {
+            theme.menu_glass[3] = channel(v * 255.0);
+        }
+        if let Some(v) = self.surface.border {
+            theme.menu_popup_border[3] = channel(v);
         }
         let m = &mut theme.motion;
         let ms = |v: f32| std::time::Duration::from_millis(v.max(0.0).round() as u64);
@@ -229,6 +308,10 @@ impl Settings {
             blur_sigma: self.sigma,
             saturation: self.saturation,
             noise: self.noise,
+            blur: BlurLimits {
+                kernel_cap: self.kernel_cap,
+                downsample: self.downsample,
+            },
         }
     }
 
@@ -415,8 +498,103 @@ impl Settings {
         if col.radio(ui, "level", &options, &mut level, "Acrylic level") {
             self.acrylic = levels[level as usize % levels.len()].1;
         }
-        col.toggle(ui, "noise", "Noise", &mut self.noise);
-        col.note(ui, "The noise strength is fixed in the toolkit.");
+        col.slider(
+            ui,
+            "noise",
+            "Noise",
+            &mut self.noise,
+            (0.0, NOISE_MAX, 0.0025),
+            |v| {
+                if v <= 0.0 {
+                    "off".to_owned()
+                } else {
+                    format!("{v:.4}")
+                }
+            },
+        );
+        col.label(ui, "Luminosity curve");
+        let shown = leveled.window.curve;
+        let rows: [(&str, &str, f64, &mut Option<f32>); 4] = [
+            (
+                "lum-mid",
+                "Mid point",
+                shown.mid_point,
+                &mut self.curve.mid_point,
+            ),
+            (
+                "lum-white",
+                "White max",
+                shown.white_max_opacity,
+                &mut self.curve.white_max_opacity,
+            ),
+            (
+                "lum-middle",
+                "Mid max",
+                shown.mid_point_max_opacity,
+                &mut self.curve.mid_point_max_opacity,
+            ),
+            (
+                "lum-black",
+                "Black max",
+                shown.black_max_opacity,
+                &mut self.curve.black_max_opacity,
+            ),
+        ];
+        for (key, label, current, edit) in rows {
+            let mut v = edit.unwrap_or(current as f32);
+            if col.slider(ui, key, label, &mut v, (0.0, 1.0, 0.0), |v| {
+                format!("{v:.2}")
+            }) {
+                *edit = Some(v);
+            }
+        }
+        col.note(ui, "How a dark or light tint suppresses its opacity.");
+
+        col.label(ui, "Floating surfaces");
+        let current = self.leveled(self.base);
+        let mut v = self
+            .surface
+            .tint
+            .unwrap_or(f32::from(current.menu_glass[0]));
+        if col.slider(
+            ui,
+            "glass-tint",
+            "Glass tint",
+            &mut v,
+            (0.0, 255.0, 1.0),
+            |v| format!("{v:.0}"),
+        ) {
+            self.surface.tint = Some(v);
+        }
+        let mut v = self
+            .surface
+            .opacity
+            .unwrap_or(f32::from(current.menu_glass[3]) / 255.0);
+        if col.slider(
+            ui,
+            "glass-opacity",
+            "Glass opacity",
+            &mut v,
+            (0.0, 1.0, 0.0),
+            |v| format!("{v:.2}"),
+        ) {
+            self.surface.opacity = Some(v);
+        }
+        let mut v = self
+            .surface
+            .border
+            .unwrap_or(f32::from(current.menu_popup_border[3]));
+        if col.slider(
+            ui,
+            "glass-border",
+            "Glass border",
+            &mut v,
+            (0.0, 255.0, 1.0),
+            |v| format!("{v:.0}"),
+        ) {
+            self.surface.border = Some(v);
+        }
+        col.note(ui, "Menus, lists, tooltips, toasts, dialogs.");
 
         col.section(ui, "BLUR");
         col.slider(
@@ -441,7 +619,33 @@ impl Settings {
             (0.0, SATURATION_MAX, 0.1),
             |v| format!("{v:.1}"),
         );
-        col.note(ui, "The kernel stops at 48 px: sigma 16.");
+        col.slider(
+            ui,
+            "kernel-cap",
+            "Kernel cap",
+            &mut self.kernel_cap,
+            (KERNEL_CAP.0, KERNEL_CAP.1, 1.0),
+            |v| format!("{v:.0} texels"),
+        );
+        let options: Vec<RadioOption<'_>> = DOWNSAMPLES
+            .iter()
+            .map(|d| RadioOption {
+                key: u64::from(*d),
+                label: match d {
+                    2 => "1/2",
+                    4 => "1/4",
+                    _ => "1/8",
+                },
+                enabled: true,
+            })
+            .collect();
+        col.label(ui, "Working size");
+        let mut chosen = u64::from(self.downsample);
+        if col.radio(ui, "downsample", &options, &mut chosen, "Blur working size") {
+            self.downsample = chosen as u32;
+        }
+        let radius = kernel_radius(self.sigma, self.kernel_cap, self.downsample);
+        col.note(ui, &format!("The kernel is {radius:.0} texels a side."));
 
         col.section(ui, "OS MATERIAL");
         let options: Vec<RadioOption<'_>> = MATERIALS
@@ -676,23 +880,210 @@ mod tests {
     }
 
     #[test]
+    fn each_glass_slider_changes_its_own_token_and_only_that() {
+        let base = Settings::default().theme();
+        // Tint: the grey of `menu_glass`; its alpha stays.
+        let mut s = Settings::default();
+        s.surface.tint = Some(90.0);
+        let t = s.theme();
+        assert_eq!(t.menu_glass, [90, 90, 90, base.menu_glass[3]]);
+        assert_eq!(
+            Theme {
+                menu_glass: base.menu_glass,
+                ..t
+            },
+            base
+        );
+        // Opacity: the alpha of `menu_glass`; its grey stays.
+        let mut s = Settings::default();
+        s.surface.opacity = Some(0.25);
+        let t = s.theme();
+        assert_eq!(
+            t.menu_glass,
+            [
+                base.menu_glass[0],
+                base.menu_glass[1],
+                base.menu_glass[2],
+                64
+            ]
+        );
+        assert_eq!(
+            Theme {
+                menu_glass: base.menu_glass,
+                ..t
+            },
+            base
+        );
+        // Border: the alpha of `menu_popup_border`; its colour stays.
+        let mut s = Settings::default();
+        s.surface.border = Some(200.0);
+        let t = s.theme();
+        assert_eq!(t.menu_popup_border[3], 200);
+        assert_eq!(t.menu_popup_border[..3], base.menu_popup_border[..3]);
+        assert_eq!(
+            Theme {
+                menu_popup_border: base.menu_popup_border,
+                ..t
+            },
+            base
+        );
+    }
+
+    #[test]
+    fn a_page_theme_keeps_its_glass_and_the_sliders_go_over_it() {
+        let mut page = THEME;
+        page.menu_glass = [10, 20, 30, 100];
+        let mut s = Settings::default();
+        assert_eq!(s.compose(page), page, "the defaults change nothing");
+        s.surface.opacity = Some(1.0);
+        assert_eq!(s.compose(page).menu_glass, [10, 20, 30, 255]);
+    }
+
+    #[test]
     fn reset_restores_every_setting() {
         let mut s = Settings::default();
         s.set_theme(3);
         s.tier = MotionTier::Off;
         s.speed = 0.3;
         s.zoom = 2.0;
-        s.noise = false;
+        s.noise = 0.0;
         s.sigma = 12.0;
+        s.kernel_cap = 10.0;
+        s.downsample = 2;
+        s.curve.mid_point = Some(0.2);
         s.material = Material::Opaque;
         s.durations[0] = Some(5.0);
+        s.surface.tint = Some(10.0);
         s.reset();
         assert_eq!(s, Settings::default());
     }
 
     #[test]
-    fn the_blur_slider_stops_where_the_kernel_caps() {
-        // radius = ceil(3 sigma), capped at 48 px (`blur.rs`).
-        assert!((3.0 * SIGMA_MAX - 48.0).abs() < f32::EPSILON);
+    fn the_blur_slider_never_runs_past_what_the_limits_can_show() {
+        // The kernel is ceil(3 sigma / downsample) texels, capped (`blur.rs`).
+        let default = BlurLimits::default();
+        assert!(
+            kernel_radius(SIGMA_MAX, default.kernel_cap, default.downsample) < default.kernel_cap
+        );
+        // Even at the finest divisor the widest cap holds the slider's top.
+        assert!(kernel_radius(SIGMA_MAX, KERNEL_CAP.1, 2) < KERNEL_CAP.1);
+        const { assert!(SIGMA_MAX > 16.0, "past the old stop") };
+        assert_eq!(
+            kernel_radius(200.0, 48.0, 8),
+            48.0,
+            "a wide sigma is capped"
+        );
+    }
+
+    #[test]
+    fn the_noise_slider_reaches_the_frame_and_zero_is_off() {
+        let mut s = Settings::default();
+        assert_eq!(s.tweaks().noise, NOISE_OPACITY);
+        s.noise = 0.05;
+        assert_eq!(s.tweaks().noise, 0.05);
+        let mut p = s.tweaks().params((10, 10), 1.0);
+        assert_eq!(p.noise_opacity, 0.05);
+        s.noise = 0.0;
+        p = s.tweaks().params((10, 10), 1.0);
+        assert_eq!(p.noise_opacity, 0.0);
+        assert_eq!(
+            s.tweaks(),
+            FrameTweaks {
+                noise: 0.0,
+                ..FrameTweaks::DEFAULT
+            }
+        );
+    }
+
+    #[test]
+    fn each_luminosity_control_changes_its_own_value_on_all_three_layers() {
+        let base = Settings::default().theme();
+        for field in 0..4 {
+            let mut s = Settings::default();
+            match field {
+                0 => s.curve.mid_point = Some(0.3),
+                1 => s.curve.white_max_opacity = Some(0.9),
+                2 => s.curve.mid_point_max_opacity = Some(0.8),
+                _ => s.curve.black_max_opacity = Some(0.1),
+            }
+            let t = s.theme();
+            for (got, was) in [
+                (t.glass.window, base.glass.window),
+                (t.glass.panel, base.glass.panel),
+                (t.glass.card, base.glass.card),
+            ] {
+                let (g, w) = (got.curve, was.curve);
+                let same = [
+                    g.mid_point == w.mid_point,
+                    g.white_max_opacity == w.white_max_opacity,
+                    g.mid_point_max_opacity == w.mid_point_max_opacity,
+                    g.black_max_opacity == w.black_max_opacity,
+                ];
+                for (i, same) in same.into_iter().enumerate() {
+                    assert_eq!(same, i != field, "field {field}, value {i}");
+                }
+                assert_eq!((got.tint, got.tint_opacity), (was.tint, was.tint_opacity));
+            }
+        }
+        // It reaches the colour a layer draws: a white tint's suppression moves.
+        let mut s = Settings::default();
+        s.layers[0].tint = Some([255, 255, 255, 255]);
+        let before = s.theme().glass.window.acrylic_colors().tint[3];
+        s.curve.white_max_opacity = Some(0.9);
+        assert_ne!(s.theme().glass.window.acrylic_colors().tint[3], before);
+        // A page that brings its own curve keeps it until a control is touched.
+        let mut page = THEME;
+        page.glass.window.curve.white_max_opacity = 0.33;
+        let mut s = Settings::default();
+        assert_eq!(s.compose(page).glass.window.curve.white_max_opacity, 0.33);
+        s.curve.mid_point = Some(0.4);
+        let t = s.compose(page).glass.window.curve;
+        assert_eq!(
+            (t.white_max_opacity, t.mid_point),
+            (0.33, f64::from(0.4_f32))
+        );
+    }
+
+    #[test]
+    fn the_kernel_cap_and_the_divisor_reach_the_frames_blur_limits() {
+        let mut s = Settings::default();
+        assert_eq!(s.tweaks().blur, BlurLimits::default());
+        s.kernel_cap = 20.0;
+        assert_eq!(
+            s.tweaks().blur,
+            BlurLimits {
+                kernel_cap: 20.0,
+                downsample: 8
+            }
+        );
+        s.downsample = 2;
+        let p = s.tweaks().params((10, 10), 1.0);
+        assert_eq!(
+            p.blur,
+            BlurLimits {
+                kernel_cap: 20.0,
+                downsample: 2
+            }
+        );
+        for d in DOWNSAMPLES {
+            assert_eq!(
+                BlurLimits {
+                    kernel_cap: 48.0,
+                    downsample: d
+                }
+                .effective()
+                .downsample,
+                d
+            );
+        }
+    }
+
+    #[test]
+    fn sigma_goes_past_sixteen() {
+        let s = Settings {
+            sigma: 40.0,
+            ..Settings::default()
+        };
+        assert_eq!(s.tweaks().blur_sigma, 40.0);
     }
 }

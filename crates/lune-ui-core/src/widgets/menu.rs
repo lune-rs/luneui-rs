@@ -858,8 +858,21 @@ impl<'a> Ui<'a> {
     /// are the popover's, and focus loss dismisses it as well as an outside press: the app hides
     /// the window once `dismissed` and the frame is idle.
     pub fn menu_window(&mut self, key: impl Hash, rows: &[MenuRow<'_>]) -> MenuResponse {
+        let area = self.painter().window;
+        self.menu_window_in(key, area, rows)
+    }
+
+    /// [`Self::menu_window`] in `area`, a rect of the window in window coordinates: the panel's
+    /// corner is the area's corner. Placement is in window coordinates, as every overlay's is: an
+    /// `Xform` does not move it.
+    pub fn menu_window_in(
+        &mut self,
+        key: impl Hash,
+        area: Rect,
+        rows: &[MenuRow<'_>],
+    ) -> MenuResponse {
         let size = menu_size(self.painter(), rows);
-        let options = crate::tray::window_popover(self.painter().window, size, Surface::None);
+        let options = crate::tray::window_popover(area, size, Surface::None);
         let name = self.tr("luneui.menu.name");
         let (frame, _, picked) = self.popover(&key, &options, |ui, panel| {
             let layout = MenuLayout {

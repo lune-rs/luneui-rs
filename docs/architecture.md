@@ -1,6 +1,6 @@
 # Architecture
 
-State after M11 (the close): the toolkit is five crates. A pure core (`lune-ui-core`, no
+State after the library pass (M11 closed the program): the toolkit is five crates. A pure core (`lune-ui-core`, no
 dependencies) holds the painter, the display list, the per-window `Ui` frame, the motion system,
 the string table, the semantic tree, widgets, the theme and the four seam types; three adapter
 crates implement the seams on wgpu/glyphon, winit and the OS glass; the facade `lune-ui` re-exports
@@ -20,7 +20,12 @@ platform keymap, the OS clipboard (`arboard`), an AccessKit bridge behind a carg
 flyout and the menu in windows of their own (D204 to D227). M11 closed the program (D234 to D245): the window's caption buttons
 through the `Ui` (`widgets/caption.rs`, the page `window`), `Gpu::is_lost`, the key readers that leaked or took a chord, a 1.5x scene,
 the rustdoc bar, the done-standard audit of the whole catalogue with the check that keeps it true (`apps/gallery/src/catalogue.rs`),
-and the vendored snapshot (`scripts/export-snapshot.sh`, `docs/consuming.md`).
+and the vendored snapshot (`scripts/export-snapshot.sh`, `docs/consuming.md`). The library pass after the gallery showcase (D255 to D282) did the
+glass over again and the review's faults: a draw layer per overlay and a blur per glass request, so a glass surface frosts what is directly behind it
+(D256, D257); frost, and the window's own background as the only draw that replaces what is below (D258); one glass surface for every popup, list, card
+and toast (D260, D261); an inactive window that stays glass (D262); frame values for noise, luminosity and blur limits (D264); `Painter::on` that keeps
+the clip (D265); small APIs (D266, D267); buttons, the tab shine, the tree look, one selection routine and the rail badge, tooltip and key-value copy
+(D269 to D275); and the faults of items 22 to 44 (D276 to D281).
 
 ## Workspace layout
 
@@ -52,12 +57,12 @@ app passes time, sizes, fonts, theme, scale and hit values in), so frames are de
 | Module (file) | Purpose | Key items |
 |---|---|---|
 | `color` (`color.rs`) | Straight-alpha colour and blend helpers | `Rgba = [u8; 4]`, `premul`, `over`, `with_alpha` |
-| `theme` (`theme.rs`, `theme/file.rs`) | Theme tokens widgets read; the dark preset; since M10 the three glass layers travel in the theme (`Theme.glass`) and a theme file overlays it. `theme.rs` holds the key table (Lunegit's names, one macro: `COLOR_KEYS`, 50 keys, and the key-to-field `match`); `theme/file.rs` the loader (D207 to D209) | `Theme`, `ThemeGlass`, `DARK`, `lunegit_dark::{THEME, WINDOW, PANEL, CARD, ...}`, `Theme::from_json`, `ThemeFile`, `Skip`, `ThemeError`, `AcrylicLevel`, `Theme::with_acrylic`, `COLOR_KEYS` |
+| `theme` (`theme.rs`, `theme/file.rs`) | Theme tokens widgets read; the dark preset; since M10 the three glass layers travel in the theme (`Theme.glass`) and a theme file overlays it. `theme.rs` holds the key table (Lunegit's names, one macro: `COLOR_KEYS`, 47 keys, and the key-to-field `match`); `theme/file.rs` the loader (D207 to D209) | `Theme`, `ThemeGlass`, `DARK`, `lunegit_dark::{THEME, WINDOW, PANEL, CARD, ...}`, `Theme::from_json`, `ThemeFile`, `Skip`, `ThemeError`, `AcrylicLevel`, `Theme::with_acrylic`, `COLOR_KEYS` |
 | `json` (`json.rs`) | The bounded JSON reader for files a user can edit (D204): strict, recursive descent bounded by the depth limit, linear work, a leading byte-order mark skipped, an integer above 2^53 flagged inexact; the loaders choose what to forgive | `parse`, `Value`, `Number`, `JsonError`, `JsonErrorKind`, `MAX_INPUT` (1 MiB), `MAX_DEPTH` (16), `MAX_STRING`, `MAX_KEY`, `MAX_MEMBERS`, `MAX_VALUES` |
 | `tray` (`tray.rs`) | The tray's pure half (D218 to D221, D226): the icon rastered on the CPU by signed distance (a transparent ring, a coloured dot), where the flyout and the menu go from the icon's rect, and the click rules | `icon_bitmap`, `TrayBitmap`, `TrayState`, `GlyphTone`, `bar_from_tray`, `place_surface`, `TraySurface`, `TrayToggle`, `TrayAction`, `tray_surface`, `TrayPlatform` |
 | `acrylic` (`acrylic.rs`) | Avalonia acrylic colour math and the noise opacity | `AcrylicColors`, `NOISE_OPACITY` |
-| `paint` (`paint.rs`, `paint/path.rs`) | Immediate-mode painter: six layers, clip and rounded clip (`push_clip_rounded`), a transform stack (D66) and `push_translate`, the seven M5 primitives (image, rotate, dash, rounded clip, sector, path fill, arc; D105), hit regions generic over the app's hit type `H` and tagged with the overlay they belong to, an op recorder (`start_recording`, `take_recording`, replayed by exit painters), faded acrylic, `acrylic_radii` (one radius per corner) and `backdrop_with` (the glass's own layer, sigma and saturation; D137, D138), `stroke_sweep` and `stroke_comet` over `StrokeStyle.mode` (the busy cue's conic arc and dash, D122), `Painter::elide` (see `text`); builds a `Scene`; holds `&mut dyn TextSystem` | `Painter<H>`, `Rect`, `StrokeStyle`, `Xform`, `Ops` |
-| `scene` (`scene.rs`) | The display list: plain data plus the draw-order contract | `Scene`, `Layer`, `LayerGeometry`, `Shape`, `Acrylic` (a shape and its opacity, D61), `StrokeVertex`, `TextItem`, `CustomItem`, `BackdropRequest` (rect, radius, alpha, `layer`, `sigma`, `saturation`), `ImageItem`, `RoundClip`, `LayerId` (Base, Page, Popup, Modal, Raised, Toast; D54, D137), `LAYER_COUNT` (6), `SCENE_LAYERS`, `Scene::split`, `FrameParams` |
+| `paint` (`paint.rs`, `paint/path.rs`) | Immediate-mode painter: seven layers, clip and rounded clip (`push_clip_rounded`), a transform stack (D66) and `push_translate`, the seven M5 primitives (image, rotate, dash, rounded clip, sector, path fill, arc; D105), hit regions generic over the app's hit type `H` and tagged with the overlay they belong to, an op recorder (`start_recording`, `take_recording`, replayed by exit painters), faded acrylic (on the fixed `Base` layer only: above it, or in an overlay, `acrylic` is a `frost`, D258), `acrylic_radii` (one radius per corner), `frost` and `frost_radii` (a premultiplied over-fill with noise), `fill_joined` (parts triangulated alone, one fringe round the outline; D272), `clip_rect`, `backdrop_with` (the glass's own layer, sigma and saturation; every request stands, D257), `on` (the layer only: the clip stack stays, D265) and the crate-private `enter` (an overlay's own draw layer, D256), `stroke_sweep` and `stroke_comet` over `StrokeStyle.mode` (the busy cue's conic arc and dash, D122), `Painter::elide` (see `text`); builds a `Scene`; holds `&mut dyn TextSystem` | `Painter<H>`, `Rect`, `StrokeStyle`, `Xform`, `Ops` |
+| `scene` (`scene.rs`) | The display list: plain data plus the draw-order contract | `Scene`, `Layer`, `LayerGeometry`, `Shape`, `Acrylic` (a shape and its opacity, D61), `StrokeVertex`, `TextItem`, `CustomItem`, `BackdropRequest` (rect, radius, alpha, `sigma`, `saturation`; a `Layer` holds its own), `ImageItem`, `RoundClip`, `LayerId` (Base, Page, Popup, Modal, Raised, Outside, Toast; D54, D137, D259), `OverlayLayer` (an overlay's own layer, D256), `LAYER_COUNT` (7), `SCENE_LAYERS`, `Scene::in_order`, `Scene::merged`, `Scene::backdrops`, `Scene::floor`, `FrameParams` (with `noise_opacity` and `blur: BlurLimits`, D264) |
 | `text` (`text.rs`) | Text specs and the text seam, with the caret, hit, line and segment queries (D86, D94) | `TextSystem` (`prepare`, `measure`, `caret`, `hit`, `lines`, `segments`), `TextKey`, `Spec`, `Style`, `Font`, `CaretPos`, `LineSpan`, `Unit`, `elide` (D114: one line cut on a grapheme boundary, U+2026 in the last kept run's style, found by binary search over `caret`; a spec that fits comes back unchanged) |
 | `input` (`input.rs`) | The input seam: what the app hands in, what the toolkit asks back | `RawInput`, `Event` (with `Access`, `ClipboardText`, `ClipboardUnavailable` and, since M10, `FileHover`, `FileHoverCancelled`, `FileDrop`: a `PathBuf` and the last pointer position, nothing opens the path; D211), `Key`, `NamedKey`, `Modifiers`, `ImeEvent`, `FocusEvent`, `Keymap` (`MAC`, `PC`; D92), `FrameOutput` (with `repaint`, `clipboard`, `tree`, `focused`, `cursor`, `ime_area`, `fired`), `Repaint`, `ClipboardRequest`, `WindowCommand`, `CursorIcon` (with `ALL`), `printable` |
 | `image` (`image.rs`) | The picture seam: the app decodes, registers by id, releases explicitly; fit geometry | `ImageStore`, `ImageData`, `ImageId`, `ImageError`, `Fit`, `ImageAlign`, `image_rect` |
@@ -74,10 +79,10 @@ app passes time, sizes, fonts, theme, scale and hit values in), so frames are de
 | `access` (`access.rs`) | The semantic tree and the actions that come back; plain data the `Ui` fills and routes | `Node`, `SemanticTree`, `Role` (37), `State` (15), `Action` (10), `Value`, `AccessAction`; `Node.level` (a tree row's depth + 1) |
 | `motion` (`motion.rs`, `motion/{easing,tween,transition,tokens,conformance}.rs`) | Closed-form motion: every value is a function of the app's `Time` and stored parameters; the 60 Hz conformance harness | `Time`, `Easing`, `Tween`, `Spring`, `Keyframes`, `Transition`, `Token`, `Kind`, `Motion`, `MotionTier`, `MOTION`, `conformance` |
 | `strings` (`strings.rs`) | The string table: keys, `{n}` and `{n:spec}` placeholders, the toolkit's defaults; since M10 a locale file loads as a `Catalog` (strict: an unknown `luneui.` key fails the file, D210), overlays a table, and a template can be audited with the scanner the formatter uses | `StringTable` (`overlay`, `iter`), `DEFAULTS`, `ArgFormat`, `DisplayFormat`, `format_template`, `Catalog`, `CatalogError`, `audit_template`, `TemplateAudit` |
-| `widgets` (`widgets/<name>.rs`, `widgets/mod.rs`) | One file per control, generic over `H` for the Painter API; each has a `Look`, a `paint` function, the old function as a wrapper and a `Ui` method (D60) | `button`, `toggle`, `checkbox`, `label`, `combo`, `stepper`, `field` (text field with its variants), `text_area`, `input_box` (shared look), `focus_ring`, `popup_panel`, `scroll_area`, `scrollbar`, `virtual_list`, `popover`, `tooltip`; M6 added `badge`, `status_dot`, `verdict_row`, `progress`, `spinner`, `callout`, `stat`, `kv_list` (with `selectable`, the read-only selectable text of D125), `row`, `list_row`, `form_field`, `steps`, `nav_item` (`Ui::nav_list`), `radio_group`, `star_rating`, `slider`, `filter_bar`, `search_picker`, `tab_strip`, `toolbar`, `banner` (with the empty state) and `tone` (the one tone recipe, D129); `button` gained `Ghost`, `ButtonOptions` (`Ui::button_with`) and `IconButton` (`Ui::icon_button`, D116); M7 added `flyout` (`Ui::flyout`), `toast` (the `Toasts` model, `Ui::toasts`, `Ui::toast_history`), `command_palette` (`Ui::command_palette`), `page` and `panel` (`Ui::page`, `Ui::panel`: one closure called per slot), `sidebar`, `side_panel` and `icon_rail` (`Ui::sidebar`, `Ui::side_panel`, `Ui::icon_rail`), `split_panes` (`Ui::split_panes`, `Ui::split_state`), `tree_view` (`Ui::tree_view`, `Ui::tree_state`) and `settings_page` (`Ui::settings_page`); M8 added `table` (`Ui::table`, `Ui::table_state`, `Ui::table_selection`: the list frame with a header, sort requests and tones; `virtual_list` gained a crate-private `ListStyle`, D161), `bar_chart` (`Ui::bar_chart`), `pie_chart` (`Ui::pie_chart`), `lane_graph` (`Ui::lane_graph_row`, a stateless `paint`) and `kanban_board` (`Ui::kanban_board`, `landed_index`); M9 added `text_lines` (`HighlightSpan`, `Highlighter`, `PlainHighlighter`, the rich-line spec and `range_boxes` across runs), `code_editor` (`Ui::code_editor`, `Ui::code_line_rect`: lines on `RowHeights` and the scroll area, read-only or editable, wrapped or not, synced panes), `code_block` (`Ui::code_block`, `code_block::height`: the same frame read-only with a copy button), `markdown` (`Ui::markdown` over the `MdBlock` model: top-level blocks as virtual rows) and `diff_view` (`Ui::diff_view`, `pair_rows`, `widest_chars`: the list frame, twice for split); M10 added `Ui::flyout_window` and `Ui::menu_window` (the flyout's and the menu's body filling a window of its own over `Ui::popover`, D220) and the public `menu_size` |
-| `widgets::menu`, `dropdown`, `dialog` | The overlays: the old Painter functions and `Ui::menu`, `Ui::dropdown`, `Ui::dialog` on the overlay stack; M7 added `menu_with` (`MenuOptions`, `MenuPlace`: anchored menus and the node name; rows `MenuRow::Entry` and `Header`; one highlight), `dropdown_with` (`DropdownOptions`: glass, `max_rows`), `dialog_with` (`DialogOptions`: `DialogWidth::{Confirm, Form}`, scrim blur, disabled confirm) and `dialog::modal_host`, which the palette shares | `menu`, `MenuRow`, `MenuItem`, `menu_open_anim`; `dropdown`; `dialog`, `Dialog`, `DialogGlass`, `Cancel` |
+| `widgets` (`widgets/<name>.rs`, `widgets/mod.rs`) | One file per control, generic over `H` for the Painter API; each has a `Look`, a `paint` function, the old function as a wrapper and a `Ui` method (D60) | `button`, `toggle`, `checkbox`, `label`, `combo`, `stepper`, `field` (text field with its variants), `text_area`, `input_box` (shared look), `focus_ring`, `scroll_area`, `scrollbar`, `virtual_list`, `popover`, `tooltip`; M6 added `badge`, `status_dot`, `verdict_row`, `progress`, `spinner`, `callout`, `stat`, `kv_list` (with `selectable`, the read-only selectable text of D125), `row`, `list_row`, `form_field`, `steps`, `nav_item` (`Ui::nav_list`), `radio_group`, `star_rating`, `slider`, `filter_bar`, `search_picker`, `tab_strip`, `toolbar`, `banner` (with the empty state) and `tone` (the one tone recipe, D129); `button` gained `Ghost`, `ButtonOptions` (`Ui::button_with`) and `IconButton` (`Ui::icon_button`, D116); M7 added `flyout` (`Ui::flyout`), `toast` (the `Toasts` model, `Ui::toasts`, `Ui::toast_history`), `command_palette` (`Ui::command_palette`), `page` and `panel` (`Ui::page`, `Ui::panel`: one closure called per slot), `sidebar`, `side_panel` and `icon_rail` (`Ui::sidebar`, `Ui::side_panel`, `Ui::icon_rail`), `split_panes` (`Ui::split_panes`, `Ui::split_state`), `tree_view` (`Ui::tree_view`, `Ui::tree_state`) and `settings_page` (`Ui::settings_page`); M8 added `table` (`Ui::table`, `Ui::table_state`, `Ui::table_selection`: the list frame with a header, sort requests and tones; `virtual_list` gained a crate-private `ListStyle`, D161), `bar_chart` (`Ui::bar_chart`), `pie_chart` (`Ui::pie_chart`), `lane_graph` (`Ui::lane_graph_row`, a stateless `paint`) and `kanban_board` (`Ui::kanban_board`, `landed_index`); M9 added `text_lines` (`HighlightSpan`, `Highlighter`, `PlainHighlighter`, the rich-line spec and `range_boxes` across runs), `code_editor` (`Ui::code_editor`, `Ui::code_line_rect`: lines on `RowHeights` and the scroll area, read-only or editable, wrapped or not, synced panes), `code_block` (`Ui::code_block`, `code_block::height`: the same frame read-only with a copy button), `markdown` (`Ui::markdown` over the `MdBlock` model: top-level blocks as virtual rows) and `diff_view` (`Ui::diff_view`, `pair_rows`, `widest_chars`: the list frame, twice for split); M10 added `Ui::flyout_window` and `Ui::menu_window` (the flyout's and the menu's body filling a window of its own over `Ui::popover`, D220) and the public `menu_size`; the library pass added `selection` (`selection::paint`, the one selection drawing, D272), `shine` (the tab title's light, D270), `Ui::flyout_window_in` and `Ui::menu_window_in` (an area of the window, D266) |
+| `widgets::menu`, `dropdown`, `dialog` | The overlays: the old Painter functions and `Ui::menu`, `Ui::dropdown`, `Ui::dialog` on the overlay stack; M7 added `menu_with` (`MenuOptions`, `MenuPlace`: anchored menus and the node name; rows `MenuRow::Entry` and `Header`; one highlight), `dropdown_with` (`DropdownOptions`: `max_rows`; the list is the one glass surface, D260), `dialog_with` (`DialogOptions`: `DialogWidth::{Confirm, Form}`, scrim blur (on by default, D261), disabled confirm) and `dialog::modal_host`, which the palette shares | `menu`, `MenuRow`, `MenuItem`, `menu_open_anim`; `dropdown`; `dialog`, `Dialog`, `DialogGlass`, `Cancel` |
 | `chrome` (`chrome.rs`) | Tab chrome outline geometry | `outline`, `TabSpan` |
-| `testing` (`testing/`) | Fakes and contract suites of the seams, public so apps can use them | `RecordingRenderer`, `FakeText`, `text_system_contract`, `FakeImages`, `image_store_contract`, `ScriptedInput`, `scripted_input_contract`, `NullMaterial`, `backdrop_contract`, `UiHarness` |
+| `testing` (`testing/`) | Fakes and contract suites of the seams, public so apps can use them | `RecordingRenderer`, `FakeText`, `text_system_contract`, `FakeImages`, `image_store_contract`, `ScriptedInput`, `scripted_input_contract`, `NullMaterial`, `backdrop_contract`, `UiHarness`, `hit_regions` and `HitRegion` (a projection of a frame's hit list, D266), `flattened`, `fill_shapes` and `fill_covers` (the bounds of a joined fill, D272) |
 
 `lib.rs` re-exports `Backdrop`, `BackdropKind`, `GlassLayer` and `theme::lunegit_dark`. Tests: unit
 tests in the modules and the files under `tests/` (`window`, `painter`, `motion`, `strings`, `ui_*`,
@@ -112,15 +117,23 @@ tree, focused widget and the shortcut commands that fired. `FrameConfig` also ca
   stops calling it. Each called frame an overlay hands the Ui an exit painter built from owned inputs
   (with the app's content recorded as painter ops), and the Ui keeps drawing it through the close
   motion (D65).
-- The `Raised` layer (D137): `Ui::overlay` chooses an overlay's layer once, when it opens or reopens, and holds it to
-  its close. A `Popup` or `Modal` overlay that opens while a modal is active is promoted to `LayerId::Raised`
-  (between `Modal` and `Toast`), so a popover, tooltip, combo list, search picker, menu or nested dialog over a dialog
-  draws and takes input on top; no widget asks for it. The rule is one level deep: overlays stacked further share
-  `Raised`, and a layer draws by kind, so a third level that overlaps its parent interleaves with it (fills under
-  text). A toast is not an overlay record: `Ui::toasts` draws on `Toast` directly and a press on a `Toast` hit is
+- The `Raised` layer (D137, amended by D255 and D263): an overlay that opens while a modal is active is put on `LayerId::Raised` (between
+  `Modal` and `Outside`) when it asks for `Popup` or `Modal`, and `Ui::overlay` keeps it there only while an older modal is on the stack (open,
+  opening, or closing with its exit not over); then it drops to the layer it asked for. So a popover, tooltip, combo list, search picker, menu or
+  nested dialog over a dialog draws and takes input on top, a dialog that replaces another is on `Raised` only during the first one's exit, and a
+  popover held after its parent closed is under a dialog opened since; no widget asks for it. "Above" is one order, `(layer, tag, index)`, for the
+  hit tests (`topmost`) and for `pointer_in` and `pointer_over` (D263). Overlays stacked further each draw on a draw layer of their own in open
+  order, so a later one hides what it covers (D256). A toast is not an overlay record: `Ui::toasts` draws on `Toast` directly and a press on a `Toast` hit is
   never an outside press, moves no focus, and an accessibility action on one dismisses no overlay and takes no focus
   out of a modal (D146). `Ui::overlay` also pauses any enclosing `record`, so a dialog's exit replay does not
-  draw the overlays opened in its body (D139).
+  draw the overlays opened in its body (D139). An overlay opened inside `with_enabled(false, ..)` draws, and exits, at the scope's alpha (D277).
+- `Outside` (D259): `Ui::outside_modals` runs a closure on `LayerId::Outside`, above `Raised` and below `Toast`, for a
+  surface that stays live and undimmed under a modal (the gallery's sidebar and settings pane). A modal's dim, blur and
+  input block do not reach it, at any modal depth: its hits are on a layer above any modal's, and a blurred scrim's
+  request is a stop before the layer is drawn. It switches the painter through saved state, so the caller's clip and
+  transforms apply inside and come back after; it is not recorded, so it belongs at a shell's top level, not inside
+  `Ui::record`. A `Popup` or `Modal` overlay opened inside it stays on `Outside`, above the scope's own drawing by tag;
+  a drag ghost from `Outside` goes to `Toast`. Keys are unchanged: Tab stays in the modal, Escape goes to it.
 - Disabled scope (D140): `Ui::node` inside a disabled scope (`with_enabled(false, ..)`) sets `State::Disabled` and
   clears `Focusable` and the actions, so a group node cannot be forgotten; a widget consumes its keys first and gates
   after (`Ui::activation_keys`), so a disabled widget keeps its keys from the shortcuts. Not every reader does yet:
@@ -276,14 +289,24 @@ Not checked, from reading only:
 
 ### Draw order
 
-Inside one layer, back to front (the contract in `scene.rs`): the acrylic shapes, the under shapes, the
+Inside one layer, back to front (the contract in `scene.rs`): the acrylic shapes (the fixed `Base` layer only: above it
+`Painter::acrylic` draws as `Painter::frost`, a premultiplied over-fill with noise among the under shapes, D258), the under shapes, the
 path fills (their own list, `LayerGeometry::fills`, drawn with the stroke pipeline so the order is
 explicit, D105), the custom items in record order, the images in record order (`Layer::images`), the
-text, the over shapes and the strokes. Layers run back to front, six of them (`Base`, `Page`, `Popup`, `Modal`,
-`Raised`, `Toast`); those below `Scene::split` render into the offscreen scene a backdrop blurs. The split moves: it
-is `SCENE_LAYERS` (2), or the backdrop request's own layer when that is higher, so a glass surface blurs everything
-under it (a glass menu in a dialog blurs the dialog; D138). A frame has one blur: of two requests the lower layer
-keeps it, and on one layer the last wins, so a glass menu over a dialog whose scrim is blurred has none of its own. Consequences a widget author meets: text draws above every fill
+text, the over shapes and the strokes. `Scene::in_order` is the order of the layers, and the one list every renderer
+walks: the seven fixed layers back to front (`Base`, `Page`, `Popup`, `Modal`, `Raised`, `Outside`, `Toast`), each followed by the
+overlays on it in tag order, which is open order (D256). `scene.layers[id as usize]` is what was drawn on `id` outside
+any overlay (`Painter::on`, a toast, a ghost dragged from outside one); `Scene::overlays` holds each overlay's own
+`Layer`, keyed by fixed layer and tag, and `Scene::merged` folds a fixed layer and its overlays into one for tests.
+Everything of an older overlay draws before anything of a newer one on its fixed layer, however their calls fell in
+the frame, and an exit keeps its overlay's tag, so it draws under an overlay opened after it. A layer with
+`BackdropRequest`s (`Layer::backdrops`) is a stop: everything drawn before it is blurred, its requests draw over that,
+and the layer follows, so a glass surface blurs everything drawn before it, other glass included (a glass menu over
+a dialog with a blurred scrim frosts the dialog; D257). A request replaces its region: `mix(sharp, blurred, coverage x
+alpha)` by an erase and an add, so nothing sharp stays in a translucent window (D258). Every request stands. Requests of one layer share a blur per
+distinct sigma, and each has its own uniforms. Up to the last stop, and at least to `Scene::floor` (the fixed layer
+`SCENE_LAYERS`, 2), the frame renders into the offscreen scene; a request below the floor stops at the floor. A frame
+with no request, or with one stop, runs the two passes and one blur it always ran. Consequences a widget author meets: text draws above every fill
 of its layer (a label shows through a fill drawn "over" it on the same layer), and a rounded clip
 (`push_clip_rounded`) cuts shapes, strokes, fills and images but gives text and custom items only its
 bounding rect.
@@ -302,9 +325,9 @@ monotone steps, the exact end and that it finishes within its duration plus one 
 | Module (file) | Purpose | Key items |
 |---|---|---|
 | `gpu` (`gpu.rs`, `shader.wgsl`) | The GPU every target shares: device, queue, noise texture, per colour format the pipelines and the glyph atlas; headless-capable; since M11 it reports a lost device and the app rebuilds (D241) | `Gpu` (`is_lost`), `instance`, `Uploaded`, `Globals` |
-| `frame` (`frame.rs`) | One target's renderer: the scene, blur, target pass sequence over a core `Scene` | `FrameRenderer`, `FrameParams` |
+| `frame` (`frame.rs`) | One target's renderer: the scene, blur, target pass sequence over a core `Scene`, walking `Scene::in_order`; the frame's stops are where a layer has requests | `FrameRenderer`, `FrameParams` |
 | `images` (`images.rs`, `image.wgsl`) | The image pipeline and the picture store: premultiply on upload, nearest at an integer ratio without rotation, else linear; rotated text is a raster of the shaped text drawn through it (D105, D106) | `Gpu::register`, `Gpu::release` (the `ImageStore` impl) |
-| `blur` (`blur.rs`, `blur.wgsl`) | Backdrop blur | `Blur` |
+| `blur` (`blur.rs`, `blur.wgsl`) | Backdrop blur: a stop per layer with requests, a blur per distinct sigma at each, and a replace by an erase then an add (D257, D258); the kernel cap and the working size come from `FrameParams.blur` (D264) | `Blur` |
 | `surface` (`surface.rs`) | A window's swapchain; no winit dependency | `WindowSurface`, `Acquired` |
 | `dump` (`dump.rs`) | Offscreen targets and GPU readback to PNG; no screen capture | `target`, `read_rgba`, `write_png` |
 | `custom` (`custom.rs`) | App-owned GPU drawing inside a painted layer (the hook for app-specific drawing, D8) | `CustomDraw`, `CustomFrame`, `CustomItem` |
@@ -313,7 +336,7 @@ monotone steps, the exact end and that it finishes within its duration plus one 
 
 Asset: `assets/acrylic-noise.png` (Avalonia's texture). Tests: `tests/text.rs` (text contract),
 `tests/targets.rs` (two targets on one `Gpu`), `tests/images.rs` (the image contract on the `Gpu`),
-`tests/primitives.rs` and `tests/text_field.rs` (pixel probes on real fonts), `tests/device_lost.rs` (a destroyed device reports lost and a rebuild draws) and `tests/custom_draw.rs` (the hook through `draw_with`).
+`tests/primitives.rs` and `tests/text_field.rs` (pixel probes on real fonts), `tests/acrylic_fade.rs`, `tests/stacked_glass.rs` and `tests/overlay_order.rs` (the glass: replace, frost, stacked blur, the order of overlays), `tests/device_lost.rs` (a destroyed device reports lost and a rebuild draws) and `tests/custom_draw.rs` (the hook through `draw_with`).
 
 ### `lune-ui-winit` (`crates/lune-ui-winit/src/`)
 
@@ -355,7 +378,7 @@ and a contract test the real adapter passes too (R-nfr-8).
 
 | Seam | Core model | Adapter | Fake | Contract test |
 |---|---|---|---|---|
-| Display list (renderer) | `scene::Scene` data and its draw-order contract; no renderer trait (D25) | `lune-ui-wgpu`: `Gpu::upload`, `FrameRenderer::draw` | `RecordingRenderer` | `records_the_documented_draw_order` (`testing/recording.rs`); two-target pixel equality in `lune-ui-wgpu/tests/targets.rs` |
+| Display list (renderer) | `scene::Scene` data and its draw-order contract (a draw layer per overlay, a blur per glass request; D256, D257); no renderer trait (D25) | `lune-ui-wgpu`: `Gpu::upload`, `FrameRenderer::draw` | `RecordingRenderer` | `records_the_documented_draw_order` (`testing/recording.rs`); two-target pixel equality in `lune-ui-wgpu/tests/targets.rs`; `tests/overlay_order.rs` and `tests/stacked_glass.rs` (the order of overlays and the stacked blur, on the GPU) |
 | Text shaping | `text::TextSystem` (`prepare(spec, scale)`, `measure`, `caret`, `hit`, `lines`, `segments`) | `lune-ui-wgpu`: `TextCache` over glyphon | `FakeText` | `text_system_contract`, run in `lune-ui-wgpu/tests/text.rs` and on the fake |
 | Pictures | `image::ImageStore` (`register`, `release`); the app decodes | `lune-ui-wgpu`: `Gpu` | `FakeImages` | `image_store_contract` (`testing/images.rs`), run on the fake and in `lune-ui-wgpu/tests/images.rs` |
 | Input and output | `input::{RawInput, FrameOutput}` | `lune-ui-winit`: `Translator`, `OutputState` | `ScriptedInput` | `lune-ui-winit/tests/input.rs` (translator and scripted input agree) |
@@ -433,7 +456,7 @@ window.
 ## Gallery pages and bench
 
 `apps/gallery` is app code (it reads the clock for the bench and bundles fonts). Every screen is a
-`Page` in `apps/gallery/src/pages/mod.rs`: the legacy pages (`reference`, `effects`) hold the 15 fixed Painter-API
+`Page` in `apps/gallery/src/pages/mod.rs`: the legacy pages (`reference`, `effects`) hold the 14 fixed Painter-API
 scenes the pixel gate compares and keep their drawing code; every other page draws through the `Ui`
 (D73). A Ui page has a live state (window mode, the bench), scripted `UiScene`s (timed input, then a
 capture frame, with the `Repaint` it must report: `Settled` or `Moving`) and optional bench steps.
@@ -447,7 +470,7 @@ functions; mid-transition and interaction scenes are live scripted `Ui` frames. 
 `flyout`, `toast-notifications`, `command-palette`, `page`, `panel`, `sidebar`, `side-panel`, `icon-rail`, `split-panes`,
 `tree-view` and `settings-page`, from M8 `table`, `bar-chart`, `pie-chart`, `kanban-board` and `lane-graph`, and from M9 `code-block`,
 `code-editor-view`, `markdown-preview` and `diff-view`, from M10 `theme`, `tray` and `file-drop`, and from M11 `window`
-(74 pages in all, 431 scene names, one of them at scale 1.5, `ui-controls@1.5x`, D243; every page of the same pattern: a live state, scripted scenes, a bench timeline); `apps/gallery/src/pages/controls_ui.rs` is the shared composition of every M4 widget that the
+(82 pages in all, the showcase's seven labs and its shell page among them, 438 scene names, one of them at scale 1.5, `ui-controls@1.5x`, D243; every page of the same pattern: a live state, scripted scenes, a bench timeline); `apps/gallery/src/pages/controls_ui.rs` is the shared composition of every M4 widget that the
 core pages draw. Window mode builds a `Ui` per frame over the page's live state; dump and bench
 drive the same state through a `Player` (a scripted input, the retained store and the page state). A scene's `Expect` is `Settled` (`Idle`),
 `Moving` (`Now`) or, for a pending tooltip, `Waiting` (`At`). `Ev` scripts pointer, scroll, typed text, keys
@@ -461,12 +484,12 @@ it visible needs a frame at the due time. Window mode and the bench draw the lis
 Window mode opens one page, the showcase (`apps/gallery/src/showcase/`, D246 to D254), which hosts every other page. `Showcase` is an ordinary Ui page:
 `mod.rs` draws three panes (the sidebar with its search field, the content pane, the settings pane) and holds the hosted page as a child `Box<dyn PageState>`
 under an id scope of its own; a chosen scene's script is replayed into the frame's input through `PageState::inject`. The hosted page draws on a `Stage`
-(`Stage::at(rect)`: its card at the rect, no window glass, the host's clip kept through `Stage::on`) on a fixed 1,020 x 616 canvas that scrolls in the pane.
+(`Stage::at(rect)`: its card at the rect, no window glass, the host's clip kept by the painter's own clip stack) on a fixed 1,020 x 616 canvas that scrolls in the pane.
 `nav.rs` is the sidebar model (groups, rows, search, row keys). `settings.rs` is the global settings, answered to the window through the `PageState` hooks
 `theme`, `tier`, `frame_params`, `material`, `time_scale` and `zoom` (the window keeps an accumulated clock, so a speed change never jumps time, and scales the
 pointer with the zoom). `knobs.rs` is `Knobs` (`toggle`, `choice`, `number`, `text`, `button`), the rows a page declares in `PageState::knobs`. `labs/` holds the
-glass, blur, effects, motion, tokens, clipboard and JSON pages, each an ordinary page in `PAGES`. A page that changes layers inside the pane goes through `Stage::on`
-(`Painter::on` drops the clip); the shell resets to the base layer after the pane. Tests: `showcase::tests` (clicks through `Translator`, the settings, the clip),
+glass, blur, effects, motion, tokens, clipboard and JSON pages, each an ordinary page in `PAGES`. A page that changes layers inside the pane keeps the pane's clip
+(`Painter::on` changes only the layer, D265). Tests: `showcase::tests` (clicks through `Translator`, the settings, the clip),
 `showcase::knobs::tests` (one turned knob per page, and every sidebar page has a knob or a named reason not to).
 
 `gallery --bench [--runs N] [--frames N] [--size WxH]` times offscreen frames: a timeline per page,
@@ -515,10 +538,9 @@ seam, in `platform/` or `material/` files, so the Windows DX12 choice is in
 The two M1 deviations are resolved: the inline `cfg(target_os)` in `gpu.rs` and `window.rs` moved
 into `platform/` files (step 8), and `Gpu::new` takes an optional compatible surface, so a headless
 device needs no window (steps 3 and 4). The limits that remain are choices with a row or an entry,
-not missing parts (D237, D245): an overlay above a modal goes one level (D137) and a frame has one
-blur (D138); text cannot be cut by a rounded clip (it gets the bounding rect) and draws above the
+not missing parts (D237, D245): text cannot be cut by a rounded clip (it gets the bounding rect) and draws above the
 fills of its layer, so overlapping labels show through during a drag; the bundled fonts have no bold,
-CJK or italic face; a ring's width follows the device scale only; the tab strip closes its menu when
+CJK or italic face; the tab strip closes its menu when
 disabled; the API gaps marked in the entries. `docs/STATE.md`, "Carried limits", lists them with
 the milestone limits. What nothing here verifies is real typing with an input method, bidi caret
 placement, a screen reader, and the Windows and Linux run time (`docs/STATE.md`, "Unverified here").
@@ -545,6 +567,34 @@ From M1 to M3:
 - `theme::DARK`, a neutral alias of `lunegit_dark::THEME`;
 - new: `RawInput`, `FrameOutput`, `Translator`, `OutputState`, `Backdrop::apply`, `WindowBackdrop`,
   the `testing` module.
+
+Since the library pass (D255 to D282; the workspace version stays 0.2.0, no consumer had adopted it; `docs/consuming.md`, "API changes of the library pass", is the same list as a migration map):
+
+- Layers and the display list: `LayerId::Outside` is 5 and `Toast` 6, `LAYER_COUNT` 7 (code that indexes `Scene::layers` by number moves again); `Ui::outside_modals`
+  (D259). `Scene` gains `overlays: Vec<OverlayLayer>` with `Scene::in_order` (the one list every renderer walks), `merged`, `floor` and `backdrops`; `scene.layers[id]` is
+  what was drawn on `id` outside any overlay; `Scene::backdrop`, `Scene::split` and `BackdropRequest::layer` are gone, a `Layer` holds its own `backdrops` and every
+  request stands (D256, D257);
+- the painter: `frost`, `frost_radii`, `fill_joined` and `clip_rect` are new; `acrylic` and `acrylic_radii` draw as `frost` anywhere but the fixed `Base` layer (D258);
+  `Painter::on` changes only the layer and keeps the clip stack, so `Stage::on` of the gallery is gone (D265); a ring's width follows the transform's scale (D277);
+- the frame: `FrameParams` gains `noise_opacity` and `blur: BlurLimits` (use `FrameParams::default()` and set what you mean), `GlassLayer` gains `curve:
+  LuminosityCurve` (`LuminosityCurve::AVALONIA`), and the shader's noise constant is the value in `Globals` (D264);
+- `Ui` and `testing`: `Ui::tab_scope(order, f)` (D267), `Ui::flyout_window_in` and `Ui::menu_window_in` (D266), `testing::hit_regions` and `HitRegion`, `testing::flattened`,
+  `fill_shapes` and `fill_covers`; `OutputState::apply(window, out, ui_scale)` sends the input-method area in physical pixels; `caption_rect` places from the window's own
+  origin (D266); `EditLayout::extend_hit` (a provided method, D280); `RowHeights::splice` (D279); `ScrollOptions::bar_room` (D279);
+- theme: new `tree_guide` (#FFFFFF14), `selection_radius` (3) and `selection_pad` (2) and the file key `MenuGlassBackground` (47 keys in all); `menu_popup_border` is
+  #FFFFFF1F; gone are `dropdown_bg`, `toast_bg`, `toast_border`, `window_fallback`, `on_accent_text`, `accent_hover`, `lunegit_dark::INACTIVE_FALLBACK`,
+  `TAB_HEADER_HEIGHT` and `BODY_PADDING`, and the keys `BackdropDark`, `ToastBackground`, `ToastBorder` and `WindowFallbackBackground` are unknown keys now (a file that sets
+  one loads, with the key in `skipped`); a `Theme { .. }` literal outside the toolkit follows (D260, D261, D262, D269, D271, D272, D276);
+- widgets: `DialogGlass` is `{ fill, noise }` with `DialogGlass::of(&Theme)`; `DialogOptions::scrim_blur` defaults to true; `Surface::Panel`, `popup_panel`
+  and `DropdownOptions::glass` are gone; `PageOptions`, `ToolbarOptions`, `SidePanelOptions`, `SettingsPage` and `BoardOptions` lose `active`; `RingKind::PrimaryButton` and `Edge::on_accent` are
+  gone and `ButtonLook::of` follows Lunegit's dialog buttons; `Tab::progress` shines the title (`SPINNER_SIZE` and `SPINNER_MARGIN` are gone); `TreeOptions` gains `guide_style`
+  and `chevron`; `KvOptions` gains `copy`; `SidePanelOptions` gains `card_moves`; the modules `widgets::selection` and `widgets::shine` are new (D260 to D275, D281);
+- behaviour with no signature change: the hold on `Raised` and the one order for "above" (D255, D263), `Painter::on` and the clip, a footer button at least 80 wide with the
+  primary on the right, an overlay in a disabled scope dimmed (D277), a key before a release in the same frame belongs to the press (D278), the table's rows keep their
+  measured heights and a focused row stays alive out of view (D278), a hit inside a multi-glyph cluster goes by the cluster's midpoint and a drag right of a cut row reaches
+  its end (D280), the panes of a split draw the size the frame ends with (D281);
+- scenes: 438 names. `unfocused`, `window-inactive-wane` and the five `*-inactive` page scenes (D262), `popover-glass` and `dropdown-glass` (D260) are gone; `window-caption-inactive`, `dialog-scrim-plain`,
+  `tab-strip-shine-mid`, `tree-view-straight`, `tree-view-on-hover`, `tree-view-chevron`, `kv-list-copy`, `lane-graph-advanced` and three selection scenes are new. The pixel gate's allow list for the whole pass is D282's.
 
 Since M11 (D234 to D245; nothing public was removed; the workspace version is 0.2.0, D238):
 
@@ -727,11 +777,11 @@ only under `target/`, except that `scripts/pixel-gate.sh` extracts its base sour
 | Gate | Proves | Compare | Exit codes |
 |---|---|---|---|
 | `scripts/pixel-gate-luneterm.sh` | M1 only: this repo's `lune-ui` drew the same pixels as Luneterm's. Phases: lock parity (every registry package in this repo's `Cargo.lock` is in Luneterm's lock at the rev; `--parity-only` stops here and still applies), run A (Luneterm's own crate), run B (the scratch clone's `lune-ui` repointed at this repo's crate), compare with Luneterm's `dump_compare`. Since M2 step 2 run B cannot build against the new API, so a full run exits 2 by design (roadmap D4) | `18 files, 18 identical, 0 differ, max delta 0` | 0 pass; 1 parity mismatch or pixel difference; 2 usage or setup error |
-| `scripts/pixel-gate.sh [--base <rev>] [--allow <id>...]` | A change since `<rev>` (default `HEAD`) leaves every scene `gallery --list` prints unchanged (431 at M11's close; the 15 legacy scenes stay on the Painter API, so the gate keeps proving the moved drawing code is untouched; scenes a later change adds are reported as new, D59). Dumps `git archive <rev>` and the working tree, compares with `dump-compare --allow-new`. `--allow <id>` names a scene whose frames may differ (reported only); an id not in `gallery --list` is an error | `15 files, 15 identical` | 0 pass; 1 delta or scene missing from the candidate; 2 usage or setup error (a base without `apps/gallery` included: nothing to compare is not a pass) |
+| `scripts/pixel-gate.sh [--base <rev>] [--allow <id>...] [--removed <id>...]` | A change since `<rev>` (default `HEAD`) leaves every scene `gallery --list` prints unchanged (438 at the library pass's close; the 14 legacy scenes stay on the Painter API, so the gate keeps proving the moved drawing code is untouched; scenes a later change adds are reported as new, D59). Dumps `git archive <rev>` and the working tree, compares with `dump-compare --allow-new`. `--allow <id>` names a scene whose frames may differ (reported only); an id not in `gallery --list` is an error; `--removed <id>` names a scene whose subject is gone: it must be in the base's dump and not in the candidate's list, and its base files move aside (D260) | `N files, M identical, K differ, max delta D` | 0 pass; 1 delta or scene missing from the candidate; 2 usage or setup error (a base without `apps/gallery` included: nothing to compare is not a pass) |
 | `scripts/check-targets.sh [--skip-linux]` | The workspace lints and builds beyond the host: Windows `clippy` (needs the `x86_64-pc-windows-msvc` target) and Linux fmt, clippy and tests in a `rust:1.92` container. Not a pixel gate; it covers the code the host `cfg` hides | `windows: passed`, `linux: passed` or `skipped (<reason>)` | 0 every half that ran passed; 1 a check failed; 2 usage |
 
 Dump file names: the gallery writes `<id>@<scale>x.png` (logical 1040x660; `gallery --list` prints
-the 15 legacy names first, then the Ui pages' scenes: 62 names after M4, 152 after M5, 231 after M6, 305 after M7, 332 after M8, 389 after M9, 413 after M10, 431 after M11); Luneterm's spike writes `NN-<name>@<scale>x.png` (18 scenes). `tools/dump-compare`
+the 14 legacy names first, then the Ui pages' scenes: 62 names after M4, 152 after M5, 231 after M6, 305 after M7, 332 after M8, 389 after M9, 413 after M10, 431 after M11, 438 after the library pass); Luneterm's spike writes `NN-<name>@<scale>x.png` (18 scenes). `tools/dump-compare`
 (`cargo run -p dump-compare -- <baseline> <candidate> [--max-delta N] [--allow-new]`) compares per
 pixel, max channel delta including alpha; a file missing from the candidate, a file only in the
 candidate (unless `--allow-new`), a size or colour-type mismatch or a delta above `N` (default 0)

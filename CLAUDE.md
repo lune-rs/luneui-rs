@@ -25,11 +25,12 @@ for the extraction; Luneterm's `docs/architecture.md` sections "lune-ui modules"
 - Acceptance bench (milestone acceptance only; a recorded reading that no gate, merge or fix waits on, and is not re-run to settle load noise, D235; runnable on a busy machine, D85: each run judged on its own p99 <= 16.6 ms and worst frame <= 33 ms, a page OVER only in at least half its runs, the self-test spread and load printed beside every verdict; exit 0): `cargo run --release -p gallery -- --bench` (`--runs 5` is the default; `--size 3456x2234` is report-only)
 - Gate (before every commit; must be green): `cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && cargo clippy -p lune-ui-winit --all-targets -- -D warnings && cargo test -p lune-ui-winit && scripts/check-boundaries.sh && scripts/gen-component-index.sh --check`
 - Showcase (the gallery's window; Cmd or Ctrl `]` and `[` walk the pages, Cmd or Ctrl `Q` quits): `cargo run -p gallery`
-- Pixel gate (a change to a component's drawing; gallery-only work is checked by eye, D254): `scripts/pixel-gate.sh [--base <rev>] [--allow <id>…]` dumps
-  every scene `gallery --list` prints (431 at M11's close; the first 15 are the legacy Painter-API scenes) for `<rev>`
+- Pixel gate (a change to a component's drawing; gallery-only work is checked by eye, D254): `scripts/pixel-gate.sh [--base <rev>] [--allow <id>…] [--removed <id>…]` dumps
+  every scene `gallery --list` prints (438 at the library pass's close; the first 14 are the legacy Painter-API scenes) for `<rev>`
   (default `HEAD`) and for the working tree and compares them
   (`dump-compare`); zero delta unless the look change is intended: name its scenes with `--allow <id>`
-  and give the reason in a DECISIONS.md row in the same commit. Exit 0 pass, 1 delta, 2 setup error.
+  and give the reason in a DECISIONS.md row in the same commit. A scene whose subject is gone is named with `--removed <id>` (D260): it must be in
+  the base's dump and not in the candidate's list, and its base files move aside; any other missing scene fails. Exit 0 pass, 1 delta, 2 setup error.
   The working tree dumps headless (no window); a base from before M2 step 4 (`52b11d6` and older)
   opens a hidden window, so such a gate needs a logged-in macOS GUI session.
 - Platform smoke (needs a logged-in macOS or Windows GUI session; puts a tray item up for about 2 s; not in the gate; exit 0 held, 1 failed, 2 no session): `cargo run -p gallery -- --smoke-platform`
@@ -64,17 +65,26 @@ Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, r
 - A composite with one tab stop (radio group, star rating, nav list, tab strip, table header, board cards) uses roving focus: `Sense.skip_tab`,
   `Ui::rove_stop`, `rove_keys`, `rove_focus` (D113); text that must fit a width goes through `text::elide` / `Painter::elide`
   (D114). A drag ghost draws one layer group above its source, out of any `record` (`Ui::drag_ghost`, D168).
+- Only the window's background replaces what is below it: `Painter::acrylic` above the fixed `Base` layer, or in an overlay, draws as `Painter::frost`, and a backdrop replaces its region, so no draw opens a hole to the desktop (D258).
 - A loaded theme must reach every widget: a widget takes every colour from `ui.theme()` (or its options), never a literal or the preset (`c4::m10` draws the controls under a theme of distinct colours and fails on a preset colour; a fixed colour on purpose is listed in `docs/STATE.md`).
 - One text editing engine: `TextEdit` edits through `EditText` and `EditBuffer`, implemented for `str`, `String` and the line-indexed
   `CodeDoc` (D180); a new text kind implements them, it does not get a second engine. A text view draws only the lines in view and
   never shapes, hashes or clones the whole text per frame (D179, D195).
+- One selection drawing: every text selection (and the diff view's row selection, in its own colour) is drawn by
+  `widgets::selection::paint` from the selected part of each row in view, joined into one shape with rounded outer and
+  inner corners (`Painter::fill_joined`, R18, D272); no widget fills a selection itself (the gallery's
+  `no_widget_fills_a_selection_itself` walks every scene for it).
 - A wheel delta routes per axis: the topmost scroll region live on that axis takes it (D178). A composite with nothing to scroll on
   an axis disables that axis (`Bars::unless_fits`), so the delta reaches the area around it (D176).
-- An overlay that opens above an active modal is put on `LayerId::Raised` by `Ui::overlay`, once at open (D137): a widget
-  never names the layer. A widget in a `with_enabled(false, ..)` scope needs no rule of its own for its nodes (`Ui::node`
+- An overlay that opens above an active modal is put on `LayerId::Raised` by `Ui::overlay` and held there only while an older modal is on
+  the stack (D137, D255, D263): a widget never names the layer. Each overlay draws on a layer of its own in open order (`Scene::in_order`,
+  D256), so a later overlay hides an earlier one's text; every glass request blurs everything drawn before its layer, other glass included
+  (one blur per request, at its layer, D257); one routine, `popover::glass_surface`, frosts every floating surface (D260). A surface that
+  must stay live and undimmed under a modal goes through `Ui::outside_modals` (`LayerId::Outside`, D259). `Painter::on` changes only the
+  layer and keeps the clip stack (`enter`, the overlays, still clears it, D265). A widget in a `with_enabled(false, ..)` scope needs no rule of its own for its nodes (`Ui::node`
   marks them, D140), but it consumes its keys before it gates on `enabled` (`docs/architecture.md`, "Disabled keys", is the one list, D159); `testing::disabled_violations` checks a subtree.
 - Each seam has a fake and a contract test in `lune_ui_core::testing` (`RecordingRenderer`, `FakeText`
-  with `text_system_contract`, `FakeImages` with `image_store_contract`, `ScriptedInput`, `NullMaterial` with
+  with `text_system_contract`, `FakeImages` with `image_store_contract`, `ScriptedInput` with `scripted_input_contract`, `NullMaterial` with
   `backdrop_contract`); a new adapter
   passes the same suite. `docs/architecture.md` holds the module map, the seam table, the multi-window
   model and the pixel gates.
@@ -111,7 +121,7 @@ Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, r
 ## Git
 
 - Worktree per orchestrated task; commit per change.
-- No remote is configured yet; nothing is pushed until the user says so.
+- Remote `origin`: github.com/lune-rs/luneui-rs (public, D284). Push only when the user asks; never force-push.
 
 ## Read on demand
 

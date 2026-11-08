@@ -1,8 +1,8 @@
 //! The side panel host (`layout.side-panel`, D149): one column on the app's glass layer that shows
 //! one of several panels by key. The panels' contents are the app's.
 //!
-//! [`Ui::side_panel`] draws the card (the layer while the window is active, the theme's
-//! `window_fallback` fill when it is not, D128: the widget names no preset), then runs `content`
+//! [`Ui::side_panel`] draws the card (the app's glass layer, whatever the window's state: R13, the
+//! widget names no preset), then runs `content`
 //! once, for the shown panel, in the rect inside the 1 px [`RING`] and the [`PAD`] of 10. The shown panel runs under
 //! [`Ui::keep_alive`]; every other key of [`SidePanelOptions::keys`] is only marked alive, so a
 //! hidden panel's scroll offset, text edits and other retained state survive however many frames
@@ -12,8 +12,10 @@
 //! A change of [`SidePanelOptions::panel`] shows the new panel with the drawer motion: its
 //! content fades in ([`SHOW_OPACITY`]) while it slides in from [`SHOW_SLIDE_FROM`] px to its place
 //! ([`SHOW_SLIDE`], dropped under Reduced). The first frame of a host does not animate; a show in
-//! flight restarts from the look it has. The card does not move, and a hide snaps: the old panel is
-//! gone on the frame of the change. A show moves no focus (the app knows the first control).
+//! flight restarts from the look it has. The card does not move (the source animates the panel's
+//! own view, not the card: [`SidePanelOptions::card_moves`] makes the card and ring take the slide
+//! and fade too), and a hide snaps: the old panel is gone on the frame of the change. A show moves
+//! no focus (the app knows the first control).
 //!
 //! The card's text limit (D12): a text cannot be cut by a rounded clip, so the host keeps the
 //! content [`RING`] + [`PAD`] (11) from the edge, more than the radius of 8.
@@ -55,15 +57,16 @@ pub struct SidePanelOptions<'a> {
     pub panel: u64,
     /// Every panel's key, so the hidden ones stay alive. `panel` need not be repeated.
     pub keys: &'a [u64],
-    /// The window is active: the glass shows. Inactive, the solid fallback replaces it.
-    pub active: bool,
-    /// The glass layer drawn while active.
+    /// The glass layer the card draws.
     pub glass: GlassLayer,
     /// What the card is composed over (premultiplied); see
     /// [`ToolbarOptions::under`](super::toolbar::ToolbarOptions::under).
     pub under: [f32; 4],
     /// The accessible name of the group (the shown panel's title).
     pub name: &'a str,
+    /// The card and its ring take the show's slide and fade with the content. Off by default: the
+    /// source's animation is on the panel's own view, and the card stays still.
+    pub card_moves: bool,
 }
 
 /// The rect `content` is given in a host at `rect`.
@@ -91,23 +94,35 @@ impl Ui<'_> {
         content: impl FnOnce(&mut Ui<'_>, Rect),
     ) {
         let id = self.id(&key);
-        let (fallback, border) = (self.theme().window_fallback, self.theme().border);
+        let border = self.theme().border;
+        let (alpha, dx) = self.show_look(id.with("show"), opts.panel);
+        let (faded, moved) = (alpha < 1.0, dx != 0.0);
+        // The card and its ring move with the show only when asked.
+        let (card_faded, card_moved) = (opts.card_moves && faded, opts.card_moves && moved);
         let p = self.painter();
-        if opts.active {
-            p.acrylic(rect, RADIUS, opts.glass.premultiplied(), opts.under, true);
-        } else {
-            p.fill(rect, RADIUS, fallback);
+        if card_faded {
+            p.push_xform(Xform {
+                alpha,
+                ..Xform::translate(0.0, 0.0)
+            });
         }
+        if card_moved {
+            p.push_translate(dx, 0.0);
+        }
+        p.acrylic(rect, RADIUS, opts.glass.premultiplied(), opts.under, true);
         p.ring(rect, RADIUS, RING, border, false);
+        if card_moved {
+            p.pop_translate();
+        }
+        if card_faded {
+            p.pop_xform();
+        }
         for k in opts.keys.iter().filter(|k| **k != opts.panel) {
             self.mark_alive((&key, *k));
         }
-        let (alpha, dx) = self.show_look(id.with("show"), opts.panel);
         let group = Node::new(id, Role::Group, opts.name, rect);
         self.node_container(group, |ui| {
             ui.keep_alive((&key, opts.panel), |ui| {
-                let faded = alpha < 1.0;
-                let moved = dx != 0.0;
                 let p = ui.painter();
                 if faded {
                     p.push_xform(Xform {

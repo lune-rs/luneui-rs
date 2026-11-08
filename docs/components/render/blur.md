@@ -31,10 +31,10 @@ Conflicts: none. The menu glass in Wane is `blur(30px) saturate(1.8)` [W docs/ui
 
 ### Anatomy
 
-- Offscreen scene texture, then a copy, a horizontal and a vertical blur pass, each with its own parameter buffer [R crates/lune-ui-wgpu/src/blur.rs:190-196].
+- Offscreen scene texture, then three downsampling copies, then per blur a horizontal and a vertical pass into that blur's own result, each with its own parameter buffers: a buffer write lands before the frame's submit, so a shared one would hold the last value for every blur [D257] [R crates/lune-ui-wgpu/src/blur.rs].
 - The scene texture view is exposed for the frame pass [R crates/lune-ui-wgpu/src/blur.rs:315].
-- Backdrop request: a rect and a radius [R crates/lune-ui-core/src/paint.rs:189], plus (M7, [D138]) the `layer` it sits under, its own `sigma` and its own `saturation` (0 means the frame's `FrameParams` values), set by `Painter::backdrop_with`. The offscreen scene holds the layers below `Scene::split()`: `SCENE_LAYERS`, or the request's layer when higher, so a glass surface blurs everything under it. The frame renders that scene, copies it to the target, draws the blur over it and then the layers from the split up; the renderer and the recording fake read the same `Scene::split`.
-- One blur per frame: of two requests the lower layer keeps it, and on one layer the last wins. A glass menu over a dialog whose scrim is blurred therefore has no blur of its own.
+- Backdrop request: a rect and a radius [R crates/lune-ui-core/src/paint.rs:189], plus (M7, [D138]) its own `sigma` and its own `saturation` (0 means the frame's `FrameParams` values), set by `Painter::backdrop_with`. The frame renders offscreen up to its last stop, and at least to `Scene::floor()`, the fixed layer `SCENE_LAYERS`: a request below the floor stops there, so it blurs those layers and draws over them. Each stop before the last draws its requests and the layers up to the next stop back into the scene; the last copies the scene to the target, draws its requests, and the layers after it follow. A frame with no request, or one stop, runs the passes it ran with one blur.
+- A blur per request, at its layer [D257]: a request lives on the layer it was asked on (`Layer::backdrops`), and every one stands. A layer with requests is a stop: what is drawn so far is blurred, the requests draw, the layer follows. Requests of one layer share a blur per distinct sigma; each has its own uniforms. A request that shows nothing (alpha 0, no area) records nothing.
 
 ### States
 
@@ -76,14 +76,14 @@ n/a — no text.
 
 - Pixel probes on a headless device (`crates/lune-ui-wgpu/tests/primitives.rs`): `a_glass_panel_on_raised_blurs_the_modal_layer_under_it` (inside the glass the black/white edge is blurred, outside it stays sharp), `a_popup_backdrop_leaves_the_modal_layer_sharp_and_on_top` (the split: layers from the request's up are not blurred), `a_backdrop_with_its_own_sigma_and_saturation_differs_from_the_frames` (sigma 4 and saturation 1 by value equal the frame's look; sigma 8 reaches further; saturation 2 differs).
 - The scene texture follows the target's size: `crates/lune-ui-wgpu/tests/targets.rs::one_renderer_across_two_sizes_matches_a_fresh_renderer_at_each` (one `FrameRenderer` drawn at A, B, A, A equals a fresh renderer at each size, pixel for pixel).
-- One blur per frame and the split: `crates/lune-ui-core/tests/painter.rs::of_two_backdrops_the_lower_layer_keeps_it_in_either_draw_order`, `on_one_layer_the_last_backdrop_wins`, `the_recording_renderer_puts_the_backdrop_at_the_split`.
+- Every request stands, and the stops: `crates/lune-ui-wgpu/tests/stacked_glass.rs`; `crates/lune-ui-core/tests/painter.rs::backdrops_on_two_layers_both_stand_in_draw_order_whichever_came_first`, `backdrops_on_one_layer_both_stand_in_record_order`, `the_recording_renderer_puts_a_backdrop_before_its_layer_and_no_lower_than_the_floor`.
 - The pixel gate on `blur-contrast` and `menu` at zero delta: `scripts/pixel-gate.sh` (the orchestrator's gate; M11's pre-audit run, base 55cfaaf, held 413 of 413 identical).
 
 ### Build
 
 - Milestone: M11 (done standard; code exists).
 - Depends on: render.frame, render.gpu, core.scene.
-- Done (D47, M11): tests `crates/lune-ui-wgpu/tests/primitives.rs::a_glass_panel_on_raised_blurs_the_modal_layer_under_it, crates/lune-ui-wgpu/tests/primitives.rs::a_popup_backdrop_leaves_the_modal_layer_sharp_and_on_top, crates/lune-ui-wgpu/tests/primitives.rs::a_backdrop_with_its_own_sigma_and_saturation_differs_from_the_frames, crates/lune-ui-wgpu/tests/targets.rs::one_renderer_across_two_sizes_matches_a_fresh_renderer_at_each, crates/lune-ui-core/tests/painter.rs::of_two_backdrops_the_lower_layer_keeps_it_in_either_draw_order, crates/lune-ui-core/tests/painter.rs::the_recording_renderer_puts_the_backdrop_at_the_split`; page n/a (a renderer pass, drawn by the scenes `blur-contrast` and `menu`); unverified here: none (the tests skip without a GPU adapter; with `LUNEUI_REQUIRE_GPU=1` they fail instead).
+- Done (D47, M11): tests `crates/lune-ui-wgpu/tests/primitives.rs::a_glass_panel_on_raised_blurs_the_modal_layer_under_it, crates/lune-ui-wgpu/tests/primitives.rs::a_popup_backdrop_leaves_the_modal_layer_sharp_and_on_top, crates/lune-ui-wgpu/tests/primitives.rs::a_backdrop_with_its_own_sigma_and_saturation_differs_from_the_frames, crates/lune-ui-wgpu/tests/targets.rs::one_renderer_across_two_sizes_matches_a_fresh_renderer_at_each, crates/lune-ui-core/tests/painter.rs::backdrops_on_two_layers_both_stand_in_draw_order_whichever_came_first, crates/lune-ui-core/tests/painter.rs::the_recording_renderer_puts_a_backdrop_before_its_layer_and_no_lower_than_the_floor`; page n/a (a renderer pass, drawn by the scenes `blur-contrast` and `menu`); unverified here: none (the tests skip without a GPU adapter; with `LUNEUI_REQUIRE_GPU=1` they fail instead).
 
 ## Open questions
 

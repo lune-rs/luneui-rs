@@ -5,7 +5,7 @@ use std::hash::Hash;
 
 use super::focus_ring::{self, RingKind};
 use crate::access::{Action, Node, Role, State};
-use crate::color::Rgba;
+use crate::color::{Rgba, clear};
 use crate::input::NamedKey;
 use crate::motion::{Kind, Motion, Reduce};
 use crate::paint::{Painter, Rect};
@@ -49,11 +49,6 @@ pub struct ToggleLook {
     pub knob_pos: f32,
     /// Focus ring opacity.
     pub focus: f32,
-}
-
-/// `c` with alpha 0 (the same colour, invisible, so fades keep their hue).
-fn clear(c: Rgba) -> Rgba {
-    [c[0], c[1], c[2], 0]
 }
 
 impl ToggleLook {

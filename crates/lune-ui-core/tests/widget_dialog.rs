@@ -11,7 +11,7 @@ use lune_ui_core::motion::{FRAME, MotionTier, Time, conformance, conformance_of}
 use lune_ui_core::paint::{LayerId, Painter, Rect};
 use lune_ui_core::scene::Scene;
 use lune_ui_core::shortcuts::{Binding, Chord, Scope};
-use lune_ui_core::testing::{FakeText, UiHarness, disabled_violations};
+use lune_ui_core::testing::{FakeText, UiHarness, disabled_violations, flattened};
 use lune_ui_core::theme::DARK;
 use lune_ui_core::ui::{Response, Ui, WidgetId};
 use lune_ui_core::widgets::button::{ButtonKind, button};
@@ -28,7 +28,6 @@ const BODY_FILL: [u8; 4] = [200, 30, 30, 255];
 
 fn glass() -> DialogGlass {
     DialogGlass {
-        panel: [0.1, 0.1, 0.12, 1.0],
         fill: [0.2, 0.2, 0.2, 0.62],
         noise: true,
     }
@@ -149,7 +148,7 @@ fn at_rest_the_ui_dialog_draws_exactly_what_the_painter_dialog_does() {
         let (scene, out, _, _) = frame(&mut h, Some(&d));
         assert_eq!(out.repaint, Repaint::Idle);
         assert_eq!(
-            scene,
+            flattened(&scene),
             old_scene(old_cancel, extra),
             "{cancel:?} extra {extra}"
         );
@@ -162,9 +161,10 @@ fn at_rest_nothing_is_transparent_and_no_transform_is_pushed() {
     let mut h = opened(&d);
     h.at_ms(2000);
     let (scene, _, _, _) = frame(&mut h, Some(&d));
-    let modal = &scene.layers[LayerId::Modal as usize];
-    assert!(modal.geometry.acrylic.iter().all(|a| a.opacity == 1.0));
+    let modal = &scene.merged(LayerId::Modal);
     let g = &modal.geometry;
+    let frost = g.under.iter().find(|s| s.is_frost()).expect("the card");
+    assert_eq!(frost.params[1], 1.0, "at full alpha");
     assert!(g.under.iter().chain(&g.over).all(|s| s.color[3] > 0.0));
     assert!(modal.texts.iter().all(|t| t.scale == 1.0));
 }
@@ -395,17 +395,18 @@ fn pixel_probes_at_scale_two() {
     frame(&mut h, Some(&d));
     h.at_ms(1000);
     let (scene, _, _, _) = frame(&mut h, Some(&d));
-    let modal = &scene.layers[LayerId::Modal as usize];
+    let modal = &scene.merged(LayerId::Modal);
     // Scrim: the window, #00000080.
     let scrim = modal.geometry.under[0];
     assert_eq!(scrim.rect, [0.0, 0.0, WIN.0 * 2.0, WIN.1 * 2.0]);
     assert_eq!(DARK.dialog_backdrop, [0, 0, 0, 0x80]);
     assert_eq!(scrim.color, premul([0, 0, 0, 0x80]));
     // Card: 896 wide, corner radius 16.
-    let card = modal.geometry.acrylic[0];
-    assert_eq!(card.shape.rect[2], 896.0);
-    assert_eq!(card.shape.radii, [16.0; 4]);
-    assert_eq!(card.opacity, 1.0);
+    let card = modal.geometry.under.iter().find(|s| s.is_frost());
+    let card = card.expect("the card");
+    assert_eq!(card.rect[2], 896.0);
+    assert_eq!(card.radii, [16.0; 4]);
+    assert_eq!(card.params[1], 1.0);
     // Footer: 136 high, bottom corners 16.
     let footer = modal
         .geometry
@@ -415,22 +416,65 @@ fn pixel_probes_at_scale_two() {
         .expect("footer");
     assert_eq!(footer.rect[3], 136.0);
     assert_eq!(footer.rect[2], 896.0);
-    // Two buttons, 64 high.
+    // The confirm button's fill, 64 high; the cancel button rests clear and draws no fill (R4).
     let buttons: Vec<_> = modal
         .geometry
         .under
         .iter()
         .filter(|s| s.radii == [12.0; 4])
         .collect();
-    assert_eq!(buttons.len(), 2);
+    assert_eq!(buttons.len(), 1);
     assert!(buttons.iter().all(|s| s.rect[3] == 64.0));
+    assert_eq!(buttons[0].color, premul(DARK.surface_input));
+}
+
+#[test]
+fn a_footer_button_is_at_least_80_wide_primary_right_and_secondary_left() {
+    let two_letters = Dialog {
+        title: "Quit",
+        message: "Really?",
+        extra_h: 0.0,
+        confirm: "OK",
+        cancel: Cancel::Label("No"),
+    };
+    let mut h = opened(&two_letters);
+    let (_, out) = run(&mut h, &two_letters, 1200, 1);
+    let bounds = |name: &str| {
+        out.tree
+            .nodes
+            .iter()
+            .find(|n| n.role == Role::Button && n.name == name)
+            .unwrap_or_else(|| panic!("no button {name}"))
+            .bounds
+    };
+    let (ok, no) = (bounds("OK"), bounds("No"));
+    assert_eq!(
+        (ok.w, no.w),
+        (80.0, 80.0),
+        "two letters are an 80 px button"
+    );
+    assert!(no.right() < ok.x, "the secondary is left of the primary");
+    assert_eq!(ok.x - no.right(), 8.0, "spacing 8");
+    // The card's right padding is 24, whatever the width.
+    assert_eq!(card_bounds(&out).right() - ok.right(), 24.0);
+    // A label wider than 80 keeps its own width: "Discard" plus 16 each side.
+    let d = the_dialog(Cancel::Default, 0.0);
+    let mut h = opened(&d);
+    let (_, out) = run(&mut h, &d, 1200, 1);
+    let discard = out
+        .tree
+        .nodes
+        .iter()
+        .find(|n| n.role == Role::Button && n.name == "Discard")
+        .expect("the confirm");
+    assert!(discard.bounds.w >= 80.0);
 }
 
 /// The sampler of a dialog's visibility on the 60 Hz grid: the scrim's alpha as a fraction of its
 /// rest alpha (0 when nothing is drawn) and the card's scale (the title text's glyph scale; 0.96
 /// when nothing is drawn yet).
 fn measure(scene: &Scene) -> (f32, f32) {
-    let modal = &scene.layers[LayerId::Modal as usize];
+    let modal = &scene.merged(LayerId::Modal);
     let rest = premul(DARK.dialog_backdrop)[3];
     let opacity = modal
         .geometry
@@ -563,7 +607,8 @@ fn a_closing_dialog_draws_the_apps_body_and_fades_it_with_the_card() {
     let mut h = opened(&d);
     // The body is the only shape of the Modal layer with radius 4 (at most; the card scales it).
     let find = |scene: &Scene| {
-        scene.layers[LayerId::Modal as usize]
+        scene
+            .merged(LayerId::Modal)
             .geometry
             .under
             .iter()
@@ -589,12 +634,7 @@ fn a_closing_dialog_draws_the_apps_body_and_fades_it_with_the_card() {
     h.at_ms(3180);
     let (end, out, _, _) = frame(&mut h, None);
     assert_eq!(out.repaint, Repaint::Idle);
-    assert!(
-        end.layers[LayerId::Modal as usize]
-            .geometry
-            .under
-            .is_empty()
-    );
+    assert!(end.merged(LayerId::Modal).geometry.under.is_empty());
 }
 
 #[test]
@@ -626,6 +666,11 @@ const FORM: DialogOptions = DialogOptions {
 const BLUR: DialogOptions = DialogOptions {
     width: DialogWidth::Confirm,
     scrim_blur: true,
+    confirm_enabled: true,
+};
+const PLAIN: DialogOptions = DialogOptions {
+    width: DialogWidth::Confirm,
+    scrim_blur: false,
     confirm_enabled: true,
 };
 const OFF: DialogOptions = DialogOptions {
@@ -703,7 +748,7 @@ fn the_default_options_draw_what_dialog_draws() {
         DialogOptions::default(),
         DialogOptions {
             width: DialogWidth::Confirm,
-            scrim_blur: false,
+            scrim_blur: true,
             confirm_enabled: true
         }
     );
@@ -738,7 +783,7 @@ fn the_form_card_is_600_wide_and_centred_and_holds_two_columns() {
         "the body is the card less 24 each side"
     );
     // The footer is as wide as the card and the buttons stay right-aligned in it.
-    let modal = &scene.layers[LayerId::Modal as usize];
+    let modal = &scene.merged(LayerId::Modal);
     let footer = modal
         .geometry
         .under
@@ -765,9 +810,11 @@ fn the_form_scale_two_probes() {
     frame_with(&mut h, Some((&d, &FORM)));
     h.at_ms(1000);
     let (scene, _, _, _) = frame_with(&mut h, Some((&d, &FORM)));
-    let modal = &scene.layers[LayerId::Modal as usize];
-    assert_eq!(modal.geometry.acrylic[0].shape.rect[2], 1200.0);
-    assert_eq!(modal.geometry.acrylic[0].shape.radii, [16.0; 4]);
+    let modal = &scene.merged(LayerId::Modal);
+    let card = modal.geometry.under.iter().find(|s| s.is_frost());
+    let card = card.expect("the card");
+    assert_eq!(card.rect[2], 1200.0);
+    assert_eq!(card.radii, [16.0; 4]);
 }
 
 #[test]
@@ -801,28 +848,30 @@ fn every_close_path_of_the_form_fires_once() {
 
 /// The blur request of a frame, or `None`.
 fn blur_of(scene: &Scene) -> Option<lune_ui_core::scene::BackdropRequest> {
-    scene.backdrop
+    scene.backdrops().next().copied()
 }
 
 #[test]
 fn the_scrim_blur_asks_for_the_window_at_sigma_eight_on_the_modal_layer() {
     let d = the_dialog(Cancel::Default, 0.0);
-    let mut plain = opened_with(&d, &DialogOptions::default());
-    let (scene, _, _, _) = frame_with(&mut plain, Some((&d, &DialogOptions::default())));
-    assert_eq!(blur_of(&scene), None, "no blur by default");
+    let mut plain = opened_with(&d, &PLAIN);
+    let (scene, _, _, _) = frame_with(&mut plain, Some((&d, &PLAIN)));
+    assert_eq!(blur_of(&scene), None, "no blur with `scrim_blur: false`");
+    let mut dflt = opened_with(&d, &DialogOptions::default());
+    let (scene, _, _, _) = frame_with(&mut dflt, Some((&d, &DialogOptions::default())));
+    assert!(blur_of(&scene).is_some(), "the blur is the default");
 
     let mut h = opened_with(&d, &BLUR);
     let (scene, _, _, _) = frame_with(&mut h, Some((&d, &BLUR)));
     let b = blur_of(&scene).expect("the blur is asked for");
-    assert_eq!(b.layer, LayerId::Modal as usize);
+    assert_eq!(scene.merged(LayerId::Modal).backdrops, [b], "on the dialog");
     assert_eq!((b.sigma, b.saturation), (8.0, 1.0));
     assert_eq!(b.rect, [0.0, 0.0, WIN.0, WIN.1]);
     assert_eq!(b.radius, 0.0);
     assert_eq!(b.alpha, 1.0);
     // The scrim keeps its colour over the blur.
-    let scrim = scene.layers[LayerId::Modal as usize].geometry.under[0];
+    let scrim = scene.merged(LayerId::Modal).geometry.under[0];
     assert_eq!(scrim.color, premul(DARK.dialog_backdrop));
-    assert_eq!(scene.split(), LayerId::Modal as usize);
 }
 
 #[test]
@@ -831,7 +880,7 @@ fn the_blur_fades_with_the_scrim_opening_and_closing() {
     let rest = premul(DARK.dialog_backdrop)[3];
     let fade_of = |scene: &Scene| {
         let b = blur_of(scene).expect("blur asked for").alpha;
-        let s = scene.layers[LayerId::Modal as usize].geometry.under[0].color[3] / rest;
+        let s = scene.merged(LayerId::Modal).geometry.under[0].color[3] / rest;
         (b, s)
     };
     // Opening, 125 ms in (half way).
@@ -860,10 +909,7 @@ fn the_blur_fades_with_the_scrim_opening_and_closing() {
     let (b, s) = fade_of(&scene);
     assert!(b > 0.0 && b < 1.0, "closing: {b}");
     assert!((b - s).abs() < 1e-5, "{b} vs {s}");
-    assert_eq!(
-        blur_of(&scene).map(|b| b.layer),
-        Some(LayerId::Modal as usize)
-    );
+    assert_eq!(scene.merged(LayerId::Modal).backdrops.len(), 1);
     h.at_ms(3180);
     let (scene, _, _, _) = frame_with(&mut h, None);
     assert_eq!(blur_of(&scene), None, "gone with the dialog");
@@ -899,7 +945,8 @@ fn menu_frame(h: &mut UiHarness, o: &DialogOptions) -> Scene {
 /// Whether the Raised layer holds the menu's glass fill (radius 9, `menu_glass`).
 fn raised_menu_fill(scene: &Scene) -> bool {
     let want = premul(DARK.menu_glass);
-    scene.layers[LayerId::Raised as usize]
+    scene
+        .merged(LayerId::Raised)
         .geometry
         .under
         .iter()
@@ -907,28 +954,31 @@ fn raised_menu_fill(scene: &Scene) -> bool {
 }
 
 #[test]
-fn a_glass_menu_above_a_blurred_scrim_loses_the_blur_and_draws_its_fill() {
+fn a_glass_menu_above_a_blurred_scrim_keeps_a_blur_of_its_own() {
     let mut h = UiHarness::new(WIN);
     menu_frame(&mut h, &BLUR);
     h.at_ms(1000);
     menu_frame(&mut h, &BLUR);
     let scene = menu_frame(&mut h, &BLUR);
-    let b = blur_of(&scene).expect("one blur");
-    assert_eq!(b.layer, LayerId::Modal as usize, "the lower layer keeps it");
-    assert_eq!(b.sigma, 8.0, "the scrim's sigma, not the menu's");
+    let scrim = &scene.merged(LayerId::Modal).backdrops;
+    assert_eq!(scrim.len(), 1);
+    assert_eq!(scrim[0].sigma, 8.0, "the scrim's sigma");
+    let menu = &scene.merged(LayerId::Raised).backdrops;
+    assert_eq!(menu.len(), 1);
+    assert_eq!(menu[0].sigma, 0.0, "the frame's sigma, for the menu");
     assert!(
         raised_menu_fill(&scene),
         "the menu still draws its fill, on Raised"
     );
     // Without the scrim blur the menu's own blur is the one, on its own layer.
     let mut h = UiHarness::new(WIN);
-    menu_frame(&mut h, &DialogOptions::default());
+    menu_frame(&mut h, &PLAIN);
     h.at_ms(1000);
-    menu_frame(&mut h, &DialogOptions::default());
-    let scene = menu_frame(&mut h, &DialogOptions::default());
-    let b = blur_of(&scene).expect("the menu's blur");
-    assert_eq!(b.layer, LayerId::Raised as usize);
-    assert_eq!(b.sigma, 0.0, "the frame's sigma");
+    menu_frame(&mut h, &PLAIN);
+    let scene = menu_frame(&mut h, &PLAIN);
+    assert_eq!(scene.backdrops().count(), 1, "the menu's blur");
+    let menu = &scene.merged(LayerId::Raised).backdrops;
+    assert_eq!(menu[0].sigma, 0.0, "the frame's sigma");
     assert!(raised_menu_fill(&scene));
 }
 
@@ -960,7 +1010,8 @@ fn a_disabled_confirm_draws_at_the_disabled_opacity_open_and_closing() {
     let d = the_dialog(Cancel::Default, 0.0);
     let confirm_fill = |scene: &Scene, out: &FrameOutput| {
         let r = button_node(out, "Discard").bounds;
-        scene.layers[LayerId::Modal as usize]
+        scene
+            .merged(LayerId::Modal)
             .geometry
             .under
             .iter()
@@ -980,7 +1031,8 @@ fn a_disabled_confirm_draws_at_the_disabled_opacity_open_and_closing() {
     h.at_ms(3000);
     let (scene, _, _, _) = frame_with(&mut h, None);
     let r = button_node(&out, "Discard").bounds;
-    let closing = scene.layers[LayerId::Modal as usize]
+    let closing = scene
+        .merged(LayerId::Modal)
         .geometry
         .under
         .iter()
@@ -1150,19 +1202,14 @@ fn a_nested_dialog_draws_on_raised_over_the_dialog() {
     nest_frame(&mut h, false, &mut t);
     h.at_ms(500);
     let (rest, _) = nest_frame(&mut h, false, &mut t);
-    assert!(
-        rest.layers[LayerId::Raised as usize]
-            .geometry
-            .under
-            .is_empty()
-    );
+    assert!(rest.merged(LayerId::Raised).geometry.under.is_empty());
     nest_frame(&mut h, true, &mut t);
     h.at_ms(1500);
     nest_frame(&mut h, true, &mut t);
     let (scene, _) = nest_frame(&mut h, true, &mut t);
-    let raised = &scene.layers[LayerId::Raised as usize];
+    let raised = &scene.merged(LayerId::Raised);
     assert!(
-        !raised.geometry.acrylic.is_empty(),
+        raised.geometry.under.iter().any(|s| s.is_frost()),
         "the inner card is on Raised"
     );
     assert!(!raised.texts.is_empty());

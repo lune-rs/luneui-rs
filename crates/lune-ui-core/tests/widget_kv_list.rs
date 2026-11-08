@@ -7,9 +7,9 @@ use lune_ui_core::access::{Role, State, Value};
 use lune_ui_core::color::premul;
 use lune_ui_core::input::{ClipboardRequest, FrameOutput, Key, Modifiers, NamedKey, PointerButton};
 use lune_ui_core::paint::Rect;
-use lune_ui_core::scene::{Scene, Shape, TextItem};
-use lune_ui_core::testing::{FakeText, ScriptedInput, UiHarness};
-use lune_ui_core::text::{Spec, Style, elide};
+use lune_ui_core::scene::{Scene, TextItem};
+use lune_ui_core::testing::{FakeText, ScriptedInput, UiHarness, disabled_violations, fill_shapes};
+use lune_ui_core::text::{Spec, Style, TextSystem, elide};
 use lune_ui_core::theme::DARK;
 use lune_ui_core::ui::{Ui, WidgetId};
 use lune_ui_core::widgets::button::ButtonKind;
@@ -28,19 +28,27 @@ const PAIRS: [(&str, &str); 3] = [
 ];
 
 fn texts(scene: &Scene) -> Vec<TextItem> {
-    scene.layers.iter().flat_map(|l| l.texts.clone()).collect()
-}
-
-fn fills(scene: &Scene) -> Vec<Shape> {
-    let c = premul(DARK.text_selection);
-    scene.layers[0]
-        .geometry
-        .under
-        .iter()
-        .filter(|s| s.color == c)
-        .copied()
+    scene
+        .in_order()
+        .into_iter()
+        .flat_map(|l| l.texts.clone())
         .collect()
 }
+
+/// The selection shapes as `[x, y, w, h]` (scale 1), padding included; no flat fill has the
+/// selection's colour.
+fn fills(scene: &Scene) -> Vec<[f32; 4]> {
+    let c = premul(DARK.text_selection);
+    let g = &scene.layers[0].geometry;
+    assert!(!g.under.iter().chain(&g.over).any(|s| s.color == c));
+    fill_shapes(g, DARK.text_selection)
+        .iter()
+        .map(|r| [r.x, r.y, r.w, r.h])
+        .collect()
+}
+
+/// The selection's padding past each end of a row.
+const PAD: f32 = DARK.selection_pad;
 
 fn kv(
     h: &mut UiHarness,
@@ -110,7 +118,6 @@ fn the_key_column_is_the_longest_keys_measured_width_and_the_gap_is_16() {
 
 /// The width the fake text system gives `s` at 13 px.
 fn text_w(s: &str) -> f32 {
-    use lune_ui_core::text::TextSystem;
     FakeText
         .measure(&Spec::plain(s, Style::ui(13.0, DARK.fg_primary)), 1.0)
         .0
@@ -301,7 +308,7 @@ fn a_drag_across_a_value_then_copy_writes_the_substring() {
     assert_eq!(selection_of(&out, 0), (0, 5));
     let f = fills(&scene);
     assert_eq!(f.len(), 1, "one selection box");
-    assert_eq!(f[0].rect, [x, RECT.y + 2.0, 5.0 * GLYPH, 20.0]);
+    assert_eq!(f[0], [x - PAD, RECT.y + 2.0, 5.0 * GLYPH + 2.0 * PAD, 20.0]);
     h.input.release(PointerButton::Primary);
     plain(&mut h);
     chord(&mut h, "c");
@@ -429,8 +436,8 @@ fn a_press_on_an_elided_value_selects_it_whole_and_copy_writes_all_of_it() {
     let (scene, out, _) = kv(&mut h, rect, &pairs, &opts);
     let f = fills(&scene);
     assert_eq!(f.len(), 1);
-    let w = f[0].rect[2];
-    assert_eq!((f[0].rect[0], f[0].rect[1], f[0].rect[3]), (vx, 32.0, 20.0));
+    let w = f[0][2] - 2.0 * PAD;
+    assert_eq!((f[0][0], f[0][1], f[0][3]), (vx - PAD, 32.0, 20.0));
     assert!(
         w < 200.0 - text_w("Key") - 16.0 + 0.01,
         "the fill covers what is drawn, not the full text"
@@ -791,11 +798,257 @@ fn a_two_run_spec_equal_to_full_selects_part_of_it_and_copies_that_part() {
     assert_eq!(node.text.as_ref().expect("text").selection, (2, 5));
     let f = fills(&scene);
     assert_eq!(f.len(), 1, "one fill: {f:?}");
-    assert!((f[0].rect[0] - (20.0 + 2.0 * GLYPH)).abs() < 0.01, "{f:?}");
-    assert!((f[0].rect[2] - 3.0 * GLYPH).abs() < 0.01, "{f:?}");
+    assert!((f[0][0] - (20.0 + 2.0 * GLYPH - PAD)).abs() < 0.01, "{f:?}");
+    assert!((f[0][2] - (3.0 * GLYPH + 2.0 * PAD)).abs() < 0.01, "{f:?}");
     h.input.release(PointerButton::Primary);
     run(&mut h);
     chord(&mut h, "c");
     let (_, out) = run(&mut h);
     assert_eq!(out.clipboard, [ClipboardRequest::Write("cde".to_owned())]);
+}
+
+// ---- the copy control (R16) ----
+
+const P: PointerButton = PointerButton::Primary;
+
+fn copying() -> KvOptions {
+    KvOptions {
+        copy: true,
+        ..KvOptions::default()
+    }
+}
+
+fn copy_id(i: usize) -> WidgetId {
+    WidgetId::ROOT.with("kv").with(i.to_string()).with("copy")
+}
+
+/// The row-`i` control's middle: 21 px square at the right end, centred on the 20 px line.
+fn copy_mid(i: usize) -> (f32, f32) {
+    (RECT.right() - 10.5, RECT.y + 24.0 * i as f32 + 2.0 + 10.0)
+}
+
+fn at_ms(h: &mut UiHarness, ms: u64, opts: &KvOptions) -> (Scene, FrameOutput) {
+    h.at_ms(ms);
+    let (scene, out, _) = kv(h, RECT, &PAIRS, opts);
+    (scene, out)
+}
+
+fn glyph_text(color: [u8; 4]) -> Spec {
+    lune_ui_core::icon::glyph(lune_ui_core::icon::COPY, 13.0, color)
+}
+
+/// The copy glyphs drawn in `colour`: their `y`s.
+fn copy_glyphs(scene: &Scene, color: [u8; 4]) -> Vec<f32> {
+    let key = FakeText.prepare(&glyph_text(color), 1.0).0;
+    texts(scene)
+        .iter()
+        .filter(|t| t.key == key)
+        .map(|t| t.y)
+        .collect()
+}
+
+fn check_shows(scene: &Scene) -> bool {
+    let check = lune_ui_core::icon::glyph(lune_ui_core::icon::CHECK, 13.0, DARK.fg_primary);
+    let key = FakeText.prepare(&check, 1.0).0;
+    texts(scene).iter().any(|t| t.key == key)
+}
+
+#[test]
+fn copy_off_draws_and_registers_what_it_did() {
+    let mut h = UiHarness::new(WIN);
+    let (scene, out, height) = kv(&mut h, RECT, &PAIRS, &KvOptions::default());
+    assert_eq!(height, 72.0);
+    assert_eq!(texts(&scene).len(), 6, "a key and a value per pair");
+    assert!(out.tree.nodes.iter().all(|n| n.role != Role::Button));
+    assert!(out.tree.get(copy_id(0)).is_none());
+    // Values are as wide as ever: a copy-less value is elided at the whole column.
+    let long = "0123456789".repeat(8);
+    let pairs = [("Id", long.as_str())];
+    let (scene, _, _) = kv(
+        &mut UiHarness::new(WIN),
+        RECT,
+        &pairs,
+        &KvOptions::default(),
+    );
+    let column = RECT.w - text_w("Id") - 16.0;
+    let spec = Spec::plain(
+        &long,
+        Style {
+            line: 20.0,
+            ..Style::ui(13.0, DARK.fg_primary)
+        },
+    );
+    let want = elide(&mut FakeText, &spec, 1.0, column);
+    assert_eq!(texts(&scene)[1].key.0, want.cache_key(1.0));
+}
+
+#[test]
+fn a_hover_shows_one_control_on_its_own_row() {
+    let mut h = UiHarness::new(WIN);
+    let o = copying();
+    at_ms(&mut h, 0, &o);
+    let (scene, _) = at_ms(&mut h, 10, &o);
+    assert!(
+        copy_glyphs(&scene, DARK.fg_tertiary).is_empty(),
+        "no control shows at rest"
+    );
+    let (x, y) = copy_mid(1);
+    h.input.pointer_to(value_x() + 5.0, y);
+    at_ms(&mut h, 20, &o);
+    let (scene, _) = at_ms(&mut h, 30, &o);
+    let shown = copy_glyphs(&scene, DARK.fg_tertiary);
+    assert_eq!(shown.len(), 1, "one control: {shown:?}");
+    let row = RECT.y + 24.0;
+    assert!(
+        (row..row + 24.0).contains(&shown[0]),
+        "on the hovered row: {shown:?}"
+    );
+    // It sits at the row's right end.
+    let n = texts(&scene)
+        .into_iter()
+        .find(|t| t.key == FakeText.prepare(&glyph_text(DARK.fg_tertiary), 1.0).0)
+        .expect("the glyph");
+    assert!(n.x > RECT.right() - 21.0, "{}", n.x);
+    let _ = x;
+    // The pointer leaving takes it away.
+    h.input.pointer_to(500.0, 300.0);
+    at_ms(&mut h, 40, &o);
+    let (scene, _) = at_ms(&mut h, 50, &o);
+    assert!(copy_glyphs(&scene, DARK.fg_tertiary).is_empty());
+}
+
+#[test]
+fn a_click_writes_that_rows_value_and_no_other() {
+    let mut h = UiHarness::new(WIN);
+    let o = copying();
+    at_ms(&mut h, 0, &o);
+    let (x, y) = copy_mid(1);
+    h.input.pointer_to(x, y);
+    at_ms(&mut h, 10, &o);
+    h.input.click(P);
+    let (_, out) = at_ms(&mut h, 20, &o);
+    assert_eq!(
+        out.clipboard,
+        vec![ClipboardRequest::Write(PAIRS[1].1.to_owned())]
+    );
+    let (scene, out) = at_ms(&mut h, 300, &o);
+    assert!(check_shows(&scene), "the check mark shows");
+    assert!(out.clipboard.is_empty());
+    // Row 0 and row 2 are untouched: one status node, on the clicked row.
+    let said: Vec<_> = out
+        .tree
+        .nodes
+        .iter()
+        .filter(|n| n.role == Role::Status)
+        .collect();
+    assert_eq!(said.len(), 1);
+    assert_eq!(said[0].live, Some(lune_ui_core::access::Live::Polite));
+    assert_eq!(
+        said[0].id,
+        WidgetId::ROOT.with("kv").with("1").with("copied")
+    );
+    // The check goes after feedback_ms (1,500) exactly.
+    let (scene, out) = at_ms(&mut h, 1_519, &o);
+    assert!(check_shows(&scene));
+    assert!(out.clipboard.is_empty());
+    let (_, out) = at_ms(&mut h, 1_520, &o);
+    assert!(!out.tree.nodes.iter().any(|n| n.role == Role::Status));
+}
+
+#[test]
+fn the_name_carries_the_key_and_the_control_is_a_button() {
+    let mut h = UiHarness::new(WIN);
+    let (_, out) = at_ms(&mut h, 0, &copying());
+    for (i, (key, _)) in PAIRS.iter().enumerate() {
+        let n = out.tree.get(copy_id(i)).expect("the control");
+        assert_eq!(n.role, Role::Button);
+        assert_eq!(n.name, format!("Copy {key}"));
+    }
+}
+
+#[test]
+fn tab_reaches_a_hidden_control_and_shows_it() {
+    let mut h = UiHarness::new(WIN);
+    let o = copying();
+    at_ms(&mut h, 0, &o);
+    h.input.key_down(Key::Named(NamedKey::Tab), None);
+    at_ms(&mut h, 10, &o);
+    let (scene, out) = at_ms(&mut h, 20, &o);
+    assert_eq!(out.focused, Some(copy_id(0)));
+    let shown = copy_glyphs(&scene, DARK.fg_tertiary);
+    assert_eq!(shown.len(), 1, "only the focused row's control: {shown:?}");
+    assert!((RECT.y..RECT.y + 24.0).contains(&shown[0]));
+    h.input.key_down(Key::Named(NamedKey::Enter), None);
+    let (_, out) = at_ms(&mut h, 30, &o);
+    assert_eq!(
+        out.clipboard,
+        vec![ClipboardRequest::Write(PAIRS[0].1.to_owned())]
+    );
+    h.input.key_down(Key::Named(NamedKey::Tab), None);
+    at_ms(&mut h, 40, &o);
+    let (_, out) = at_ms(&mut h, 50, &o);
+    assert_eq!(out.focused, Some(copy_id(1)));
+}
+
+#[test]
+fn disabled_the_controls_are_inert() {
+    let mut h = UiHarness::new(WIN);
+    let o = copying();
+    let run = |h: &mut UiHarness, ms: u64| {
+        h.at_ms(ms);
+        h.frame(|ui| {
+            ui.with_enabled(false, |ui| {
+                ui.kv_list("kv", RECT, &PAIRS, &o);
+            });
+        })
+    };
+    run(&mut h, 0);
+    let (x, y) = copy_mid(1);
+    h.input.pointer_to(x, y);
+    run(&mut h, 10);
+    h.input.click(P);
+    let (scene, out) = run(&mut h, 20);
+    assert!(out.clipboard.is_empty());
+    assert!(!check_shows(&scene));
+    let n = out.tree.get(copy_id(1)).expect("the control");
+    assert!(n.states.contains(State::Disabled));
+    assert!(disabled_violations(&out.tree, copy_id(1)).is_empty());
+}
+
+#[test]
+fn the_value_gives_up_the_controls_room() {
+    let long = "0123456789".repeat(8);
+    let pairs = [("Id", long.as_str())];
+    let style = Style {
+        line: 20.0,
+        ..Style::ui(13.0, DARK.fg_primary)
+    };
+    let column = RECT.w - text_w("Id") - 16.0;
+    let (scene, _, _) = kv(&mut UiHarness::new(WIN), RECT, &pairs, &copying());
+    let room = 21.0 + 4.0;
+    let want = elide(
+        &mut FakeText,
+        &Spec::plain(&long, style),
+        1.0,
+        column - room,
+    );
+    assert_eq!(texts(&scene)[1].key.0, want.cache_key(1.0));
+    // The measure agrees with the draw in the wrap mode.
+    let wrap = KvOptions {
+        mode: KvMode::Wrap,
+        copy: true,
+        ..KvOptions::default()
+    };
+    let mut h = UiHarness::new(WIN);
+    let (_, _, drawn) = kv(&mut h, RECT, &pairs, &wrap);
+    let (_, _, plain) = kv(
+        &mut h,
+        RECT,
+        &pairs,
+        &KvOptions {
+            copy: false,
+            ..wrap
+        },
+    );
+    assert!(drawn >= plain, "a narrower value wraps at least as much");
 }

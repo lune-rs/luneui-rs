@@ -7,7 +7,7 @@ use std::hash::Hash;
 use std::rc::Rc;
 
 use super::menu::{CLOSE, OPEN, menu_close_anim, menu_open_anim, xform_of};
-use super::popup_panel;
+use crate::color::premul;
 use crate::paint::{LayerId, Ops, Painter, Rect};
 use crate::ui::{OverlayFrame, OverlayOptions, OverlayPhase, Ui, WidgetId};
 
@@ -138,11 +138,9 @@ pub fn place(req: &PlaceRequest) -> Placement {
 /// What a popover draws behind its content.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Surface {
-    /// [`popup_panel`](fn@popup_panel): radius 8, `dropdown_bg`, a 1 px `border` ring.
+    /// `glass_panel`: radius 9, the blurred scene under it (`backdrop`), `menu_glass` frosted
+    /// over it, a 1 px `menu_popup_border` ring: the one surface of every popup and list (D8).
     #[default]
-    Panel,
-    /// `glass_panel`: radius 9, the blurred scene under it (`backdrop`), `menu_glass`, a 1 px
-    /// `menu_popup_border` ring: the surface of the glass menu (D7).
     Glass,
     /// Nothing: the content draws its own surface.
     None,
@@ -151,14 +149,21 @@ pub enum Surface {
 /// The radius of the glass surface.
 pub(crate) const GLASS_RADIUS: f32 = 9.0;
 
-/// The glass menu's surface at `r`: the backdrop under it, `menu_glass` over it, the
-/// `menu_popup_border` ring. The menu, the glass dropdown, the glass popover and the flyout draw
-/// this one function.
-pub(crate) fn glass_panel<H: Copy + PartialEq>(p: &mut Painter<'_, H>, r: Rect) {
+/// The one glass routine of every popup and list that floats over app content: the blurred scene
+/// under `r` (`backdrop`, a request of its own on this layer), then `menu_glass` frosted over it
+/// with the noise on, then the 1 px `menu_popup_border` ring. The menu, the flyout, the
+/// dropdown and the combo's list, the search picker, the popover and the tooltip draw
+/// this one function, so no surface can forget a part.
+pub(crate) fn glass_surface<H: Copy + PartialEq>(p: &mut Painter<'_, H>, r: Rect, radius: f32) {
     let t = p.theme;
-    p.backdrop(r, GLASS_RADIUS);
-    p.fill(r, GLASS_RADIUS, t.menu_glass);
-    p.ring(r, GLASS_RADIUS, 1.0, t.menu_popup_border, false);
+    p.backdrop(r, radius);
+    p.frost(r, radius, premul(t.menu_glass), true);
+    p.ring(r, radius, 1.0, t.menu_popup_border, false);
+}
+
+/// [`glass_surface`] at [`GLASS_RADIUS`].
+pub(crate) fn glass_panel<H: Copy + PartialEq>(p: &mut Painter<'_, H>, r: Rect) {
+    glass_surface(p, r, GLASS_RADIUS);
 }
 
 /// Where a popover goes and how it looks.
@@ -190,7 +195,7 @@ impl PopoverOptions {
             gap: 4.0,
             margin: 8.0,
             shift: true,
-            surface: Surface::Panel,
+            surface: Surface::Glass,
         }
     }
 
@@ -257,10 +262,6 @@ impl<'a> Ui<'a> {
                 .push_xform(xform_of(anim, origin, frame.transforms));
             let (r, ops) = ui.record(|ui| {
                 match surface {
-                    Surface::Panel => {
-                        let t = *ui.theme();
-                        popup_panel(ui.painter(), rect, t.dropdown_bg, t.border);
-                    }
                     Surface::Glass => glass_panel(ui.painter(), rect),
                     Surface::None => {}
                 }
@@ -300,7 +301,7 @@ mod tests {
             };
             menu_paint(&mut b, &[], &layout, &[]);
             assert!(a.scene == b.scene, "scale {scale}");
-            assert!(a.scene.backdrop.is_some());
+            assert!(a.scene.backdrops().next().is_some());
         }
     }
 

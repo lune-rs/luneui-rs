@@ -18,6 +18,7 @@ use std::ops::Range;
 
 use super::input_box::{self, InputBoxLook};
 use super::label;
+use super::selection;
 use super::text_lines::range_boxes;
 use crate::access::{AccessValue, Action, Node, Role, State, TextValue, Value};
 use crate::color::{Rgba, premul};
@@ -841,17 +842,18 @@ pub(super) fn draw_shown_inked(
 ) -> Rect {
     let t = *ui.theme();
     let at = |b: &Rect| Rect::new(x + b.x, y + b.y, b.w, b.h);
-    for b in range_boxes(ui, &shown.spec, &shown.selection) {
-        ui.painter().fill(at(&b), 0.0, t.text_selection);
-    }
+    let rows: Vec<Rect> = range_boxes(ui, &shown.spec, &shown.selection)
+        .iter()
+        .map(at)
+        .collect();
+    selection::paint(ui.painter(), &rows, (false, false), t.text_selection);
     let clause = shown
         .clause
         .as_ref()
         .map(|c| range_boxes(ui, &shown.spec, c))
         .unwrap_or_default();
-    for b in &clause {
-        ui.painter().fill(at(b), 0.0, t.text_selection);
-    }
+    let rows: Vec<Rect> = clause.iter().map(at).collect();
+    selection::paint(ui.painter(), &rows, (false, false), t.text_selection);
     if !shown.empty {
         ui.painter().text(&shown.spec, x, y);
     }

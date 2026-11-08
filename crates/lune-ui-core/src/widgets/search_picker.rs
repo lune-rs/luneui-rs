@@ -20,8 +20,7 @@ use std::hash::Hash;
 use super::filter_bar::{self, FilterOptions};
 use super::focus_ring::{self, RingKind};
 use super::label;
-use super::popover::{PopoverOptions, Side, Surface};
-use super::popup_panel;
+use super::popover::{PopoverOptions, Side};
 use super::scroll_area::{Bars, Extent, ScrollOptions};
 use crate::access::{Action, Node, Role, State, Value};
 use crate::icon;
@@ -291,7 +290,6 @@ impl<'a> Ui<'a> {
         let ring = match opts.trigger {
             Trigger::Field => RingKind::Edge {
                 radius: self.theme().item_radius,
-                on_accent: false,
             },
             Trigger::Link => RingKind::Button,
         };
@@ -379,14 +377,11 @@ fn popup<S: AsRef<str>>(
     let options = PopoverOptions {
         anchor_id: Some(id),
         side: st.side.unwrap_or(Side::Bottom),
-        surface: Surface::None,
         ..PopoverOptions::new(anchor, size)
     };
     let search = &mut st.search;
     let lists = &mut st.lists;
     let (frame, placement, picked) = ui.popover(("popup", st.opens), &options, |ui, at| {
-        let t = *ui.theme();
-        popup_panel(ui.painter(), at, t.dropdown_bg, t.border);
         let bar_w = at.w - 2.0 * POPUP_PADDING;
         let bar = Rect::new(
             at.x + POPUP_PADDING,

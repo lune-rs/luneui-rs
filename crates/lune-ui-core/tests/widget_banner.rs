@@ -404,5 +404,5 @@ fn the_action_hover_fill_tweens_over_instant_and_a_settled_view_is_idle() {
     let done = view_frame(&mut h, &s);
     assert_eq!(done.repaint, Repaint::Idle);
     let fill = done.scene.layers[0].geometry.under[0];
-    assert_eq!(fill.color, premul(DARK.surface_selected));
+    assert_eq!(fill.color, premul(DARK.surface_hover));
 }

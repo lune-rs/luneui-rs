@@ -68,6 +68,8 @@ pub const DEFAULTS: &[(&str, &str)] = &[
     ("luneui.kanban-board.empty-column", "No cards yet."),
     ("luneui.code-block.copy", "Copy code"),
     ("luneui.code-block.copied", "Copied"),
+    ("luneui.kv-list.copy", "Copy {0}"),
+    ("luneui.kv-list.copied", "Copied"),
     (
         "luneui.code-editor.truncated",
         "File truncated \u{2014} showing partial content",

@@ -1,22 +1,16 @@
 //! The `window` page (`platform.window`, M11): the caption buttons through the `Ui` (rest,
 //! maximized, hovered, mid-fade), the six-pixel resize border with its eight regions as `edge_at`
-//! answers them, and the inactive window under Wane's theme values. The window mode runs the live
+//! answers them, and the caption of a window that is not the active one. The window mode runs the live
 //! buttons: Maximize flips the restore glyph; Minimize and Close are the app's, and here do nothing.
 
-use lune_ui::chrome;
-use lune_ui::color::premul;
-use lune_ui::lunegit_dark::THEME;
 use lune_ui::motion::MotionTier;
-use lune_ui::paint::{LayerId, Rect};
-use lune_ui::text::{Spec, Style};
-use lune_ui::theme::Theme;
+use lune_ui::paint::Rect;
 use lune_ui::ui::Ui;
 use lune_ui::widgets::caption::{CaptionButton, CaptionOptions};
 use lune_ui::window::{EDGE_BORDER, ResizeEdge, edge_at};
 
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
-use crate::scenes::TITLE_BAND;
 use crate::showcase::knobs::Knobs;
 
 use super::{caption, card};
@@ -31,49 +25,45 @@ pub(crate) static PAGE: Page = Page {
     }),
 };
 
-/// Wane's inactive window: the solid `--glass-inactive` for the window, near-black, instead of the
-/// preset's `#333333` grey (the user's decision of 2026-11-03).
-const WANE_INACTIVE: [u8; 4] = [0x0B, 0x0B, 0x0B, 0xFF];
-/// Wane's `--glass-inactive-card`, the page card of an inactive window.
-const WANE_INACTIVE_CARD: [u8; 4] = [0x14, 0x14, 0x14, 0xFF];
-
 /// The caption buttons' height in the title band (Wane's `--titlebar-h`).
 const BUTTON_HEIGHT: f32 = 32.0;
 
 fn live() -> Box<dyn PageState> {
-    Box::<Caption>::default()
+    Box::new(Caption::default())
 }
 
 fn maximized() -> Box<dyn PageState> {
-    Box::new(Caption { maximized: true })
+    Box::new(Caption {
+        maximized: true,
+        ..Caption::default()
+    })
+}
+
+fn inactive() -> Box<dyn PageState> {
+    Box::new(Caption {
+        active: false,
+        ..Caption::default()
+    })
 }
 
 fn edges() -> Box<dyn PageState> {
     Box::new(Edges)
 }
 
-fn wane() -> Box<dyn PageState> {
-    Box::new(Inactive)
-}
-
-/// The caption buttons along the top right of `area`. The widget places them from the origin of
-/// the window it is given, so an area that is not at the window's origin moves them there with a
-/// translation (which carries their hit regions and nodes with it, and leaves the host's clip
-/// where it is on screen).
-fn caption_in(ui: &mut Ui<'_>, area: Rect, opts: CaptionOptions) -> Option<CaptionButton> {
-    if area.x == 0.0 && area.y == 0.0 {
-        return ui.caption_buttons("caption", area, opts);
-    }
-    ui.painter().push_translate(area.x, area.y);
-    let clicked = ui.caption_buttons("caption", Rect::new(0.0, 0.0, area.w, area.h), opts);
-    ui.painter().pop_translate();
-    clicked
-}
-
 /// The window with live caption buttons.
-#[derive(Default)]
 struct Caption {
     maximized: bool,
+    /// The window is the active one: the caption's own state, glyphs dim when it is not.
+    active: bool,
+}
+
+impl Default for Caption {
+    fn default() -> Self {
+        Self {
+            maximized: false,
+            active: true,
+        }
+    }
 }
 
 impl PageState for Caption {
@@ -84,15 +74,16 @@ impl PageState for Caption {
         let opts = CaptionOptions {
             height: BUTTON_HEIGHT,
             maximized: self.maximized,
-            active: true,
+            active: self.active,
         };
-        if caption_in(ui, win, opts) == Some(CaptionButton::Maximize) {
+        if ui.caption_buttons("caption", win, opts) == Some(CaptionButton::Maximize) {
             self.maximized = !self.maximized;
         }
     }
 
     fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
         panel.toggle(ui, "Maximized", &mut self.maximized);
+        panel.toggle(ui, "Window active", &mut self.active);
     }
 }
 
@@ -142,61 +133,6 @@ fn edge_name(e: ResizeEdge) -> &'static str {
         ResizeEdge::NorthWest => "North-west",
         ResizeEdge::SouthEast => "South-east",
         ResizeEdge::SouthWest => "South-west",
-    }
-}
-
-/// The inactive window under Wane's values: a solid near-black window, a `#141414` card, no
-/// glass, caption glyphs in `fg_quaternary`. The window fill is the theme's `window_fallback`; the
-/// card has no token, so the page names it.
-struct Inactive;
-
-impl PageState for Inactive {
-    fn draw(&mut self, ui: &mut Ui<'_>, stage: &Stage) {
-        let theme = *ui.theme();
-        let win = stage.area(ui);
-        let band = TITLE_BAND;
-        let margin = 10.0;
-        // On a stage the card is the stage's rect and the window around it is not ours to paint.
-        let card = stage.rect().unwrap_or(Rect::new(
-            margin,
-            band,
-            win.w - 2.0 * margin,
-            win.h - band - margin,
-        ));
-        let p = ui.painter();
-        stage.on(p, LayerId::Base);
-        let solid = premul(theme.window_fallback);
-        if stage.rect().is_none() {
-            p.acrylic(win, 0.0, solid, [0.0; 4], false);
-        }
-        p.acrylic(
-            card,
-            chrome::CARD_RADIUS,
-            premul(WANE_INACTIVE_CARD),
-            solid,
-            false,
-        );
-        if stage.rect().is_none() {
-            let spec = Spec::plain(
-                "luneui gallery",
-                Style::ui(12.0, theme.fg_secondary).medium(),
-            );
-            p.text_centered(&spec, Rect::new(0.0, 0.0, win.w, band - 2.0));
-        }
-        caption(ui, "Inactive, Wane", card.x + 24.0, card.y + 24.0);
-        let opts = CaptionOptions {
-            height: BUTTON_HEIGHT,
-            maximized: false,
-            active: false,
-        };
-        caption_in(ui, win, opts);
-    }
-
-    fn theme(&self) -> Option<Theme> {
-        Some(Theme {
-            window_fallback: WANE_INACTIVE,
-            ..THEME
-        })
     }
 }
 
@@ -269,11 +205,13 @@ const SCENES: &[UiScene] = &[
         capture_ms: 0,
         expect: Expect::Settled,
     },
+    // The caption of a window that is not the active one: glyphs in `fg_quaternary`. The caption
+    // owns that state (D10); no widget's surface depends on it.
     UiScene {
-        id: "window-inactive-wane",
+        id: "window-caption-inactive",
         scale: 2.0,
         tier: MotionTier::Full,
-        state: wane,
+        state: inactive,
         script: &[],
         capture_ms: 0,
         expect: Expect::Settled,

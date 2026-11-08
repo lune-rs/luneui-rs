@@ -8,8 +8,8 @@ use lune_ui_core::input::{
     Repaint,
 };
 use lune_ui_core::paint::Rect;
-use lune_ui_core::scene::{Scene, Shape};
-use lune_ui_core::testing::{FakeText, UiHarness};
+use lune_ui_core::scene::Scene;
+use lune_ui_core::testing::{FakeText, UiHarness, fill_covers, fill_shapes};
 use lune_ui_core::text::{Spec, Style, TextSystem};
 use lune_ui_core::theme::DARK;
 use lune_ui_core::ui::WidgetId;
@@ -250,20 +250,49 @@ fn a_press_lands_on_the_scrolled_line_and_a_drag_selects_per_line() {
         .pointer_to(TX + 2.0 * glyph() + 0.5, TY + 2.0 * line_h() + 1.0);
     let (scene, _, out) = plain(&mut h, &mut text);
     assert_eq!(selection(&out), (3 * 7 + 1, 5 * 7 + 2));
+    // One joined shape over the three lines, the widest (line 4, six glyphs) and the padding.
     let fill = premul(DARK.text_selection);
-    let fills: Vec<Shape> = scene.layers[0]
-        .geometry
-        .under
-        .iter()
-        .filter(|s| s.color == fill)
-        .copied()
-        .collect();
-    assert_eq!(fills.len(), 3, "one box per line");
-    assert_eq!(fills[0].rect[0], TX + glyph());
-    assert_eq!(fills[1].rect[0], TX);
-    assert_eq!(fills[1].rect[2], 6.0 * glyph());
-    assert_eq!(fills[2].rect[2], 2.0 * glyph());
-    assert_eq!(fills[1].rect[1] - fills[0].rect[1], line_h());
+    let g = &scene.layers[0].geometry;
+    assert!(!g.under.iter().chain(&g.over).any(|s| s.color == fill));
+    let fills = fill_shapes(g, DARK.text_selection);
+    assert_eq!(fills.len(), 1, "one shape: {fills:?}");
+    let (pad, f) = (DARK.selection_pad, fills[0]);
+    assert_eq!((f.x, f.w), (TX - pad, 6.0 * glyph() + 2.0 * pad));
+    assert!((f.h - 3.0 * line_h()).abs() < 1e-3, "{f:?}");
+    // Line 3 from its second glyph, line 4 whole, line 5 two glyphs.
+    let mid = |row: f32| f.y + (row + 0.5) * line_h();
+    let at = |x: f32, row: f32| fill_covers(g, DARK.text_selection, [x, mid(row)]);
+    assert!(!at(TX + 0.5 * glyph(), 0.0) && at(TX + 1.5 * glyph(), 0.0));
+    assert!(at(TX + 0.5 * glyph(), 1.0) && at(TX + 5.5 * glyph(), 1.0));
+    assert!(at(TX + 1.5 * glyph(), 2.0) && !at(TX + 3.0 * glyph(), 2.0));
+}
+
+#[test]
+fn a_drag_right_of_a_wrapped_row_reaches_the_rows_end() {
+    let opts = AreaOptions {
+        wrap: true,
+        ..AreaOptions::default()
+    };
+    // 40 glyphs of one word wrap into two rows of 20 that run into each other.
+    let mut text = "a".repeat(40);
+    let mut h = UiHarness::new(WIN);
+    run(&mut h, &mut text, &opts);
+    let y = TY + 1.0;
+    h.input
+        .pointer_to(TX + 0.5, y)
+        .press(PointerButton::Primary);
+    run(&mut h, &mut text, &opts);
+    h.input.pointer_to(TX + 20.0 * glyph() + 30.0, y);
+    let (_, _, out) = run(&mut h, &mut text, &opts);
+    assert_eq!(selection(&out), (0, 20), "the row's last glyph is selected");
+    // A plain click at the same point keeps the caret on the first row.
+    let mut h = UiHarness::new(WIN);
+    run(&mut h, &mut text, &opts);
+    h.input
+        .pointer_to(TX + 20.0 * glyph() + 30.0, y)
+        .press(PointerButton::Primary);
+    let (_, _, out) = run(&mut h, &mut text, &opts);
+    assert_eq!(selection(&out), (19, 19), "a click is unchanged");
 }
 
 #[test]
@@ -523,4 +552,32 @@ fn an_insert_over_the_cap_is_refused_whole_by_set_value_and_by_paste() {
             "paste of {len}"
         );
     }
+}
+
+/// The selection's shape is built from the rows in view: a select-all over forty lines is one
+/// shape no taller than the view and a row each side, square where it runs on out of view.
+#[test]
+fn a_selection_past_the_view_is_built_from_the_rows_in_view() {
+    let mut text = numbered(40);
+    let mut h = focused(&mut text, &AreaOptions::default());
+    h.input.set_modifiers(Modifiers {
+        logo: true,
+        ..Modifiers::default()
+    });
+    h.input.key_down(Key::Character("a".to_owned()), None);
+    h.input.set_modifiers(Modifiers::default());
+    plain(&mut h, &mut text);
+    let (scene, _, out) = plain(&mut h, &mut text);
+    assert_eq!(selection(&out), (0, text.chars().count()));
+    let g = &scene.layers[0].geometry;
+    let fills = fill_shapes(g, DARK.text_selection);
+    assert_eq!(fills.len(), 1, "{fills:?}");
+    let f = fills[0];
+    assert!(f.h <= RECT.h + 2.0 * line_h(), "rows in view only: {f:?}");
+    // The caret went to the end, and the view with it: the last line is in view, its corner
+    // round; the top runs on out of view, square.
+    let at = |x: f32, y: f32| fill_covers(g, DARK.text_selection, [x, y]);
+    assert!(at(f.x + 0.3, f.y + 0.3), "a square top corner");
+    assert!(!at(f.x + 0.3, f.bottom() - 0.3), "a round bottom corner");
+    assert!(at(f.x + 0.3, f.bottom() - line_h() / 2.0), "the instrument");
 }

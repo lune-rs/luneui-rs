@@ -112,6 +112,31 @@ fn a_press_on_a_non_focusable_widget_leaves_focus_alone() {
     assert!(run(&mut h));
 }
 
+/// A widget that is focused with its ring showing, then drawn disabled: the next frame it reports
+/// neither the focus nor the ring (`core.focus`, "disabled"; the `tree-view-disabled` scene).
+#[test]
+fn a_focused_widget_that_turns_disabled_shows_no_ring_the_next_frame() {
+    let mut h = harness();
+    let run = |h: &mut UiHarness, enabled: bool| {
+        let mut r = None;
+        h.frame(|ui| r = Some(ui.with_enabled(enabled, |ui| stop(ui, "a", 0))));
+        r.expect("ran")
+    };
+    run(&mut h, true);
+    tab(&mut h);
+    let on = run(&mut h, true);
+    assert!(
+        on.enabled && on.focused && on.focus_visible,
+        "instrument: the ring shows"
+    );
+    let off = run(&mut h, false);
+    assert!(!off.enabled);
+    assert!(
+        !off.focused && !off.focus_visible,
+        "disabled: no focus, no ring: {off:?}"
+    );
+}
+
 fn modal() -> OverlayOptions {
     OverlayOptions {
         layer: LayerId::Modal,
@@ -1331,4 +1356,139 @@ fn initial_focus_ignores_skip_tab_regions() {
         });
     }
     assert_eq!(focused, Some("x"));
+}
+
+// --- Tab scopes (`Ui::tab_scope`) ---------------------------------------------------------------
+
+/// `a`, `b` in a scope of order 1 drawn first; `c`, `d` in a scope of order 0 drawn second; `e`
+/// outside any scope (order 0) last. Returns the focused key.
+fn scoped(h: &mut UiHarness) -> Option<&'static str> {
+    let mut focused = None;
+    h.frame(|ui| {
+        let mut note = |k: &'static str, r: Response| {
+            if r.focused {
+                focused = Some(k);
+            }
+        };
+        ui.tab_scope(1, |ui| {
+            note("a", stop(ui, "a", 0));
+            note("b", stop(ui, "b", 1));
+        });
+        ui.tab_scope(0, |ui| {
+            note("c", stop(ui, "c", 2));
+            note("d", stop(ui, "d", 3));
+        });
+        note("e", stop(ui, "e", 4));
+    });
+    focused
+}
+
+#[test]
+fn a_scope_of_order_one_drawn_first_is_tabbed_after_the_scope_of_order_zero() {
+    let mut h = harness();
+    scoped(&mut h);
+    let mut order = Vec::new();
+    for _ in 0..6 {
+        tab(&mut h);
+        order.push(scoped(&mut h));
+    }
+    // Order 0 in registration order (c, d, then e, which is outside any scope), then order 1.
+    let want = ["c", "d", "e", "a", "b", "c"].map(Some);
+    assert_eq!(order, want);
+}
+
+#[test]
+fn shift_tab_reverses_the_scoped_order() {
+    let mut h = harness();
+    scoped(&mut h);
+    let mut back = Vec::new();
+    for _ in 0..6 {
+        shift_tab(&mut h);
+        back.push(scoped(&mut h));
+    }
+    let want = ["b", "a", "e", "d", "c", "b"].map(Some);
+    assert_eq!(back, want);
+}
+
+#[test]
+fn a_nested_scope_replaces_the_outer_order_and_the_outer_comes_back() {
+    let mut h = harness();
+    let run = |h: &mut UiHarness| {
+        let mut focused = None;
+        h.frame(|ui| {
+            let mut note = |k: &'static str, r: Response| {
+                if r.focused {
+                    focused = Some(k);
+                }
+            };
+            ui.tab_scope(5, |ui| {
+                note("a", stop(ui, "a", 0));
+                ui.tab_scope(0, |ui| note("b", stop(ui, "b", 1)));
+                note("c", stop(ui, "c", 2));
+            });
+            note("d", stop(ui, "d", 3));
+        });
+        focused
+    };
+    run(&mut h);
+    let mut order = Vec::new();
+    for _ in 0..5 {
+        tab(&mut h);
+        order.push(run(&mut h));
+    }
+    // b and d are order 0, a and c are 5 (the outer scope is back after the nested one).
+    assert_eq!(order, ["b", "d", "a", "c", "b"].map(Some));
+}
+
+#[test]
+fn a_modal_overlays_stops_are_its_own_and_sorted_among_themselves() {
+    let mut h = harness();
+    let o = modal();
+    let run = |h: &mut UiHarness, open: bool| {
+        let mut focused = None;
+        h.frame(|ui| {
+            ui.painter().on(LayerId::Page);
+            ui.tab_scope(1, |ui| {
+                if stop(ui, "a", 0).focused {
+                    focused = Some("a");
+                }
+            });
+            if open {
+                ui.overlay(
+                    "modal",
+                    &o,
+                    |_, _, _| {},
+                    |ui, _| {
+                        // x and z are order 1 and y, drawn between them, is order 0.
+                        ui.tab_scope(1, |ui| {
+                            if stop(ui, "x", 2).focused {
+                                focused = Some("x");
+                            }
+                        });
+                        if stop(ui, "y", 3).focused {
+                            focused = Some("y");
+                        }
+                        ui.tab_scope(1, |ui| {
+                            if stop(ui, "z", 4).focused {
+                                focused = Some("z");
+                            }
+                        });
+                    },
+                );
+            }
+        });
+        focused
+    };
+    run(&mut h, true);
+    run(&mut h, true);
+    let mut seen = Vec::new();
+    for _ in 0..6 {
+        tab(&mut h);
+        seen.push(run(&mut h, true));
+    }
+    // The page's `a` is never reached; the modal's stops go y (order 0), then x and z (order 1).
+    let at = seen.iter().position(|f| *f == Some("y")).expect("y");
+    let cycle: Vec<_> = (0..3).map(|i| seen[at + i]).collect();
+    assert_eq!(cycle, ["y", "x", "z"].map(Some), "{seen:?}");
+    assert!(!seen.contains(&Some("a")), "{seen:?}");
 }

@@ -154,11 +154,7 @@ fn failing() -> Box<dyn PageState> {
 }
 
 fn glass() -> DialogGlass {
-    DialogGlass {
-        panel: lunegit_dark::PANEL.premultiplied(),
-        fill: lunegit_dark::WINDOW.premultiplied(),
-        noise: true,
-    }
+    DialogGlass::of(&lunegit_dark::THEME)
 }
 
 /// What the page finds for `query`: the rows of the files and of the commands, each with whether
@@ -533,10 +529,7 @@ mod tests {
             "the pointer is on the destructive row and the tooltip shows"
         );
         assert!(
-            !scene.layers[LayerId::Raised as usize]
-                .geometry
-                .under
-                .is_empty(),
+            !scene.merged(LayerId::Raised).geometry.under.is_empty(),
             "above the card"
         );
         let (_, out) = run("command-palette-date-error");

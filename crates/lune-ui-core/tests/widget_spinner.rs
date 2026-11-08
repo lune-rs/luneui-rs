@@ -25,7 +25,11 @@ fn opts(busy: bool) -> SpinnerOptions<'static> {
 }
 
 fn image(scene: &Scene) -> ImageItem {
-    let all: Vec<_> = scene.layers.iter().flat_map(|l| l.images.clone()).collect();
+    let all: Vec<_> = scene
+        .in_order()
+        .into_iter()
+        .flat_map(|l| l.images.clone())
+        .collect();
     assert_eq!(all.len(), 1, "one turned glyph");
     all[0]
 }

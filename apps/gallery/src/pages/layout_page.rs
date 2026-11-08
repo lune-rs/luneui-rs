@@ -2,7 +2,7 @@
 //! scrolling body of a stat strip over a zebra table that runs edge to edge (so the card's rounded
 //! clip shows at the corners) and, in the wizard variant, a pinned footer. The header's primary
 //! action swaps the body for another page. The glass layer is the page's choice (the widget names
-//! no preset); inactive, the card is the solid fallback.
+//! no preset).
 
 use lune_ui::input::NamedKey;
 use lune_ui::lunegit_dark::{CARD, PANEL, THEME};
@@ -58,18 +58,9 @@ fn tall_no_footer() -> Box<dyn PageState> {
     })
 }
 
-fn inactive() -> Box<dyn PageState> {
-    Box::new(Live {
-        active: false,
-        rows: SHORT,
-        ..Live::base()
-    })
-}
-
 struct Live {
     /// Which body is shown; the header's primary action adds one.
     key: u64,
-    active: bool,
     footer: bool,
     rows: u32,
 }
@@ -78,7 +69,6 @@ impl Live {
     fn base() -> Live {
         Live {
             key: 0,
-            active: true,
             footer: true,
             rows: TALL,
         }
@@ -97,7 +87,6 @@ impl PageState for Live {
                 "Requests"
             },
             subtitle: Some("Last 30 days, all upstreams"),
-            active: self.active,
             glass: PANEL,
             under: CARD.premultiplied(),
             actions_w: ACTIONS_W,
@@ -149,7 +138,6 @@ impl PageState for Live {
     }
 
     fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
-        panel.toggle(ui, "Window active", &mut self.active);
         panel.toggle(ui, "Footer", &mut self.footer);
         let mut rows = self.rows as f32;
         if panel.number(ui, "Rows", &mut rows, (0.0, 60.0, 1.0)) {
@@ -267,16 +255,6 @@ const SCENES: &[UiScene] = &[
             },
         ],
         capture_ms: 700,
-        expect: Expect::Settled,
-    },
-    // The window is inactive: the solid fallback replaces the acrylic.
-    UiScene {
-        id: "page-inactive",
-        scale: 2.0,
-        tier: MotionTier::Full,
-        state: inactive,
-        script: &[],
-        capture_ms: 0,
         expect: Expect::Settled,
     },
     // The swap is `moderate` (350 ms): half way at 175 ms after the first new-key frame.

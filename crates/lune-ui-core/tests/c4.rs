@@ -40,7 +40,6 @@ const OPTIONS: [(&str, bool); 3] = [("RznSans", true), ("Sans Serif", true), ("S
 
 fn glass() -> DialogGlass {
     DialogGlass {
-        panel: [0.1, 0.1, 0.12, 1.0],
         fill: [0.2, 0.2, 0.2, 0.62],
         noise: true,
     }
@@ -194,7 +193,7 @@ fn centre(r: Rect) -> (f32, f32) {
 }
 
 fn modal_is_empty(scene: &Scene) -> bool {
-    let layer = &scene.layers[LayerId::Modal as usize];
+    let layer = &scene.merged(LayerId::Modal);
     layer.geometry.under.is_empty()
         && layer.geometry.over.is_empty()
         && layer.geometry.acrylic.is_empty()
@@ -588,10 +587,7 @@ fn a_settled_dropdown_reports_idle_the_frame_after_the_change() {
         assert_eq!(out.repaint, Repaint::Now, "{tier:?} dismissal frame");
         let (scene, out) = dropdown_frame(&mut h, &mut app, 3016);
         assert!(
-            scene.layers[LayerId::Popup as usize]
-                .geometry
-                .under
-                .is_empty(),
+            scene.merged(LayerId::Popup).geometry.under.is_empty(),
             "{tier:?} the list is gone at once (D80)"
         );
         assert_eq!(
@@ -787,19 +783,13 @@ fn a_dropdown_pick_frame_asks_for_the_frame_that_drops_the_list() {
         let (scene, out) = at(&mut h, &mut app, 2100);
         assert!(!app.combo_open, "{tier:?}: picked");
         assert!(
-            !scene.layers[LayerId::Popup as usize]
-                .geometry
-                .under
-                .is_empty(),
+            !scene.merged(LayerId::Popup).geometry.under.is_empty(),
             "{tier:?}: the pick frame still drew the list"
         );
         assert_eq!(out.repaint, Repaint::Now, "{tier:?}: pick frame");
         let (scene, _) = at(&mut h, &mut app, 2116);
         assert!(
-            scene.layers[LayerId::Popup as usize]
-                .geometry
-                .under
-                .is_empty(),
+            scene.merged(LayerId::Popup).geometry.under.is_empty(),
             "{tier:?}: the list is gone"
         );
         // Then it settles (Full: once the combo's closed look has faded in).
@@ -1293,7 +1283,9 @@ mod m7 {
     use lune_ui_core::widgets::split_panes::{Pane, SplitOptions, SplitSide};
     use lune_ui_core::widgets::toast::{ToastAction, ToastKind, ToastSpec, Toasts};
     use lune_ui_core::widgets::tone::Tone;
-    use lune_ui_core::widgets::tree_view::{TreeOptions, TreeRow};
+    use lune_ui_core::widgets::tree_view::{
+        ChevronStyle, GuideStub, GuideStyle, TreeOptions, TreeRow,
+    };
 
     const M7_WIN: (f32, f32) = (1240.0, 900.0);
     const RAIL: Rect = Rect::new(0.0, 0.0, 48.0, 420.0);
@@ -1310,6 +1302,7 @@ mod m7 {
         tint: [10, 20, 30, 255],
         tint_opacity: 0.8,
         material_opacity: 0.7,
+        curve: lune_ui_core::LuminosityCurve::AVALONIA,
     };
     const UNDER: [f32; 4] = [0.05, 0.06, 0.07, 1.0];
     const SPLIT_DEFAULT: f32 = 200.0;
@@ -1514,6 +1507,9 @@ mod m7 {
                         rows: &TREE_ROWS,
                         label: "Project",
                         guides: true,
+                        guide_style: GuideStyle::Elbow,
+                        chevron: ChevronStyle::Triangle,
+                        stub: GuideStub::Label,
                         toggle_on_row: false,
                     },
                     |_, _| {},
@@ -1571,7 +1567,6 @@ mod m7 {
                     &PageOptions {
                         title: "Overview",
                         subtitle: Some("The project at a glance"),
-                        active: true,
                         glass: GLASS,
                         under: UNDER,
                         actions_w: 0.0,
@@ -1590,10 +1585,10 @@ mod m7 {
                     &SidePanelOptions {
                         panel: 1,
                         keys: &[1, 2],
-                        active: true,
                         glass: GLASS,
                         under: UNDER,
                         name: "History",
+                        card_moves: false,
                     },
                     |_, _| {},
                 );
@@ -1601,7 +1596,6 @@ mod m7 {
                     "settings",
                     SETTINGS,
                     &SettingsPage {
-                        active: true,
                         glass: GLASS,
                         under: UNDER,
                         restart: p.restart,
@@ -2194,7 +2188,7 @@ mod m7 {
             last = bed_frame(&mut h, &mut b, at);
         }
         assert!(b.combo_open, "the click opened the list");
-        let raised = &last.0.layers[LayerId::Raised as usize];
+        let raised = &last.0.merged(LayerId::Raised);
         assert!(
             !raised.geometry.under.is_empty() || !raised.texts.is_empty(),
             "the list is drawn on the raised layer, over the dialog"
@@ -2325,6 +2319,7 @@ mod m8 {
         tint: [10, 20, 30, 255],
         tint_opacity: 0.8,
         material_opacity: 0.7,
+        curve: lune_ui_core::LuminosityCurve::AVALONIA,
     };
 
     const ROUTE: u64 = 1;
@@ -2567,7 +2562,6 @@ mod m8 {
                         title: "Roadmap",
                         columns: &columns,
                         error: None,
-                        active: true,
                         glass: GLASS,
                         under: [0.05, 0.06, 0.07, 1.0],
                         name: "",
@@ -3535,7 +3529,9 @@ mod nested_wheel {
     use lune_ui_core::widgets::text_area::AreaOptions;
     use lune_ui_core::widgets::toast::{ToastKind, ToastSpec, Toasts};
     use lune_ui_core::widgets::tone::Tone;
-    use lune_ui_core::widgets::tree_view::{TreeOptions, TreeRow};
+    use lune_ui_core::widgets::tree_view::{
+        ChevronStyle, GuideStub, GuideStyle, TreeOptions, TreeRow,
+    };
     use lune_ui_core::widgets::virtual_list::{Heights, ListOptions, RowKey, SelectionMode};
 
     /// F11: two non-modal overlays on one layer. The wheel over the part where the later one
@@ -3712,6 +3708,9 @@ mod nested_wheel {
                 rows: &rows,
                 label: "Files",
                 guides: false,
+                guide_style: GuideStyle::Elbow,
+                chevron: ChevronStyle::Triangle,
+                stub: GuideStub::Label,
                 toggle_on_row: false,
             };
             ui.tree_view("t", INNER, &o, |_, _| {});
@@ -3978,6 +3977,9 @@ mod m10 {
     use lune_ui_core::widgets::tab_strip::{BusyCue, Tab, TabKey, TabStripOptions};
     use lune_ui_core::widgets::toast::{ToastKind, ToastSpec, Toasts};
     use lune_ui_core::widgets::tone::Tone;
+    use lune_ui_core::widgets::tree_view::{
+        ChevronStyle, GuideStub, GuideStyle, TreeOptions, TreeRow,
+    };
     use std::time::Duration;
 
     type Rgb = [u8; 3];
@@ -4034,6 +4036,8 @@ mod m10 {
                     font_title: _,
                     line_title: _,
                     item_radius: _,
+                    selection_radius: _,
+                    selection_pad: _,
                     motion: _,
                 } = t;
             }
@@ -4049,14 +4053,12 @@ mod m10 {
         surface_selected,
         border,
         border_subtle,
+        tree_guide,
         accent,
-        accent_hover,
         scroll_thumb,
         scroll_thumb_hover,
         text_selection,
         on_accent,
-        on_accent_text,
-        dropdown_bg,
         dialog_backdrop,
         dialog_footer,
         menu_text_primary,
@@ -4068,8 +4070,6 @@ mod m10 {
         menu_glass,
         menu_item_pressed,
         menu_text_disabled,
-        toast_bg,
-        toast_border,
         toast_info,
         toast_success,
         toast_warning,
@@ -4102,7 +4102,6 @@ mod m10 {
         data_hi,
         gold,
         paused,
-        window_fallback,
         link,
         code_inline,
         diff_added,
@@ -4204,7 +4203,7 @@ mod m10 {
     struct Seen {
         fills: Vec<Rgb>,
         texts: Vec<Rgb>,
-        /// Every acrylic layer colour (premultiplied), which the glass recipe makes from a tint.
+        /// Every acrylic and frost colour (premultiplied), which the glass recipe makes from a tint.
         acrylics: Vec<[f32; 4]>,
     }
 
@@ -4219,7 +4218,7 @@ mod m10 {
     impl Seen {
         fn take(&mut self, scene: &Scene, rec: &Rec) {
             let mut colours = Vec::new();
-            for layer in &scene.layers {
+            for layer in scene.in_order() {
                 let g = &layer.geometry;
                 colours.extend(g.under.iter().map(|s| s.color));
                 colours.extend(g.over.iter().map(|s| s.color));
@@ -4227,12 +4226,13 @@ mod m10 {
                 colours.extend(g.strokes.iter().map(|v| v.color));
                 colours.extend(g.fills.iter().map(|v| v.color));
             }
-            self.acrylics.extend(
-                scene
-                    .layers
-                    .iter()
-                    .flat_map(|l| l.geometry.acrylic.iter().map(|a| a.shape.color)),
-            );
+            for layer in scene.in_order() {
+                let g = &layer.geometry;
+                self.acrylics
+                    .extend(g.acrylic.iter().map(|a| a.shape.color));
+                let frosts = g.under.iter().filter(|s| s.is_frost());
+                self.acrylics.extend(frosts.map(|s| s.color));
+            }
             self.fills.extend(colours.into_iter().filter_map(straight));
             self.texts.extend(rec.colours.iter().copied());
         }
@@ -4420,8 +4420,7 @@ mod m10 {
             1 => {
                 let win = Rect::new(0.0, 0.0, 900.0, 700.0);
                 ui.caption_buttons("caption", win, CaptionOptions::default());
-                let bar = |active, g| ToolbarOptions {
-                    active,
+                let bar = |g| ToolbarOptions {
                     glass: g,
                     under: UNDER,
                     name: "Bar",
@@ -4429,7 +4428,7 @@ mod m10 {
                 ui.toolbar(
                     "bar-off",
                     Rect::new(0.0, 60.0, 900.0, 52.0),
-                    &bar(false, glass.window),
+                    &bar(glass.window),
                     |ui, _| {
                         ui.toolbar_label(
                             "label",
@@ -4443,7 +4442,7 @@ mod m10 {
                 ui.toolbar(
                     "bar-on",
                     Rect::new(0.0, 120.0, 900.0, 52.0),
-                    &bar(true, glass.panel),
+                    &bar(glass.panel),
                     |ui, _| {
                         ui.toolbar_action(
                             "act",
@@ -4516,6 +4515,45 @@ mod m10 {
                         meter: Some(0.4),
                         no_data: false,
                     },
+                );
+                // A tree with a nested level: the guides (`tree_guide`) and a mark.
+                let rows = [
+                    TreeRow {
+                        key: 1,
+                        depth: 0,
+                        text: "src",
+                        glyph: None,
+                        has_children: true,
+                    },
+                    TreeRow {
+                        key: 2,
+                        depth: 1,
+                        text: "main.rs",
+                        glyph: None,
+                        has_children: false,
+                    },
+                    TreeRow {
+                        key: 3,
+                        depth: 1,
+                        text: "lib.rs",
+                        glyph: None,
+                        has_children: false,
+                    },
+                ];
+                ui.tree_state("audit-tree").expanded.insert(1);
+                ui.tree_view(
+                    "audit-tree",
+                    Rect::new(560.0, 400.0, 260.0, 120.0),
+                    &TreeOptions {
+                        rows: &rows,
+                        label: "Audit",
+                        guides: true,
+                        guide_style: GuideStyle::Elbow,
+                        chevron: ChevronStyle::Triangle,
+                        stub: GuideStub::Label,
+                        toggle_on_row: false,
+                    },
+                    |_, _| {},
                 );
             }
             2 => {
@@ -4649,7 +4687,6 @@ mod m10 {
                         title: "Roadmap",
                         columns: &columns,
                         error: None,
-                        active: true,
                         glass: glass.card,
                         under: UNDER,
                         name: "",
@@ -4660,7 +4697,6 @@ mod m10 {
                 let page = PageOptions {
                     title: "Page",
                     subtitle: Some("Sub"),
-                    active: true,
                     glass: glass.panel,
                     under: UNDER,
                     actions_w: 0.0,
@@ -4675,7 +4711,6 @@ mod m10 {
                     |_, _| 10.0,
                 );
                 let settings = SettingsPage {
-                    active: true,
                     glass: glass.window,
                     under: UNDER,
                     restart: true,
@@ -4718,8 +4753,6 @@ mod m10 {
                     name: "",
                 };
                 ui.flyout("fly", &fly);
-                let items = ["one"];
-                let _ = items;
                 let mut o =
                     PopoverOptions::new(Rect::new(20.0, 400.0, 100.0, 30.0), (200.0, 100.0));
                 o.surface = Surface::Glass;
@@ -4749,7 +4782,6 @@ mod m10 {
                         name: "",
                     },
                     &DialogGlass {
-                        panel: [0.1, 0.1, 0.12, 1.0],
                         fill: [0.2, 0.2, 0.2, 0.62],
                         noise: true,
                     },
@@ -4982,7 +5014,7 @@ mod m10 {
     fn the_audit_theme_has_a_colour_no_preset_field_has_in_every_field() {
         let (t, p) = (fields(&distinct()), fields(&DARK));
         assert_eq!(t.len(), p.len());
-        assert_eq!(t.len(), 71, "the colour fields of `Theme`");
+        assert_eq!(t.len(), 66, "the colour fields of `Theme`");
         for (i, (name, c)) in t.iter().enumerate() {
             assert_ne!(*c, p[i].1, "{name}");
             for (_, q) in &p {
@@ -5152,6 +5184,7 @@ mod m11 {
         tint: [10, 20, 30, 255],
         tint_opacity: 0.8,
         material_opacity: 0.7,
+        curve: lune_ui_core::LuminosityCurve::AVALONIA,
     };
     const UNDER: [f32; 4] = [0.05, 0.06, 0.07, 1.0];
 
@@ -5479,7 +5512,6 @@ mod m11 {
 
     fn toolbar(ui: &mut Ui<'_>, pg: &mut Pg) {
         let opts = ToolbarOptions {
-            active: true,
             glass: GLASS,
             under: UNDER,
             name: "Main toolbar",
@@ -5548,7 +5580,6 @@ mod m11 {
 
     fn settings(ui: &mut Ui<'_>, pg: &mut Pg) {
         let page = SettingsPage {
-            active: true,
             glass: GLASS,
             under: UNDER,
             restart: true,

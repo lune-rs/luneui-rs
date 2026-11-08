@@ -352,10 +352,11 @@ pub(crate) struct SurfaceFrame {
     pub(crate) picked: Option<usize>,
 }
 
-/// The surface `surface` fills the window with, in the state `state`. A stand-in app: the
-/// flyout's rows are the ones of the `flyout` page, the menus' are [`menu_rows`].
+/// The surface `surface` fills `area` with, from its corner, in the state `state`. A stand-in app:
+/// the flyout's rows are the ones of the `flyout` page, the menus' are [`menu_rows`].
 pub(crate) fn draw_surface(
     ui: &mut Ui<'_>,
+    area: Rect,
     surface: TraySurface,
     state: TrayState,
 ) -> SurfaceFrame {
@@ -375,13 +376,13 @@ pub(crate) fn draw_surface(
             rows: &rows,
             name: "Wane tray menu",
         };
-        let r = ui.flyout_window("tray-flyout", &flyout);
+        let r = ui.flyout_window_in("tray-flyout", area, &flyout);
         SurfaceFrame {
             dismissed: r.dismissed,
             picked: r.picked,
         }
     } else {
-        let r = ui.menu_window("tray-menu", &menu_rows(surface, state));
+        let r = ui.menu_window_in("tray-menu", area, &menu_rows(surface, state));
         SurfaceFrame {
             dismissed: r.dismissed,
             picked: r.picked,
@@ -420,6 +421,9 @@ pub(crate) fn surface_size<H: Copy + PartialEq>(
 /// A surface in a window of its own, over a flat stand-in for the desktop.
 struct Surface {
     surface: TraySurface,
+    /// Shown. A press outside, Escape or a pick dismisses it, as the app hiding the window does;
+    /// the knob brings it back.
+    open: bool,
 }
 
 impl PageState for Surface {
@@ -428,7 +432,7 @@ impl PageState for Surface {
         let win = stage.area(ui);
         {
             let p = ui.painter();
-            stage.on(p, lune_ui::paint::LayerId::Base);
+            p.on(lune_ui::paint::LayerId::Base);
             p.fill(win, 0.0, DESKTOP);
         }
         for (i, line) in [
@@ -442,29 +446,27 @@ impl PageState for Surface {
             ui.painter()
                 .text(&spec, win.x + 400.0, win.y + 40.0 + i as f32 * 22.0);
         }
-        if stage.rect().is_some() {
-            // The surface is an overlay the toolkit puts at the corner of the window, so it
-            // cannot be moved into a pane: say so instead of drawing it at the window's corner.
-            let spec = Spec::plain(
-                "This surface fills a window of its own, so a pane cannot show it. The tray page opens it for real.",
-                Style::ui(t.font_base, t.fg_tertiary),
-            );
-            ui.painter().text(&spec, win.x + 400.0, win.y + 94.0);
-            return;
+        if self.open && draw_surface(ui, win, self.surface, TrayState::Serving).dismissed {
+            self.open = false;
         }
-        draw_surface(ui, self.surface, TrayState::Serving);
+    }
+
+    fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
+        panel.toggle(ui, "Open", &mut self.open);
     }
 }
 
 fn flyout_window() -> Box<dyn PageState> {
     Box::new(Surface {
         surface: TraySurface::FlyoutOverBar,
+        open: true,
     })
 }
 
 fn menu_window() -> Box<dyn PageState> {
     Box::new(Surface {
         surface: TraySurface::MenuUnderBar,
+        open: true,
     })
 }
 

@@ -847,7 +847,6 @@ const DIALOG: Dialog<'static> = Dialog {
 
 fn dialog_glass() -> DialogGlass {
     DialogGlass {
-        panel: [0.0; 4],
         fill: [0.0; 4],
         noise: false,
     }
@@ -1348,8 +1347,8 @@ fn a_cancel_clears_the_offsets_at_once() {
 
 fn shapes(scene: &Scene) -> Vec<Shape> {
     scene
-        .layers
-        .iter()
+        .in_order()
+        .into_iter()
         .flat_map(|l| l.geometry.under.iter().chain(&l.geometry.over))
         .copied()
         .collect()
@@ -1802,10 +1801,11 @@ fn an_escape_in_the_frame_a_second_dialog_takes_the_capture_closes_that_dialog()
     assert!(f.second && !f.first, "the top dialog, and only it");
 }
 
-/// The limit D176 states: at the key the press still holds, so the key queues, and at the gesture's
-/// turn the press is gone. The drop commits and the one key is lost; the next Escape dismisses.
+/// An Escape that arrives before the release in one frame is the gesture's: at the key the press
+/// holds the capture, and the key keeps that, so at the gesture's turn the drag cancels and the
+/// drop does not commit. The dialog stays; the next Escape dismisses it.
 #[test]
-fn an_escape_before_the_release_in_one_frame_is_lost_and_the_next_closes_the_dialog() {
+fn an_escape_before_the_release_in_one_frame_cancels_the_drag_and_the_next_closes_the_dialog() {
     let b = board();
     let cols = columns(&b);
     let mut drag = FreeDrag::new();
@@ -1814,12 +1814,31 @@ fn an_escape_before_the_release_in_one_frame_is_lost_and_the_next_closes_the_dia
     h.input.key_down(Key::Named(NamedKey::Escape), None);
     h.input.release(P);
     let f = free_in_dialog(&mut h, 1030, &mut drag, &cols, false);
-    assert!(!f.first && !f.gesture.cancelled, "the key is lost");
+    assert!(!f.first, "the dialog is not closed by it");
+    assert!(f.gesture.cancelled, "the drag is cancelled");
     assert!(
-        matches!(f.gesture.result, FreeResult::Drop { .. }),
-        "and the drop commits"
+        !matches!(f.gesture.result, FreeResult::Drop { .. }),
+        "and the drop does not commit: {:?}",
+        f.gesture.result
     );
     h.input.key_down(Key::Named(NamedKey::Escape), None);
     let f = free_in_dialog(&mut h, 1040, &mut drag, &cols, false);
     assert!(f.first);
+}
+
+/// An Escape after the release of the same frame is the overlay's (D176): the capture is gone at
+/// the key, so it is not queued for the gesture.
+#[test]
+fn an_escape_after_the_release_in_one_frame_closes_the_dialog_and_the_drop_commits() {
+    let b = board();
+    let cols = columns(&b);
+    let mut drag = FreeDrag::new();
+    let mut h = UiHarness::new(WIN);
+    dragging_in_dialog(&mut h, &mut drag, &cols);
+    h.input.release(P);
+    h.input.key_down(Key::Named(NamedKey::Escape), None);
+    let f = free_in_dialog(&mut h, 1030, &mut drag, &cols, false);
+    assert!(f.first, "the dialog takes it");
+    assert!(!f.gesture.cancelled);
+    assert!(matches!(f.gesture.result, FreeResult::Drop { .. }));
 }

@@ -1,4 +1,5 @@
-//! Device loss: `Gpu::is_lost` reports it, and drawing on a lost device does not panic.
+//! Device loss: `Gpu::is_lost` reports it, and a draw on a lost device never reports success (wgpu
+//! panics inside it).
 //!
 //! GPU test: with no adapter it prints `skipped: no GPU adapter` and passes, unless
 //! `LUNEUI_REQUIRE_GPU=1`, which makes a missing adapter a failure.
@@ -60,6 +61,7 @@ fn a_destroyed_device_is_lost_a_draw_on_it_never_succeeds_and_a_rebuild_draws() 
         scale: 1.0,
         blur_sigma: 4.0,
         saturation: 1.0,
+        ..FrameParams::default()
     };
     // Instrument check: before the loss the same draw works and the device reports it healthy.
     let s = scene(&mut text);

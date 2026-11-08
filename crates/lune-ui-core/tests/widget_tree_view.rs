@@ -17,7 +17,9 @@ use lune_ui_core::theme::DARK;
 use lune_ui_core::ui::WidgetId;
 use lune_ui_core::widgets::button::ButtonKind;
 use lune_ui_core::widgets::tree_view::{
-    CHEVRON, INDENT, PAD_LEFT, ROW, TreeOptions, TreeResponse, TreeRow, TreeState, guide_paths,
+    CHEVRON, ChevronStyle, GuideStub, GuideStyle, INDENT, LABEL_GAP, MARK_DROP, PAD_LEFT, ROW,
+    STUB_GAP, TreeOptions, TreeResponse, TreeRow, TreeState, column, guide_paths, straight_paths,
+    stub_end,
 };
 
 const WIN: (f32, f32) = (500.0, 400.0);
@@ -61,6 +63,9 @@ fn opts<'a>(rows: &'a [TreeRow<'a>]) -> TreeOptions<'a> {
         rows,
         label: "Files",
         guides: true,
+        guide_style: GuideStyle::Elbow,
+        chevron: ChevronStyle::Triangle,
+        stub: GuideStub::Label,
         toggle_on_row: false,
     }
 }
@@ -142,10 +147,7 @@ fn top_of(out: &FrameOutput, key: u64) -> f32 {
 
 /// The centre of the chevron of the row at `y` of `depth`.
 fn chevron_at(depth: u16, y: f32) -> (f32, f32) {
-    (
-        TREE.x + PAD_LEFT + f32::from(depth) * INDENT + CHEVRON / 2.0,
-        y + ROW / 2.0,
-    )
+    (TREE.x + column(depth), y + ROW / 2.0)
 }
 
 fn click(h: &mut UiHarness, rows: &[TreeRow<'_>], ms: u64, at: (f32, f32)) -> Run {
@@ -171,8 +173,8 @@ fn segments(scene: &Scene) -> Vec<([f32; 2], [f32; 2])> {
         [(a.pos[0] + b.pos[0]) / 2.0, (a.pos[1] + b.pos[1]) / 2.0]
     };
     scene
-        .layers
-        .iter()
+        .in_order()
+        .into_iter()
         .flat_map(|l| l.geometry.strokes.chunks(6))
         .map(|c| (mid(&c[0], &c[1]), mid(&c[2], &c[4])))
         .collect()
@@ -338,12 +340,13 @@ fn a_selection_scrolled_out_of_view_is_kept() {
 }
 
 // The guide's geometry, computed by hand from
-// elbow x = floor((depth - 1) * 16 + 8) + 0.5, stub = depth * 16, cy = h / 2, r = 3.5.
+// elbow x = floor((depth - 1) * 16 + 15) + 0.5 (under the parent's mark), stub = 8 + depth * 16 - 1,
+// cy = h / 2, r = 3.5.
 
 #[test]
 fn the_guide_of_a_last_child_is_one_line_turning_into_the_stub() {
-    for (depth, x, stub) in [(1, 8.5, 16.0), (2, 24.5, 32.0), (3, 40.5, 48.0)] {
-        let paths = guide_paths(depth, true, &[], 28.0);
+    for (depth, x, stub) in [(1, 15.5, 23.0), (2, 31.5, 39.0), (3, 47.5, 55.0)] {
+        let paths = guide_paths(depth, true, &[], 28.0, stub);
         assert_eq!(paths.len(), 1, "depth {depth}");
         let p = &paths[0];
         assert_eq!(p[0], [x, 0.0]);
@@ -361,8 +364,8 @@ fn the_guide_of_a_last_child_is_one_line_turning_into_the_stub() {
 
 #[test]
 fn the_guide_of_a_child_with_a_next_sibling_is_a_trunk_and_a_branch() {
-    for (depth, x, stub) in [(1, 8.5, 16.0), (2, 24.5, 32.0), (3, 40.5, 48.0)] {
-        let paths = guide_paths(depth, false, &[], 28.0);
+    for (depth, x, stub) in [(1, 15.5, 23.0), (2, 31.5, 39.0), (3, 47.5, 55.0)] {
+        let paths = guide_paths(depth, false, &[], 28.0, stub);
         assert_eq!(paths.len(), 2, "depth {depth}");
         assert_eq!(paths[0], [[x, 0.0], [x, 28.0]], "the whole row");
         let b = &paths[1];
@@ -373,13 +376,72 @@ fn the_guide_of_a_child_with_a_next_sibling_is_a_trunk_and_a_branch() {
 }
 
 #[test]
+fn a_leaf_stub_reaches_its_label_by_default_and_stops_short_when_asked() {
+    // A tree with marks: a leaf's stub crosses its empty slot to `LABEL_GAP` before the label,
+    // or stops `STUB_GAP` before the slot; a row with a mark always stops before the slot.
+    let label_x = |d: u16| PAD_LEFT + f32::from(d) * INDENT + CHEVRON + 4.0;
+    for d in 1..4u16 {
+        assert_eq!(stub_end(d, true, GuideStub::Label), label_x(d) - LABEL_GAP);
+        assert_eq!(
+            stub_end(d, true, GuideStub::Short),
+            PAD_LEFT + f32::from(d) * INDENT - STUB_GAP
+        );
+        for reach in [GuideStub::Label, GuideStub::Short] {
+            assert_eq!(
+                stub_end(d, false, reach),
+                PAD_LEFT + f32::from(d) * INDENT - STUB_GAP
+            );
+        }
+    }
+
+    // Drawn: a1x (a leaf at depth 2) ends at 54 by default and 39 with `Short`; a1 (with a mark,
+    // depth 1) ends at 23 either way. The cap is a half disc at the stub's end.
+    let caps = |stub: GuideStub| -> Vec<f32> {
+        let mut h = UiHarness::new(WIN);
+        let o = TreeOptions {
+            stub,
+            ..opts(&ROWS)
+        };
+        let f = run_with(&mut h, &o, |st| {
+            st.expanded.extend([A, A1]);
+        });
+        let mut xs: Vec<f32> = f
+            .scene
+            .in_order()
+            .into_iter()
+            .flat_map(|l| {
+                l.geometry
+                    .under
+                    .iter()
+                    .filter(|s| s.radii == [0.0, 0.5, 0.5, 0.0])
+                    .map(|s| s.rect[0] - TREE.x)
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        xs.sort_by(f32::total_cmp);
+        xs.dedup();
+        xs
+    };
+    assert_eq!(
+        caps(GuideStub::Label),
+        vec![23.0, 38.0, 54.0],
+        "a1; a2; a1x and a1y"
+    );
+    assert_eq!(
+        caps(GuideStub::Short),
+        vec![23.0, 39.0],
+        "every stub stops before the slot"
+    );
+}
+
+#[test]
 fn ancestor_lines_are_full_height_at_their_columns() {
-    let paths = guide_paths(3, true, &[0, 1], 28.0);
-    assert_eq!(paths[0], [[8.5, 0.0], [8.5, 28.0]]);
-    assert_eq!(paths[1], [[24.5, 0.0], [24.5, 28.0]]);
-    assert_eq!(paths[2][0], [40.5, 0.0]);
+    let paths = guide_paths(3, true, &[0, 1], 28.0, 55.0);
+    assert_eq!(paths[0], [[15.5, 0.0], [15.5, 28.0]]);
+    assert_eq!(paths[1], [[31.5, 0.0], [31.5, 28.0]]);
+    assert_eq!(paths[2][0], [47.5, 0.0]);
     assert!(
-        guide_paths(0, true, &[], 28.0).is_empty(),
+        guide_paths(0, true, &[], 28.0, 7.0).is_empty(),
         "a top row has none"
     );
 }
@@ -391,7 +453,7 @@ fn the_guides_follow_siblings_across_a_collapsed_one_and_stop_at_the_last() {
     let f = run_with(&mut h, &opts(&ROWS), |st| {
         st.expanded.insert(A);
     });
-    let x = TREE.x + 8.5;
+    let x = TREE.x + 15.5;
     let y = TREE.y;
     assert!(
         has_line(&f.scene, x, y + ROW, y + 2.0 * ROW),
@@ -436,7 +498,7 @@ fn a_branch_starts_at_the_trunks_edge_so_the_translucent_line_does_not_double() 
     let f = run_with(&mut h, &opts(&ROWS), |st| {
         st.expanded.insert(A);
     });
-    let x = TREE.x + 8.5;
+    let x = TREE.x + 15.5;
     let branch: Vec<_> = segments(&f.scene)
         .into_iter()
         .filter(|(a, b)| a[0] != b[0])
@@ -465,8 +527,8 @@ fn the_probes_at_scale_two() {
     });
     let geometry = &f
         .scene
-        .layers
-        .iter()
+        .in_order()
+        .into_iter()
         .find(|l| !l.geometry.strokes.is_empty());
     let geometry = &geometry.expect("guides").geometry;
 
@@ -479,22 +541,26 @@ fn the_probes_at_scale_two() {
     assert_eq!(fill.rect[3], 56.0, "the row");
     assert_eq!(fill.radii, [12.0; 4]);
 
-    // One depth moves the content 32 device px: the chevrons of a and a1 (depths 0, 1).
-    let chevrons: Vec<f32> = f
+    // One depth moves the content 32 device px: the texts of a and a1 (depths 0, 1). The mark is
+    // drawn, not a glyph, so every text is a row's.
+    let texts: Vec<f32> = f
         .scene
-        .layers
-        .iter()
+        .in_order()
+        .into_iter()
         .flat_map(|l| l.texts.iter().map(|t| t.x))
         .collect();
-    let x = |n: usize| chevrons[n];
-    assert_eq!((x(2) - x(0)) * 2.0, 32.0, "chevron of depth 1 from depth 0");
+    assert_eq!(
+        (texts[1] - texts[0]) * 2.0,
+        32.0,
+        "text of depth 1 from depth 0"
+    );
 
     // The guide is 2 device px wide: `style[1]` is the half width.
     assert_eq!(geometry.strokes[0].style[1], 1.0);
 
     // The elbow's curve spans 7 device px each way.
     let row = TREE.y + 3.0 * ROW;
-    let (cx, cy) = (TREE.x + 24.5, row + 14.0);
+    let (cx, cy) = (TREE.x + 31.5, row + 14.0);
     let curve: Vec<_> = segments(&f.scene)
         .into_iter()
         .map(|(a, _)| a)
@@ -509,8 +575,9 @@ fn the_probes_at_scale_two() {
     let top = curve.iter().map(|p| p[1]).fold(f32::INFINITY, f32::min);
     assert_eq!(cy * 2.0 - top, 7.0, "the curve starts r above the stub");
 
-    // The stub's free end has its round cap: a half disc, one device px past the end.
-    let stub = (TREE.x + 32.0) * 2.0;
+    // The stub's free end has its round cap: a half disc, one device px past the end. a1y is a
+    // leaf, so its stub crosses the empty mark slot to 4 px before its text: 8 + 32 + 14 + 4 - 4.
+    let stub = (TREE.x + 54.0) * 2.0;
     let cap = geometry
         .under
         .iter()
@@ -518,7 +585,7 @@ fn the_probes_at_scale_two() {
         .expect("the cap");
     assert_eq!((cap.rect[2], cap.rect[3]), (1.0, 2.0));
     assert_eq!(cap.radii, [0.0, 1.0, 1.0, 0.0]);
-    assert_eq!(cap.color, premul(DARK.border));
+    assert_eq!(cap.color, premul(DARK.tree_guide));
 }
 
 #[test]
@@ -529,8 +596,8 @@ fn the_chevron_slot_is_on_every_row_when_any_row_has_children() {
         let mut h = UiHarness::new(WIN);
         let f = run(&mut h, rows);
         f.scene
-            .layers
-            .iter()
+            .in_order()
+            .into_iter()
             .flat_map(|l| l.texts.iter().map(|t| t.x))
             .next()
             .expect("the first row's text")
@@ -921,8 +988,8 @@ fn block_rows_draw_under_the_clip_with_no_hits() {
     // The block's guide strokes carry its clip: one row high at half of two rows.
     let clipped = f
         .scene
-        .layers
-        .iter()
+        .in_order()
+        .into_iter()
         .flat_map(|l| l.geometry.strokes.iter())
         .find(|v| v.clip[3] < TREE.h - 1.0)
         .expect("a block stroke");
@@ -1146,8 +1213,8 @@ fn a_block_taller_than_the_viewport_builds_only_what_the_clip_shows() {
     assert_eq!(built(&f.out), ["open"], "the viewport is all block");
     let strokes = f
         .scene
-        .layers
-        .iter()
+        .in_order()
+        .into_iter()
         .map(|l| l.geometry.strokes.len())
         .sum::<usize>();
     // Nine rows of block at most reach into the viewport, each a bounded guide.
@@ -1344,8 +1411,8 @@ fn a_secondary_click_reports_the_row() {
 fn a_hovered_row_fills_and_a_selected_one_keeps_its_own_hover() {
     let fills = |f: &Run| -> Vec<[f32; 4]> {
         f.scene
-            .layers
-            .iter()
+            .in_order()
+            .into_iter()
             .flat_map(|l| l.geometry.under.iter())
             .map(|s| s.color)
             .collect()
@@ -1378,8 +1445,8 @@ fn row_fills_tween_while_still_and_snap_while_the_content_scrolls() {
     let selected = premul(DARK.surface_selected);
     let has = |f: &Run| {
         f.scene
-            .layers
-            .iter()
+            .in_order()
+            .into_iter()
             .flat_map(|l| l.geometry.under.iter())
             .any(|s| s.color == selected)
     };
@@ -1501,8 +1568,8 @@ fn focus_rests_on_the_selected_row_when_it_shows_and_rings_only_the_cursor() {
     assert_eq!(f.st.cursor, Some(B));
     let ring = f
         .scene
-        .layers
-        .iter()
+        .in_order()
+        .into_iter()
         .flat_map(|l| l.geometry.over.iter().chain(l.geometry.under.iter()))
         .filter(|s| s.params != [0.0; 4])
         .count();
@@ -1591,4 +1658,408 @@ fn an_enabled_tree_leaves_a_global_binding_alone_on_keys_it_does_not_use() {
     let f = run(&mut h, &ROWS);
     assert_eq!(f.out.fired.len(), 1, "no type-ahead");
     assert_eq!(f.st.cursor, Some(A));
+}
+
+// R15: the guide styles, the disclosure mark and its turn.
+
+/// `p` holds one parent with two leaves: one mark on the page.
+const PK: u64 = 1;
+const P_ROWS: [TreeRow<'static>; 3] = [
+    row(1, 0, "p", true),
+    row(2, 1, "c1", false),
+    row(3, 1, "c2", false),
+];
+
+/// Four deep: each row is the only child of the one above.
+const CHAIN: [TreeRow<'static>; 4] = [
+    row(1, 0, "d0", true),
+    row(2, 1, "d1", true),
+    row(3, 2, "d2", true),
+    row(4, 3, "d3", false),
+];
+
+fn styled<'a>(
+    rows: &'a [TreeRow<'a>],
+    guide_style: GuideStyle,
+    chevron: ChevronStyle,
+) -> TreeOptions<'a> {
+    TreeOptions {
+        guide_style,
+        chevron,
+        ..opts(rows)
+    }
+}
+
+/// Every stroke vertex of the frame.
+fn strokes(scene: &Scene) -> Vec<StrokeVertex> {
+    scene
+        .in_order()
+        .into_iter()
+        .flat_map(|l| l.geometry.strokes.iter().copied())
+        .collect()
+}
+
+/// The largest alpha among the frame's strokes; 0 when there are none.
+fn guide_alpha(scene: &Scene) -> f32 {
+    strokes(scene)
+        .iter()
+        .map(|v| v.color[3])
+        .fold(0.0, f32::max)
+}
+
+/// The three corners of the first filled triangle, in device px.
+fn first_triangle(scene: &Scene) -> [[f32; 2]; 3] {
+    let v: Vec<[f32; 2]> = scene
+        .in_order()
+        .into_iter()
+        .flat_map(|l| l.geometry.fills.iter().map(|v| v.pos))
+        .take(3)
+        .collect();
+    assert_eq!(v.len(), 3, "a filled mark");
+    [v[0], v[1], v[2]]
+}
+
+/// The bounding box of `pts`: (left, top, right, bottom).
+fn bounds(pts: &[[f32; 2]]) -> (f32, f32, f32, f32) {
+    let f = |g: fn(f32, f32) -> f32, k: usize, init: f32| pts.iter().fold(init, |a, p| g(a, p[k]));
+    (
+        f(f32::min, 0, f32::INFINITY),
+        f(f32::min, 1, f32::INFINITY),
+        f(f32::max, 0, f32::NEG_INFINITY),
+        f(f32::max, 1, f32::NEG_INFINITY),
+    )
+}
+
+/// The triangle's turn in degrees: from the middle of its longest edge (the base) to the opposite
+/// corner (the apex), measured clockwise from pointing right.
+fn turn_degrees(t: [[f32; 2]; 3]) -> f32 {
+    let d = |a: [f32; 2], b: [f32; 2]| ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2)).sqrt();
+    let edges = [(0, 1, 2), (1, 2, 0), (2, 0, 1)];
+    let (a, b, apex) = *edges
+        .iter()
+        .max_by(|x, y| d(t[x.0], t[x.1]).total_cmp(&d(t[y.0], t[y.1])))
+        .expect("edges");
+    let mid = [(t[a][0] + t[b][0]) / 2.0, (t[a][1] + t[b][1]) / 2.0];
+    (t[apex][1] - mid[1])
+        .atan2(t[apex][0] - mid[0])
+        .to_degrees()
+}
+
+#[test]
+fn each_guide_style_draws_what_it_says_at_depth_3() {
+    let rows = |style| {
+        let mut h = UiHarness::new(WIN);
+        let o = styled(&CHAIN, style, ChevronStyle::Triangle);
+        run_with(&mut h, &o, |st| st.expanded.extend([1, 2, 3])).scene
+    };
+    let row3 = TREE.y + 3.0 * ROW;
+    let verticals = |scene: &Scene| -> Vec<f32> {
+        let mut xs: Vec<f32> = segments(scene)
+            .into_iter()
+            .filter(|(a, b)| a[0] == b[0] && a[1] == row3 && b[1] == row3 + ROW)
+            .map(|(a, _)| a[0])
+            .collect();
+        xs.sort_by(f32::total_cmp);
+        xs
+    };
+
+    // Straight: exactly one full height line per depth above the row, at `k x 16 + 15.5`.
+    let straight = rows(GuideStyle::Straight);
+    let want: Vec<f32> = (0..3).map(|k| TREE.x + k as f32 * INDENT + 15.5).collect();
+    assert_eq!(verticals(&straight), want);
+    assert!(
+        segments(&straight)
+            .iter()
+            .all(|(a, b)| a[0] == b[0] && b[1] > a[1]),
+        "no elbow, no stub"
+    );
+    assert_eq!(straight_paths(3, ROW).len(), 3);
+    assert!(straight_paths(0, ROW).is_empty());
+
+    // Elbow: the last child's line turns into the stub, so only the row's own column has a
+    // full height line... none: it stops at the middle of the row, then curves.
+    let elbow = rows(GuideStyle::Elbow);
+    assert!(
+        verticals(&elbow).is_empty(),
+        "the last child's line stops mid row"
+    );
+    assert!(
+        segments(&elbow).iter().any(|(a, b)| a[1] == b[1]),
+        "the stub runs along the row"
+    );
+
+    // OnHover with the pointer away draws no guide; that it fades in is below.
+    assert!(strokes(&rows(GuideStyle::OnHover)).is_empty());
+}
+
+#[test]
+fn the_default_guide_colour_is_the_token_not_the_border() {
+    assert_ne!(DARK.tree_guide, DARK.border);
+    assert_eq!(DARK.tree_guide, [0xFF, 0xFF, 0xFF, 0x14]);
+    let mut h = UiHarness::new(WIN);
+    let f = run_with(&mut h, &opts(&ROWS), |st| {
+        st.expanded.insert(A);
+    });
+    let guide = strokes(&f.scene);
+    assert!(!guide.is_empty());
+    assert!(guide.iter().all(|v| v.color == premul(DARK.tree_guide)));
+    // The stub's cap too.
+    let cap = f
+        .scene
+        .in_order()
+        .into_iter()
+        .flat_map(|l| l.geometry.under.iter())
+        .any(|s| s.color == premul(DARK.tree_guide));
+    assert!(cap, "the stub's cap");
+
+    // A theme that moves the token moves the guide, and the border does not reach it.
+    let mut h = UiHarness::new(WIN);
+    h.theme.tree_guide = [0x11, 0x22, 0x33, 0xFF];
+    h.theme.border = [0x44, 0x55, 0x66, 0xFF];
+    let f = run_with(&mut h, &opts(&ROWS), |st| {
+        st.expanded.insert(A);
+    });
+    assert!(
+        strokes(&f.scene)
+            .iter()
+            .all(|v| v.color == premul(h.theme.tree_guide))
+    );
+}
+
+#[test]
+fn guides_off_draw_no_guide_under_any_style() {
+    for style in [GuideStyle::Elbow, GuideStyle::Straight, GuideStyle::OnHover] {
+        let mut h = UiHarness::new(WIN);
+        let o = TreeOptions {
+            guides: false,
+            ..styled(&CHAIN, style, ChevronStyle::Triangle)
+        };
+        run_with(&mut h, &o, |st| st.expanded.extend([1, 2, 3]));
+        h.input.pointer_to(TREE.x + 100.0, TREE.y + 40.0);
+        h.at_ms(300);
+        let f = run_with(&mut h, &o, |_| {});
+        assert!(strokes(&f.scene).is_empty(), "{style:?}");
+    }
+}
+
+#[test]
+fn on_hover_fades_the_elbow_in_with_the_pointer_and_out_without() {
+    let o = styled(&CHAIN, GuideStyle::OnHover, ChevronStyle::Triangle);
+    let full = f32::from(DARK.tree_guide[3]) / 255.0;
+    let mut h = UiHarness::new(WIN);
+    let f = run_with(&mut h, &o, |st| st.expanded.extend([1, 2, 3]));
+    assert_eq!(guide_alpha(&f.scene), 0.0, "pointer away: no guide");
+    run_with(&mut h, &o, |_| {});
+
+    h.input.pointer_to(TREE.x + 100.0, TREE.y + 40.0);
+    h.at_ms(100);
+    run_with(&mut h, &o, |_| {});
+    h.at_ms(160);
+    let mid = run_with(&mut h, &o, |_| {});
+    let a = guide_alpha(&mid.scene);
+    assert!(a > 0.0 && a < full - 0.005, "fading in: {a} of {full}");
+    assert_eq!(mid.out.repaint, Repaint::Now);
+    h.at_ms(400);
+    let f = run_with(&mut h, &o, |_| {});
+    assert!((guide_alpha(&f.scene) - full).abs() < 0.003, "fully in");
+    assert!(
+        strokes(&f.scene).iter().all(|v| v.color[3] <= full + 1e-4),
+        "never brighter than the token"
+    );
+
+    h.input.pointer_to(480.0, 380.0);
+    h.at_ms(500);
+    run_with(&mut h, &o, |_| {});
+    h.at_ms(700);
+    let f = run_with(&mut h, &o, |_| {});
+    assert_eq!(guide_alpha(&f.scene), 0.0, "pointer gone: faded out");
+}
+
+#[test]
+fn on_hover_reduced_fades_and_off_snaps() {
+    let o = styled(&CHAIN, GuideStyle::OnHover, ChevronStyle::Triangle);
+    let full = f32::from(DARK.tree_guide[3]) / 255.0;
+    for (tier, snaps) in [(MotionTier::Reduced, false), (MotionTier::Off, true)] {
+        let mut h = UiHarness::new(WIN);
+        h.tier = tier;
+        run_with(&mut h, &o, |st| st.expanded.extend([1, 2, 3]));
+        h.input.pointer_to(TREE.x + 100.0, TREE.y + 40.0);
+        h.at_ms(100);
+        run_with(&mut h, &o, |_| {});
+        h.at_ms(160);
+        let f = run_with(&mut h, &o, |_| {});
+        let a = guide_alpha(&f.scene);
+        if snaps {
+            assert!((a - full).abs() < 0.003, "{tier:?}: snapped to {a}");
+            assert_eq!(f.out.repaint, Repaint::Idle, "{tier:?}");
+        } else {
+            assert!(a > 0.0 && a < full - 0.005, "{tier:?}: fading {a}");
+        }
+    }
+}
+
+#[test]
+fn the_triangle_records_a_fill_and_no_glyph_and_sits_on_the_label_line() {
+    let mut h = UiHarness::new(WIN);
+    let o = TreeOptions {
+        guides: false,
+        ..opts(&P_ROWS)
+    };
+    let f = run_with(&mut h, &o, |_| {});
+    // One fill, no stroke, and a text for each row shown (the one row), none for the mark.
+    assert!(strokes(&f.scene).is_empty());
+    let texts: usize = f.scene.in_order().into_iter().map(|l| l.texts.len()).sum();
+    assert_eq!(texts, 1, "the row's label only");
+    let t = first_triangle(&f.scene);
+    let (l, top, r, b) = bounds(&t);
+    assert_eq!(
+        (r - l, b - top),
+        (5.5, 7.5),
+        "closed: 5.5 wide, 7.5 tall, pointing right"
+    );
+    // On guide column 0, so a guide drops from the triangle's centre.
+    assert_eq!((l + r) / 2.0, TREE.x + column(0));
+    assert_eq!((top + b) / 2.0, TREE.y + ROW / 2.0 + MARK_DROP);
+    assert_eq!(turn_degrees(t), 0.0);
+    let colour = f.scene.in_order()[0].geometry.fills[0].color;
+    assert_eq!(colour, premul(DARK.fg_tertiary));
+}
+
+#[test]
+fn the_mark_turns_to_the_block_and_reaches_its_end_in_full_and_snaps_in_reduced_and_off() {
+    let o = opts(&P_ROWS);
+    let mut h = UiHarness::new(WIN);
+    run_with(&mut h, &o, |_| {});
+    h.at_ms(1000);
+    let f = run_with(&mut h, &o, |st| {
+        st.expanded.insert(PK);
+    });
+    assert_eq!(turn_degrees(first_triangle(&f.scene)), 0.0, "starts closed");
+    h.at_ms(1125);
+    let f = run_with(&mut h, &o, |_| {});
+    let mid = turn_degrees(first_triangle(&f.scene));
+    assert!((mid - 45.0).abs() < 1.0, "half way, sine-in-out: {mid}");
+    h.at_ms(1250);
+    let f = run_with(&mut h, &o, |_| {});
+    let t = first_triangle(&f.scene);
+    let (l, top, r, b) = bounds(&t);
+    assert_eq!(turn_degrees(t), 90.0, "ends pointing down");
+    assert_eq!((r - l, b - top), (7.5, 5.5));
+
+    // Closing runs it back.
+    h.at_ms(2000);
+    let f = run_with(&mut h, &o, |st| {
+        st.expanded.remove(&PK);
+    });
+    assert_eq!(turn_degrees(first_triangle(&f.scene)), 90.0);
+    h.at_ms(2125);
+    let f = run_with(&mut h, &o, |_| {});
+    let mid = turn_degrees(first_triangle(&f.scene));
+    assert!((mid - 45.0).abs() < 1.0, "back half way: {mid}");
+    h.at_ms(2250);
+    let f = run_with(&mut h, &o, |_| {});
+    assert_eq!(turn_degrees(first_triangle(&f.scene)), 0.0);
+
+    for tier in [MotionTier::Reduced, MotionTier::Off] {
+        let mut h = UiHarness::new(WIN);
+        h.tier = tier;
+        run_with(&mut h, &o, |_| {});
+        h.at_ms(1000);
+        let f = run_with(&mut h, &o, |st| {
+            st.expanded.insert(PK);
+        });
+        // The frame of the change already shows the end, at exactly 90 deg: no transform.
+        let t = first_triangle(&f.scene);
+        assert_eq!(turn_degrees(t), 90.0, "{tier:?}");
+        let (l, top, r, b) = bounds(&t);
+        assert_eq!((r - l, b - top), (7.5, 5.5), "{tier:?}");
+    }
+}
+
+#[test]
+fn the_chevron_is_a_thin_stroke_that_brightens_on_row_hover() {
+    let rows = [row(1, 0, "p", true), row(2, 0, "q", true)];
+    let o = TreeOptions {
+        guides: false,
+        ..styled(&rows, GuideStyle::Elbow, ChevronStyle::Chevron)
+    };
+    let mut h = UiHarness::new(WIN);
+    run_with(&mut h, &o, |_| {});
+    // Hover the first row's text.
+    h.input.pointer_to(TREE.x + 120.0, TREE.y + ROW / 2.0);
+    h.at_ms(100);
+    run_with(&mut h, &o, |_| {});
+    h.at_ms(400);
+    let f = run_with(&mut h, &o, |_| {});
+    let all = strokes(&f.scene);
+    assert!(!all.is_empty());
+    assert!(
+        f.scene
+            .in_order()
+            .iter()
+            .all(|l| l.geometry.fills.is_empty()),
+        "a stroke, not a fill"
+    );
+    let row_of = |v: &StrokeVertex| (v.pos[1] > TREE.y + ROW) as usize;
+    let colour = |r: usize| {
+        all.iter()
+            .find(|v| row_of(v) == r)
+            .expect("a chevron")
+            .color
+    };
+    assert_eq!(colour(0), premul(DARK.fg_secondary), "the hovered row");
+    assert_eq!(colour(1), premul(DARK.fg_tertiary), "a resting row");
+    assert!(colour(0)[3] > colour(1)[3]);
+    // 1.25 px wide: the half width of the stroke vertices is 0.625.
+    assert!(
+        (all[0].style[1] - 0.625).abs() < 1e-4,
+        "{}",
+        all[0].style[1]
+    );
+    // Its ink lies inside a 10 px box about the slot's centre; a vertex is one px past the ink
+    // (the antialiasing fringe).
+    let (cx, cy) = (
+        TREE.x + PAD_LEFT + CHEVRON / 2.0,
+        TREE.y + ROW / 2.0 + MARK_DROP,
+    );
+    for v in all.iter().filter(|v| row_of(v) == 0) {
+        assert!(
+            (v.pos[0] - cx).abs() <= 6.0 && (v.pos[1] - cy).abs() <= 6.0,
+            "{:?} about {:?}",
+            v.pos,
+            (cx, cy)
+        );
+    }
+}
+
+#[test]
+fn the_chevron_turns_with_the_block_too() {
+    let rows = [row(1, 0, "p", true), row(2, 1, "c", false)];
+    let o = TreeOptions {
+        guides: false,
+        ..styled(&rows, GuideStyle::Elbow, ChevronStyle::Chevron)
+    };
+    // The chevron's three points are the stroke's two segments' ends: the apex is the vertex with
+    // the largest distance along the pointing direction; the arms' middle is the base mid.
+    let tip = |scene: &Scene| -> f32 {
+        let v = strokes(scene);
+        let c = (
+            TREE.x + PAD_LEFT + CHEVRON / 2.0,
+            TREE.y + ROW / 2.0 + MARK_DROP,
+        );
+        let (l, t, r, b) = bounds(&v.iter().map(|q| q.pos).collect::<Vec<_>>());
+        // Wider than tall pointing down (8 x 5 ink), taller than wide pointing right (5 x 8).
+        let _ = c;
+        (r - l) - (b - t)
+    };
+    let mut h = UiHarness::new(WIN);
+    run_with(&mut h, &o, |_| {});
+    h.at_ms(1000);
+    let closed = run_with(&mut h, &o, |st| {
+        st.expanded.insert(1);
+    });
+    assert!(tip(&closed.scene) < 0.0, "pointing right: taller than wide");
+    h.at_ms(1250);
+    let open = run_with(&mut h, &o, |_| {});
+    assert!(tip(&open.scene) > 0.0, "pointing down: wider than tall");
 }

@@ -3,9 +3,9 @@
 //! after the app stops calling them (D8). The Ui never closes an overlay; the app stops calling it.
 
 use crate::motion::{Motion, MotionTier, MotionTokens, Resolved, Time};
-use crate::paint::{LayerId, Painter};
+use crate::paint::{LayerId, Painter, SUPPRESSED, Xform};
 
-use super::{Ui, WidgetId};
+use super::{DISABLED_ALPHA, Ui, WidgetId};
 
 /// How an overlay behaves: where it draws, whether it captures input, what dismisses it, where
 /// focus goes and how it moves.
@@ -55,9 +55,6 @@ pub struct OverlayFrame {
     pub transforms: bool,
 }
 
-/// The hit tag of exit painters: their hits are dropped.
-pub(crate) const SUPPRESSED: u32 = u32::MAX;
-
 /// An overlay's retained phase.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) enum RecPhase {
@@ -78,6 +75,8 @@ pub(crate) struct OverlayRec {
     pub(crate) exit: Option<ExitPainter>,
     pub(crate) saved_focus: Option<WidgetId>,
     pub(crate) called: bool,
+    /// The scope it was last called in was disabled: it and its exit draw at `DISABLED_ALPHA`.
+    pub(crate) disabled: bool,
 }
 
 impl std::fmt::Debug for OverlayRec {
@@ -91,16 +90,77 @@ impl std::fmt::Debug for OverlayRec {
     }
 }
 
-/// The layer of an overlay opening with `tag` that asks for `requested`: [`LayerId::Raised`] for a
-/// popup or a modal above an active modal, else `requested`.
-fn open_layer(overlays: &[OverlayRec], requested: LayerId, tag: u32) -> LayerId {
-    let above_modal = overlays
+/// What [`Ui::with_enabled`] pushes: the dimming of a disabled scope.
+pub(crate) fn disabled_xform() -> Xform {
+    Xform {
+        origin: (0.0, 0.0),
+        scale: 1.0,
+        dx: 0.0,
+        dy: 0.0,
+        alpha: DISABLED_ALPHA,
+    }
+}
+
+/// The layer of an overlay with `tag` that asks for `requested`, from the modals under it: the
+/// older modals `under` counts. [`LayerId::Outside`] for a popup or a modal called inside
+/// [`Ui::outside_modals`] (`outside`); else, above at least one such modal, the higher of
+/// [`LayerId::Raised`] and their layers (`Outside` when one of them is on it), so it draws and
+/// takes input above them all; else `requested`. The one rule for open, reopen and the hold, so
+/// the layer is always this function of the modals under the overlay (D263).
+fn layer_over(
+    overlays: &[OverlayRec],
+    requested: LayerId,
+    tag: u32,
+    outside: bool,
+    under: impl Fn(&OverlayRec) -> bool,
+) -> LayerId {
+    let popup_or_modal = matches!(requested, LayerId::Popup | LayerId::Modal);
+    if !popup_or_modal {
+        return requested;
+    }
+    if outside {
+        return LayerId::Outside;
+    }
+    let top = overlays
         .iter()
-        .any(|o| o.tag < tag && o.active() && o.opts.modal);
-    if above_modal && matches!(requested, LayerId::Popup | LayerId::Modal) {
-        LayerId::Raised
+        .filter(|o| o.tag < tag && o.opts.modal && under(o))
+        .map(|o| o.opts.layer as usize)
+        .max();
+    match top {
+        Some(l) if l >= LayerId::Outside as usize => LayerId::Outside,
+        Some(_) => LayerId::Raised,
+        None => requested,
+    }
+}
+
+/// The layer of an overlay opening or reopening with `tag`: [`layer_over`] the active modals.
+fn open_layer(overlays: &[OverlayRec], requested: LayerId, tag: u32, outside: bool) -> LayerId {
+    layer_over(overlays, requested, tag, outside, OverlayRec::active)
+}
+
+/// The layer an open overlay held on `held` is on this frame: [`layer_over`] the modals still on
+/// the stack (`on_stack`: open, opening, or closing with the exit not yet over, so it drops only
+/// once the exit is over), when that is lower than `held`. It never rises mid-life. Only an
+/// overlay put above a modal (`Raised`, or `Outside` while not called in the scope) moves,
+/// and only while it asks for `Popup` or `Modal` (D137 amended, D263).
+fn held_layer(
+    overlays: &[OverlayRec],
+    held: LayerId,
+    requested: LayerId,
+    tag: u32,
+    outside: bool,
+    on_stack: impl Fn(&OverlayRec) -> bool,
+) -> LayerId {
+    if !matches!(held, LayerId::Raised | LayerId::Outside)
+        || !matches!(requested, LayerId::Popup | LayerId::Modal)
+    {
+        return held;
+    }
+    let target = layer_over(overlays, requested, tag, outside, on_stack);
+    if (target as usize) < (held as usize) {
+        target
     } else {
-        requested
+        held
     }
 }
 
@@ -240,9 +300,18 @@ impl<'a> Ui<'a> {
     /// app stops calling it. `exit` gets the linear close progress and `transforms`.
     ///
     /// A `Popup` or `Modal` overlay opened above an active modal draws on [`LayerId::Raised`]
-    /// instead. That is settled at open or reopen and holds until it closes, whatever later frames
-    /// pass as `layer`, so the overlay draws, hits and exits on one layer. A reopen under a modal
-    /// that opened during the close is an open above that modal. What `content` draws is
+    /// instead, or on [`LayerId::Outside`] when a modal under it is on `Outside` (a dialog opened
+    /// from [`Self::outside_modals`]), so it is above every modal either way. That is settled at
+    /// open or reopen. On each later frame the same rule runs again over the older modals still on
+    /// the stack (open, opening, or closing with their exit not yet over), whatever later frames
+    /// pass as `layer`, and the overlay takes the result when it is lower: it drops from `Outside`
+    /// to `Raised` once the last `Outside` modal under it has finished its exit, and to the layer
+    /// it asks for once no older modal is left (a dialog that replaces another in one frame is
+    /// raised only during the first one's exit). It never rises mid-life. An overlay called inside
+    /// the scope stays on `Outside` for the scope's sake, with or without a modal; a child that was
+    /// on `Outside` because its parent was drops with the parent, in the same frame.
+    /// Once closing, an overlay keeps the layer it has, so it exits where it drew. A reopen under
+    /// a modal that opened during the close is an open above that modal. What `content` draws is
     /// the overlay's alone: a surrounding [`Self::record`] does not get it.
     pub fn overlay<R>(
         &mut self,
@@ -255,11 +324,12 @@ impl<'a> Ui<'a> {
         let now = self.time();
         let (tokens, tier) = (self.config.theme.motion, self.config.tier);
         let focused = self.store.focus.focused;
+        let outside = self.painter.hit_context().0 == LayerId::Outside as usize;
         let mut index = match self.store.overlays.iter().position(|o| o.id == id) {
             Some(i) => i,
             None => {
                 let tag = next_tag(self.store);
-                let layer = open_layer(&self.store.overlays, options.layer, tag);
+                let layer = open_layer(&self.store.overlays, options.layer, tag, outside);
                 self.store.overlays.push(OverlayRec {
                     id,
                     tag,
@@ -271,6 +341,7 @@ impl<'a> Ui<'a> {
                     exit: None,
                     saved_focus: focused,
                     called: false,
+                    disabled: false,
                 });
                 self.opened.push(id);
                 self.store.overlays.len() - 1
@@ -287,9 +358,17 @@ impl<'a> Ui<'a> {
         }
         let layer = if reopened {
             let tag = self.store.overlays[index].tag;
-            open_layer(&self.store.overlays, options.layer, tag)
+            open_layer(&self.store.overlays, options.layer, tag, outside)
         } else {
-            self.store.overlays[index].opts.layer
+            let rec = &self.store.overlays[index];
+            held_layer(
+                &self.store.overlays,
+                rec.opts.layer,
+                options.layer,
+                rec.tag,
+                outside,
+                |o| o.active() || o.closing(now, &tokens, tier).is_some(),
+            )
         };
         let rec = &mut self.store.overlays[index];
         if reopened {
@@ -300,6 +379,7 @@ impl<'a> Ui<'a> {
         rec.opts = OverlayOptions { layer, ..*options };
         rec.exit = Some(Box::new(exit));
         rec.called = true;
+        rec.disabled = !self.enabled;
         let tag = rec.tag;
         let (phase, transforms) = rec.opening(now, &tokens, tier);
         let frame = OverlayFrame {
@@ -310,6 +390,11 @@ impl<'a> Ui<'a> {
         };
         let saved = self.painter.save_state();
         self.painter.enter(layer, tag);
+        // `enter` leaves the opener's transforms, its disabled scope's dimming with them: the
+        // scope's look reaches everything drawn inside it, so it is put back.
+        if !self.enabled {
+            self.painter.push_xform(disabled_xform());
+        }
         let first_hit = self.painter.hits.len();
         // Scopes opened by the caller are outside the overlay for `Scope::Within`.
         let floor = std::mem::replace(&mut self.scope_floor, self.scopes.len());
@@ -322,6 +407,24 @@ impl<'a> Ui<'a> {
             self.initial_focus(tag, first_hit, options.initial_focus, options.modal);
         }
         (frame, r)
+    }
+
+    /// Runs `f` on [`LayerId::Outside`], a surface that stays live and undimmed under a modal: a
+    /// modal's dim, blur and input block do not reach what `f` draws and registers, at any modal
+    /// depth. `f` draws under the current clip and transform; the painter's layer, clip,
+    /// transforms and hit tag come back afterwards. An overlay opened inside `f` that asks for
+    /// `Popup` or `Modal` is on `Outside` too, above `f`'s own drawing by tag; one that asks for
+    /// `Toast` stays there. Keys are unchanged: Tab stays trapped in the modal and Escape goes to it.
+    ///
+    /// The switch is not recorded, so it does not replay: the scope belongs at an app's top level,
+    /// not inside [`Self::record`].
+    pub fn outside_modals<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
+        let saved = self.painter.save_state();
+        self.painter
+            .restore_state(self.painter.save_state().on_fixed(LayerId::Outside));
+        let r = f(self);
+        self.painter.restore_state(saved);
+        r
     }
 
     /// Runs `f` and returns what it drew as owned painter calls, for an exit painter to replay.
@@ -399,8 +502,14 @@ impl<'a> Ui<'a> {
             if let (Some((p, transforms)), Some(exit)) =
                 (rec.closing(now, tokens, tier), rec.exit.as_ref())
             {
-                painter.enter(rec.opts.layer, SUPPRESSED);
+                painter.enter_closing(rec.opts.layer, rec.tag);
+                if rec.disabled {
+                    painter.push_xform(disabled_xform());
+                }
                 exit(painter, p, transforms);
+                if rec.disabled {
+                    painter.pop_xform();
+                }
             }
         }
         let mut moving = false;

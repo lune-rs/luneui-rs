@@ -317,7 +317,9 @@ fn finite_size(property: &str, size: (f32, f32)) -> Result<(), String> {
 /// - P19: the caret of every grapheme boundary is on the last row whose start is at or before it,
 ///   the row `lines` gives it to;
 /// - P20: `hit` on a row answers an offset of that row whose caret is on it, wherever the point is
-///   along the row: right of a soft-wrapped row that is not the next row's first offset.
+///   along the row: right of a soft-wrapped row that is not the next row's first offset;
+/// - P21: on a row of left-to-right text, `hit` does not go backwards as `x` grows, in steps of a
+///   half pixel from left of the row to right of it, through a cluster of several glyphs too.
 pub fn text_system_contract(ts: &mut dyn TextSystem) -> Result<(), String> {
     let white = [255; 4];
     let samples = [
@@ -633,6 +635,9 @@ const LINE_TEXTS: &[&str] = &[
     "a\r",
     "a\r\r\nb",
     "\u{e9}\n\rb",
+    // Clusters that shape to several glyphs: a skin tone, a flag, a mark pair.
+    "ok \u{1F44D}\u{1F3FD}\u{1F1F2}\u{1F1FE}x",
+    "a\u{308}\u{301}b",
 ];
 
 /// The rows of a text as byte ranges, for P16.
@@ -700,7 +705,7 @@ fn line_contract(ts: &mut dyn TextSystem, style: Style) -> Result<(), String> {
     Ok(())
 }
 
-/// P14, P15, the caret around each break of P16, and P17 to P20 for one `spec`, at each of
+/// P14, P15, the caret around each break of P16, and P17 to P21 for one `spec`, at each of
 /// `LINE_SCALES`. For a system that lays text out; [`text_system_contract`] runs it on its own specs, and an adapter's
 /// tests may run it on generated ones.
 pub fn spec_line_contract(ts: &mut dyn TextSystem, spec: &Spec) -> Result<(), String> {
@@ -712,6 +717,7 @@ pub fn spec_line_contract(ts: &mut dyn TextSystem, spec: &Spec) -> Result<(), St
         caret_along_rows(ts, spec, scale)?;
         hit_of_the_caret(ts, spec, scale)?;
         hit_on_its_row(ts, spec, scale)?;
+        hit_along_the_row(ts, spec, scale)?;
     }
     Ok(())
 }
@@ -757,6 +763,36 @@ fn hit_on_its_row(ts: &mut dyn TextSystem, spec: &Spec, scale: f32) -> Result<()
                 "P20 hit on a row",
                 || format!("{text:?} at {scale}, x {x}, row {i} {l:?}: {got}, {c:?}"),
             )?;
+        }
+    }
+    Ok(())
+}
+
+/// Whether `text` has a char of a right-to-left script, whose rows P21 leaves alone: there a
+/// larger `x` is an earlier offset.
+fn has_rtl(text: &str) -> bool {
+    text.chars().any(|c| {
+        matches!(c as u32, 0x590..=0x8FF | 0xFB1D..=0xFDFF | 0xFE70..=0xFEFF | 0x1E800..=0x1EFFF)
+    })
+}
+
+fn hit_along_the_row(ts: &mut dyn TextSystem, spec: &Spec, scale: f32) -> Result<(), String> {
+    let text = joined_text(spec);
+    if has_rtl(&text) {
+        return Ok(());
+    }
+    let width = ts.prepare(spec, scale).1.0;
+    for (i, l) in ts.lines(spec, scale).iter().enumerate() {
+        let y = l.y + l.height / 2.0;
+        let mut last = ts.hit(spec, scale, (-1.0, y));
+        let mut x = -0.5;
+        while x <= width + 1.0 {
+            let got = ts.hit(spec, scale, (x, y));
+            check(got >= last, "P21 hit along a row", || {
+                format!("{text:?} at {scale}, row {i}, x {x}: {got} after {last}")
+            })?;
+            last = got;
+            x += 0.5;
         }
     }
     Ok(())
@@ -1076,6 +1112,45 @@ mod tests {
     fn the_contract_catches_a_caret_that_jumps_back_along_a_row() {
         let err = text_system_contract(&mut Jumping).expect_err("caught");
         assert!(err.starts_with("P17 caret along a row"), "{err}");
+    }
+
+    /// A `hit` that answers the row's end for a stretch of `x` and the right offset on both sides, as
+    /// a shaper does that halves each glyph of a multi-glyph cluster on its own.
+    struct Backwards;
+
+    impl TextSystem for Backwards {
+        fn prepare(&mut self, spec: &Spec, scale: f32) -> (TextKey, (f32, f32)) {
+            FakeText.prepare(spec, scale)
+        }
+        fn caret(&mut self, spec: &Spec, scale: f32, offset: usize) -> CaretPos {
+            FakeText.caret(spec, scale, offset)
+        }
+        fn hit(&mut self, spec: &Spec, scale: f32, pos: (f32, f32)) -> usize {
+            let at = FakeText.hit(spec, scale, pos);
+            let rows = FakeText.lines(spec, scale);
+            let row = rows.iter().rposition(|l| l.y <= pos.1).unwrap_or(0);
+            if (11.0..11.5).contains(&pos.0) && at < rows[row].end && rows[row].end > 3 {
+                return at + 1;
+            }
+            at
+        }
+        fn lines(&mut self, spec: &Spec, scale: f32) -> Vec<LineSpan> {
+            FakeText.lines(spec, scale)
+        }
+        fn segments(&self, text: &str, unit: Unit) -> Vec<usize> {
+            FakeText.segments(text, unit)
+        }
+    }
+
+    #[test]
+    fn the_contract_catches_a_hit_that_goes_backwards_along_a_row() {
+        let err = text_system_contract(&mut Backwards).expect_err("caught");
+        assert!(
+            err.starts_with("P21 hit along a row")
+                || err.starts_with("P18")
+                || err.starts_with("P20"),
+            "{err}"
+        );
     }
 
     /// A shaper that makes a CRLF two breaks once the text is not ASCII, as `BidiInfo` does.

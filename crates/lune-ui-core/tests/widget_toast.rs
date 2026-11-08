@@ -285,7 +285,7 @@ fn a_dismissed_toast_fades_in_one_fade_and_one_archive() {
     let mut alphas = Vec::new();
     for t in (500..800).step_by(10) {
         let (scene, out, _) = frame(&mut h, &mut toasts, t);
-        if let Some(s) = scene.layers[LayerId::Toast as usize].geometry.under.first() {
+        if let Some(s) = scene.merged(LayerId::Toast).geometry.under.first() {
             alphas.push(s.color[3]);
         }
         assert!(shown(&out).is_empty(), "no node while leaving");
@@ -305,12 +305,7 @@ fn a_toast_that_left_before_it_was_drawn_has_no_fade() {
     let (scene, out, _) = frame(&mut h, &mut toasts, 0);
     assert!(toasts.is_empty());
     assert!(shown(&out).is_empty());
-    assert!(
-        scene.layers[LayerId::Toast as usize]
-            .geometry
-            .under
-            .is_empty()
-    );
+    assert!(scene.merged(LayerId::Toast).geometry.under.is_empty());
     assert_eq!(toasts.history().count(), 1);
 }
 
@@ -324,13 +319,13 @@ fn scale_two_probes_width_radius_padding_gap_and_margin() {
     toasts.push(info("First"), ms(0));
     toasts.push(info("Second"), ms(0));
     let (scene, _) = settle(&mut h, &mut toasts, 0);
-    let layer = &scene.layers[LayerId::Toast as usize];
-    // The card fills are the shapes with a fill (the border rings follow each).
+    let layer = &scene.merged(LayerId::Toast);
+    // The card fills are the frosts, one per card (the border rings are strokes).
     let fills: Vec<_> = layer
         .geometry
         .under
         .iter()
-        .filter(|s| s.params[0] == 0.0 && s.color[3] > 0.8 * premul(DARK.toast_bg)[3])
+        .filter(|s| s.params[2] == 2.0 && s.color[3] > 0.8 * premul(DARK.menu_glass)[3])
         .collect();
     assert_eq!(fills.len(), 2);
     let (first, second) = (fills[0], fills[1]);
@@ -391,16 +386,18 @@ fn sampler<'a>(
 }
 
 fn card_fill(scene: &Scene) -> [f32; 4] {
-    scene.layers[LayerId::Toast as usize].geometry.under[0].rect
+    scene.merged(LayerId::Toast).geometry.under[0].rect
 }
 
 fn card_alpha(scene: &Scene) -> f32 {
-    let full = premul(DARK.toast_bg)[3];
-    scene.layers[LayerId::Toast as usize]
+    // A frost keeps its colour unfaded and the fade rides in `params[1]`.
+    scene
+        .merged(LayerId::Toast)
         .geometry
         .under
-        .first()
-        .map_or(0.0, |s| s.color[3] / full)
+        .iter()
+        .find(|s| s.params[2] == 2.0)
+        .map_or(0.0, |s| s.params[1])
 }
 
 const TIERS: [MotionTier; 3] = [MotionTier::Full, MotionTier::Reduced, MotionTier::Off];
@@ -899,7 +896,6 @@ fn toasts_waiting_on_a_timer_report_at_the_next_deadline_never_now() {
 // -- over a dialog and a raised popover ----------------------------------------------------------
 
 const GLASS: DialogGlass = DialogGlass {
-    panel: [0.1, 0.1, 0.12, 1.0],
     fill: [0.2, 0.2, 0.2, 0.62],
     noise: false,
 };
@@ -1332,8 +1328,8 @@ fn the_history_title_is_white() {
     let key = TextKey(title.cache_key(1.0));
     assert!(
         scene
-            .layers
-            .iter()
+            .in_order()
+            .into_iter()
             .any(|l| l.texts.iter().any(|t| t.key == key))
     );
 }
@@ -1392,7 +1388,7 @@ fn a_long_log_shapes_only_the_lines_in_view() {
         frame(&mut h, &mut toasts, t);
     }
     let (scene, _, _) = frame(&mut h, &mut toasts, 600);
-    let texts = scene.layers[LayerId::Toast as usize].texts.len();
+    let texts = scene.merged(LayerId::Toast).texts.len();
     // The tail follows: about 13 lines fit 184 px at 14 px a line, plus the margin lines.
     assert!(texts < 40, "{texts} texts");
     let _ = FRAME;

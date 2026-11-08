@@ -1,7 +1,6 @@
 //! The `side-panel` page: the host on the panel glass showing one of three panels (a row list
-//! each), with a row of buttons that switch the shown panel and a switch for the window's active
-//! state. The glass layer is the page's choice (the widget names no preset); inactive, the host
-//! draws the fallback fill. A switch shows the new panel with the drawer motion.
+//! each), with a row of buttons that switch the shown panel. The glass layer is the page's choice
+//! (the widget names no preset). A switch shows the new panel with the drawer motion.
 
 use std::time::Duration;
 
@@ -14,7 +13,7 @@ use lune_ui::ui::Ui;
 use lune_ui::widgets::button::{ButtonKind, ButtonOptions};
 use lune_ui::widgets::side_panel::SidePanelOptions;
 
-use super::{caption, card, heading, on_card};
+use super::{card, heading, on_card};
 use crate::page::Stage;
 use crate::page::{Ev, Expect, Page, PageKind, PageState, Step, UiPage, UiScene};
 use crate::showcase::knobs::Knobs;
@@ -40,33 +39,29 @@ const TITLES: [&str; 3] = ["Items", "Branches", "Changes"];
 const ROW: f32 = 28.0;
 
 fn live() -> Box<dyn PageState> {
-    Box::new(Live::new(1, true, None))
-}
-
-fn inactive() -> Box<dyn PageState> {
-    Box::new(Live::new(1, false, None))
+    Box::new(Live::new(1, None))
 }
 
 /// Panel 1 shown, then panel 2 at 200 ms.
 fn show_later() -> Box<dyn PageState> {
-    Box::new(Live::new(1, true, Some(Duration::from_millis(200))))
+    Box::new(Live::new(1, Some(Duration::from_millis(200))))
 }
 
 /// The host and three panels; the knobs choose the panel and how many rows it holds.
 struct Live {
     panel: u64,
-    active: bool,
     switch_at: Option<Duration>,
     rows: u32,
+    card_moves: bool,
 }
 
 impl Live {
-    fn new(panel: u64, active: bool, switch_at: Option<Duration>) -> Live {
+    fn new(panel: u64, switch_at: Option<Duration>) -> Live {
         Live {
             panel,
-            active,
             switch_at,
             rows: 10,
+            card_moves: false,
         }
     }
 }
@@ -95,10 +90,10 @@ impl PageState for Live {
         let opts = SidePanelOptions {
             panel: self.panel,
             keys: &KEYS,
-            active: self.active,
             glass: PANEL,
             under: CARD.premultiplied(),
             name: TITLES[(self.panel - 1) as usize],
+            card_moves: self.card_moves,
         };
         let rows = self.rows;
         ui.side_panel("host", host, &opts, |ui, inner| {
@@ -120,13 +115,6 @@ impl PageState for Live {
                 p.text_in(&line, r, 8.0);
             }
         });
-        ui.toggle(
-            "active",
-            Rect::new(ox, host.bottom() + 16.0, 40.0, 24.0),
-            &mut self.active,
-            "Window active",
-        );
-        caption(ui, "Window active", ox + 52.0, host.bottom() + 19.0);
     }
 
     fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
@@ -138,6 +126,7 @@ impl PageState for Live {
         if panel.number(ui, "Rows", &mut rows, (0.0, 30.0, 1.0)) {
             self.rows = rows.round() as u32;
         }
+        panel.toggle(ui, "Card moves with the show", &mut self.card_moves);
     }
 }
 
@@ -150,16 +139,6 @@ const SCENES: &[UiScene] = &[
         scale: 2.0,
         tier: MotionTier::Full,
         state: live,
-        script: &[],
-        capture_ms: 0,
-        expect: Expect::Settled,
-    },
-    // The window is inactive: the solid fallback replaces the glass.
-    UiScene {
-        id: "side-panel-inactive",
-        scale: 2.0,
-        tier: MotionTier::Full,
-        state: inactive,
         script: &[],
         capture_ms: 0,
         expect: Expect::Settled,

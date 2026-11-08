@@ -25,8 +25,8 @@ Keys: Cmd or Ctrl `]` and `[` walk the sidebar's pages, Cmd or Ctrl `Q` quits; e
 
 ## Needs
 
-None from a consumer: this is the gallery's own tool, not a toolkit component. It changes nothing under
-`crates/` (D246); what the toolkit would need to show more is in `docs/STATE.md`, Next.
+None from a consumer: this is the gallery's own tool, not a toolkit component. It changed nothing under
+`crates/` (D246); the follow-ups it found (noise and luminosity values, tray surfaces in an area, scoped tab order, `Painter::on` and the clip, numeric script keys, the IME area under zoom) were paid by the library pass (D264 to D268).
 
 ## Existing code
 
@@ -41,9 +41,9 @@ rows and the search), `settings.rs` (the global settings), `knobs.rs` (the knob 
 
 Theme (the preset and the five Lunegit files), Motion (tier, speed 0.1x to 2x, the five durations and the
 tooltip delay), Zoom (1x, 1.5x, 2x), Glass (per layer: tint, tint opacity, material opacity; the acrylic
-level; noise on or off), Blur (sigma to the kernel's cap, saturation), OS material (the five kinds), Reset.
-They outlive a change of page and go back only by Reset. The noise strength, the luminosity constants and the
-blur kernel's cap are fixed in the toolkit: the noise control is a switch and sigma stops at 16 (D246).
+level; a noise strength slider (0 is off) and the four values of the luminosity curve (applied to the three layers); the floating surfaces' tint, opacity and border: `menu_glass` and `menu_popup_border`, D8), Blur (sigma to 64, saturation, the kernel cap and the working size 1/2, 1/4 or 1/8), OS material (the five kinds), Reset.
+They outlive a change of page and go back only by Reset. Each reaches a frame through `FrameTweaks` or the composed theme (D268); a page with its own theme keeps these
+overrides, as the glass layers do.
 
 ### Knobs (right pane, first)
 
@@ -62,8 +62,7 @@ overlay come last: an open modal blocks the pane. Every page of the sidebar has 
 
 ### Labs
 
-Glass (the three layers over stripes and colour), Blur (a backdrop over moving content; it owns the frame's one
-backdrop), Effects (custom draw, glass off, unfocused, the tab outline), Motion (the 15 kinds and 7 easings,
+Glass (the three layers over stripes and colour), Blur (a backdrop over moving content), Effects (custom draw, glass off, the tab outline), Motion (the 15 kinds and 7 easings,
 each replayed on a press), Tokens (every theme colour, size and radius), Clipboard (copy and paste on a press
 only), JSON (the bounded reader on typed text).
 

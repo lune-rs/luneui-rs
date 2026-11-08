@@ -3,8 +3,8 @@
 //!
 //! [`Ui::page`] draws the card in the space it is given (margin 0 10 10 6 applied inside), then runs
 //! one closure per slot, in tab order: the header actions, the body, the footer. Like the toolbar
-//! it takes the glass layer from the caller and draws the theme's `window_fallback` fill when the
-//! window is inactive (D128): the widget names no preset.
+//! it takes the glass layer from the caller and draws it whatever the window's state is (R13): the
+//! widget names no preset.
 //!
 //! The footer is fixed at [`FOOTER_H`] (12 + a 32 px button row + 12) so the body's room is known
 //! before the closure runs; its closure's return is ignored. A page is a container, so a disabled
@@ -68,9 +68,7 @@ pub struct PageOptions<'a> {
     pub title: &'a str,
     /// The line under the title (13 on 20, `fg_tertiary`); it is also the group's description.
     pub subtitle: Option<&'a str>,
-    /// The window is active: the glass shows. Inactive, the solid fallback replaces it.
-    pub active: bool,
-    /// The glass layer drawn while active.
+    /// The glass layer the card draws.
     pub glass: GlassLayer,
     /// What the card is composed over (premultiplied); see [`ToolbarOptions::under`](super::toolbar::ToolbarOptions::under).
     pub under: [f32; 4],
@@ -148,11 +146,7 @@ impl Ui<'_> {
         };
 
         let p = self.painter();
-        if opts.active {
-            p.acrylic(card, RADIUS, opts.glass.premultiplied(), opts.under, true);
-        } else {
-            p.fill(card, RADIUS, t.window_fallback);
-        }
+        p.acrylic(card, RADIUS, opts.glass.premultiplied(), opts.under, true);
 
         let name = if opts.name.is_empty() {
             opts.title

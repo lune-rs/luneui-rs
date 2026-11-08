@@ -83,7 +83,8 @@ impl RoveStep {
     }
 }
 
-/// The tab stops of the scope `tag` in the previous frame, in call order, each id once.
+/// The tab stops of the scope `tag` in the previous frame, each id once: by ascending
+/// [`Ui::tab_scope`] order, and in call order among stops of one order.
 ///
 /// `current` (the focus) is listed where its region is, also when that is no stop, so [`step`]
 /// continues from it. Focus can reach a child of a roving composite after the frame that
@@ -98,18 +99,25 @@ pub(crate) fn tab_stops(
     roves: &[Vec<WidgetId>],
 ) -> Vec<WidgetId> {
     let group = current.and_then(|c| roves.iter().find(|g| g.contains(&c)));
-    let mut stops: Vec<WidgetId> = Vec::new();
+    let mut stops: Vec<(i32, WidgetId)> = Vec::new();
     for h in hits {
         let stop = if Some(h.id) == current {
             h.enabled || h.sense.skip_tab
         } else {
             h.enabled && !h.sense.skip_tab && !group.is_some_and(|g| g.contains(&h.id))
         };
-        if stop && h.tag == tag && h.sense.focusable && eligible(h) && !stops.contains(&h.id) {
-            stops.push(h.id);
+        if stop
+            && h.tag == tag
+            && h.sense.focusable
+            && eligible(h)
+            && !stops.iter().any(|(_, id)| *id == h.id)
+        {
+            stops.push((h.order, h.id));
         }
     }
-    stops
+    // A stable sort: the stops of one order keep their call order.
+    stops.sort_by_key(|(order, _)| *order);
+    stops.into_iter().map(|(_, id)| id).collect()
 }
 
 /// The stop after (or before) `current` in `stops`, wrapping; the first (or last) when `current`

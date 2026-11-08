@@ -15,8 +15,9 @@
 //! Text cannot be cut by a rounded clip (D12), so the toolkit keeps its own text at least the
 //! radius from the edges (16 for the header, the note and the unavailable line). The body is
 //! clipped to the rounded rect, which cuts fills and images; a flush body's text is the caller's
-//! to keep [`TEXT_INSET`] in. With `fit: true` the clip is the rect given, since the final height
-//! is known only after the body ran.
+//! to keep [`TEXT_INSET`] in. With `fit: true` the final height is known only after the body ran,
+//! so the clip takes the height the last frame ended with (the rect given on the first frame); a
+//! frame whose height differs from the clip it used asks for one catch-up frame.
 
 use std::hash::Hash;
 
@@ -106,6 +107,10 @@ pub enum PanelSlot {
     /// `footer_w` is above 0.
     Footer(Rect),
 }
+
+/// The height a `fit` panel ended its last frame with: what the next frame's body clip is cut at.
+#[derive(Debug, Default)]
+struct FitHeight(Option<f32>);
 
 fn clean(v: f32) -> f32 {
     if v.is_finite() { v.max(0.0) } else { 0.0 }
@@ -225,8 +230,16 @@ impl Ui<'_> {
                     }
                 }
 
-                // The body, cut by the rounded rect.
-                ui.painter().push_clip_rounded(rect, RADIUS);
+                // The body, cut by the rounded rect. A hugging panel's final height is known only
+                // after the body ran: the last frame's cuts it, the rect given is the first guess.
+                let fit_id = id.with("fit-height");
+                let clip_h = if opts.fit {
+                    ui.transient::<FitHeight>(fit_id).0.unwrap_or(rect.h)
+                } else {
+                    rect.h
+                };
+                ui.painter()
+                    .push_clip_rounded(Rect::new(rect.x, rect.y, rect.w, clip_h), RADIUS);
                 let content_h = if let Some(text) = opts.unavailable {
                     let x = rect.x + pad_x.max(16.0);
                     let w = (rect.w - 2.0 * pad_x.max(16.0)).max(0.0);
@@ -257,6 +270,14 @@ impl Ui<'_> {
                 } else {
                     rect.h
                 };
+
+                if opts.fit {
+                    ui.transient::<FitHeight>(fit_id).0 = Some(height);
+                    if height != clip_h {
+                        // The body was cut at another height than the panel ended at.
+                        ui.request_catch_up();
+                    }
+                }
 
                 // The footer, pinned to the bottom of the panel.
                 if footer_h > 0.0 {

@@ -11,7 +11,7 @@ summary: FrameRenderer: one target's scene, blur, target pass sequence over the 
 
 ## What it is
 
-`FrameRenderer` (`new`, `format`, `blur`, `draw`, `draw_with`) draws a core `Scene` into one target; `FrameParams` is a core type re-exported here. Each renderer owns what a draw writes (globals, viewport, text renderers, blur textures), so several targets share one `Gpu` without ordering hazards.
+`FrameRenderer` (`new`, `format`, `blur`, `draw`, `draw_with`) draws a core `Scene` into one target; `FrameParams` is a core type re-exported here; its `noise_opacity` and `blur: BlurLimits` (kernel cap in texels, default 48, at most 128; divisor 2, 4 or 8, default 8) are values of the frame, and a bad one draws as the default (D264). Each renderer owns what a draw writes (globals, viewport, text renderers, blur textures), so several targets share one `Gpu` without ordering hazards.
 
 ## Needs
 

@@ -1,5 +1,4 @@
-//! The side panel host (`layout.side-panel` acceptance): the glass card and the solid inactive
-//! fill, the radius and padding probes at scale 2, exactly one panel's nodes, hidden panels that
+//! The side panel host (`layout.side-panel` acceptance): the glass card, the radius and padding probes at scale 2, exactly one panel's nodes, hidden panels that
 //! keep their scroll offset and text edit across 600 undrawn frames, the show motion in three
 //! tiers (the first frame does not animate, a show in flight restarts from its look), a hide that
 //! snaps, no focus moved by a show, and the disabled walk.
@@ -36,6 +35,7 @@ const GLASS: GlassLayer = GlassLayer {
     tint: [10, 20, 30, 255],
     tint_opacity: 0.8,
     material_opacity: 0.7,
+    curve: lune_ui_core::LuminosityCurve::AVALONIA,
 };
 const UNDER: [f32; 4] = [0.05, 0.06, 0.07, 1.0];
 
@@ -51,18 +51,18 @@ fn in_panel(panel: u64, key: &str) -> WidgetId {
 #[derive(Clone, Copy)]
 struct Cfg {
     panel: u64,
-    active: bool,
     enabled: bool,
     keys: &'static [u64],
+    card_moves: bool,
 }
 
 impl Cfg {
     fn new(panel: u64) -> Cfg {
         Cfg {
             panel,
-            active: true,
             enabled: true,
             keys: &KEYS,
+            card_moves: false,
         }
     }
 }
@@ -91,10 +91,10 @@ fn frame(h: &mut UiHarness, c: &Cfg) -> Out {
         let opts = SidePanelOptions {
             panel: c.panel,
             keys: c.keys,
-            active: c.active,
             glass: GLASS,
             under: UNDER,
             name: line(c.panel),
+            card_moves: c.card_moves,
         };
         ui.with_enabled(c.enabled, |ui| {
             ui.side_panel("host", HOST, &opts, |ui, rect| {
@@ -223,27 +223,6 @@ fn pixel_probes_at_scale_two() {
 }
 
 #[test]
-fn inactive_draws_the_fallback_fill_and_no_acrylic() {
-    let mut h = UiHarness::new(WIN);
-    let out = settled(
-        &mut h,
-        &Cfg {
-            active: false,
-            ..Cfg::new(1)
-        },
-    );
-    let g = &out.scene.layers[0].geometry;
-    assert!(g.acrylic.is_empty());
-    let fill = g
-        .under
-        .iter()
-        .find(|s| s.rect == [20.0, 20.0, 300.0, 400.0])
-        .expect("the card fill");
-    assert_eq!(fill.color, premul(DARK.window_fallback));
-    assert_eq!(fill.radii, [RADIUS; 4]);
-}
-
-#[test]
 fn exactly_one_panels_nodes_exist_and_hidden_panels_emit_none() {
     let mut h = UiHarness::new(WIN);
     let one = settled(&mut h, &Cfg::new(1));
@@ -360,6 +339,57 @@ fn shown(tier: MotionTier, after: u64) -> Out {
     frame(&mut h, &Cfg::new(2));
     h.at_ms(6000 + after);
     frame(&mut h, &Cfg::new(2))
+}
+
+/// The card and its ring half way into a show of panel 2 over panel 1.
+fn card_mid_show(card_moves: bool) -> (Rect, f32, [f32; 4]) {
+    let mut h = UiHarness::new(WIN);
+    let c = |panel| Cfg {
+        card_moves,
+        ..Cfg::new(panel)
+    };
+    settled(&mut h, &c(1));
+    h.at_ms(6000);
+    frame(&mut h, &c(2));
+    h.at_ms(6120);
+    let out = frame(&mut h, &c(2));
+    let g = &out.scene.layers[0].geometry;
+    let card = g.acrylic[0];
+    let ring = g
+        .under
+        .iter()
+        .find(|s| s.params[0] == 1.0)
+        .expect("the ring");
+    let [x, y, w, h_] = card.shape.rect;
+    // The line's own slide is there either way.
+    let dx = x_of(&out.scene, 2) - 31.0;
+    assert!(dx < 0.0 && dx > SHOW_SLIDE_FROM, "{dx}");
+    (Rect::new(x, y, w, h_), card.opacity, ring.rect)
+}
+
+#[test]
+fn the_card_stays_still_during_a_show_by_default() {
+    let (card, opacity, ring) = card_mid_show(false);
+    assert_eq!(card, HOST);
+    assert_eq!(opacity, 1.0);
+    assert_eq!(ring, [HOST.x, HOST.y, HOST.w, HOST.h]);
+}
+
+#[test]
+fn with_card_moves_the_card_and_ring_take_the_slide_and_the_fade() {
+    let (card, opacity, ring) = card_mid_show(true);
+    // The same slide the content takes: left of its place, and partway.
+    assert!(
+        card.x < HOST.x && card.x > HOST.x + SHOW_SLIDE_FROM,
+        "{card:?}"
+    );
+    assert_eq!((card.y, card.w, card.h), (HOST.y, HOST.w, HOST.h));
+    assert!(opacity > 0.0 && opacity < 1.0, "{opacity}");
+    assert_eq!(
+        ring,
+        [card.x, card.y, card.w, card.h],
+        "the ring goes with the card"
+    );
 }
 
 #[test]
@@ -556,7 +586,7 @@ fn a_disabled_host_is_disabled_all_the_way_down_and_consumes_no_key() {
 fn the_host_draws_only_on_the_layer_it_is_called_on() {
     let mut h = UiHarness::new(WIN);
     let out = settled(&mut h, &Cfg::new(2));
-    for (i, l) in out.scene.layers.iter().enumerate() {
+    for (i, l) in out.scene.in_order().into_iter().enumerate() {
         if i != LayerId::Base as usize {
             assert!(
                 l.texts.is_empty() && l.geometry.under.is_empty(),

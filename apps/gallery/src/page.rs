@@ -10,6 +10,7 @@
 //! caller lends, so dump, bench and the self-check tests all drive it the same way.
 
 use lune_ui::access::{AccessAction, Action};
+use lune_ui::acrylic::NOISE_OPACITY;
 use lune_ui::image::{ImageData, ImageId, ImageStore};
 use lune_ui::input::{
     FrameOutput, ImeEvent, Key, Keymap, Modifiers, NamedKey, PointerButton, RawInput, Repaint,
@@ -18,7 +19,7 @@ use lune_ui::lunegit_dark::THEME;
 use lune_ui::material::Material;
 use lune_ui::motion::MotionTier;
 use lune_ui::paint::Rect;
-use lune_ui::scene::{FrameParams, Scene};
+use lune_ui::scene::{BlurLimits, FrameParams, Scene};
 use lune_ui::shortcuts::Shortcuts;
 use lune_ui::strings::{DisplayFormat, StringTable};
 use lune_ui::testing::ScriptedInput;
@@ -66,8 +67,7 @@ pub(crate) struct UiPage {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct Stage {
     rect: Option<Rect>,
-    /// The clip the host holds over the page, in the space the page draws in. `Painter::on`
-    /// drops the clip, so a page that changes layer gets it back through [`Stage::on`].
+    /// The clip the host holds over the page, in the space the page draws in.
     clip: Option<Rect>,
 }
 
@@ -95,19 +95,6 @@ impl Stage {
     pub(crate) const fn clipped(mut self, clip: Rect) -> Self {
         self.clip = Some(clip);
         self
-    }
-
-    /// `Painter::on`, then the host's clip again: a page that draws on more than one layer goes
-    /// through here, or the clip around it would be lost at the first change.
-    pub(crate) fn on<H: Copy + PartialEq>(
-        &self,
-        p: &mut lune_ui::paint::Painter<'_, H>,
-        layer: lune_ui::scene::LayerId,
-    ) {
-        p.on(layer);
-        if let Some(clip) = self.clip {
-            p.set_clip(Some(clip));
-        }
     }
 
     /// `r` cut to the host's clip: what of it shows. A request the clip cannot cut (a backdrop)
@@ -218,8 +205,10 @@ pub(crate) struct FrameTweaks {
     pub(crate) blur_sigma: f32,
     /// Saturation boost on the blurred backdrop.
     pub(crate) saturation: f32,
-    /// Acrylic carries the noise texture.
-    pub(crate) noise: bool,
+    /// Opacity of the noise texture on acrylic and frost; 0 is none.
+    pub(crate) noise: f32,
+    /// The blur kernel's cap and the divisor of its working picture.
+    pub(crate) blur: BlurLimits,
 }
 
 impl FrameTweaks {
@@ -227,7 +216,11 @@ impl FrameTweaks {
     pub(crate) const DEFAULT: FrameTweaks = FrameTweaks {
         blur_sigma: crate::scenes::BLUR_SIGMA,
         saturation: crate::scenes::BLUR_SATURATION,
-        noise: true,
+        noise: NOISE_OPACITY,
+        blur: BlurLimits {
+            kernel_cap: BlurLimits::KERNEL_CAP,
+            downsample: BlurLimits::DOWNSAMPLE,
+        },
     };
 
     /// The renderer's frame parameters for a target of `size` physical pixels at scale `scale`.
@@ -237,19 +230,8 @@ impl FrameTweaks {
             scale,
             blur_sigma: self.blur_sigma,
             saturation: self.saturation,
-        }
-    }
-
-    /// Takes the noise off every acrylic of `scene` when it is off here. The flag is the last of
-    /// a shape's parameters, as `Painter::acrylic` wrote it.
-    pub(crate) fn apply_noise(&self, scene: &mut Scene) {
-        if self.noise {
-            return;
-        }
-        for layer in &mut scene.layers {
-            for acrylic in &mut layer.geometry.acrylic {
-                acrylic.shape.params[3] = 0.0;
-            }
+            noise_opacity: self.noise,
+            blur: self.blur,
         }
     }
 }
@@ -359,6 +341,10 @@ pub(crate) struct Step {
 pub(crate) enum Ev {
     /// The pointer moves to the centre of the widget's previous-frame rect.
     PointerOver(&'static [&'static str]),
+    /// The pointer moves to the centre of the widget at the path, then the numeric key folded in
+    /// as one more `WidgetId::with` step: a row of a list or tree that keys its rows by number.
+    /// An unknown key is the same error as an unknown path.
+    PointerOverKey(&'static [&'static str], u64),
     PointerAt(f32, f32),
     Press,
     Release,
@@ -426,6 +412,13 @@ impl Scope<'_> {
             .last_rect(self.id(path))
             .ok_or_else(|| format!("{}: no widget at {path:?}", self.name))
     }
+
+    /// The previous frame's rect of the widget `key` under the one at `path`.
+    pub(crate) fn rect_of_key(&self, path: &[&str], key: u64) -> Result<Rect, String> {
+        self.store
+            .last_rect(self.id(path).with(key))
+            .ok_or_else(|| format!("{}: no widget at {path:?} with key {key}", self.name))
+    }
 }
 
 /// Applies one scripted event to `input`. `held` is the modifiers `Ev::Mods` holds; `shift`
@@ -443,6 +436,10 @@ pub(crate) fn apply_event(
     match ev {
         Ev::PointerOver(path) => {
             let r = scope.rect_of(path)?;
+            input.pointer_to(r.x + r.w / 2.0, r.y + r.h / 2.0);
+        }
+        Ev::PointerOverKey(path, key) => {
+            let r = scope.rect_of_key(path, *key)?;
             input.pointer_to(r.x + r.w / 2.0, r.y + r.h / 2.0);
         }
         Ev::PointerAt(x, y) => {
@@ -560,6 +557,8 @@ pub(crate) struct Player {
     stage: Stage,
     /// `PageState::epoch` when `strings` was read.
     epoch: u64,
+    /// Applied to each frame's theme after the page's own (a test's distinct colours).
+    restyle: Option<fn(Theme) -> Theme>,
 }
 
 impl std::fmt::Debug for Player {
@@ -594,7 +593,15 @@ impl Player {
             shortcuts: Shortcuts::default(),
             stage: Stage::window(),
             epoch: 0,
+            restyle: None,
         }
+    }
+
+    /// This player with `restyle` applied to every frame's theme, after the page's own.
+    #[cfg(test)]
+    pub(crate) fn restyled(mut self, restyle: fn(Theme) -> Theme) -> Self {
+        self.restyle = Some(restyle);
+        self
     }
 
     #[allow(dead_code)] // the showcase shell (step 2); the tests use it now
@@ -651,9 +658,10 @@ impl Player {
             self.epoch = self.state.epoch();
             self.strings = self.state.strings();
         }
+        // Read after the events, so a cue's change shows in the frame it comes with.
+        let theme = self.state.theme().unwrap_or(THEME);
         let config = FrameConfig {
-            // Read after the events, so a cue's change shows in the frame it comes with.
-            theme: self.state.theme().unwrap_or(THEME),
+            theme: self.restyle.map_or(theme, |f| f(theme)),
             tier: self.state.tier().unwrap_or(self.tier),
             strings: &self.strings,
             arg_format: &DisplayFormat,
@@ -798,10 +806,13 @@ mod tests {
     struct Probe {
         clicks: Rc<Cell<u32>>,
         enter: Rc<Cell<u32>>,
+        row_hovered: Rc<Cell<bool>>,
     }
 
     const A: Rect = Rect::new(10.0, 10.0, 100.0, 40.0);
     const B: Rect = Rect::new(200.0, 10.0, 100.0, 40.0);
+    /// A row under `a`, keyed by the number 7.
+    const ROW7: Rect = Rect::new(10.0, 100.0, 100.0, 40.0);
 
     impl PageState for Probe {
         fn draw(&mut self, ui: &mut Ui<'_>, _stage: &Stage) {
@@ -809,6 +820,8 @@ mod tests {
             let b = ui.id("b");
             let ra = ui.interact(a, A, Sense::CLICK_FOCUS);
             ui.interact(b, B, Sense::CLICK_FOCUS);
+            let row = ui.interact(a.with(7u64), ROW7, Sense::CLICK);
+            self.row_hovered.set(row.hovered);
             self.clicks.set(self.clicks.get() + u32::from(ra.clicked));
             if ra.focused && ui.consume_key(a, NamedKey::Enter) {
                 self.enter.set(self.enter.get() + 1);
@@ -877,6 +890,28 @@ mod tests {
         }];
         let err = run_scene("p", &probe_scene(BAD, 10, Expect::Settled), &mut FakeText)
             .expect_err("no such widget");
+        assert!(err.contains("nope"), "{err}");
+    }
+
+    #[test]
+    fn a_numeric_key_aims_at_the_row_under_a_path_and_an_unknown_one_is_the_path_error() {
+        let probe = Probe::default();
+        let hovered = probe.row_hovered.clone();
+        let mut player = Player::new("p", Box::new(probe), (400.0, 300.0), 1.0, MotionTier::Full);
+        player.frame(&mut FakeText, 0, &[]).expect("frame");
+        assert!(!hovered.get());
+        player
+            .frame(&mut FakeText, 10, &[Ev::PointerOverKey(&["a"], 7)])
+            .expect("a known key");
+        player.frame(&mut FakeText, 16, &[]).expect("frame");
+        assert!(hovered.get(), "the pointer is over the row keyed 7");
+        let err = player
+            .frame(&mut FakeText, 20, &[Ev::PointerOverKey(&["a"], 8)])
+            .expect_err("no such row");
+        assert!(err.contains("key 8") && err.contains("\"a\""), "{err}");
+        let err = player
+            .frame(&mut FakeText, 30, &[Ev::PointerOverKey(&["nope"], 7)])
+            .expect_err("no such path");
         assert!(err.contains("nope"), "{err}");
     }
 
@@ -966,6 +1001,75 @@ mod tests {
             }
         }
         out.into_iter().collect()
+    }
+
+    /// R18: every selection goes through `widgets::selection`. Under a theme whose
+    /// `text_selection` and `accent` are found nowhere else, no scene draws a flat shape (under or
+    /// over the text, on any layer) in the selection's colour or the diff view's (the accent at
+    /// 0x33), every path fill is finite, and the scenes that hold a selection draw it as a path
+    /// fill: so the walker sees the colour where it is drawn, and its silence elsewhere counts.
+    #[test]
+    fn no_widget_fills_a_selection_itself() {
+        use lune_ui::color::{Rgba, premul};
+        const SEL: Rgba = [0x13, 0x57, 0x9B, 0x66];
+        const ACCENT: Rgba = [0x24, 0x68, 0xAC, 0xFF];
+        const DIFF: Rgba = [ACCENT[0], ACCENT[1], ACCENT[2], 0x33];
+        fn restyle(t: Theme) -> Theme {
+            Theme {
+                text_selection: SEL,
+                accent: ACCENT,
+                ..t
+            }
+        }
+        let inks = [premul(SEL), premul(DIFF)];
+        let mut bad = Vec::new();
+        let mut drawn = BTreeSet::new();
+        for page in PAGES {
+            let PageKind::Ui(ui_page) = page.kind else {
+                continue;
+            };
+            for scene in ui_page.scenes {
+                let mut player = Player::for_scene(page.id, scene).restyled(restyle);
+                player.frame(&mut FakeText, 0, &[]).expect("frame");
+                for step in scene.script {
+                    player
+                        .frame(&mut FakeText, step.at_ms, step.events)
+                        .expect("frame");
+                }
+                let (frame, _) = player
+                    .frame(&mut FakeText, scene.capture_ms, &[])
+                    .expect("frame");
+                for layer in frame.in_order() {
+                    let g = &layer.geometry;
+                    if g.under
+                        .iter()
+                        .chain(&g.over)
+                        .any(|s| inks.contains(&s.color))
+                    {
+                        bad.push(format!("{}: a flat selection fill", scene.id));
+                    }
+                    if g.fills.iter().any(|v| v.pos.iter().any(|c| !c.is_finite())) {
+                        bad.push(format!("{}: a fill not finite", scene.id));
+                    }
+                    if g.fills.iter().any(|v| inks.contains(&v.color)) {
+                        drawn.insert(scene.id);
+                    }
+                }
+            }
+        }
+        assert!(bad.is_empty(), "{}", bad.join("\n"));
+        for id in [
+            "code-editor-view-selection",
+            "code-block-selection",
+            "text-edit-selection",
+            "kv-list-selected",
+            "diff-view-selection",
+        ] {
+            assert!(
+                drawn.contains(id),
+                "{id} draws its selection as a path fill"
+            );
+        }
     }
 
     /// Every Ui page's live state and scene states draw inside a content rect: nothing they make

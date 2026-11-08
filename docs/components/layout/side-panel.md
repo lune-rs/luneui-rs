@@ -38,7 +38,7 @@ Conflicts: none between sources. Wane has no side-panel entry; this repo has no 
 
 ### Anatomy
 
-- Host: acrylic card at radius 8 while the window is active [L src/Lunegit.Desktop/Views/SidePanelView.axaml:9]; solid `WindowFallbackBackground` while inactive [L src/Lunegit.Desktop/Views/SidePanelView.axaml:19].
+- Host: acrylic card at radius 8, whatever the window's state [L src/Lunegit.Desktop/Views/SidePanelView.axaml:9]; Lunegit's solid `WindowFallbackBackground` while inactive [L src/Lunegit.Desktop/Views/SidePanelView.axaml:19] is not ported (R13, D262).
 - Inner: a `glass-panel` border with padding 10 [L src/Lunegit.Desktop/Views/SidePanelView.axaml:20]; the border is 1 px `SurfaceBorder` (`border`) at radius 8 [L src/Lunegit.Desktop/App.axaml:294-298], drawn inside the host's rect, so the content starts `RING` 1 + `PAD` 10 = 11 in (C21).
 - Panels: nine views, one visible; visibility = `ActivePanelKey` equals the panel's key [L src/Lunegit.Desktop/Views/SidePanelView.axaml:22-53].
 - The column width is set by the window, not the host; it snaps [L src/Lunegit.Desktop/Themes/Animations.axaml:314-317].
@@ -48,7 +48,7 @@ Conflicts: none between sources. Wane has no side-panel entry; this repo has no 
 | state | look | cite |
 |---|---|---|
 | active window | acrylic host, radius 8 | [L src/Lunegit.Desktop/Views/SidePanelView.axaml:9] |
-| inactive window | solid fallback fill | [L src/Lunegit.Desktop/Views/SidePanelView.axaml:19] |
+| inactive window | the same glass (no `active` option) | [D262] |
 | panel shown | the keyed panel visible, with the show motion | [L src/Lunegit.Desktop/Views/SidePanelView.axaml:22-53], [L src/Lunegit.Desktop/Themes/Animations.axaml:318-335] |
 | panel hidden | not drawn | [L src/Lunegit.Desktop/Views/SidePanelView.axaml:22-53] |
 | focus-visible | the focused control in the panel | [core.focus] |
@@ -92,7 +92,6 @@ None: the host draws no text; panel titles are app text.
 ### Gallery scenes
 
 - `side-panel-shown` (new): one panel (a row list) shown, settled.
-- `side-panel-inactive` (new): the host with the window inactive, settled.
 - `side-panel-show-mid` (new): show at t = 175 ms after the first frame of the new panel (half of moderate, 350 ms) [L src/Lunegit.Desktop/App.axaml:154].
 
 ### Painter primitives
@@ -102,21 +101,21 @@ None: the host draws no text; panel titles are app text.
 
 ### Acceptance
 
-- Behaviour (scripted input, injected time): changing the active key shows exactly one panel; the hidden panels draw nothing; the inactive window draws the fallback fill.
+- Behaviour (scripted input, injected time): changing the active key shows exactly one panel; the hidden panels draw nothing.
 - Pixel probes at scale 2: host radius 16 px; ring 2 px in `border`; content 22 px in; slide 12 px at scale 2 (−6 px) at the start of the show.
 - Conformance: show reaches opacity 1 and offset 0 at 350 ms; Reduced fades opacity only; Off snaps.
 - Semantic node: `group` named by the panel title; hidden panels are not in the tree.
-- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_side_panel.rs`: behaviour `exactly_one_panels_nodes_exist_and_hidden_panels_emit_none`, `a_hidden_panels_scroll_offset_and_text_edit_survive_600_undrawn_frames`, `a_hide_snaps_the_old_panel_is_gone_on_the_first_frame_of_the_change`, `a_show_moves_no_focus`, `inactive_draws_the_fallback_fill_and_no_acrylic`; pixel probes `pixel_probes_at_scale_two`, `the_card_is_the_acrylic_at_radius_8_with_the_given_under_and_content_inside_ring_and_10`; conformance `show_conforms_in_three_tiers`, `reduced_fades_the_opacity_only_and_off_snaps`, `a_show_fades_the_panel_in_and_slides_it_from_the_left_and_leaves_the_card`, `the_first_frame_of_a_host_does_not_animate`; node `the_tree_of_a_frame_has_the_host_group_first`; `a_disabled_host_is_disabled_all_the_way_down_and_consumes_no_key`.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_side_panel.rs`: behaviour `exactly_one_panels_nodes_exist_and_hidden_panels_emit_none`, `a_hidden_panels_scroll_offset_and_text_edit_survive_600_undrawn_frames`, `a_hide_snaps_the_old_panel_is_gone_on_the_first_frame_of_the_change`, `a_show_moves_no_focus`, ; pixel probes `pixel_probes_at_scale_two`, `the_card_is_the_acrylic_at_radius_8_with_the_given_under_and_content_inside_ring_and_10`; conformance `show_conforms_in_three_tiers`, `reduced_fades_the_opacity_only_and_off_snaps`, `a_show_fades_the_panel_in_and_slides_it_from_the_left_and_leaves_the_card`, `the_first_frame_of_a_host_does_not_animate`; node `the_tree_of_a_frame_has_the_host_group_first`; `a_disabled_host_is_disabled_all_the_way_down_and_consumes_no_key`.
 
 ### Build
 
 - Milestone: M7.
 - Depends on: core.acrylic, core.painter, layout.icon-rail, layout.panel, motion.transitions.
-- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_side_panel.rs::exactly_one_panels_nodes_exist_and_hidden_panels_emit_none, crates/lune-ui-core/tests/widget_side_panel.rs::a_hidden_panels_scroll_offset_and_text_edit_survive_600_undrawn_frames, crates/lune-ui-core/tests/widget_side_panel.rs::pixel_probes_at_scale_two, crates/lune-ui-core/tests/widget_side_panel.rs::inactive_draws_the_fallback_fill_and_no_acrylic, crates/lune-ui-core/tests/widget_side_panel.rs::show_conforms_in_three_tiers, crates/lune-ui-core/tests/widget_side_panel.rs::the_tree_of_a_frame_has_the_host_group_first`; page `side-panel`; unverified here: none.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_side_panel.rs::exactly_one_panels_nodes_exist_and_hidden_panels_emit_none, crates/lune-ui-core/tests/widget_side_panel.rs::a_hidden_panels_scroll_offset_and_text_edit_survive_600_undrawn_frames, crates/lune-ui-core/tests/widget_side_panel.rs::pixel_probes_at_scale_two, crates/lune-ui-core/tests/widget_side_panel.rs::show_conforms_in_three_tiers, crates/lune-ui-core/tests/widget_side_panel.rs::the_tree_of_a_frame_has_the_host_group_first`; page `side-panel`; unverified here: none.
 
 ## Open questions
 
-None. Closed by [D149]: the host is a toolkit component (`Ui::side_panel`, `SidePanelOptions { panel, keys, active, glass, under, name }`); the panels' contents are the app's. The host has no width of its own (the app passes the rect). A show moves no focus: the app knows the first control. `keys` lists every panel so hidden ones stay alive (`keep_alive` for the shown one, `mark_alive` for the rest): a hidden panel's scroll offset and text edit survive any number of undrawn frames. The show is `SHOW_OPACITY` (kept under Reduced) and `SHOW_SLIDE` (-6 to 0 px, dropped under Reduced) from the frame `panel` changes; the first frame does not animate; a show in flight restarts from the look it has; a hide snaps. Keyboard switching is the icon rail's (`layout.icon-rail`). The content is inset 10, above the radius of 8 (a rounded clip cannot cut text, [D148]).
+None. Closed by [D149]: the host is a toolkit component (`Ui::side_panel`, `SidePanelOptions { panel, keys, glass, under, name, card_moves }`); the panels' contents are the app's. The host has no width of its own (the app passes the rect). A show moves no focus: the app knows the first control. `keys` lists every panel so hidden ones stay alive (`keep_alive` for the shown one, `mark_alive` for the rest): a hidden panel's scroll offset and text edit survive any number of undrawn frames. The show is `SHOW_OPACITY` (kept under Reduced) and `SHOW_SLIDE` (-6 to 0 px, dropped under Reduced) from the frame `panel` changes; the first frame does not animate; a show in flight restarts from the look it has; a hide snaps. The card does not move with a show, as in Lunegit, where `.side-panel-anim` is on the panel's own view and not on the host card; `card_moves: true` (off by default, item 44, D281) makes the card and its ring take the slide and fade too (`the_card_stays_still_during_a_show_by_default`, `with_card_moves_the_card_and_ring_take_the_slide_and_the_fade`; the gallery page's knob "Card moves with the show"). Keyboard switching is the icon rail's (`layout.icon-rail`). The content is inset 10, above the radius of 8 (a rounded clip cannot cut text, [D148]).
 
 ## Notes for the planner
 

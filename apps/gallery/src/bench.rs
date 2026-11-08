@@ -471,6 +471,7 @@ fn frame(
         scale: s,
         blur_sigma: BLUR_SIGMA,
         saturation: BLUR_SATURATION,
+        ..FrameParams::default()
     };
     let mut customs: [&mut dyn lune_ui::custom::CustomDraw; 1] = [&mut r.fill];
     r.frame.draw_with(

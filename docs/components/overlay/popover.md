@@ -27,7 +27,7 @@ pickers are built on it or share its rules; today each repeats the flip by hand
 ## Existing code
 
 Built in M5 (D101): `crates/lune-ui-core/src/widgets/popover.rs` (`place`, `Ui::popover`); the dropdown and the menu now call `place`. The placement rule had existed twice inline: `crates/lune-ui-core/src/widgets/dropdown.rs:19-23` (flip) and `crates/lune-ui-core/src/widgets/menu.rs:95-100` (flip and shift);
-the plain shell is `popup_panel` at `crates/lune-ui-core/src/widgets/mod.rs:200-203`; the layer order is `LayerId` at `crates/lune-ui-core/src/scene.rs:17-22`.
+the shell is `glass_panel` in `crates/lune-ui-core/src/widgets/popover.rs`; the layer order is `LayerId` at `crates/lune-ui-core/src/scene.rs:17-22`.
 
 ## Spec
 
@@ -38,8 +38,8 @@ Lunegit src/Lunegit.Desktop/Views/DiffView.axaml:18-40,100-125, Controls/LinkSea
 Themes/Animations.axaml:241-267, Themes/DarkTheme.axaml:300-310, .claude/docs/animation-rules.md:98-110; Wane docs/ui/components.md:543-556,702-717.
 Conflicts: (1) the open animation. Lunegit's popups open with opacity only, Base, quad-out, "by necessity" because a scale keyframe crashes on inline runs [L src/Lunegit.Desktop/Themes/Animations.axaml:241-249]; its own rule table wants opacity plus scale 0.96 to 1 at Base [L .claude/docs/animation-rules.md:109];
 the moved menu opens in 0.18 s with an ease-out curve from 4 px lower at 97 percent [R crates/lune-ui-core/src/widgets/menu.rs:19-22,46-49]. The moved code is pixel-gated and wins: the popover pops like the menu (`pop`, `fast`, `cubic-out`), see Transitions.
-(2) The shell radius: Lunegit's options flyout uses an outer radius 12 and an inner 11 [L src/Lunegit.Desktop/Views/DiffView.axaml:28-33], the picker popup 8 [L src/Lunegit.Desktop/Controls/LinkSearchPicker.axaml:45], the moved menu 9 [R crates/lune-ui-core/src/widgets/menu.rs:74] and the moved panel 8 [R crates/lune-ui-core/src/widgets/mod.rs:201].
-The popover therefore draws no shell: the consumer passes its own, and the default is `popup_panel`.
+(2) The shell radius: Lunegit's options flyout uses an outer radius 12 and an inner 11 [L src/Lunegit.Desktop/Views/DiffView.axaml:28-33], the picker popup 8 [L src/Lunegit.Desktop/Controls/LinkSearchPicker.axaml:45], the moved menu 9 [R crates/lune-ui-core/src/widgets/menu.rs:74] and the moved opaque panel 8 (gone since step 6a).
+The popover's default shell is the glass surface at radius 9 (`glass_surface`, D8); `Surface::None` leaves it to the consumer.
 
 ### Anatomy
 
@@ -48,7 +48,7 @@ The popover therefore draws no shell: the consumer passes its own, and the defau
 - Flip: when the preferred side overflows the window minus an 8 px margin (`below + h > window.h - 8`), use the opposite side at the same gap, and never above the 8 px margin (`max(anchor.y - 4 - h, 8)`) [R crates/lune-ui-core/src/widgets/dropdown.rs:19-23], [R crates/lune-ui-core/src/widgets/menu.rs:96-100].
 - Shift: the x position is clamped to `[8, window.w - w - 8]` [R crates/lune-ui-core/src/widgets/menu.rs:95]. Wane asks for the same rule: "flips or shifts a surface to stay on screen" [W docs/ui/components.md:707].
 - Size limits come from the content: Lunegit's picker popup has a minimum width 220 and a maximum height 320 [L src/Lunegit.Desktop/Controls/LinkSearchPicker.axaml:47-48]; the flyouts set a minimum content width of 220 and 240 [L src/Lunegit.Desktop/Views/DiffView.axaml:110], [L src/Lunegit.Desktop/Views/SidePanels/CommitPanelView.axaml:368].
-- Shell: `Surface::Panel` (default) is `popup_panel` (radius 8, fill `dropdown_bg`, 1 px `border` ring) [R crates/lune-ui-core/src/widgets/mod.rs:200-203]; `Surface::Glass` is the menu's glass (`glass_panel`: the backdrop, `menu_glass`, the `menu_popup_border` ring, radius 9) [D143]; `Surface::None` draws nothing. A closing popover replays what its content drew, the backdrop included, with the fade; Lunegit's glass shells are a layered pair of borders with 1 px and 4 px padding [L src/Lunegit.Desktop/Views/DiffView.axaml:26-40], [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:300-303].
+- Shell: `Surface::Glass` (default) is the one glass routine (`glass_surface`: the backdrop, `menu_glass` frosted over it, the `menu_popup_border` ring, radius 9) [R crates/lune-ui-core/src/widgets/popover.rs]; `Surface::None` draws nothing. The opaque `Surface::Panel` is gone (library-pass step 6a). A closing popover replays what its content drew, the backdrop included, with the fade; Lunegit's glass shells are a layered pair of borders with 1 px and 4 px padding [L src/Lunegit.Desktop/Views/DiffView.axaml:26-40], [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:300-303].
 - Layer `Popup`, above `Page`; the layers beneath it go to the offscreen scene so a glass shell can blur them [R crates/lune-ui-core/src/scene.rs:17-26].
 - Not placed here: tray-anchored popovers (a separate OS window, `platform.tray-icon`, `overlay.flyout`, [D48]).
 
@@ -111,7 +111,6 @@ None: the popover has no text of its own.
 - `popover-scale-1`: the same placement at scale 1, settled.
 - `popover-closing`: the dismiss at t = 60 ms (half of `instant`).
 - `popover-opening`: the open at t = 90 ms (half of `fast`).
-- `popover-glass`: the glass surface, settled.
 
 ### Painter primitives
 

@@ -4,8 +4,8 @@
 use crate::color::{Rgba, premul};
 use crate::image::{Fit, ImageAlign, ImageId};
 use crate::scene::{
-    Acrylic, BackdropRequest, CustomItem, ImageItem, ImageSource, LayerGeometry, RoundClip, Scene,
-    Shape, StrokeVertex, TextItem,
+    Acrylic, BackdropRequest, CustomItem, ImageItem, ImageSource, Layer, LayerGeometry,
+    OverlayLayer, RoundClip, Scene, Shape, StrokeVertex, TextItem,
 };
 use crate::text::{CaretPos, LineSpan, Spec, TextSystem, Unit};
 use crate::theme::Theme;
@@ -162,12 +162,14 @@ enum Op {
     FillOver(Rect, f32, [f32; 4]),
     Ring(Rect, f32, f32, Rgba, bool),
     Acrylic(Rect, [f32; 4], [f32; 4], [f32; 4], bool),
+    Frost(Rect, [f32; 4], [f32; 4], bool),
     Backdrop(Rect, f32, f32, f32),
     Text(Spec, f32, f32),
     Stroke(Vec<[f32; 2]>, bool, StrokeStyle),
     Dash(Vec<[f32; 2]>, bool, f32, f32, f32, Rgba),
     Arc([f32; 2], f32, f32, f32, StrokeStyle),
     FillPath(Vec<[f32; 2]>, Rgba),
+    FillJoined(Vec<Vec<[f32; 2]>>, Vec<[f32; 2]>, Rgba),
     Sector([f32; 2], f32, f32, f32, Rgba),
     Image(Rect, ImageId, Fit, ImageAlign, f32, f32),
     TextRotated(Spec, (f32, f32), f32),
@@ -200,15 +202,29 @@ impl Ops {
     }
 }
 
+/// The hit tag of exit painters: their hits are dropped.
+pub(crate) const SUPPRESSED: u32 = u32::MAX;
+
 /// The painter state an overlay saves and restores around its content.
 #[derive(Debug, Clone)]
 pub(crate) struct PainterState {
     layer: usize,
+    slot: Option<usize>,
     clip: Option<Rect>,
     round: Option<(Rect, f32)>,
     clips: Vec<ClipFrame>,
     xforms: Vec<Xform>,
     hit_tag: u32,
+}
+
+impl PainterState {
+    /// This state drawing on the fixed layer `layer` instead, with its clip, transforms and hit
+    /// tag as they were.
+    pub(crate) fn on_fixed(mut self, layer: LayerId) -> Self {
+        self.layer = layer as usize;
+        self.slot = None;
+        self
+    }
 }
 
 /// Records one frame's drawing into a [`Scene`] and the hit regions of what it drew, at scale `s`.
@@ -218,7 +234,10 @@ pub struct Painter<'a, H> {
     pub window: Rect,
     /// The display list painted so far: every layer and the backdrop request.
     pub scene: Scene,
+    /// The fixed layer drawing is on, and what a hit records.
     layer: usize,
+    /// The entry of `scene.overlays` drawing goes to; `None` for the fixed layer itself.
+    slot: Option<usize>,
     clip: Option<Rect>,
     /// The innermost rounded clip: its rect (also folded into `clip`) and corner radius.
     round: Option<(Rect, f32)>,
@@ -244,6 +263,7 @@ impl<H: std::fmt::Debug> std::fmt::Debug for Painter<'_, H> {
             .field("window", &self.window)
             .field("scene", &self.scene)
             .field("layer", &self.layer)
+            .field("slot", &self.slot)
             .field("clip", &self.clip)
             .field("hits", &self.hits)
             .field("hover", &self.hover)
@@ -268,6 +288,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
             window,
             scene: Scene::default(),
             layer: 0,
+            slot: None,
             clip: None,
             round: None,
             clips: Vec::new(),
@@ -349,6 +370,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
                 Op::Acrylic(r, radii, c, under, noise) => {
                     self.acrylic_radii(*r, *radii, *c, *under, *noise);
                 }
+                Op::Frost(r, radii, c, noise) => self.frost_radii(*r, *radii, *c, *noise),
                 Op::Backdrop(r, radius, sigma, saturation) => {
                     self.backdrop_with(*r, *radius, *sigma, *saturation);
                 }
@@ -363,6 +385,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
                     self.arc(*center, *radius, *start, *sweep, *st);
                 }
                 Op::FillPath(pts, c) => self.fill_path(pts, *c),
+                Op::FillJoined(parts, outline, c) => self.fill_joined(parts, outline, *c),
                 Op::Sector(center, radius, start, sweep, c) => {
                     self.sector(*center, *radius, *start, *sweep, *c);
                 }
@@ -398,6 +421,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
     pub(crate) fn save_state(&self) -> PainterState {
         PainterState {
             layer: self.layer,
+            slot: self.slot,
             clip: self.clip,
             round: self.round,
             clips: self.clips.clone(),
@@ -409,6 +433,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
     /// Puts back a [`Self::save_state`] result. Not recorded.
     pub(crate) fn restore_state(&mut self, s: PainterState) {
         self.layer = s.layer;
+        self.slot = s.slot;
         self.clip = s.clip;
         self.round = s.round;
         self.clips = s.clips;
@@ -417,26 +442,65 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
     }
 
     /// Switches to `layer` with no clip, an empty transform stack and hit tag `tag`, for the
-    /// `Ui`'s overlays. Not recorded.
+    /// `Ui`'s overlays. A `tag` above 0 draws into that overlay's own layer on `layer`, made on
+    /// first use; tag 0 draws into the fixed layer. Not recorded.
     pub(crate) fn enter(&mut self, layer: LayerId, tag: u32) {
+        self.enter_as(layer, tag, tag);
+    }
+
+    /// [`Self::enter`] for the exit of the overlay `tag`: it draws in its open order, and its hits
+    /// are suppressed.
+    pub(crate) fn enter_closing(&mut self, layer: LayerId, tag: u32) {
+        self.enter_as(layer, tag, SUPPRESSED);
+    }
+
+    fn enter_as(&mut self, layer: LayerId, draw_tag: u32, hit_tag: u32) {
         self.layer = layer as usize;
+        self.slot = (draw_tag > 0).then(|| self.overlay_slot(layer, draw_tag));
         self.clip = None;
         self.round = None;
         self.clips.clear();
         self.xforms.clear();
-        self.hit_tag = tag;
+        self.hit_tag = hit_tag;
     }
 
-    /// Draws on `layer` from now on, with no clip. Items of one kind keep the order they were drawn
+    /// The index in `scene.overlays` of the layer of overlay `tag` on `on`, made on first use.
+    fn overlay_slot(&mut self, on: LayerId, tag: u32) -> usize {
+        let overlays = &mut self.scene.overlays;
+        overlays
+            .iter()
+            .position(|o| o.on == on && o.tag == tag)
+            .unwrap_or_else(|| {
+                overlays.push(OverlayLayer {
+                    on,
+                    tag,
+                    layer: Layer::default(),
+                });
+                overlays.len() - 1
+            })
+    }
+
+    /// The layer drawing goes to: the current overlay's, or the fixed layer.
+    fn target(&mut self) -> &mut Layer {
+        match self.slot {
+            Some(i) => &mut self.scene.overlays[i].layer,
+            None => &mut self.scene.layers[self.layer],
+        }
+    }
+
+    /// Draws on `layer` from now on. The clip stack and the transforms stay as they are: they belong
+    /// to the code that pushed them, so a [`Self::pop_clip`] after a layer change restores what its
+    /// push replaced. (An overlay starts with none, [`Ui::overlay`](crate::ui::Ui::overlay): it is
+    /// not inside its opener's clip.) Items of one kind keep the order they were drawn
     /// in; the kinds draw in the renderer's order (acrylic, under shapes, path fills, customs,
     /// images, text, then over shapes and strokes, see [`crate::scene::Layer`]), so a fill drawn
-    /// after a text still draws under it. The layers draw back to front ([`LayerId`]).
+    /// after a text still draws under it. The layers draw back to front ([`LayerId`]). This is the
+    /// fixed layer, whichever overlay is drawing: what an overlay draws after it is not the
+    /// overlay's.
     pub fn on(&mut self, layer: LayerId) {
         self.rec(|| Op::On(layer));
         self.layer = layer as usize;
-        self.clip = None;
-        self.round = None;
-        self.clips.clear();
+        self.slot = None;
     }
 
     /// Sets the clip to `clip` (logical px), or removes the rect clip with `None`. [`Self::push_clip`]
@@ -486,6 +550,11 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         if radius > 0.0 {
             self.round = Some((rect, radius));
         }
+    }
+
+    /// The current rect clip, in the space draws are made in now; `None` when no rect clips.
+    pub fn clip_rect(&self) -> Option<Rect> {
+        self.clip
     }
 
     fn push_frame(&mut self) {
@@ -615,26 +684,27 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
     }
 
     /// [`Self::backdrop`] at its own `sigma` and `saturation` (0 means the frame's). Everything
-    /// under this layer is blurred. A frame has one blur: of two requests the lower layer keeps
-    /// it, and on one layer the last wins.
+    /// drawn before this layer is blurred, other glass included. Every request stands, and each has
+    /// its own numbers; one that shows nothing (alpha 0, no area) records nothing.
     pub fn backdrop_with(&mut self, r: Rect, radius: f32, sigma: f32, saturation: f32) {
         self.rec(|| Op::Backdrop(r, radius, sigma, saturation));
-        if self.scene.backdrop.is_some_and(|b| b.layer < self.layer) {
+        let (rect, alpha) = (self.tr(r).phys(self.s), self.alpha_k());
+        let shows = alpha > 0.0 && rect[2] > 0.0 && rect[3] > 0.0;
+        if !shows {
             return;
         }
-        let k = self.scale_k();
-        self.scene.backdrop = Some(BackdropRequest {
-            rect: self.tr(r).phys(self.s),
-            radius: radius * k * self.s,
-            alpha: self.alpha_k(),
-            layer: self.layer,
+        let radius = radius * self.scale_k() * self.s;
+        self.target().backdrops.push(BackdropRequest {
+            rect,
+            radius,
+            alpha,
             sigma,
             saturation,
         });
     }
 
     fn geo(&mut self) -> &mut LayerGeometry {
-        &mut self.scene.layers[self.layer].geometry
+        &mut self.target().geometry
     }
 
     fn shape(&self, r: Rect, radii: [f32; 4], color: [f32; 4]) -> Shape {
@@ -675,7 +745,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
     pub fn ring(&mut self, r: Rect, radius: f32, width: f32, color: Rgba, above_text: bool) {
         self.rec(|| Op::Ring(r, radius, width, color, above_text));
         let mut sh = self.shape(r, [radius; 4], premul(color));
-        sh.params = [1.0, width * self.s, 0.0, 0.0];
+        sh.params = [1.0, width * self.s * self.scale_k(), 0.0, 0.0];
         if above_text {
             self.geo().over.push(sh);
         } else {
@@ -683,10 +753,15 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         }
     }
 
-    /// Acrylic layer with Skia `Src` semantics: replaces what is below, `under` only feeds the
-    /// antialiased edge. Colours premultiplied. The shape keeps `color` unfaded; the transform
-    /// stack's alpha travels as the record's `opacity`, which the renderer blends the layer in
-    /// with. Nothing is recorded when that opacity is not above zero.
+    /// The window's own background, on the fixed [`LayerId::Base`] layer: an acrylic layer with
+    /// Skia `Src` semantics, which replaces what is below (`under` only feeds the antialiased
+    /// edge). Colours premultiplied. The shape keeps `color` unfaded; the transform stack's alpha
+    /// travels as the record's `opacity`, which the renderer blends the layer in with. Nothing is
+    /// recorded when that opacity is not above zero.
+    ///
+    /// Anywhere else, on a fixed layer above `Base` or inside any overlay, it draws as
+    /// [`Self::frost`] with the same colour and ignores `under`: no draw inside a window replaces
+    /// what is below it, so none can open a hole to the desktop.
     pub fn acrylic(&mut self, r: Rect, radius: f32, color: [f32; 4], under: [f32; 4], noise: bool) {
         self.acrylic_radii(r, [radius; 4], color, under, noise);
     }
@@ -700,6 +775,11 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         under: [f32; 4],
         noise: bool,
     ) {
+        // The branch comes first: a call above the background records one op, the frost's.
+        if self.layer != LayerId::Base as usize || self.slot.is_some() {
+            self.frost_radii(r, radii, color, noise);
+            return;
+        }
         self.rec(|| Op::Acrylic(r, radii, color, under, noise));
         let opacity = self.alpha_k();
         if opacity.is_nan() || opacity <= 0.0 {
@@ -710,6 +790,27 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         shape.under = under;
         shape.params = [0.0, 0.0, 1.0, if noise { 1.0 } else { 0.0 }];
         self.geo().acrylic.push(Acrylic { shape, opacity });
+    }
+
+    /// The tint of a glass surface: premultiplied `color` over what is below, with the noise over
+    /// it when `noise` is set. It draws with the shapes under the text, in record order; a
+    /// [`Self::backdrop`] asked for first gives it something frosted to tint.
+    pub fn frost(&mut self, r: Rect, radius: f32, color: [f32; 4], noise: bool) {
+        self.frost_radii(r, [radius; 4], color, noise);
+    }
+
+    /// [`Self::frost`] with one radius per corner, in [`Self::fill_radii`]'s order.
+    pub fn frost_radii(&mut self, r: Rect, radii: [f32; 4], color: [f32; 4], noise: bool) {
+        self.rec(|| Op::Frost(r, radii, color, noise));
+        let alpha = self.alpha_k();
+        if alpha.is_nan() || alpha <= 0.0 {
+            return;
+        }
+        let mut shape = self.shape(r, radii, color);
+        // The colour stays unfaded and the alpha rides beside it, so the noise fades with it.
+        shape.color = color;
+        shape.params = [0.0, alpha, 2.0, if noise { 1.0 } else { 0.0 }];
+        self.geo().under.push(shape);
     }
 
     /// Records an app-owned draw (the renderer's `CustomDraw` number `slot`) on the
@@ -731,7 +832,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         if x1 <= x0 || y1 <= y0 {
             return;
         }
-        self.scene.layers[self.layer].customs.push(CustomItem {
+        self.target().customs.push(CustomItem {
             slot,
             clip: [x0 as u32, y0 as u32, (x1 - x0) as u32, (y1 - y0) as u32],
         });
@@ -757,7 +858,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         };
         let clip = self.tr(self.clip.unwrap_or(self.window));
         let (x, y) = self.point(x, y);
-        self.scene.layers[self.layer].texts.push(TextItem {
+        self.target().texts.push(TextItem {
             key,
             x,
             y,
@@ -859,7 +960,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
             clip: self.clip_phys(),
             round_clip: RoundClip { rect, radius },
         };
-        self.scene.layers[self.layer].images.push(item);
+        self.target().images.push(item);
     }
 
     /// Text vertically centred in `r` at its left edge (plus `pad`).
@@ -1075,7 +1176,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         let expand = half + 1.0;
         let mut along = 0.0;
         let segs = if closed { n } else { n - 1 };
-        let out = &mut self.scene.layers[self.layer].geometry.strokes;
+        let out = &mut self.target().geometry.strokes;
         for i in 0..segs {
             let j = (i + 1) % n;
             let len = ((p[j][0] - p[i][0]).powi(2) + (p[j][1] - p[i][1]).powi(2)).sqrt();
@@ -1193,6 +1294,47 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         self.emit_fill(&poly, &tris, &boundary, color);
     }
 
+    /// Fills one shape cut into `parts` (logical px) with `color`, below this layer's text: each
+    /// part is a simple polygon, triangulated alone, so the cost stays linear in the parts however
+    /// many there are; `outline` is the shape's one outer loop and alone gets the one-pixel
+    /// antialiasing fringe, so no seam shows where two parts meet. The parts must tile the
+    /// region `outline` bounds (a part outside it draws unfringed). A part the clipper cannot
+    /// finish draws the triangles found, never panics; a part of over 4096 points draws nothing.
+    /// Points that are not finite, in any part or the outline, draw nothing.
+    pub fn fill_joined(&mut self, parts: &[Vec<[f32; 2]>], outline: &[[f32; 2]], color: Rgba) {
+        self.rec(|| Op::FillJoined(parts.to_vec(), outline.to_vec(), color));
+        let finite = |pts: &[[f32; 2]]| pts.iter().flatten().all(|v| v.is_finite());
+        if !finite(outline) || !parts.iter().all(|p| finite(p)) {
+            return;
+        }
+        let mut verts: Vec<[f32; 2]> = Vec::new();
+        let mut tris: Vec<[usize; 3]> = Vec::new();
+        for part in parts {
+            let mut poly = path::dedup_loop(&self.device_points(part));
+            if poly.len() < 3 {
+                continue;
+            }
+            if path::signed_area2(&poly) < 0.0 {
+                poly.reverse();
+            }
+            let at = verts.len();
+            tris.extend(
+                path::ear_clip(&poly)
+                    .into_iter()
+                    .map(|t| [t[0] + at, t[1] + at, t[2] + at]),
+            );
+            verts.extend(poly);
+        }
+        let ring = path::dedup_loop(&self.device_points(outline));
+        if tris.is_empty() || ring.len() < 3 {
+            return;
+        }
+        let at = verts.len();
+        let boundary: Vec<usize> = (at..at + ring.len()).collect();
+        verts.extend(ring);
+        self.emit_fill(&verts, &tris, &boundary, color);
+    }
+
     /// Fills the circular sector of `radius` about `center` (logical px) from angle `start` over
     /// `sweep`, with the angle convention of [`Self::arc`], as one fan below this layer's text:
     /// one pass, so no seam shows at the centre. A `sweep` of 2π or more is the whole disc. A
@@ -1272,7 +1414,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
             .collect();
         // Coordinates near the f32 limit overflow in the fringe's arithmetic: draw nothing.
         if made.iter().all(|v| v.pos.iter().all(|c| c.is_finite())) {
-            self.scene.layers[self.layer].geometry.fills.extend(made);
+            self.target().geometry.fills.extend(made);
         }
     }
 }
@@ -1376,6 +1518,87 @@ mod tests {
             assert!(p.scene.layers[0].customs.is_empty());
             assert_eq!(p.scene.layers[2].customs.len(), 1);
             assert_eq!(p.scene.layers[2].customs[0].slot, 1);
+        });
+    }
+
+    /// The slots of the custom items of `layers`, in order.
+    fn slots(layers: &[&crate::scene::Layer]) -> Vec<usize> {
+        let items = layers.iter().flat_map(|l| &l.customs);
+        items.map(|c| c.slot).collect()
+    }
+
+    #[test]
+    fn overlays_draw_in_tag_order_whatever_order_they_drew_in() {
+        with_painter(|p| {
+            let r = Rect::new(0.0, 0.0, 10.0, 10.0);
+            p.enter(LayerId::Modal, 7);
+            p.custom(7, r);
+            p.enter(LayerId::Modal, 5);
+            p.custom(5, r);
+            p.enter(LayerId::Toast, 0);
+            p.custom(9, r);
+            p.enter(LayerId::Modal, 0);
+            p.custom(1, r);
+            assert_eq!(p.scene.overlays.len(), 2);
+            let order = p.scene.in_order();
+            assert_eq!(order.len(), crate::scene::LAYER_COUNT + 2);
+            assert_eq!(slots(&order), [1, 5, 7, 9]);
+            let modal = p.scene.merged(LayerId::Modal);
+            assert_eq!(slots(&[&modal]), [1, 5, 7]);
+            assert_eq!(slots(&[&p.scene.layers[LayerId::Modal as usize]]), [1]);
+        });
+    }
+
+    #[test]
+    fn an_overlay_keeps_one_layer_and_the_painter_state_carries_it() {
+        with_painter(|p| {
+            let r = Rect::new(0.0, 0.0, 10.0, 10.0);
+            p.enter(LayerId::Popup, 3);
+            p.custom(1, r);
+            let parent = p.save_state();
+            p.enter(LayerId::Popup, 4);
+            p.custom(2, r);
+            p.restore_state(parent);
+            p.custom(3, r);
+            p.enter(LayerId::Popup, 3);
+            p.custom(4, r);
+            assert_eq!(p.scene.overlays.len(), 2);
+            assert_eq!(slots(&[&p.scene.overlays[0].layer]), [1, 3, 4]);
+            assert_eq!(slots(&[&p.scene.overlays[1].layer]), [2]);
+            // `on` leaves the overlay for the fixed layer.
+            p.on(LayerId::Popup);
+            p.custom(5, r);
+            assert_eq!(slots(&[&p.scene.layers[LayerId::Popup as usize]]), [5]);
+            assert_eq!(slots(&[&p.scene.overlays[0].layer]), [1, 3, 4]);
+        });
+    }
+
+    #[test]
+    fn an_exit_draws_on_its_overlays_layer_with_its_hits_suppressed() {
+        with_painter(|p| {
+            let r = Rect::new(0.0, 0.0, 10.0, 10.0);
+            p.enter_closing(LayerId::Popup, 3);
+            p.custom(1, r);
+            p.hit(r, 1);
+            assert_eq!(p.scene.overlays[0].tag, 3);
+            assert_eq!(slots(&[&p.scene.overlays[0].layer]), [1]);
+            assert_eq!(p.hit_meta(), [(LayerId::Popup as usize, SUPPRESSED)]);
+        });
+    }
+
+    #[test]
+    fn a_backdrop_stays_with_the_layer_it_was_asked_on() {
+        with_painter(|p| {
+            let r = Rect::new(0.0, 0.0, 10.0, 10.0);
+            p.enter(LayerId::Popup, 7);
+            p.backdrop(r, 7.0);
+            p.enter(LayerId::Popup, 5);
+            p.backdrop(r, 5.0);
+            p.on(LayerId::Page);
+            p.backdrop(r, 1.0);
+            let radii: Vec<f32> = p.scene.backdrops().map(|b| b.radius / 2.0).collect();
+            assert_eq!(radii, [1.0, 5.0, 7.0], "draw order");
+            assert_eq!(p.scene.floor(), crate::scene::SCENE_LAYERS);
         });
     }
 }

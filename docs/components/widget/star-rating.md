@@ -46,9 +46,9 @@ Instrument: Wane has no star component: `git grep -i star` over `docs/ui/compone
 | empty star | `fg_tertiary` glyph | [L src/Lunegit.Desktop/Controls/StarRatingControl.axaml:31-33] |
 | filled star | warning-tone glyph | [L src/Lunegit.Desktop/Controls/StarRatingControl.axaml:28-30] |
 | hover (star) | `surface_hover` behind that star, radius 4 | [L src/Lunegit.Desktop/Controls/StarRatingControl.axaml:21-23] |
-| pressed | not styled by Lunegit (Fluent default); open | [L src/Lunegit.Desktop/Controls/StarRatingControl.axaml:8-24] |
-| focus-visible | not styled by Lunegit (Fluent default); open | [L src/Lunegit.Desktop/Controls/StarRatingControl.axaml:8-24] |
-| disabled | not styled by Lunegit; open | [L src/Lunegit.Desktop/Controls/StarRatingControl.axaml:8-24] |
+| pressed | `surface_active` fill behind that star (the toolkit's; Lunegit styles none) | [R crates/lune-ui-core/src/widgets/star_rating.rs:77] |
+| focus-visible | the edge ring, radius 4 (the toolkit's; Lunegit styles none) | [R crates/lune-ui-core/src/widgets/star_rating.rs:116] |
+| disabled | inert: the stars take no click or key and carry `Disabled` | [R crates/lune-ui-core/src/widgets/star_rating.rs:151,177,203] |
 
 ### Transitions
 

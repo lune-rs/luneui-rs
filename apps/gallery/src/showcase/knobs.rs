@@ -248,7 +248,7 @@ mod tests {
             let pane = SCENE_LAYOUT.pane;
             let inside = |r: Rect| pane.contains((r.x + r.w / 2.0, r.y + r.h / 2.0));
             let mut out = Vec::new();
-            for layer in &self.last.0.layers {
+            for layer in self.last.0.in_order() {
                 let g = &layer.geometry;
                 let acrylic = g.acrylic.iter().map(|a| &a.shape);
                 for s in g.under.iter().chain(&g.over).chain(acrylic) {

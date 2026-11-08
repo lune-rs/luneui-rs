@@ -44,7 +44,7 @@ fn base() -> Live {
         size: SIZE,
         open: true,
         stop_at: None,
-        surface: Surface::Panel,
+        surface: Surface::Glass,
     }
 }
 
@@ -74,13 +74,6 @@ fn clamped() -> Box<dyn PageState> {
     })
 }
 
-fn glass() -> Box<dyn PageState> {
-    Box::new(Live {
-        surface: Surface::Glass,
-        ..base()
-    })
-}
-
 fn closing() -> Box<dyn PageState> {
     Box::new(Live {
         stop_at: Some(STOP_AT),
@@ -96,11 +89,7 @@ const ANCHORS: [(&str, Rect); 3] = [
 ];
 
 /// The surfaces the knob offers, in the order shown.
-const SURFACES: [(&str, Surface); 3] = [
-    ("Panel", Surface::Panel),
-    ("Glass", Surface::Glass),
-    ("None", Surface::None),
-];
+const SURFACES: [(&str, Surface); 2] = [("Glass", Surface::Glass), ("None", Surface::None)];
 
 /// The page plays the app: it owns `open` and the anchor.
 struct Live {
@@ -217,8 +206,6 @@ const SCENES: &[UiScene] = &[
     ),
     // The open is `fast` (180 ms): half way at 90 ms.
     scene("popover-opening", 2, below, &[], 90, Expect::Moving),
-    // The glass surface of the menu: the blurred page under a translucent fill.
-    scene("popover-glass", 2, glass, &[], 500, Expect::Settled),
 ];
 
 /// What the bench replays: open from the button, Escape, reopen, press outside.

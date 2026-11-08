@@ -5,11 +5,14 @@
 //! same, but a value wraps at the column and its row is the text plus 2 px above and below.
 //! Stacked: two columns of cells, the key (11 on a 16 px line, tertiary) over the value (13 mono on
 //! a 20 px line), 12 px between rows. Values are [selectable](super::selectable): the keys and
-//! the rest of a row take no input.
+//! the rest of a row take no input, except the optional [copy control](KvOptions::copy).
 
 use std::hash::Hash;
+use std::time::Duration;
 
+use super::code_block::{COPY_GAP, COPY_SIDE, CopyControl};
 use crate::access::{Node, Role, Value};
+use crate::motion::Time;
 use crate::paint::{Painter, Rect};
 use crate::text::{Spec, Style};
 use crate::theme::Theme;
@@ -45,6 +48,27 @@ pub struct KvOptions {
     pub mode: KvMode,
     /// Values in the mono face (ids, paths, figures). The stacked mode is always mono.
     pub mono: bool,
+    /// Each row shows a copy control at its right end while the pointer is on the row or focus is
+    /// in it; a click puts that row's value on the clipboard and the control shows a check mark
+    /// for [`COPY_FEEDBACK_MS`]. The value's room narrows by the control. Off, nothing moves.
+    pub copy: bool,
+}
+
+/// How long the check mark shows after a row's copy, in milliseconds of app time.
+pub const COPY_FEEDBACK_MS: u64 = 1_500;
+
+/// The room the copy control takes from a value's width: the control and the gap before it, or
+/// nothing with `copy` off.
+fn copy_room(opts: &KvOptions) -> f32 {
+    if opts.copy { COPY_SIDE + COPY_GAP } else { 0.0 }
+}
+
+/// What a row keeps for its copy control: when the check mark began, and the value it copied (a
+/// row whose value changed shows no check mark).
+#[derive(Debug, Default)]
+struct RowCopy {
+    at: Option<Time>,
+    value: String,
 }
 
 /// The key text's style at `size` on the same 20 px line.
@@ -130,7 +154,7 @@ pub(crate) fn height_keyed<H: Copy + PartialEq>(
                 + LINE
         }
         KvMode::Wrap => {
-            let value_w = (w - key_column(p, pairs, key_size) - GAP).max(0.0);
+            let value_w = (w - key_column(p, pairs, key_size) - GAP - copy_room(opts)).max(0.0);
             let style = value_style(&p.theme, opts.mono);
             pairs
                 .iter()
@@ -174,8 +198,11 @@ impl Ui<'_> {
             key_column(self.painter(), pairs, key_size)
         };
         let col_w = ((rect.w - GAP) / 2.0).max(0.0);
+        // The stacked cell's value is narrowed by the control, its key is not.
+        let cell_value_w = (col_w - copy_room(opts)).max(0.0);
         let value_x = rect.x + key_w + GAP;
-        let value_w = (rect.w - key_w - GAP).max(0.0);
+        let room = copy_room(opts);
+        let value_w = (rect.w - key_w - GAP - room).max(0.0);
 
         self.scope(key, |ui| {
             let mut y = rect.y;
@@ -193,13 +220,20 @@ impl Ui<'_> {
                         };
                         let key_spec = ui.painter().elide(&Spec::plain(*k, ks), col_w);
                         let vs = value_style(&t, true);
-                        let val_spec = ui.painter().elide(&Spec::plain(*v, vs), col_w);
+                        let val_spec = ui.painter().elide(&Spec::plain(*v, vs), cell_value_w);
                         let cell = Rect::new(x, top, col_w, STACKED_KEY_LINE + LINE);
                         ui.node_container(Node::new(gid, Role::Group, k, cell), |ui| {
                             let kr = ui.painter().text(&key_spec, x, top);
                             key_node(ui, gid, k, Rect::new(x, top, kr.0, kr.1));
-                            let vr = Rect::new(x, top + STACKED_KEY_LINE, col_w, LINE);
+                            let vr = Rect::new(x, top + STACKED_KEY_LINE, cell_value_w, LINE);
                             ui.selectable_named("value", vr, &val_spec, v, k);
+                            let at = Rect::new(
+                                x + col_w - COPY_SIDE,
+                                top + STACKED_KEY_LINE + (LINE - COPY_SIDE) / 2.0,
+                                COPY_SIDE,
+                                COPY_SIDE,
+                            );
+                            ui.row_copy(opts, cell, at, k, v);
                         });
                         bottom = bottom.max(top + STACKED_KEY_LINE + LINE);
                     } else {
@@ -218,6 +252,13 @@ impl Ui<'_> {
                             key_node(ui, gid, k, Rect::new(rect.x, top, kr.0, kr.1));
                             let vr = Rect::new(value_x, top, value_w, text_h);
                             ui.selectable_named("value", vr, &val_spec, v, k);
+                            let at = Rect::new(
+                                rect.right() - COPY_SIDE,
+                                top + (LINE - COPY_SIDE) / 2.0,
+                                COPY_SIDE,
+                                COPY_SIDE,
+                            );
+                            ui.row_copy(opts, cell, at, k, v);
                         });
                         y += row_h;
                         bottom = y;
@@ -226,6 +267,40 @@ impl Ui<'_> {
             }
             bottom - rect.y
         })
+    }
+}
+
+impl Ui<'_> {
+    /// A row's copy control, under the row's scope: `at` is its rect, `cell` the row. It shows
+    /// while the pointer is on the row or focus is on the row's value or on the control, and while
+    /// the check mark shows; hidden, it is still a Tab stop, which shows it.
+    fn row_copy(&mut self, opts: &KvOptions, cell: Rect, at: Rect, key: &str, value: &str) {
+        if !opts.copy {
+            return;
+        }
+        let id = self.scope_id();
+        let mut mem = std::mem::take(self.persistent::<RowCopy>(id));
+        if mem.value != value {
+            mem.value.clear();
+            mem.value.push_str(value);
+            mem.at = None;
+        }
+        let focus = self.focus_state().0;
+        let within = self.pointer_in(cell)
+            || focus == Some(self.id("copy"))
+            || focus == Some(self.id("value"));
+        let name = self.tr_fmt("luneui.kv-list.copy", &[&key]);
+        let said = self.tr("luneui.kv-list.copied");
+        let control = CopyControl {
+            at,
+            name: &name,
+            said,
+            idle: f32::from(u8::from(within)),
+            enabled: !value.is_empty(),
+        };
+        let hold = Duration::from_millis(COPY_FEEDBACK_MS);
+        self.copy_control(&control, &mut mem.at, hold, value);
+        *self.persistent::<RowCopy>(id) = mem;
     }
 }
 
@@ -257,19 +332,22 @@ mod tests {
         let mut h = UiHarness::new((600.0, 400.0));
         h.at_ms(0).frame(|ui| {
             for mode in [KvMode::Default, KvMode::Stacked, KvMode::Wrap] {
-                for mono in [false, true] {
-                    let opts = KvOptions { mode, mono };
+                for (mono, copy) in [(false, false), (true, false), (false, true), (true, true)] {
+                    let opts = KvOptions { mode, mono, copy };
                     for w in [90.0, 200.0, 312.0, 480.0] {
                         for n in [0, 1, 2, 4, 5] {
                             let pairs = &pairs[..n];
                             let measured = height(ui.painter(), pairs, &opts, w);
                             let drawn = ui.kv_list(
-                                format!("{mode:?}-{mono}-{w}-{n}"),
+                                format!("{mode:?}-{mono}-{copy}-{w}-{n}"),
                                 Rect::new(10.0, 10.0, w, 0.0),
                                 pairs,
                                 &opts,
                             );
-                            assert_eq!(measured, drawn, "{mode:?} mono {mono} width {w} pairs {n}");
+                            assert_eq!(
+                                measured, drawn,
+                                "{mode:?} mono {mono} copy {copy} width {w} pairs {n}"
+                            );
                         }
                     }
                 }

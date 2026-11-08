@@ -13,8 +13,8 @@ use lune_ui_core::motion::{MotionTier, conformance};
 use lune_ui_core::paint::{LayerId, Rect};
 use lune_ui_core::scene::{Scene, Shape, TextItem};
 use lune_ui_core::shortcuts::{Binding, Chord, CommandId, Scope};
-use lune_ui_core::testing::{ScriptedInput, UiHarness};
-use lune_ui_core::text::{Spec, Style};
+use lune_ui_core::testing::{FakeText, ScriptedInput, UiHarness};
+use lune_ui_core::text::{Spec, Style, TextSystem};
 use lune_ui_core::theme::DARK;
 use lune_ui_core::ui::{OverlayOptions, Sense, Ui, WidgetId};
 use lune_ui_core::widgets::button::ButtonKind;
@@ -766,7 +766,11 @@ fn an_access_default_action_sorts_on_a_header_and_selects_on_a_row() {
 // Cells.
 
 fn texts(scene: &Scene) -> Vec<TextItem> {
-    scene.layers.iter().flat_map(|l| l.texts.clone()).collect()
+    scene
+        .in_order()
+        .into_iter()
+        .flat_map(|l| l.texts.clone())
+        .collect()
 }
 
 fn under(scene: &Scene) -> Vec<Shape> {
@@ -920,6 +924,91 @@ fn a_wrapping_row_is_as_tall_as_its_tallest_cell_and_never_under_28() {
     assert_eq!(y(&r2, 2), y(&r2, 1) + h_of(&r2, 1), "rows stack on it");
     assert_eq!(r2.out.repaint, Repaint::Idle, "the measure settles");
     let _ = r;
+}
+
+/// A row's height follows the row, not its place: sorted, the rows already measured are placed as
+/// the settled frame places them, on the first frame, and the frame asks for no catch-up.
+#[test]
+fn a_sort_places_measured_rows_at_their_own_heights_on_the_first_frame() {
+    let text = "x".repeat(40);
+    let lines = (40.0f32 * 6.5 / 86.0).ceil();
+    let tall = lines * 20.0 + 2.0 * WRAP_PAD;
+    let mut s = setup(4);
+    s.wrap = true;
+    let mut h = harness();
+    let mut cell = |ui: &mut Ui<'_>, c: &CellCtx| {
+        // Key 1 is the tall row, key 2 a short wrapped one, wherever they are sorted.
+        if c.column == 3 && c.key.0 == 1 {
+            Cell::text(text.clone()).wrapped()
+        } else if c.column == 3 && c.key.0 == 2 {
+            Cell::text("short").wrapped()
+        } else {
+            plain(ui, c)
+        }
+    };
+    for _ in 0..3 {
+        frame_with(&mut h, &s, &mut cell);
+    }
+    let h_of = |r: &Run, k: u64| r.out.tree.get(row_id(k)).expect("row").bounds.h;
+    let y_of = |r: &Run, k: u64| r.out.tree.get(row_id(k)).expect("row").bounds.y;
+    let settled = frame_with(&mut h, &s, &mut cell);
+    assert_eq!(h_of(&settled, 1), tall, "instrument: the row is tall");
+    assert_eq!(settled.out.repaint, Repaint::Idle);
+    // The app sorts: the same rows the other way round.
+    s.reverse = true;
+    let first = frame_with(&mut h, &s, &mut cell);
+    let after = frame_with(&mut h, &s, &mut cell);
+    for k in 0..4 {
+        assert_eq!(h_of(&first, k), h_of(&after, k), "row {k}'s height");
+        assert_eq!(y_of(&first, k), y_of(&after, k), "row {k}'s place");
+    }
+    assert_eq!(h_of(&first, 1), tall);
+    assert_eq!(
+        first.out.repaint,
+        Repaint::Idle,
+        "no catch-up for rows already measured"
+    );
+}
+
+/// A wrapping number cell right-aligns every visual line against the cell's right edge.
+#[test]
+fn a_wrapping_num_cell_right_aligns_each_visual_line() {
+    let text = "aaa bbb cccc dd eeeee ff gggg h";
+    let mut s = setup(2);
+    s.wrap = true;
+    let mut h = harness();
+    let mut cell = |ui: &mut Ui<'_>, c: &CellCtx| {
+        if c.column == 2 && c.key.0 == 1 {
+            Cell::text(text).wrapped()
+        } else {
+            plain(ui, c)
+        }
+    };
+    frame_with(&mut h, &s, &mut cell);
+    let r = frame_with(&mut h, &s, &mut cell);
+    let right = r
+        .cells
+        .iter()
+        .find(|c| c.column == 2 && c.key.0 == 1)
+        .expect("the cell")
+        .rect;
+    let style = mono_style(DARK.fg_primary);
+    let spec = Spec::plain(text, style).wrapped(right.w);
+    let lines = FakeText.lines(&spec, 1.0);
+    assert!(lines.len() >= 3, "instrument: it wraps: {lines:?}");
+    let mut ys = Vec::new();
+    for l in &lines {
+        let row = text[l.start..l.end].trim();
+        let one = Spec::plain(row, style);
+        let seen = find(&r.scene, &one, 1.0).unwrap_or_else(|| panic!("line {row:?} is drawn"));
+        let w = FakeText.measure(&one, 1.0).0;
+        assert_eq!(seen.x + w, right.right(), "{row:?} ends at the cell's edge");
+        ys.push(seen.y);
+    }
+    assert!(
+        ys.windows(2).all(|w| w[1] > w[0]),
+        "one under the other: {ys:?}"
+    );
 }
 
 #[test]
@@ -1116,6 +1205,39 @@ fn a_cursor_row_outline_sits_inside_the_slot() {
 }
 
 // The header's look and motion.
+
+/// The alpha of the header's focus ring in `r`, 0 when none is drawn.
+fn header_ring_alpha(r: &Run) -> f32 {
+    under(&r.scene)
+        .into_iter()
+        .filter(|sh| sh.params[0] == 1.0 && sh.rect[1] < TABLE.y + HEADER)
+        .map(|sh| sh.color[3])
+        .fold(0.0, f32::max)
+}
+
+/// A header's focus ring fades in like every other ring (`FOCUS`), by the cell's own id.
+#[test]
+fn a_header_ring_fades_with_the_focus_motion() {
+    let s = setup(100);
+    let mut h = harness();
+    h.at_ms(1000);
+    focus_header(&mut h, &s);
+    h.at_ms(1060);
+    let mid = header_ring_alpha(&run(&mut h, &s));
+    h.at_ms(2000);
+    let settled = header_ring_alpha(&run(&mut h, &s));
+    assert!(settled > 0.0, "instrument: the ring settles drawn");
+    assert!(
+        mid > 0.0 && mid < settled,
+        "between nothing and the settled {settled}: {mid}"
+    );
+    // And out again: focus leaves the header.
+    click(&mut h, over_row(1));
+    run(&mut h, &s);
+    h.at_ms(2060);
+    let out = header_ring_alpha(&run(&mut h, &s));
+    assert!(out > 0.0 && out < settled, "fading out: {out}");
+}
 
 #[test]
 fn the_sorted_header_is_secondary_with_an_arrow_four_px_after_the_text() {

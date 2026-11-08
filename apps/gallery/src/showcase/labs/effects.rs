@@ -1,6 +1,6 @@
 //! The effects lab: what the window chrome does besides the glass layers, drawn live through
 //! `ui.painter()`: the custom-draw slot (app-owned GPU drawing clipped to a rect), a window with
-//! glass, with glass off and unfocused, and the tab outline that wraps the active tab and the
+//! glass and with glass off, and the tab outline that wraps the active tab and the
 //! card body.
 
 use lune_ui::chrome::{self, TabSpan};
@@ -39,12 +39,8 @@ const TAB_W: f32 = 150.0;
 /// The height of the tab header, and the size of the figure under it.
 const SEAM: f32 = 32.0;
 const FIGURE: (f32, f32) = (620.0, 180.0);
-/// The three windows: the label, glass on, focused.
-const WINDOWS: [(&str, bool, bool); 3] = [
-    ("Glass, focused", true, true),
-    ("Glass off", false, true),
-    ("Unfocused", true, false),
-];
+/// The two windows: the label, glass on.
+const WINDOWS: [(&str, bool); 2] = [("Glass", true), ("Glass off", false)];
 const WINDOW: (f32, f32) = (200.0, 140.0);
 const WINDOW_GAP: f32 = 16.0;
 
@@ -102,7 +98,7 @@ impl PageState for Effects {
         );
         {
             let p = ui.painter();
-            stage.on(p, LayerId::Page);
+            p.on(LayerId::Page);
             let n = (stripes.w / 20.0).ceil() as usize;
             for i in 0..n {
                 let c = if i % 2 == 0 {
@@ -117,10 +113,10 @@ impl PageState for Effects {
                     c,
                 );
             }
-            stage.on(p, LayerId::Popup);
-            for (i, (name, glass, focused)) in WINDOWS.iter().enumerate() {
+            p.on(LayerId::Popup);
+            for (i, (name, glass)) in WINDOWS.iter().enumerate() {
                 let r = window(x, y, i);
-                card_in(p, &t, *glass, *focused, r);
+                card_in(p, &t, *glass, r);
                 let title = Spec::plain(*name, Style::ui(t.font_base, t.fg_primary).medium());
                 p.text(&title, r.x + 14.0, r.y + 14.0);
                 let note = Spec::plain(
@@ -129,7 +125,7 @@ impl PageState for Effects {
                 );
                 p.text(&note, r.x + 14.0, r.y + 38.0);
             }
-            stage.on(p, LayerId::Base);
+            p.on(LayerId::Base);
         }
 
         heading(ui, "TAB OUTLINE", x, y + 196.0);
@@ -186,33 +182,32 @@ mod tests {
     use super::super::rig::{Themed, player};
     use super::*;
     use crate::page::Ev;
-    use lune_ui::color::premul;
-    use lune_ui::lunegit_dark::{self, THEME};
+    use lune_ui::lunegit_dark::THEME;
     use lune_ui::testing::FakeText;
 
     #[test]
-    fn the_slot_and_the_three_windows_are_drawn() {
+    fn the_slot_and_the_two_windows_are_drawn() {
         let mut p = player("lab-effects", Box::new(Themed(live(), THEME)));
         p.frame(&mut FakeText, 0, &[]).expect("frame");
         let (scene, _) = p.frame(&mut FakeText, 16, &[]).expect("frame");
-        let customs: usize = scene.layers.iter().map(|l| l.customs.len()).sum();
+        let customs: usize = scene.in_order().into_iter().map(|l| l.customs.len()).sum();
         assert_eq!(customs, 1, "the custom-draw slot");
-        let windows = &scene.layers[LayerId::Popup as usize].geometry.acrylic;
-        assert_eq!(windows.len(), 3);
-        // Glass on shows the glass layer; glass off is opaque; unfocused is the solid fallback
-        // without noise.
-        assert_eq!(windows[0].shape.color, THEME.glass.card.premultiplied());
+        let popup = scene.merged(LayerId::Popup);
+        let windows: Vec<_> = popup
+            .geometry
+            .under
+            .iter()
+            .filter(|s| s.is_frost())
+            .collect();
+        assert_eq!(windows.len(), 2);
+        // Glass on shows the glass layer; glass off is opaque.
+        assert_eq!(windows[0].color, THEME.glass.card.premultiplied());
         assert!(
-            (windows[1].shape.color[3] - 1.0).abs() < 1e-4,
+            (windows[1].color[3] - 1.0).abs() < 1e-4,
             "{:?}",
-            windows[1].shape.color
+            windows[1].color
         );
-        assert_eq!(
-            windows[2].shape.color,
-            premul(lunegit_dark::INACTIVE_FALLBACK)
-        );
-        assert_eq!(windows[2].shape.params[3], 0.0);
-        assert_eq!(windows[0].shape.params[3], 1.0);
+        assert_eq!(windows[0].params[3], 1.0);
     }
 
     /// A press on a tab moves the outline's gap under it.
@@ -220,8 +215,8 @@ mod tests {
     fn a_tab_moves_the_outline() {
         let strokes = |scene: &lune_ui::scene::Scene| {
             scene
-                .layers
-                .iter()
+                .in_order()
+                .into_iter()
                 .flat_map(|l| l.geometry.strokes.clone())
                 .collect::<Vec<_>>()
         };

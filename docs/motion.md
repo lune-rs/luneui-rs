@@ -32,7 +32,8 @@ it does not depend on the frame rate [motion.transitions]. Five tokens, no inter
 Not on the scale, by design: the flash highlight (3000 ms, `CubicEaseOut`, an attention cue)
 [L .claude/docs/animation-rules.md:28], the busy-outline loops (2400 ms sweep, 1800 ms breath), and the
 indeterminate progress loop (a 2400 ms trip of the segment under Full, the same 1800 ms breath of the fill
-under Reduced, a static fill under Off [D118]), which are state indicators, not feedback on a user action
+under Reduced, a static fill under Off [D118]), and a shining tab title (an 1800 ms trip of a 48 px band of light
+under Full, the title's breath under Reduced, a fixed mix under Off [D270]), which are state indicators, not feedback on a user action
 [L .claude/docs/animation-rules.md:30-38]. Nothing longer than `slow` animates except those and the spinner
 [L .claude/docs/animation-rules.md:150].
 
@@ -68,7 +69,7 @@ interaction table; the last six are D40 additions.
 | kind | property | default duration | default easing | magnitude | cite |
 |---|---|---|---|---|---|
 | hover | background, foreground, opacity | instant | linear | colour only; no lift or scale (Wane A11) | [L .claude/docs/animation-rules.md:102], [W docs/ui/README.md:92] |
-| press | scale back to 1 on release | fast | quad-out | scale 0.98 | [L .claude/docs/animation-rules.md:95,103], [L src/Lunegit.Desktop/Themes/Animations.axaml:49-60] |
+| press | scale back to 1 on release; the ghost button only (the dialog buttons have none, R4) | fast | quad-out | scale 0.98 | [L .claude/docs/animation-rules.md:95,103], [L src/Lunegit.Desktop/Themes/Animations.axaml:49-60] |
 | focus | border or glow opacity | fast | linear | none | [L .claude/docs/animation-rules.md:104] |
 | appear | opacity 0 to 1 and translateY 6-8 px to 0 | base | quad-out | slide 6-8 px | [L .claude/docs/animation-rules.md:94,105] |
 | dismiss | opacity 1 to 0, optionally a small translate | fast or base | quad-in | slide 6-8 px at most | [L .claude/docs/animation-rules.md:94,106] |
@@ -106,6 +107,9 @@ catalogue tables cite one place.
 | toast expand | expand | the toast's height to show its log; text wrapped once at the target width | base | sine-in-out | snap | [D40], [D146] |
 | menu row hover | hover | the row's fill | instant | linear | keep | [D40], [D141] |
 | tree expand | expand | the child block's clip height; one block in motion, another toggle snaps it | base | sine-in-out | snap | [D40], [D151] |
+| tree mark turn | expand | the disclosure mark's angle, 0 deg closed to 90 deg open, about its centre; it is the block's own fraction, so it lands with the rows; with no block (Reduced, Off, an app change of several rows) the mark is at 0 or 90 deg, no transform | base | sine-in-out | snap | [D40], [D271] |
+| tree guide fade | hover | the `OnHover` guides' opacity, 0 with the pointer off the tree, 1 on it | instant | linear | keep | [D40], [D271] |
+| tree chevron hover | hover | the `Chevron` mark's colour, `fg_tertiary` to `fg_secondary` on row hover | instant | linear | keep | [D40], [D271] |
 
 The expand duration is the kind's default, `base` (the entry's question on it is answered: no
 separate token). Off snaps every row above.

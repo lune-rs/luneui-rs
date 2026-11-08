@@ -109,15 +109,15 @@ impl PageState for Glass {
             ("Card", t.glass.card),
         ];
         let [stripe_band, colour_band] = bands(x, y);
-        // A glass layer replaces what is under it within its own layer, so the content is on the
-        // page layer (over the card's own glass) and the panels on the popup layer above it.
+        // The content is on the page layer (over the card's own glass) and the panels on the popup
+        // layer above it, where an acrylic call is a frost over the content.
         let under = premul([0x70, 0x70, 0x70, 0xFF]);
         {
             let p = ui.painter();
-            stage.on(p, LayerId::Page);
+            p.on(LayerId::Page);
             stripes(p, stripe_band);
             colours(p, colour_band);
-            stage.on(p, LayerId::Popup);
+            p.on(LayerId::Popup);
             for band in [stripe_band, colour_band] {
                 for (i, (name, layer)) in layers.iter().enumerate() {
                     let r = panel(band, i, self.panel_h);
@@ -127,7 +127,7 @@ impl PageState for Glass {
                 }
             }
             // Back on the layer the card is on, for the text and widgets that follow.
-            stage.on(p, LayerId::Base);
+            p.on(LayerId::Base);
         }
         heading(ui, "THE THREE LAYERS OVER BLACK AND WHITE", x, y);
         heading(ui, "AND OVER COLOUR", x, y + 186.0);
@@ -182,13 +182,19 @@ mod tests {
         p.frame(&mut FakeText, 16, &[]).expect("frame").0
     }
 
+    /// The colours of the frosts on the popup layer.
+    fn frosts(scene: &lune_ui::scene::Scene) -> Vec<[f32; 4]> {
+        let popup = scene.merged(LayerId::Popup);
+        let frosts = popup.geometry.under.iter().filter(|s| s.is_frost());
+        frosts.map(|s| s.color).collect()
+    }
+
     /// Six panels on the popup layer, in the three layers' colours, each over a band of content on
     /// the page layer.
     #[test]
     fn the_three_layers_are_drawn_over_content() {
         let scene = scene_under(THEME);
-        let page = &scene.layers[LayerId::Popup as usize].geometry.acrylic;
-        let colours: Vec<[f32; 4]> = page.iter().map(|a| a.shape.color).collect();
+        let colours = frosts(&scene);
         assert_eq!(colours.len(), 6);
         for (i, layer) in [THEME.glass.window, THEME.glass.panel, THEME.glass.card]
             .iter()
@@ -212,9 +218,9 @@ mod tests {
         theme.glass.panel.tint = [9, 80, 200, 255];
         theme.glass.panel.material_opacity = 0.2;
         let scene = scene_under(theme);
-        let page = &scene.layers[LayerId::Popup as usize].geometry.acrylic;
-        assert_eq!(page[1].shape.color, theme.glass.panel.premultiplied());
-        assert_ne!(page[1].shape.color, THEME.glass.panel.premultiplied());
+        let page = frosts(&scene);
+        assert_eq!(page[1], theme.glass.panel.premultiplied());
+        assert_ne!(page[1], THEME.glass.panel.premultiplied());
     }
 
     #[test]

@@ -24,11 +24,7 @@ pub(crate) const OPTIONS: [(&str, bool); 4] = [
 
 /// The dialog glass of the house look.
 pub(crate) fn glass() -> DialogGlass {
-    DialogGlass {
-        panel: lunegit_dark::PANEL.premultiplied(),
-        fill: lunegit_dark::WINDOW.premultiplied(),
-        noise: true,
-    }
+    DialogGlass::of(&lunegit_dark::THEME)
 }
 
 const STEPS: StepRange = StepRange {
@@ -74,19 +70,20 @@ impl Controls {
 
         heading(ui, "BUTTONS", x, y);
         let by = y + 20.0;
-        let pw = button_width(ui.painter(), "Primary");
-        ui.button(
-            "primary",
-            Rect::new(x, by, pw, 32.0),
-            "Primary",
-            ButtonKind::Primary,
-        );
+        // A pair: the secondary on the left, the primary on its right, as Lunegit's dialogs.
         let sw = button_width(ui.painter(), "Secondary");
         ui.button(
             "secondary",
-            Rect::new(x + pw + 8.0, by, sw, 32.0),
+            Rect::new(x, by, sw, 32.0),
             "Secondary",
             ButtonKind::Secondary,
+        );
+        let pw = button_width(ui.painter(), "Primary");
+        ui.button(
+            "primary",
+            Rect::new(x + sw + 8.0, by, pw, 32.0),
+            "Primary",
+            ButtonKind::Primary,
         );
 
         let y = y + 68.0;

@@ -42,7 +42,7 @@ Conflicts: none between sources (Wane has no toast entry). The layer order: Lune
 ### Anatomy
 
 - Stack: bottom-right, margin 16 on the right and bottom; items spaced 8 [L src/Lunegit.Desktop/MainWindow.axaml:273-281].
-- Toast: min width 300; width follows expansion; padding 12; radius 8; fill `ToastBackground` #E6181818; border `ToastBorder` #33FFFFFF [L src/Lunegit.Desktop/MainWindow.axaml:285-291], [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:333-334].
+- Toast: min width 300; width follows expansion; padding 12; radius 8; the card is the toolkit's one glass surface (`glass_surface`: the blurred scene under it, `menu_glass` frosted over it, a 1 px `menu_popup_border` ring), not Lunegit's `ToastBackground` #E6181818 and `ToastBorder` #33FFFFFF (those theme keys are unknown now, D8) [L src/Lunegit.Desktop/MainWindow.axaml:285-291].
 - Accent by type: info #61AFEF, success #4CAF50, warning #E2B93D, error #E06C75, loading #61AFEF [L src/Lunegit.Desktop/Themes/DarkTheme.axaml:335-339].
 - Message: wrapped text, base size, `ForegroundPrimary` [L src/Lunegit.Desktop/MainWindow.axaml:318-323].
 - Cancel control: shown only on cancellable loading toasts [L src/Lunegit.Desktop/MainWindow.axaml:325-330].

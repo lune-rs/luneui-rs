@@ -38,7 +38,7 @@ use crate::input::{
     RawInput, Repaint, ScrollDelta,
 };
 use crate::motion::{MotionTier, Time};
-use crate::paint::{Painter, Rect, Xform};
+use crate::paint::{Painter, Rect, SUPPRESSED};
 use crate::scene::{LayerId, Scene};
 use crate::shortcuts::{CommandId, Scope, Shortcuts};
 use crate::strings::{ArgFormat, StringTable};
@@ -47,7 +47,7 @@ use crate::theme::Theme;
 
 use access::Routed;
 use keys::KeyPress;
-use overlay::{Dismissal as D, SUPPRESSED};
+use overlay::Dismissal as D;
 use pointer::{Ctx, HitRecord, PointerFrame, topmost};
 
 /// The opacity of a disabled subtree.
@@ -86,6 +86,8 @@ struct Registration {
     enabled: bool,
     /// The axes a scroll region is live on, `(x, y)` (D178).
     scroll_axes: (bool, bool),
+    /// The [`Ui::tab_scope`] order it was registered in.
+    order: i32,
 }
 
 /// An active overlay as the previous frame left it, for begin's input rules.
@@ -154,6 +156,8 @@ pub struct Ui<'a> {
     watch: Vec<(WidgetId, Rect)>,
     /// The regions registered now are no Tab stops ([`Self::off_tab_order`]).
     off_tab_order: bool,
+    /// The [`Ui::tab_scope`] order of the regions registered now.
+    tab_order: i32,
     tree: SemanticTree,
     /// Indices in `tree` of the open containers.
     containers: Vec<usize>,
@@ -227,6 +231,8 @@ impl<'a> Ui<'a> {
                 o.phase = overlay::RecPhase::Open;
             }
         }
+        // A hold is for one frame: the widget that wants it renews it as it draws.
+        store.held_scopes.clear();
         let theme_cut = store.last_theme.is_some_and(|t| t != config.theme);
         let active: Vec<Active> = store
             .overlays
@@ -437,13 +443,14 @@ impl<'a> Ui<'a> {
                                 }
                                 store.focus.visible = true;
                             }
-                            Key::Named(_) | Key::Character(_) => {
-                                keys.push(KeyPress::real(FocusEvent::Key {
+                            Key::Named(_) | Key::Character(_) => keys.push(KeyPress::real_while(
+                                FocusEvent::Key {
                                     key: key.clone(),
                                     modifiers: *modifiers,
                                     repeat: *repeat,
-                                }))
-                            }
+                                },
+                                store.pointer.held(),
+                            )),
                             Key::Unidentified => {}
                         }
                     }
@@ -549,6 +556,7 @@ impl<'a> Ui<'a> {
             scroll_into_view: routed.scroll_into_view,
             watch: Vec::new(),
             off_tab_order: false,
+            tab_order: 0,
             tree: SemanticTree::default(),
             containers: Vec::new(),
             node_meta: BTreeMap::new(),
@@ -650,12 +658,13 @@ impl<'a> Ui<'a> {
             if tag == SUPPRESSED {
                 continue;
             }
-            let (sense, enabled, scroll_axes) = match senses.get(i).copied().flatten() {
-                Some(r) => (r.sense, r.enabled, r.scroll_axes),
+            let (sense, enabled, scroll_axes, order) = match senses.get(i).copied().flatten() {
+                Some(r) => (r.sense, r.enabled, r.scroll_axes, r.order),
                 None => (
                     Sense::CLICK,
                     !disabled.iter().any(|d| d.contains(&i)),
                     (true, true),
+                    0,
                 ),
             };
             hits.push(HitRecord {
@@ -666,6 +675,7 @@ impl<'a> Ui<'a> {
                 tag,
                 enabled,
                 scroll_axes,
+                order,
             });
             rects.insert(id, rect);
         }
@@ -677,7 +687,7 @@ impl<'a> Ui<'a> {
                 .focus
                 .chain
                 .iter()
-                .any(|s| store.live_scopes.contains(s))
+                .any(|s| store.live_scopes.contains(s) || store.held_scopes.contains(s))
         {
             store.focus.focused = None;
         }
@@ -820,8 +830,9 @@ impl<'a> Ui<'a> {
     }
 
     /// Whether the pointer is inside `rect`, given in the current drawing space (it goes through
-    /// the clip and the transform stack, as a hit region does), with nothing of a later overlay or
-    /// a higher layer than the current painter context under it. Ignores `enabled` and `Sense`, so
+    /// the clip and the transform stack, as a hit region does), with nothing drawn above the
+    /// current painter context over it: a higher layer, or the same layer and a later overlay (the
+    /// order [`Self::finish`] picks a press target by, so `Outside` is above every modal). Ignores `enabled` and `Sense`, so
     /// it reads true over a disabled anchor, and reads the previous frame's regions.
     pub fn pointer_in(&self, rect: Rect) -> bool {
         self.pointer_over(self.painter.hit_rect(rect))
@@ -840,7 +851,7 @@ impl<'a> Ui<'a> {
             .store
             .prev_hits
             .iter()
-            .any(|h| (h.tag > tag || h.layer > layer) && h.rect.contains(pos))
+            .any(|h| (h.layer, h.tag) > (layer, tag) && h.rect.contains(pos))
     }
 
     /// The frame's raw input (for events a widget handles itself, such as clipboard replies).
@@ -884,6 +895,18 @@ impl<'a> Ui<'a> {
         r
     }
 
+    /// [`Self::keep_alive`] for this frame only: the scope is held by [`Self::hold_focus_in`], so
+    /// it lapses on the first frame its caller does not renew it.
+    pub(crate) fn hold_alive<R>(&mut self, scope: WidgetId, f: impl FnOnce(&mut Self) -> R) -> R {
+        self.store.held_scopes.insert(scope);
+        self.scopes.push(scope);
+        self.alive.push(scope);
+        let r = f(self);
+        self.alive.pop();
+        self.scopes.pop();
+        r
+    }
+
     /// Opens the keep-alive scope `key` without drawing inside it.
     pub fn mark_alive(&mut self, key: impl std::hash::Hash) {
         let id = self.id(key);
@@ -895,6 +918,28 @@ impl<'a> Ui<'a> {
     pub fn end_keep_alive(&mut self, key: impl std::hash::Hash) {
         let id = self.id(key);
         self.store.live_scopes.remove(&id);
+    }
+
+    /// Whether the key focus is on a widget that last registered inside the id scope `scope`.
+    pub(crate) fn focus_within(&self, scope: WidgetId) -> bool {
+        let focus = &self.store.focus;
+        focus.focused.is_some() && focus.scope_path.contains(&scope)
+    }
+
+    /// Keeps the id scope `scope` live for this frame as the keep-alive scope of the focused
+    /// widget inside it: the focus survives the widget going undrawn (D15), and what the scope's
+    /// widgets keep stays. The hold lasts one frame; the caller renews it each frame it draws, so
+    /// a caller that stops drawing lets go on its own. [`Self::release_scope`] ends it early.
+    pub(crate) fn hold_focus_in(&mut self, scope: WidgetId) {
+        self.store.held_scopes.insert(scope);
+        if !self.store.focus.chain.contains(&scope) {
+            self.store.focus.chain.push(scope);
+        }
+    }
+
+    /// Ends a hold on a scope given by id before the frame is over.
+    pub(crate) fn release_scope(&mut self, scope: WidgetId) {
+        self.store.held_scopes.remove(&scope);
     }
 
     /// Registers `rect` as a hit region of `id` on the painter's current layer and returns the
@@ -913,6 +958,7 @@ impl<'a> Ui<'a> {
             sense,
             enabled: self.enabled,
             scroll_axes: (true, true),
+            order: self.tab_order,
         });
         if !self.enabled {
             return Response::inert(id, rect, false);
@@ -927,6 +973,16 @@ impl<'a> Ui<'a> {
                 focus.scope_path = path.to_vec();
             }
         }
+        let r = self.read_response(id, rect);
+        if r.focused || r.scroll_into_view {
+            self.watch.push((id, content_rect));
+        }
+        r
+    }
+
+    /// The frame's reading of `id` for an enabled region at `rect`: the pointer, key focus and
+    /// accessibility state [`Self::interact`] reports, without registering anything.
+    fn read_response(&self, id: WidgetId, rect: Rect) -> Response {
         let p = &self.pointer;
         let mut r = Response::inert(id, rect, true);
         r.hovered = p.hovered == Some(id);
@@ -950,10 +1006,20 @@ impl<'a> Ui<'a> {
         r.focus_visible = r.focused && self.store.focus.visible && self.input.focused;
         r.set_value = self.set_values.get(&id).cloned();
         r.scroll_into_view = self.scroll_into_view.contains(&id);
-        if r.focused || r.scroll_into_view {
-            self.watch.push((id, content_rect));
-        }
         r
+    }
+
+    /// What [`Self::interact`] would report for `id` over `rect` (given in the current drawing
+    /// space), read before the region is registered: for a widget that has to know its state
+    /// before it draws what it must register after (a split's strip sits above its panes, and the
+    /// panes draw the size the strip's input asks for). Registers nothing, and leaves the focus
+    /// path and the watch list alone; the later `interact` finds the same reading.
+    pub(crate) fn peek_response(&self, id: WidgetId, rect: Rect) -> Response {
+        let rect = self.painter.hit_rect(rect);
+        if !self.enabled {
+            return Response::inert(id, rect, false);
+        }
+        self.read_response(id, rect)
     }
 
     /// Runs `f`; with `off` true the regions it registers are no Tab stops: what a virtualized host
@@ -963,6 +1029,20 @@ impl<'a> Ui<'a> {
         self.off_tab_order = outer || off;
         let r = f(self);
         self.off_tab_order = outer;
+        r
+    }
+
+    /// Runs `f`; the regions it registers with [`Self::interact`] carry the Tab order `order`
+    /// (0 outside any scope; a nested scope replaces the outer one). Tab visits the stops of a
+    /// scope (an overlay's own, or the page's) in ascending order, and in registration order
+    /// among stops of one order, so a host can draw its panes in the order it needs and still
+    /// Tab through them in the order the user reads them. Roving groups and modal traps are
+    /// unchanged: an overlay's stops are its own, whatever their order.
+    pub fn tab_scope<R>(&mut self, order: i32, f: impl FnOnce(&mut Self) -> R) -> R {
+        let outer = self.tab_order;
+        self.tab_order = order;
+        let r = f(self);
+        self.tab_order = outer;
         r
     }
 
@@ -1083,13 +1163,7 @@ impl<'a> Ui<'a> {
         }
         self.enabled = false;
         let start = self.painter.hits.len();
-        self.painter.push_xform(Xform {
-            origin: (0.0, 0.0),
-            scale: 1.0,
-            dx: 0.0,
-            dy: 0.0,
-            alpha: DISABLED_ALPHA,
-        });
+        self.painter.push_xform(overlay::disabled_xform());
         let r = f(self);
         self.painter.pop_xform();
         self.disabled.push(start..self.painter.hits.len());

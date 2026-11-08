@@ -493,14 +493,60 @@ fn row_centre(out: &FrameOutput, n: usize) -> (f32, f32) {
 }
 
 #[test]
+fn a_menu_window_in_an_area_starts_at_the_areas_corner_and_the_window_form_is_unchanged() {
+    let (w, h) = size();
+    let rows = rows();
+    let win = (w + 300.0, h + 200.0);
+    let panel = |out: &FrameOutput| {
+        out.tree
+            .nodes
+            .iter()
+            .find(|n| n.role == Role::Menu)
+            .expect("the menu node")
+            .bounds
+    };
+    let area = Rect::new(120.0, 50.0, w, h);
+    let mut ui = UiHarness::new(win);
+    let mut out = FrameOutput::default();
+    for ms in [0, 300] {
+        out = ui
+            .at_ms(ms)
+            .frame(|ui| {
+                ui.menu_window_in(KEY, area, &rows);
+            })
+            .1;
+    }
+    assert_eq!(panel(&out), Rect::new(120.0, 50.0, w, h));
+
+    // The window form is the same call with the painter's window.
+    let window = Rect::new(0.0, 0.0, win.0, win.1);
+    let (mut a, mut b) = (UiHarness::new(win), UiHarness::new(win));
+    let mut last = (None, None);
+    for ms in [0, 300] {
+        last.0 = Some(a.at_ms(ms).frame(|ui| {
+            ui.menu_window(KEY, &rows);
+        }));
+        last.1 = Some(b.at_ms(ms).frame(|ui| {
+            ui.menu_window_in(KEY, window, &rows);
+        }));
+    }
+    let (la, lb) = (last.0.expect("frame"), last.1.expect("frame"));
+    assert_eq!(la.0, lb.0, "the same scene");
+    assert_eq!(panel(&la.1), Rect::new(0.0, 0.0, w, h));
+}
+
+#[test]
 fn the_menu_card_fills_the_window() {
     let (w, h) = size();
     assert!(w >= 190.0 && h > 100.0);
     let mut ui = opened();
     let (scene, ..) = draw(&mut ui, 600, true);
-    let card = scene.layers[LayerId::Popup as usize].geometry.under[0].rect;
+    let card = scene.merged(LayerId::Popup).geometry.under[0].rect;
     assert_eq!(card, [0.0, 0.0, w, h]);
-    assert!(scene.backdrop.is_some(), "a glass card asks for the blur");
+    assert!(
+        scene.backdrops().next().is_some(),
+        "a glass card asks for the blur"
+    );
 }
 
 #[test]
@@ -608,12 +654,12 @@ fn the_window_menu_opens_and_closes_with_the_menus_motion_and_goes_idle() {
         let mut r = UiHarness::new(size());
         draw(&mut r, 0, true);
         let (scene, ..) = draw(&mut r, 400, true);
-        scene.layers[LayerId::Popup as usize].geometry.under[0].color[3]
+        scene.merged(LayerId::Popup).geometry.under[0].color[3]
     };
     for k in 0..=15_u64 {
         let dt = (k * 1000 + 30) / 60;
         let (scene, _, out) = draw(&mut h, dt, true);
-        let a = scene.layers[LayerId::Popup as usize].geometry.under[0].color[3];
+        let a = scene.merged(LayerId::Popup).geometry.under[0].color[3];
         assert!(a >= last && a.is_finite(), "{dt}: {a} after {last}");
         last = a;
         if dt >= 180 + 17 {
@@ -626,9 +672,12 @@ fn the_window_menu_opens_and_closes_with_the_menus_motion_and_goes_idle() {
     let mut alphas = Vec::new();
     loop {
         let (scene, _, out) = draw(&mut h, t, false);
-        if let Some(s) = scene.layers[LayerId::Popup as usize].geometry.under.first() {
+        if let Some(s) = scene.merged(LayerId::Popup).geometry.under.first() {
             alphas.push(s.color[3]);
-            assert!(scene.backdrop.is_some(), "the blur goes with the fade");
+            assert!(
+                scene.backdrops().next().is_some(),
+                "the blur goes with the fade"
+            );
         }
         if out.repaint == Repaint::Idle {
             break;
@@ -640,5 +689,8 @@ fn the_window_menu_opens_and_closes_with_the_menus_motion_and_goes_idle() {
     assert_eq!(alphas.len(), 12);
     assert!(alphas.windows(2).all(|w| w[1] <= w[0]));
     let (scene, ..) = draw(&mut h, t + 50, false);
-    assert!(scene.backdrop.is_none(), "gone once the close is over");
+    assert!(
+        scene.backdrops().next().is_none(),
+        "gone once the close is over"
+    );
 }

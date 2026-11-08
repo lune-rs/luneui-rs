@@ -8,7 +8,7 @@ use lune_ui_core::input::{FrameOutput, ImeEvent, Key, NamedKey, PointerButton, R
 use lune_ui_core::paint::{LayerId, Rect};
 use lune_ui_core::scene::{Scene, Shape};
 use lune_ui_core::shortcuts::{Binding, Chord, Scope};
-use lune_ui_core::testing::{FakeText, UiHarness};
+use lune_ui_core::testing::{FakeText, UiHarness, fill_shapes};
 use lune_ui_core::text::{Spec, Style, TextSystem};
 use lune_ui_core::theme::DARK;
 use lune_ui_core::ui::{Dismissal, OverlayOptions, Sense, WidgetId};
@@ -138,11 +138,17 @@ fn a_selected_clause_is_filled_and_thicker_and_hides_the_caret() {
     assert_eq!(u.len(), 1);
     assert_eq!(u[0].rect[0], TX + 4.0 * glyph());
     assert_eq!(u[0].rect[2], glyph());
+    // The clause is one selection shape: the clause's box and the padding each side.
+    let fills = fill_shapes(&scene.layers[0].geometry, DARK.text_selection);
+    assert_eq!(fills.len(), 1);
+    assert_eq!(fills[0].x, TX + 4.0 * glyph() - DARK.selection_pad);
+    assert_eq!(fills[0].w, glyph() + 2.0 * DARK.selection_pad);
     let fill = premul(DARK.text_selection);
     let under = &scene.layers[0].geometry.under;
-    let fills: Vec<_> = under.iter().filter(|s| s.color == fill).collect();
-    assert_eq!(fills.len(), 1);
-    assert_eq!(fills[0].rect[2], glyph());
+    assert!(
+        !under.iter().any(|s| s.color == fill),
+        "no flat selection fill"
+    );
     assert!(carets(&scene).is_empty());
     // The candidate window goes by the clause.
     let area = r.ime_area.expect("area");

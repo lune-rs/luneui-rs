@@ -329,15 +329,19 @@ impl PopoverHost {
         let mut drawn = SurfaceFrame::default();
         if self.open {
             let kind = self.kind;
-            ui.scope("tray", |ui| drawn = draw_surface(ui, kind, state));
+            ui.scope("tray", |ui| {
+                let area = ui.painter().window;
+                drawn = draw_surface(ui, area, kind, state);
+            });
         }
         let (display, out) = ui.finish();
-        self.output.apply(&window, &out);
+        self.output.apply(&window, &out, scale);
         let params = FrameParams {
             size,
             scale,
             blur_sigma: BLUR_SIGMA,
             saturation: BLUR_SATURATION,
+            ..FrameParams::default()
         };
         self.frame
             .draw_with(&mut r.gpu, &mut r.text, &display, &view, params, &mut [])?;

@@ -27,8 +27,10 @@ pub struct Theme {
     pub surface_selected: Rgba,
     pub border: Rgba,
     pub border_subtle: Rgba,
+    /// A tree view's indent guides: white at 0x14 (about 8%), quieter than `border` (R15, D11:
+    /// provisional). A toolkit value, not a file key.
+    pub tree_guide: Rgba,
     pub accent: Rgba,
-    pub accent_hover: Rgba,
     /// The scrollbar thumb: `accent` at alpha 0x8C (Wane's `--scroll-thumb`).
     pub scroll_thumb: Rgba,
     /// The thumb while hovered or held: `accent` at alpha 0xE6.
@@ -37,26 +39,26 @@ pub struct Theme {
     pub text_selection: Rgba,
     /// Knob and check mark on an accent fill.
     pub on_accent: Rgba,
-    /// Label on a primary button.
-    pub on_accent_text: Rgba,
-    pub dropdown_bg: Rgba,
     pub dialog_backdrop: Rgba,
     pub dialog_footer: Rgba,
     pub menu_text_primary: Rgba,
     pub menu_text_tertiary: Rgba,
     pub menu_text_quaternary: Rgba,
+    /// The 1 px ring of every glass surface (menu, list, popover, tooltip). A deliberate deviation
+    /// from Lunegit's `PopupMenuOuterBorder` (#3AFFFFFF): white at 0x1F, quieter (D11).
     pub menu_popup_border: Rgba,
     pub menu_item_hover: Rgba,
     pub menu_separator: Rgba,
+    /// The tint every glass surface draws over the blurred scene under it (straight alpha; file
+    /// key `MenuGlassBackground`, which Lunegit does not have).
     pub menu_glass: Rgba,
     /// The menu row while pressed: Lunegit `DarkTheme.axaml:305` (#FFFFFF23).
     pub menu_item_pressed: Rgba,
     /// A disabled menu row's text: Lunegit `DarkTheme.axaml:307` (#FFFFFF58).
     pub menu_text_disabled: Rgba,
-    /// Toast fill, border and the four tone colours, and the expanded log's fill and text:
-    /// Lunegit `DarkTheme.axaml:333-341`. `toast_info` also tints a loading toast.
-    pub toast_bg: Rgba,
-    pub toast_border: Rgba,
+    /// The four toast tone colours, and the expanded log's fill and text: Lunegit
+    /// `DarkTheme.axaml:335-341`. `toast_info` also tints a loading toast. The toast card itself
+    /// is the glass surface (`menu_glass`, `menu_popup_border`, D8).
     pub toast_info: Rgba,
     pub toast_success: Rgba,
     pub toast_warning: Rgba,
@@ -100,10 +102,6 @@ pub struct Theme {
     pub gold: Rgba,
     /// The neutral status dot.
     pub paused: Rgba,
-    /// The window fill a toolbar shows when the window is inactive or no glass material is
-    /// available: Lunegit's `WindowFallbackBackground` #FF333333 (`DarkTheme.axaml:245`, D128).
-    /// Opaque, so the toolbar never reads as see-through without a backdrop.
-    pub window_fallback: Rgba,
     /// A link, a quote bar and a diff hunk header: Lunegit's `MarkdownLinkForeground` and
     /// `DiffHunkForeground` #61AFEF (D14).
     pub link: Rgba,
@@ -126,6 +124,12 @@ pub struct Theme {
     pub font_title: f32,
     pub line_title: f32,
     pub item_radius: f32,
+    /// The corner radius of a text selection's joined shape, outer and inner corners alike
+    /// (`widgets::selection`, R18): 3 logical px. A toolkit value, not a file key.
+    pub selection_radius: f32,
+    /// How far a text selection reaches past each selected row's ends, left and right: 2 logical
+    /// px. A toolkit value, not a file key.
+    pub selection_pad: f32,
     /// Motion durations and the Reduced map (`docs/motion.md`).
     pub motion: MotionTokens,
 }
@@ -252,15 +256,13 @@ color_keys! {
     "SurfaceBorder" => |t| Slot::One(&mut t.border),
     "SurfaceBorderSubtle" => |t| Slot::One(&mut t.border_subtle),
     "AccentPrimaryColor" => |t| Slot::One(&mut t.accent),
-    "BackdropDark" => |t| Slot::One(&mut t.dropdown_bg),
     "DialogBackdropBrush" => |t| Slot::One(&mut t.dialog_backdrop),
     "DialogDarkerBlockBackground" => |t| Slot::One(&mut t.dialog_footer),
     "PopupMenuOuterBorder" => |t| Slot::One(&mut t.menu_popup_border),
+    "MenuGlassBackground" => |t| Slot::One(&mut t.menu_glass),
     "PopupMenuItemHover" => |t| Slot::One(&mut t.menu_item_hover),
     "PopupMenuItemPressed" => |t| Slot::One(&mut t.menu_item_pressed),
     "PopupMenuDisabledForeground" => |t| Slot::One(&mut t.menu_text_disabled),
-    "ToastBackground" => |t| Slot::One(&mut t.toast_bg),
-    "ToastBorder" => |t| Slot::One(&mut t.toast_border),
     "ToastInfoAccent" => |t| Slot::One(&mut t.toast_info),
     "ToastSuccessAccent" => |t| Slot::One(&mut t.toast_success),
     "ToastWarningAccent" => |t| Slot::One(&mut t.toast_warning),
@@ -277,7 +279,6 @@ color_keys! {
     "StatusWarningDark" => |t| Slot::One(&mut t.status_warning_dark),
     "StatusError" => |t| Slot::One(&mut t.status_error),
     "StatusErrorLight" => |t| Slot::One(&mut t.status_error_light),
-    "WindowFallbackBackground" => |t| Slot::One(&mut t.window_fallback),
     "MarkdownLinkForeground" => |t| Slot::One(&mut t.link),
     "MarkdownInlineCodeBackground" => |t| Slot::One(&mut t.code_inline),
     "DiffAddedBackground" => |t| Slot::One(&mut t.diff_added),
@@ -304,21 +305,19 @@ pub mod lunegit_dark {
         surface_selected: [0xFF, 0xFF, 0xFF, 0x18],
         border: [0xFF, 0xFF, 0xFF, 0x30],
         border_subtle: [0xFF, 0xFF, 0xFF, 0x1A],
+        tree_guide: [0xFF, 0xFF, 0xFF, 0x14],
         accent: [0x76, 0x7D, 0x85, 0xFF],
-        accent_hover: [0x86, 0x8D, 0x95, 0xFF],
         scroll_thumb: [0x76, 0x7D, 0x85, 0x8C],
         scroll_thumb_hover: [0x76, 0x7D, 0x85, 0xE6],
         text_selection: [0x76, 0x7D, 0x85, 0x66],
         on_accent: [0xFF, 0xFF, 0xFF, 0xFF],
-        on_accent_text: [0xFF, 0xFF, 0xFF, 0xF0],
-        dropdown_bg: [0x00, 0x00, 0x00, 0xF0],
         dialog_backdrop: [0x00, 0x00, 0x00, 0x80],
         dialog_footer: [0x00, 0x00, 0x00, 0x24],
         // Luneium browser context-menu tokens (`tokens.css`, `ContextMenu.css`).
         menu_text_primary: [0xFF, 0xFF, 0xFF, 0xCC],
         menu_text_tertiary: [0xFF, 0xFF, 0xFF, 0x88],
         menu_text_quaternary: [0xFF, 0xFF, 0xFF, 0x66],
-        menu_popup_border: [0xFF, 0xFF, 0xFF, 0x3A],
+        menu_popup_border: [0xFF, 0xFF, 0xFF, 0x1F],
         menu_item_hover: [0xFF, 0xFF, 0xFF, 0x16],
         menu_separator: [0xFF, 0xFF, 0xFF, 0x22],
         // `linear-gradient(rgba(0,0,0,.45)), rgba(165,165,165,.3)` flattened: alpha .615, grey 44.
@@ -326,9 +325,7 @@ pub mod lunegit_dark {
         // Lunegit `DarkTheme.axaml:305,307`.
         menu_item_pressed: [0xFF, 0xFF, 0xFF, 0x23],
         menu_text_disabled: [0xFF, 0xFF, 0xFF, 0x58],
-        // Lunegit `DarkTheme.axaml:333-341`.
-        toast_bg: [0x18, 0x18, 0x18, 0xE6],
-        toast_border: [0xFF, 0xFF, 0xFF, 0x33],
+        // Lunegit `DarkTheme.axaml:335-341`.
         toast_info: [0x61, 0xAF, 0xEF, 0xFF],
         toast_success: [0x4C, 0xAF, 0x50, 0xFF],
         toast_warning: [0xE2, 0xB9, 0x3D, 0xFF],
@@ -362,8 +359,6 @@ pub mod lunegit_dark {
         data_hi: [0x8F, 0xBB, 0xFF, 0xFF],
         gold: [0xE9, 0xC4, 0x6A, 0xFF],
         paused: [0x8A, 0x90, 0x99, 0xFF],
-        // Lunegit `Themes/DarkTheme.axaml:245`.
-        window_fallback: [0x33, 0x33, 0x33, 0xFF],
         // Lunegit `DarkTheme.axaml:106-110,134-141`; the marks are derived (D14).
         link: [0x61, 0xAF, 0xEF, 0xFF],
         code_inline: [0xFF, 0xFF, 0xFF, 0x14],
@@ -382,6 +377,8 @@ pub mod lunegit_dark {
         font_title: 18.0,
         line_title: 24.0,
         item_radius: 6.0,
+        selection_radius: 3.0,
+        selection_pad: 2.0,
         motion: crate::motion::MOTION,
     };
 
@@ -392,6 +389,7 @@ pub mod lunegit_dark {
         tint: TINT,
         tint_opacity: 1.0,
         material_opacity: 0.7,
+        curve: crate::LuminosityCurve::AVALONIA,
     };
 
     /// Panel layer (`GlassTintLightOpacity` 0.8, `GlassMaterialLightOpacity` 0.7).
@@ -399,6 +397,7 @@ pub mod lunegit_dark {
         tint: TINT,
         tint_opacity: 0.8,
         material_opacity: 0.7,
+        curve: crate::LuminosityCurve::AVALONIA,
     };
 
     /// Card and header-tint layer (tint 1, `GlassMaterialDarkHeaderOpacity` 0.8).
@@ -406,15 +405,10 @@ pub mod lunegit_dark {
         tint: TINT,
         tint_opacity: 1.0,
         material_opacity: 0.8,
+        curve: crate::LuminosityCurve::AVALONIA,
     };
 
-    /// Solid fill shown while the window is inactive (tint lightened 20%), replacing all
-    /// acrylic layers. Lunegit works around AvaloniaUI/Avalonia#5440 this way.
-    pub const INACTIVE_FALLBACK: Rgba = [0x33, 0x33, 0x33, 0xFF];
-
     pub const CARD_CORNER_RADIUS: f32 = 8.0;
-    pub const TAB_HEADER_HEIGHT: f32 = 32.0;
-    pub const BODY_PADDING: f32 = 10.0;
 }
 
 #[cfg(test)]
@@ -453,11 +447,8 @@ mod tests {
             (THEME.data_hi, [0x8F, 0xBB, 0xFF, 0xFF]),
             (THEME.gold, [0xE9, 0xC4, 0x6A, 0xFF]),
             (THEME.paused, [0x8A, 0x90, 0x99, 0xFF]),
-            (THEME.window_fallback, [0x33, 0x33, 0x33, 0xFF]),
             (THEME.menu_item_pressed, [0xFF, 0xFF, 0xFF, 0x23]),
             (THEME.menu_text_disabled, [0xFF, 0xFF, 0xFF, 0x58]),
-            (THEME.toast_bg, [0x18, 0x18, 0x18, 0xE6]),
-            (THEME.toast_border, [0xFF, 0xFF, 0xFF, 0x33]),
             (THEME.toast_info, [0x61, 0xAF, 0xEF, 0xFF]),
             (THEME.toast_success, [0x4C, 0xAF, 0x50, 0xFF]),
             (THEME.toast_warning, [0xE2, 0xB9, 0x3D, 0xFF]),
@@ -467,7 +458,7 @@ mod tests {
             (THEME.dirty_indicator, [0xD9, 0x8A, 0x3D, 0xFF]),
             (THEME.count_badge, [0xE7, 0x48, 0x56, 0xFF]),
         ];
-        assert_eq!(expected.len(), 35);
+        assert_eq!(expected.len(), 32);
         for (got, want) in expected {
             assert_eq!(got, want);
         }
@@ -547,7 +538,6 @@ mod tests {
             "#FF767D85",
             [0x76, 0x7D, 0x85, 0xFF],
         ),
-        ("BackdropDark", 42, "#F0000000", [0x00, 0x00, 0x00, 0xF0]),
         (
             "DialogBackdropBrush",
             317,
@@ -559,12 +549,6 @@ mod tests {
             318,
             "#24000000",
             [0x00, 0x00, 0x00, 0x24],
-        ),
-        (
-            "PopupMenuOuterBorder",
-            301,
-            "#3AFFFFFF",
-            [0xFF, 0xFF, 0xFF, 0x3A],
         ),
         (
             "PopupMenuItemHover",
@@ -584,13 +568,6 @@ mod tests {
             "#58FFFFFF",
             [0xFF, 0xFF, 0xFF, 0x58],
         ),
-        (
-            "ToastBackground",
-            333,
-            "#E6181818",
-            [0x18, 0x18, 0x18, 0xE6],
-        ),
-        ("ToastBorder", 334, "#33FFFFFF", [0xFF, 0xFF, 0xFF, 0x33]),
         ("ToastInfoAccent", 335, "#61AFEF", [0x61, 0xAF, 0xEF, 0xFF]),
         (
             "ToastSuccessAccent",
@@ -643,12 +620,6 @@ mod tests {
         ("StatusError", 63, "#F44336", [0xF4, 0x43, 0x36, 0xFF]),
         ("StatusErrorLight", 64, "#EF9A9A", [0xEF, 0x9A, 0x9A, 0xFF]),
         (
-            "WindowFallbackBackground",
-            245,
-            "#FF333333",
-            [0x33, 0x33, 0x33, 0xFF],
-        ),
-        (
             "MarkdownLinkForeground",
             140,
             "#61AFEF",
@@ -676,9 +647,13 @@ mod tests {
 
     #[test]
     fn every_color_key_holds_the_dark_theme_axaml_value() {
-        // 49 rows plus `GlassTintColor`: all 50 keys of the table are covered, none twice.
+        // 44 rows plus three keys with no row here: `GlassTintColor`, `MenuGlassBackground` (not in
+        // Lunegit) and `PopupMenuOuterBorder` (a deviation, tested below): all 47 keys of the
+        // table are covered, none twice.
         let mut keys: Vec<&str> = AXAML.iter().map(|r| r.0).collect();
         keys.push("GlassTintColor");
+        keys.push("MenuGlassBackground");
+        keys.push("PopupMenuOuterBorder");
         keys.sort_unstable();
         let mut table = COLOR_KEYS.to_vec();
         table.sort_unstable();
@@ -710,16 +685,27 @@ mod tests {
             tint: [0, 0, 0, 255],
             tint_opacity,
             material_opacity,
+            curve: crate::LuminosityCurve::AVALONIA,
         };
         assert_eq!(THEME.glass.window, layer(1.0, 0.7));
         assert_eq!(THEME.glass.card, layer(1.0, 0.8));
         assert_eq!(THEME.glass.panel, layer(0.8, 0.7));
-        // `WindowFallbackBackground` #FF333333 (:245) is the inactive fill.
+    }
+
+    /// `PopupMenuOuterBorder` is #3AFFFFFF in `DarkTheme.axaml:301`; the toolkit's glass ring is
+    /// white at 0x1F, a deliberate deviation (D11, R8). `MenuGlassBackground` is the toolkit's own key.
+    #[test]
+    fn the_glass_ring_and_tint_keys_hold_the_toolkits_values() {
         assert_eq!(
-            super::lunegit_dark::INACTIVE_FALLBACK,
-            [0x33, 0x33, 0x33, 0xFF]
+            THEME.color_key("PopupMenuOuterBorder"),
+            Some([0xFF, 0xFF, 0xFF, 0x1F])
         );
-        assert_eq!(THEME.window_fallback, [0x33, 0x33, 0x33, 0xFF]);
+        assert_ne!(THEME.menu_popup_border, [0xFF, 0xFF, 0xFF, 0x3A]);
+        assert_eq!(
+            THEME.color_key("MenuGlassBackground"),
+            Some([44, 44, 44, 157])
+        );
+        assert_eq!(THEME.color_key("BackdropDark"), None);
     }
 
     /// Fields with no key of their own, each with the row that sets its value.
@@ -739,8 +725,6 @@ mod tests {
             THEME.text_selection,
             [accent[0], accent[1], accent[2], 0x66]
         );
-        // `accent_hover`: each channel plus 0x10, saturating (D208).
-        assert_eq!(THEME.accent_hover, [0x86, 0x8D, 0x95, 0xFF]);
         // The diff intra-line marks: the line fill's hue at alpha 0x40 (D14, D208).
         assert_eq!(THEME.diff_added_mark, [0x73, 0xC9, 0x91, 0x40]);
         assert_eq!(THEME.diff_removed_mark, [0xE0, 0x6C, 0x75, 0x40]);

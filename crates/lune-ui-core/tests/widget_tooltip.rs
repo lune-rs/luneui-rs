@@ -58,10 +58,7 @@ struct Out {
 
 impl Out {
     fn shown(&self) -> bool {
-        !self.scene.layers[LayerId::Popup as usize]
-            .geometry
-            .under
-            .is_empty()
+        !self.scene.merged(LayerId::Popup).geometry.under.is_empty()
     }
 }
 
@@ -257,7 +254,7 @@ fn it_has_no_hit_region_and_takes_no_focus() {
     let shown = frame(&mut h, 900, &[anchor("a", A)]);
     assert!(shown.shown());
     // The pointer moves onto the tooltip's own panel: the page under it gets the hover and click.
-    let panel = shown.scene.layers[LayerId::Popup as usize].geometry.under[0].rect;
+    let panel = shown.scene.merged(LayerId::Popup).geometry.under[0].rect;
     h.input
         .pointer_to(panel[0] + panel[2] / 2.0, panel[1] + panel[3] / 2.0);
     frame(&mut h, 910, &[anchor("a", A)]);
@@ -285,7 +282,7 @@ fn it_stays_inside_the_window_flipped_and_shifted() {
         frame(&mut h, t, &[anchor("a", low)]);
     }
     let out = frame(&mut h, 1300, &[anchor("a", low)]);
-    let panel = out.scene.layers[LayerId::Popup as usize].geometry.under[0].rect;
+    let panel = out.scene.merged(LayerId::Popup).geometry.under[0].rect;
     assert!(panel[1] + panel[3] <= low.y, "above the anchor: {panel:?}");
     // Shifted inside at the right edge.
     let edge = Rect::new(780.0, 100.0, 16.0, 32.0);
@@ -295,7 +292,7 @@ fn it_stays_inside_the_window_flipped_and_shifted() {
         frame(&mut h, t, &[anchor("a", edge)]);
     }
     let out = frame(&mut h, 1300, &[anchor("a", edge)]);
-    let panel = out.scene.layers[LayerId::Popup as usize].geometry.under[0].rect;
+    let panel = out.scene.merged(LayerId::Popup).geometry.under[0].rect;
     assert_eq!(panel[0] + panel[2], WIN.0 - 8.0, "8 px from the right edge");
     assert_eq!(panel[2], size(TEXT).0);
 }
@@ -309,9 +306,9 @@ fn pixel_probes_at_scale_2() {
         frame(&mut h, t, &[anchor("a", A)]);
     }
     let out = frame(&mut h, 1300, &[anchor("a", A)]);
-    let layer = &out.scene.layers[LayerId::Popup as usize];
+    let layer = &out.scene.merged(LayerId::Popup);
     let (fill, ring) = (layer.geometry.under[0], layer.geometry.under[1]);
-    assert_eq!(fill.radii, [16.0; 4], "radius 16 device px");
+    assert_eq!(fill.radii, [18.0; 4], "radius 9 logical, 18 device px");
     assert_eq!(ring.params[1], 2.0, "2 px border");
     let mut t = FakeText;
     let text = t.measure(
@@ -348,7 +345,7 @@ fn long_text_wraps_at_320() {
         run(&mut h, t);
     }
     let scene = run(&mut h, 1300);
-    let fill = scene.layers[LayerId::Popup as usize].geometry.under[0];
+    let fill = scene.merged(LayerId::Popup).geometry.under[0];
     assert_eq!(fill.rect[2], 320.0);
 }
 
@@ -365,16 +362,15 @@ fn the_fade_is_opacity_only_reduced_keeps_it_and_off_snaps() {
         frame(&mut h, 0, &[anchor("a", A)]);
         frame(&mut h, 10, &[anchor("a", A)]);
         frame(&mut h, 790, &[anchor("a", A)]);
-        let mid = frame(&mut h, 830, &[anchor("a", A)]);
-        let fill = mid.scene.layers[LayerId::Popup as usize].geometry.under[0];
-        assert_eq!(
-            fill.color[3] < DARK.dropdown_bg[3] as f32 / 255.0 - 1e-6,
-            expect_fade,
-            "{tier:?}"
-        );
+        // The first frame of the appear is at opacity 0 and records no frost; the next is mid-fade.
+        frame(&mut h, 830, &[anchor("a", A)]);
+        let mid = frame(&mut h, 880, &[anchor("a", A)]);
+        let fill = mid.scene.merged(LayerId::Popup).geometry.under[0];
+        assert_eq!(fill.params[2], 2.0, "{tier:?}: the frost");
+        assert_eq!(fill.params[1] < 1.0 - 1e-6, expect_fade, "{tier:?}");
         // It never moves or scales.
         let settled = frame(&mut h, 1300, &[anchor("a", A)]);
-        let rest = settled.scene.layers[LayerId::Popup as usize].geometry.under[0];
+        let rest = settled.scene.merged(LayerId::Popup).geometry.under[0];
         assert_eq!(fill.rect, rest.rect, "{tier:?}: opacity only");
         assert_eq!(settled.repaint, Repaint::Idle);
     }
@@ -406,7 +402,7 @@ fn a_popover_over_the_anchor_blocks_the_hover() {
                 ui.interact(id("pop-body"), rect, Sense::HOVER);
             });
         });
-        shown |= scene.layers[LayerId::Popup as usize].geometry.under.len() > 2;
+        shown |= scene.merged(LayerId::Popup).geometry.under.len() > 2;
         shown
     };
     hover(&mut h, A);
@@ -438,10 +434,7 @@ fn a_list_scrolling_under_a_parked_pointer_shows_none() {
                 ui.tooltip(&r, "row");
             }
         });
-        shown |= !scene.layers[LayerId::Popup as usize]
-            .geometry
-            .under
-            .is_empty();
+        shown |= !scene.merged(LayerId::Popup).geometry.under.is_empty();
         assert!(!shown, "frame {k}");
     }
 }

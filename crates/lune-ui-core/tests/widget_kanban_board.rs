@@ -111,7 +111,6 @@ const ERROR: BoardError<'static> = BoardError {
 
 fn glass() -> DialogGlass {
     DialogGlass {
-        panel: [0.0; 4],
         fill: [0.0; 4],
         noise: false,
     }
@@ -172,11 +171,11 @@ fn show(ui: &mut Ui<'_>, m: &Model, rect: Rect) -> BoardResponse {
         title: "Roadmap",
         columns: &columns,
         error: m.error.then_some(&ERROR),
-        active: true,
         glass: lune_ui_core::GlassLayer {
             tint: [0, 0, 0, 255],
             tint_opacity: 0.5,
             material_opacity: 0.5,
+            curve: lune_ui_core::LuminosityCurve::AVALONIA,
         },
         under: [0.0; 4],
         name: "",
@@ -269,7 +268,7 @@ fn drawn(scene: &Scene, key: u64, scale: f32) -> Vec<(usize, f32, f32, u8)> {
         keys.insert(spec.cache_key(scale), a);
     }
     let mut found = Vec::new();
-    for (l, layer) in scene.layers.iter().enumerate() {
+    for (l, layer) in scene.in_order().into_iter().enumerate() {
         for t in &layer.texts {
             if let Some(a) = keys.get(&t.key.0) {
                 found.push((l, t.x, t.y, *a));
@@ -281,7 +280,8 @@ fn drawn(scene: &Scene, key: u64, scale: f32) -> Vec<(usize, f32, f32, u8)> {
 
 /// The under shapes of `layer` with the colour `c`, as drawn.
 fn fills(scene: &Scene, layer: LayerId, c: Rgba) -> Vec<Shape> {
-    scene.layers[layer as usize]
+    scene
+        .merged(layer)
         .geometry
         .under
         .iter()
@@ -290,9 +290,15 @@ fn fills(scene: &Scene, layer: LayerId, c: Rgba) -> Vec<Shape> {
         .collect()
 }
 
-/// The ghost's under-fill on `layer`: the one window-fallback fill there.
+/// The ghost's frost on `layer`: the `menu_glass` one there (D168: the ghost stands on glass).
 fn ghost_on(scene: &Scene, layer: LayerId) -> Option<Shape> {
-    fills(scene, layer, DARK.window_fallback).first().copied()
+    scene
+        .merged(layer)
+        .geometry
+        .under
+        .iter()
+        .find(|s| s.is_frost() && s.color == premul(DARK.menu_glass))
+        .copied()
 }
 
 fn ghost(scene: &Scene) -> Option<Shape> {
@@ -570,11 +576,11 @@ fn a_name_given_wins_over_the_title() {
             title: "Roadmap",
             columns: &[],
             error: None,
-            active: false,
             glass: lune_ui_core::GlassLayer {
                 tint: [0, 0, 0, 255],
                 tint_opacity: 0.5,
                 material_opacity: 0.5,
+                curve: lune_ui_core::LuminosityCurve::AVALONIA,
             },
             under: [0.0; 4],
             name: "Plan",
@@ -815,6 +821,36 @@ fn the_drop_line_sits_in_the_gap_of_the_slot_and_the_target_fills() {
     assert_eq!(line[0].rect[0], CARD_X + 2.0 * LANE_PITCH);
     let r = drag_to(&mut h, &m, 2010, (LANE_X + COLUMN_W + 5.0, LIST_Y));
     assert!(fills(&r.scene, LayerId::Page, DARK.accent).is_empty());
+}
+
+#[test]
+fn the_ghost_stands_on_glass_so_what_is_under_it_does_not_read_through() {
+    // D168's reason: a card dragged over text must not show that text through its own 4% fill.
+    // The ghost asks for a blur of what is under it and frosts `menu_glass` over that.
+    let mut h = UiHarness::new(WIN);
+    let m = model();
+    let r = grab(&mut h, &m, 12, 0);
+    let g = ghost(&r.scene).expect("a ghost");
+    let blurs: Vec<_> = r
+        .scene
+        .backdrops()
+        .filter(|b| {
+            b.rect[0] <= g.rect[0] + 0.01
+                && b.rect[1] <= g.rect[1] + 0.01
+                && b.rect[0] + b.rect[2] >= g.rect[0] + g.rect[2] - 0.01
+                && b.rect[1] + b.rect[3] >= g.rect[1] + g.rect[3] - 0.01
+        })
+        .collect();
+    assert!(!blurs.is_empty(), "a request covers the ghost's frost");
+    let layer = r.scene.merged(LayerId::Popup);
+    assert!(
+        layer
+            .geometry
+            .under
+            .iter()
+            .all(|s| !(s.rect == g.rect && s.color[3] >= 1.0 - 1e-6)),
+        "no opaque fill under the card"
+    );
 }
 
 #[test]
@@ -1123,8 +1159,11 @@ fn a_press_on_a_landing_card_holds_it_and_it_goes_on_or_drags_from_there() {
         let r = run(&mut h, &m, frame_ms(17));
         let g = ghost(&r.scene).expect("held");
         assert_eq!(drawn(&r.scene, 11, 1.0).len(), 1);
-        let step = (g.rect[0] - before.rect[0]).abs();
-        assert!(step < 0.35 * LANE_PITCH, "{step}, from {held:?}");
+        assert_eq!(
+            g.rect[..2],
+            before.rect[..2],
+            "the press holds the card where it was drawn, from {held:?}"
+        );
         let r = run(&mut h, &m, frame_ms(18));
         assert_eq!(ghost(&r.scene).expect("held").rect[..2], g.rect[..2]);
         if drags {
@@ -1622,10 +1661,8 @@ fn the_ghost_is_above_the_board_cut_by_no_clip_and_hits_nothing() {
     let g = ghost(&r.scene).expect("a ghost");
     assert_eq!(g.clip[2], 0.0, "no clip");
     assert!(ghost_on(&r.scene, LayerId::Page).is_none());
-    let text = r.scene.layers[LayerId::Popup as usize]
-        .texts
-        .first()
-        .expect("the ghost's title");
+    let layer = r.scene.merged(LayerId::Popup);
+    let text = layer.texts.first().expect("the ghost's title");
     assert_eq!((text.clip.x, text.clip.y), (0.0, 0.0));
     assert_eq!((text.clip.w, text.clip.h), WIN);
 
@@ -1675,7 +1712,7 @@ fn inside_a_dialog_the_ghost_is_raised_and_a_close_replays_none() {
     assert!(ghost_on(&r.scene, LayerId::Modal).is_none());
     assert!(ghost_on(&r.scene, LayerId::Popup).is_none());
     assert_eq!(
-        r.scene.layers[LayerId::Raised as usize].geometry.under[0].rect[0],
+        r.scene.merged(LayerId::Raised).geometry.under[0].rect[0],
         b.x + 40.0
     );
 
@@ -2274,7 +2311,9 @@ fn the_ghost_of_a_focused_card_carries_the_focus_ring() {
     for ms in [1032, 1048, 1064, 1080] {
         let r = run(&mut h, &m, ms);
         assert!(ghost(&r.scene).is_some(), "landing at {ms}");
-        let rings: Vec<f32> = r.scene.layers[LayerId::Popup as usize]
+        let rings: Vec<f32> = r
+            .scene
+            .merged(LayerId::Popup)
             .geometry
             .under
             .iter()
@@ -2322,4 +2361,85 @@ fn at_scale_two_a_column_is_544_a_card_s_radius_12_and_the_threshold_8() {
     h.input.pointer_to(x + 4.0, y);
     let r = run(&mut h, &m, 40);
     assert!(ghost(&r.scene).is_some());
+}
+
+/// A card that is sliding up (its neighbour left the column) is pressed, and the pointer moves
+/// 10 px: the ghost is where the body was drawn on the press frame, plus the 10 px, with no step.
+#[test]
+fn a_press_on_a_sliding_card_grabs_it_where_it_is_drawn() {
+    let mut h = UiHarness::new(WIN);
+    let mut m = model();
+    run(&mut h, &m, 0);
+    m.cols[0].1.remove(0);
+    run(&mut h, &m, 10);
+    // The slot of card 12 is now the first; it started a pitch below and is on its way.
+    let pointer = (CARD_X + 20.0, LIST_Y + 20.0);
+    h.input.pointer_to(pointer.0, pointer.1);
+    run(&mut h, &m, 20);
+    h.input.press(P);
+    let r = run(&mut h, &m, 40);
+    let seen = drawn(&r.scene, 12, 1.0);
+    assert_eq!(seen.len(), 1, "the body: {seen:?}");
+    let (x, y) = (seen[0].1 - TEXT, seen[0].2 - TEXT);
+    assert!(
+        y > LIST_Y + 1.0 && y < LIST_Y + PITCH - 1.0,
+        "instrument: mid-slide, not at the slot or where it began: {y}"
+    );
+    h.input.pointer_to(pointer.0, pointer.1 + 10.0);
+    let r = run(&mut h, &m, 50);
+    let g = ghost(&r.scene).expect("the drag");
+    assert_eq!(g.rect[0], x, "no step across");
+    assert!(
+        (g.rect[1] - (y + 10.0)).abs() < 1e-3,
+        "no step down: {} against {}",
+        g.rect[1],
+        y + 10.0
+    );
+}
+
+/// A second Shift move while the card is landing (in its column or across): the landing starts again
+/// from where the card was drawn, so the first frame of it draws the card where the frame before
+/// did, and the card never jumps toward the new slot.
+#[test]
+fn a_second_shift_move_during_a_landing_restarts_from_where_the_card_is_drawn() {
+    for key in [NamedKey::ArrowDown, NamedKey::ArrowRight] {
+        let mut h = UiHarness::new(WIN);
+        let mut m = model();
+        focus(&mut h, &m, 11, 0);
+        shift_key(&mut h, NamedKey::ArrowRight);
+        let r = run(&mut h, &m, frame_ms(1));
+        apply(&mut m, r.r.moved.expect("a move"));
+        let mut r = run(&mut h, &m, frame_ms(2));
+        for k in 3..6 {
+            r = run(&mut h, &m, frame_ms(k));
+        }
+        let before = drawn(&r.scene, 11, 1.0);
+        assert_eq!(before.len(), 1, "the ghost only: {before:?}");
+        assert!(ghost(&r.scene).is_some(), "instrument: still landing");
+        shift_key(&mut h, key);
+        let r = run(&mut h, &m, frame_ms(6));
+        let moved = r.r.moved.expect("the second move");
+        let now = drawn(&r.scene, 11, 1.0);
+        assert_eq!(now.len(), 1, "{now:?}");
+        assert_eq!(
+            (now[0].1, now[0].2),
+            (before[0].1, before[0].2),
+            "{key:?}: restarts where it was drawn"
+        );
+        apply(&mut m, moved);
+        // It then goes to the new slot without a jump: no frame steps more than the one before it
+        // did, plus a pitch's worth of slack for the slot's own move.
+        let mut at = (now[0].1, now[0].2);
+        for k in 7..40 {
+            let r = run(&mut h, &m, frame_ms(k));
+            let seen = drawn(&r.scene, 11, 1.0);
+            assert_eq!(seen.len(), 1, "drawn once at frame {k}");
+            let step = ((seen[0].1 - at.0).powi(2) + (seen[0].2 - at.1).powi(2)).sqrt();
+            assert!(step < LANE_PITCH, "{key:?}: a jump of {step} at frame {k}");
+            at = (seen[0].1, seen[0].2);
+            if r.out.repaint == Repaint::Idle {
+                break;
+            }
+        }
+    }
 }

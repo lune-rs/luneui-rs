@@ -367,8 +367,8 @@ fn the_dot_and_the_badge_appear_at_once_and_at_their_offsets() {
         .find(|s| s.color == premul(DARK.count_badge))
         .expect("badge");
     assert_eq!((badge.rect[3], badge.radii), (BADGE_H, [8.0; 4]));
-    assert_eq!(badge.rect[0] + badge.rect[2], b8.x + 34.0, "the right edge");
-    assert_eq!(badge.rect[1], b8.y + 10.0);
+    assert_eq!(badge.rect[0] + badge.rect[2], b8.x + 38.0, "the right edge");
+    assert_eq!(badge.rect[1], b8.y + 2.0);
     assert!(badge.rect[2] >= BADGE_MIN_W);
     // The count's text is 9 px, bold, on_accent.
     let spec = Spec::plain("3", Style::ui(9.0, DARK.on_accent).bold());
@@ -707,10 +707,7 @@ fn a_tooltip_names_the_button_after_the_delay_and_the_description_stays_the_note
     clock.0 += 1200;
     h.at_ms(clock.0);
     let out = frame(&mut h, &c);
-    let shown = !out.scene.layers[LayerId::Popup as usize]
-        .geometry
-        .under
-        .is_empty();
+    let shown = !out.scene.merged(LayerId::Popup).geometry.under.is_empty();
     assert!(shown, "the tooltip is up");
     assert_eq!(
         out.out
@@ -728,12 +725,7 @@ fn a_tooltip_names_the_button_after_the_delay_and_the_description_stays_the_note
     clock.0 += 1200;
     h.at_ms(clock.0);
     let out = frame(&mut h, &c);
-    assert!(
-        !out.scene.layers[LayerId::Popup as usize]
-            .geometry
-            .under
-            .is_empty()
-    );
+    assert!(!out.scene.merged(LayerId::Popup).geometry.under.is_empty());
     assert_eq!(
         out.out.tree.get(item_id(4)).expect("present").description,
         None
@@ -804,7 +796,7 @@ fn the_rail_draws_only_on_the_layer_it_is_called_on() {
         ..cfg()
     };
     let out = clock.settle(&mut h, &c);
-    for (i, l) in out.scene.layers.iter().enumerate() {
+    for (i, l) in out.scene.in_order().into_iter().enumerate() {
         if i != LayerId::Base as usize {
             assert!(
                 l.texts.is_empty() && l.geometry.under.is_empty(),

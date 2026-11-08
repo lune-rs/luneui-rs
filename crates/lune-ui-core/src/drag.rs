@@ -804,9 +804,9 @@ impl Ui<'_> {
     }
 
     /// Runs `f` to draw a dragged item's ghost above the current layer group (`Base` and `Page` to
-    /// `Popup`, `Popup` and `Modal` to `Raised`, `Raised` to `Toast`, so text under it cannot show
-    /// through): no clip or transform applies, `f` draws in window coordinates, and what it draws
-    /// belongs to no open recording. The caller's painter state is back afterwards.
+    /// `Popup`, `Popup` and `Modal` to `Raised`, `Raised` and `Outside` to `Toast`, so text under it
+    /// cannot show through): no clip or transform applies, `f` draws in window coordinates, and what
+    /// it draws belongs to no open recording. The caller's painter state is back afterwards.
     pub(crate) fn drag_ghost(&mut self, f: impl FnOnce(&mut Ui<'_>)) {
         let (layer, tag) = self.painter().hit_context();
         let above = match layer {

@@ -172,7 +172,7 @@ fn opened(f: &Flyout<'_>) -> UiHarness {
 
 /// The card: the first shape on the popup layer.
 fn card(scene: &Scene) -> [f32; 4] {
-    scene.layers[LayerId::Popup as usize].geometry.under[0].rect
+    scene.merged(LayerId::Popup).geometry.under[0].rect
 }
 
 fn key(h: &mut UiHarness, k: NamedKey) {
@@ -340,7 +340,7 @@ fn pixel_probes_at_scale_2() {
     h.input.set_scale(2.0);
     draw(&mut h, 0, Some(&f));
     let (scene, _, _) = draw(&mut h, 400, Some(&f));
-    let fill = scene.layers[LayerId::Popup as usize].geometry.under[0];
+    let fill = scene.merged(LayerId::Popup).geometry.under[0];
     assert_eq!(fill.rect[2], 680.0, "340 logical px wide");
     assert_eq!(fill.radii, [18.0; 4], "radius 9");
     assert_eq!(fill.color, premul(DARK.menu_glass));
@@ -350,7 +350,8 @@ fn pixel_probes_at_scale_2() {
         ..Style::ui(DARK.font_m, DARK.gold).bold()
     };
     let key = FakeText.prepare(&Spec::plain("Atlas", style), 2.0).0;
-    let name = scene.layers[LayerId::Popup as usize]
+    let layer = scene.merged(LayerId::Popup);
+    let name = layer
         .texts
         .iter()
         .find(|t| t.key == key)
@@ -369,8 +370,7 @@ fn pixel_probes_at_scale_2() {
         "12 device px above"
     );
     // The backdrop sits under the popup layer, over the card.
-    let b = scene.backdrop.expect("a glass card asks for the blur");
-    assert_eq!(b.layer, LayerId::Popup as usize);
+    let b = scene.merged(LayerId::Popup).backdrops[0];
     assert_eq!(b.rect, fill.rect);
     assert_eq!(b.radius, 18.0);
 }
@@ -384,7 +384,7 @@ fn no_text_is_closer_than_9_px_to_the_card() {
     let mut h = opened(&f);
     let (scene, ..) = draw(&mut h, 600, Some(&f));
     let c = card(&scene);
-    for t in &scene.layers[LayerId::Popup as usize].texts {
+    for t in &scene.merged(LayerId::Popup).texts {
         assert!(t.x >= c[0] + 9.0, "{t:?} against {c:?}");
     }
     // The state ends 14 px from the right edge: 6 inset and 8 padding.
@@ -394,7 +394,8 @@ fn no_text_is_closer_than_9_px_to_the_card() {
     };
     let spec = Spec::plain("Serving", style);
     let (key, (w, _)) = FakeText.prepare(&spec, 1.0);
-    let state = scene.layers[LayerId::Popup as usize]
+    let layer = scene.merged(LayerId::Popup);
+    let state = layer
         .texts
         .iter()
         .find(|t| t.key == key)
@@ -414,7 +415,7 @@ fn close_run(tier: MotionTier) -> (u64, Vec<f32>) {
     let mut t = 1000;
     loop {
         let (scene, _, out) = draw(&mut h, t, None);
-        if let Some(s) = scene.layers[LayerId::Popup as usize].geometry.under.first() {
+        if let Some(s) = scene.merged(LayerId::Popup).geometry.under.first() {
             alphas.push(s.color[3]);
         }
         if out.repaint == Repaint::Idle {
@@ -451,13 +452,13 @@ fn the_curves_are_the_menus_under_every_tier() {
         let mut r = UiHarness::new(WIN);
         draw(&mut r, 0, Some(&f));
         let (scene, ..) = draw(&mut r, 400, Some(&f));
-        scene.layers[LayerId::Popup as usize].geometry.under[0].color[3]
+        scene.merged(LayerId::Popup).geometry.under[0].color[3]
     };
     let mut last = 0.0;
     for k in 1..=15_u64 {
         let dt = (k * 1000 + 30) / 60;
         let (scene, _, out) = draw(&mut h, dt, Some(&f));
-        let a = scene.layers[LayerId::Popup as usize].geometry.under[0].color[3];
+        let a = scene.merged(LayerId::Popup).geometry.under[0].color[3];
         assert!(a >= last && a.is_finite(), "{dt}: {a} after {last}");
         last = a;
         if dt >= 180 + 17 {
@@ -472,14 +473,21 @@ fn a_closing_flyout_replays_its_blur_with_the_fade() {
     let f = serving();
     let mut h = opened(&f);
     let (scene, ..) = draw(&mut h, 600, Some(&f));
-    let open = scene.backdrop.expect("blur while open");
+    let open = scene.backdrops().next().copied().expect("blur while open");
     let (scene, _, out) = draw(&mut h, 1000, None);
-    let closing = scene.backdrop.expect("blur while closing");
+    let closing = scene
+        .backdrops()
+        .next()
+        .copied()
+        .expect("blur while closing");
     assert_eq!(closing.rect[2], open.rect[2]);
     assert!(closing.alpha <= open.alpha);
     assert_eq!(out.repaint, Repaint::Now);
     let (scene, ..) = draw(&mut h, 1200, None);
-    assert!(scene.backdrop.is_none(), "gone once the close is over");
+    assert!(
+        scene.backdrops().next().is_none(),
+        "gone once the close is over"
+    );
 }
 
 #[test]
@@ -596,7 +604,7 @@ fn the_routes_keys_are_small_and_the_strip_has_its_outline() {
         line: 20.0,
         ..Style::ui(DARK.font_s, DARK.fg_tertiary)
     };
-    let layer = &scene.layers[LayerId::Popup as usize];
+    let layer = &scene.merged(LayerId::Popup);
     let want = lune_ui_core::text::TextKey(Spec::plain("Sonnet", key_style).cache_key(1.0));
     assert!(layer.texts.iter().any(|t| t.key == want), "key at font_s");
     let strip = out
@@ -653,9 +661,62 @@ fn a_window_flyout_card_fills_the_window_at_the_three_states() {
         let (scene, ..) = win_draw(&mut ui, 600, Some(&f));
         // The card is the window: its size, at the origin, whatever the anchor says.
         assert_eq!(card(&scene), [0.0, 0.0, w, h], "{state}");
-        let b = scene.backdrop.expect("a glass card asks for the blur");
+        let b = scene
+            .backdrops()
+            .next()
+            .copied()
+            .expect("a glass card asks for the blur");
         assert_eq!(b.rect, [0.0, 0.0, w, h], "{state}");
     }
+}
+
+#[test]
+fn a_flyout_window_in_an_area_starts_at_the_areas_corner_and_the_window_forms_are_unchanged() {
+    let f = serving();
+    let (w, h) = size_of(&f);
+    let area = Rect::new(120.0, 50.0, w, h);
+    let mut ui = UiHarness::new((w + 300.0, h + 200.0));
+    let mut draw_in = |ms: u64, area: Option<Rect>| {
+        ui.at_ms(ms)
+            .frame(|ui| {
+                match area {
+                    Some(a) => ui.flyout_window_in("fly", a, &f),
+                    None => ui.flyout_window("fly", &f),
+                };
+            })
+            .0
+    };
+    draw_in(0, Some(area));
+    let scene = draw_in(300, Some(area));
+    assert_eq!(
+        card(&scene),
+        [120.0, 50.0, w, h],
+        "the card is at the corner"
+    );
+    let b = scene.backdrops().next().copied().expect("the blur");
+    assert_eq!(b.rect, [120.0, 50.0, w, h]);
+
+    // The window form is the area form with the painter's window, drawn identically.
+    let window = Rect::new(0.0, 0.0, w + 300.0, h + 200.0);
+    let mut a = UiHarness::new((window.w, window.h));
+    let mut b = UiHarness::new((window.w, window.h));
+    let mut last = (Scene::default(), Scene::default());
+    for ms in [0, 300] {
+        last.0 = a
+            .at_ms(ms)
+            .frame(|ui| {
+                ui.flyout_window("fly", &f);
+            })
+            .0;
+        last.1 = b
+            .at_ms(ms)
+            .frame(|ui| {
+                ui.flyout_window_in("fly", window, &f);
+            })
+            .0;
+    }
+    assert_eq!(last.0, last.1);
+    assert_eq!(card(&last.0), [0.0, 0.0, w, h]);
 }
 
 #[test]
@@ -755,9 +816,9 @@ fn win_close_run(tier: MotionTier) -> (u64, Vec<f32>, bool) {
     let mut t = 1000;
     loop {
         let (scene, _, out) = win_draw(&mut h, t, None);
-        if let Some(s) = scene.layers[LayerId::Popup as usize].geometry.under.first() {
+        if let Some(s) = scene.merged(LayerId::Popup).geometry.under.first() {
             alphas.push(s.color[3]);
-            blurred &= scene.backdrop.is_some();
+            blurred &= scene.backdrops().next().is_some();
         }
         if out.repaint == Repaint::Idle {
             return (t - 1000, alphas, blurred);
@@ -787,13 +848,13 @@ fn a_window_flyout_opens_and_closes_with_the_menus_curves_and_goes_idle() {
         let mut r = UiHarness::new(size_of(&f));
         win_draw(&mut r, 0, Some(&f));
         let (scene, ..) = win_draw(&mut r, 400, Some(&f));
-        scene.layers[LayerId::Popup as usize].geometry.under[0].color[3]
+        scene.merged(LayerId::Popup).geometry.under[0].color[3]
     };
     let mut last = 0.0;
     for k in 1..=15_u64 {
         let dt = (k * 1000 + 30) / 60;
         let (scene, _, out) = win_draw(&mut h, dt, Some(&f));
-        let a = scene.layers[LayerId::Popup as usize].geometry.under[0].color[3];
+        let a = scene.merged(LayerId::Popup).geometry.under[0].color[3];
         assert!(a >= last && a.is_finite(), "{dt}: {a} after {last}");
         last = a;
         if dt >= 180 + 17 {
@@ -803,9 +864,9 @@ fn a_window_flyout_opens_and_closes_with_the_menus_curves_and_goes_idle() {
     }
     // Stopped calling, it fades out; once the close is over the blur is gone.
     let (scene, ..) = win_draw(&mut h, 1200, None);
-    assert!(scene.backdrop.is_some());
+    assert!(scene.backdrops().next().is_some());
     let (scene, ..) = win_draw(&mut h, 1400, None);
-    assert!(scene.backdrop.is_none());
+    assert!(scene.backdrops().next().is_none());
 }
 
 #[test]

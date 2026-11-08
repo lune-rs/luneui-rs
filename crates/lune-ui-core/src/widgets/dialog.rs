@@ -1,7 +1,7 @@
-//! The house look's dialog: dim backdrop, 448 px acrylic card (600 for a form), 24 px padding,
-//! darker footer block.
+//! The house look's dialog: a dim, blurred backdrop, a 448 px frosted glass card (600 for a form),
+//! 24 px padding, darker footer block.
 //!
-//! The drawing is split into the scrim, the card (acrylic, ring, text), the app's body and the
+//! The drawing is split into the scrim, the card (frost, ring, text), the app's body and the
 //! footer, so one set of paint functions serves three callers: [`dialog`], the Painter-API
 //! function (everything at rest, no transform), [`Ui::dialog`] and [`Ui::dialog_with`] (the same
 //! on the overlay machinery, with the open fade and scale), and the exit painter of a closing
@@ -14,11 +14,16 @@ use std::rc::Rc;
 
 use super::button::{self, ButtonKind, ButtonLook, ButtonState};
 use super::{button as button_fn, button_width};
+
+/// The least width of a footer button (the source look's `MinWidth`, R4), so a two-letter confirm
+/// is not a stub.
+const BUTTON_MIN_WIDTH: f32 = 80.0;
 use crate::access::{Action, Node, Role, State};
-use crate::color::{over, premul};
+use crate::color::premul;
 use crate::motion::{Easing, Kind, Motion, Reduce, Token};
 use crate::paint::{LayerId, Ops, Painter, Rect, Xform};
 use crate::text::{Spec, Style};
+use crate::theme::Theme;
 use crate::ui::{DISABLED_ALPHA, OverlayFrame, OverlayOptions, OverlayPhase, Sense, Ui, WidgetId};
 
 /// What the dialog says.
@@ -33,14 +38,23 @@ pub struct DialogSpec<'s> {
     pub cancel: Option<&'s str>,
 }
 
-/// Acrylic colours for the card, from the app's glass policy (premultiplied).
+/// The card's frost, from the app's glass policy.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DialogGlass {
-    /// What the panel layer shows behind the dim backdrop (feeds the card's antialiased edge).
-    pub panel: [f32; 4],
-    /// The card's own fill.
+    /// The card's own fill, premultiplied: frosted over the scrim's blurred picture.
     pub fill: [f32; 4],
     pub noise: bool,
+}
+
+impl DialogGlass {
+    /// The glass every surface of the toolkit draws: `theme`'s `menu_glass`, premultiplied, with
+    /// the noise on (D8, D9).
+    pub fn of(theme: &Theme) -> DialogGlass {
+        DialogGlass {
+            fill: premul(theme.menu_glass),
+            noise: true,
+        }
+    }
 }
 
 /// Hit regions of a dialog.
@@ -117,10 +131,10 @@ impl Layout {
             body_h + footer_h,
         );
         let footer = Rect::new(card.x, card.bottom() - footer_h, card_w, footer_h);
-        let cw = button_width(p, spec.confirm);
+        let cw = button_width(p, spec.confirm).max(BUTTON_MIN_WIDTH);
         let confirm = Rect::new(footer.right() - 24.0 - cw, footer.y + 18.0, cw, 32.0);
         let cancel = spec.cancel.map(|label| {
-            let xw = button_width(p, label);
+            let xw = button_width(p, label).max(BUTTON_MIN_WIDTH);
             Rect::new(confirm.x - 8.0 - xw, confirm.y, xw, 32.0)
         });
         // The same association as the moved code: `y += th + 10.0`, then `y += mh`.
@@ -152,8 +166,8 @@ fn card_xform(card: Rect, scale: f32, alpha: f32) -> Xform {
     }
 }
 
-/// The scrim over the window; `blur` first asks for the window content behind it blurred (at
-/// sigma 8, saturation 1), at the scrim's own opacity.
+/// The scrim over the window; `blur` first asks for what is drawn behind it, blurred (at sigma 8,
+/// saturation 1), at the scrim's own opacity.
 fn paint_scrim<H: Copy + PartialEq>(p: &mut Painter<'_, H>, blur: bool) {
     let win = p.window;
     let t = p.theme;
@@ -163,12 +177,12 @@ fn paint_scrim<H: Copy + PartialEq>(p: &mut Painter<'_, H>, blur: bool) {
     p.fill(win, 0.0, t.dialog_backdrop);
 }
 
-/// The card's acrylic and its ring.
+/// The card's frost and its ring. The scrim's blur (when there is one) is already under it, so
+/// the card asks for none of its own.
 fn paint_card<H: Copy + PartialEq>(p: &mut Painter<'_, H>, card: Rect, glass: &DialogGlass) {
     let t = p.theme;
-    let under = over(premul(t.dialog_backdrop), glass.panel);
-    p.acrylic(card, 8.0, glass.fill, under, glass.noise);
-    p.ring(card, 8.0, 1.0, t.border_subtle, false);
+    p.frost(card, 8.0, glass.fill, glass.noise);
+    p.ring(card, 8.0, 1.0, t.menu_popup_border, false);
 }
 
 fn paint_text<H: Copy + PartialEq>(p: &mut Painter<'_, H>, l: &Layout) {
@@ -181,7 +195,8 @@ fn paint_footer<H: Copy + PartialEq>(p: &mut Painter<'_, H>, l: &Layout) {
     p.fill_radii(l.footer, [0.0, 0.0, 8.0, 8.0], t.dialog_footer);
 }
 
-/// Draws a dialog on the modal layer. `body` draws the app's part between the message and the
+/// Draws a dialog on the modal layer with [`Painter::on`], so it inherits the caller's clip and
+/// transforms; call it with none (the `Ui` overlays start with none). `body` draws the app's part between the message and the
 /// footer; it gets the painter, the card's content x, the y just below the message and the
 /// content width.
 pub fn dialog<H: Copy + PartialEq>(
@@ -194,7 +209,7 @@ pub fn dialog<H: Copy + PartialEq>(
     p.on(LayerId::Modal);
     let win = p.window;
     p.hit(win, hits.block);
-    paint_scrim(p, false);
+    paint_scrim(p, true);
 
     let l = Layout::of(p, spec, CARD_W);
     paint_card(p, l.card, glass);
@@ -264,8 +279,8 @@ impl DialogWidth {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DialogOptions {
     pub width: DialogWidth,
-    /// Blur the window content behind the scrim (sigma 8, saturation 1). Off draws the plain
-    /// scrim.
+    /// Blur what is behind the scrim (sigma 8, saturation 1); the default. Off draws the plain
+    /// scrim, and the card frosts the sharp picture.
     pub scrim_blur: bool,
     /// False draws the confirm button disabled: nothing activates it (Enter, Space, a click and
     /// the default action do nothing), and the open focus goes to Cancel, or nowhere.
@@ -276,7 +291,7 @@ impl Default for DialogOptions {
     fn default() -> Self {
         Self {
             width: DialogWidth::Confirm,
-            scrim_blur: false,
+            scrim_blur: true,
             confirm_enabled: true,
         }
     }
@@ -325,12 +340,12 @@ fn fade(alpha: f32) -> Xform {
 
 /// What a modal surface needs of its host.
 pub(crate) struct ModalHost<'s> {
-    /// The card's rect: the transform's origin, the node's bounds, the acrylic.
+    /// The card's rect: the transform's origin, the node's bounds, the frost.
     pub(crate) card: Rect,
     /// The node's name and description.
     pub(crate) name: &'s str,
     pub(crate) description: Option<&'s str>,
-    /// Blur the window content behind the scrim.
+    /// Blur what is behind the scrim.
     pub(crate) scrim_blur: bool,
     pub(crate) glass: &'s DialogGlass,
     /// The widget focused on open, if it is a tab stop of the overlay; else its first tab stop.
@@ -352,9 +367,9 @@ pub(crate) struct ModalReport<R> {
 }
 
 /// The modal host: the overlay on the `Modal` layer (Escape dismisses, focus trapped), the
-/// scrim (blurred when asked) with its click, the card's acrylic with the open and close
+/// scrim (blurred when asked) with its click, the card's frost with the open and close
 /// transform, the node (role `Dialog`, state `Modal`, actions Dismiss and, when offered, Default),
-/// and the exit painter of a closing surface. `content` draws on the card after the acrylic;
+/// and the exit painter of a closing surface. `content` draws on the card after the frost;
 /// `exit_parts` draws the same on the card of a closing surface, from owned data, inside the
 /// card's transform. Stop calling to close.
 pub(crate) fn modal_host<'a, R>(

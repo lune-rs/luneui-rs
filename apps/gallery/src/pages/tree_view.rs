@@ -11,7 +11,9 @@ use lune_ui::motion::MotionTier;
 use lune_ui::paint::Rect;
 use lune_ui::text::{Spec, Style};
 use lune_ui::ui::Ui;
-use lune_ui::widgets::tree_view::{ROW, TreeOptions, TreeRow, TreeRowCtx};
+use lune_ui::widgets::tree_view::{
+    ChevronStyle, GuideStub, GuideStyle, ROW, TreeOptions, TreeRow, TreeRowCtx,
+};
 
 use super::{caption, card, heading, on_card};
 use crate::page::Stage;
@@ -92,15 +94,31 @@ struct Live {
     /// The indent guides, and whether a press on a row toggles it.
     guides: bool,
     toggle_on_row: bool,
+    guide_style: GuideStyle,
+    chevron: ChevronStyle,
+    stub: GuideStub,
 }
 
 fn state(open: &'static [u64], selected: Option<u64>) -> Box<dyn PageState> {
+    styled(open, selected, GuideStyle::Elbow, ChevronStyle::Triangle)
+}
+
+/// A tree seeded like [`state`], with the guide lines and the mark in the given styles.
+fn styled(
+    open: &'static [u64],
+    selected: Option<u64>,
+    guide_style: GuideStyle,
+    chevron: ChevronStyle,
+) -> Box<dyn PageState> {
     Box::new(Live {
         seed: Some((open, selected)),
         activated: None,
         disabled: false,
         guides: true,
         toggle_on_row: false,
+        guide_style,
+        chevron,
+        stub: GuideStub::Label,
     })
 }
 
@@ -112,6 +130,9 @@ fn disabled() -> Box<dyn PageState> {
         disabled: true,
         guides: true,
         toggle_on_row: false,
+        guide_style: GuideStyle::Elbow,
+        chevron: ChevronStyle::Triangle,
+        stub: GuideStub::Label,
     })
 }
 
@@ -120,7 +141,7 @@ fn live() -> Box<dyn PageState> {
 }
 
 fn all_open() -> Box<dyn PageState> {
-    state(&[SRC, GPU, SHADERS, WIDGETS, DOCS], None)
+    state(ALL_OPEN, None)
 }
 
 fn closed() -> Box<dyn PageState> {
@@ -129,6 +150,20 @@ fn closed() -> Box<dyn PageState> {
 
 fn one_open() -> Box<dyn PageState> {
     state(&[SRC], None)
+}
+
+const ALL_OPEN: &[u64] = &[SRC, GPU, SHADERS, WIDGETS, DOCS];
+
+fn straight() -> Box<dyn PageState> {
+    styled(ALL_OPEN, None, GuideStyle::Straight, ChevronStyle::Triangle)
+}
+
+fn on_hover() -> Box<dyn PageState> {
+    styled(ALL_OPEN, None, GuideStyle::OnHover, ChevronStyle::Triangle)
+}
+
+fn chevron() -> Box<dyn PageState> {
+    styled(&[SRC], None, GuideStyle::Elbow, ChevronStyle::Chevron)
 }
 
 fn selected() -> Box<dyn PageState> {
@@ -161,6 +196,9 @@ impl PageState for Live {
             rows: &ROWS,
             label: "Files",
             guides: self.guides,
+            guide_style: self.guide_style,
+            chevron: self.chevron,
+            stub: self.stub,
             toggle_on_row: self.toggle_on_row,
         };
         let tree = on_card(c, TREE);
@@ -185,6 +223,24 @@ impl PageState for Live {
 
     fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
         panel.toggle(ui, "Indent guides", &mut self.guides);
+        let mut style = self.guide_style as usize;
+        if panel.choice(
+            ui,
+            "Guide lines",
+            &["Elbow", "Straight", "On hover"],
+            &mut style,
+        ) {
+            self.guide_style =
+                [GuideStyle::Elbow, GuideStyle::Straight, GuideStyle::OnHover][style];
+        }
+        let mut mark = self.chevron as usize;
+        if panel.choice(ui, "Disclosure mark", &["Triangle", "Chevron"], &mut mark) {
+            self.chevron = [ChevronStyle::Triangle, ChevronStyle::Chevron][mark];
+        }
+        let mut stub = self.stub as usize;
+        if panel.choice(ui, "Leaf stub", &["To the label", "Short"], &mut stub) {
+            self.stub = [GuideStub::Label, GuideStub::Short][stub];
+        }
         panel.toggle(ui, "A press on a row toggles it", &mut self.toggle_on_row);
         let mut enabled = !self.disabled;
         if panel.toggle(ui, "Enabled", &mut enabled) {
@@ -224,6 +280,33 @@ const SCENES: &[UiScene] = &[
         expect: Expect::Settled,
     },
     settled("tree-view-expanded", 2, one_open),
+    settled("tree-view-straight", 2, straight),
+    // The guides fade in while the pointer is over the tree (120 ms, `hover`), settled by 300 ms.
+    UiScene {
+        id: "tree-view-on-hover",
+        scale: 2.0,
+        tier: MotionTier::Full,
+        state: on_hover,
+        script: &[Step {
+            at_ms: 100,
+            events: &[Ev::PointerAt(SECOND_ROW.0, SECOND_ROW.1)],
+        }],
+        capture_ms: 400,
+        expect: Expect::Settled,
+    },
+    // The thin chevron: the hovered row's brighter than the resting rows'.
+    UiScene {
+        id: "tree-view-chevron",
+        scale: 2.0,
+        tier: MotionTier::Full,
+        state: chevron,
+        script: &[Step {
+            at_ms: 100,
+            events: &[Ev::PointerAt(SECOND_ROW.0, SECOND_ROW.1)],
+        }],
+        capture_ms: 400,
+        expect: Expect::Settled,
+    },
     // The expand is base (250 ms): half way 125 ms after the key.
     UiScene {
         id: "tree-view-expand-mid",
@@ -367,8 +450,8 @@ mod tests {
         let (scene, _) = run("tree-view-hover", 2);
         let hover = lune_ui::color::premul(THEME.surface_hover);
         let filled = |s: &Scene| {
-            s.layers
-                .iter()
+            s.in_order()
+                .into_iter()
                 .flat_map(|l| l.geometry.under.iter())
                 .any(|f| f.color == hover)
         };
@@ -407,5 +490,39 @@ mod tests {
 
         let (_, out) = run("tree-view-focus", 2);
         assert!(out.focused.is_some(), "the tree holds the focus");
+    }
+
+    /// The turn in degrees of the first row's mark (the first triangle with a corner in the top
+    /// row, at 2x; a block's rows draw before it): from the middle of its longest edge to the
+    /// opposite corner, clockwise from pointing right.
+    fn turn(scene: &Scene) -> f32 {
+        let top_row = TREE.y * 2.0..(TREE.y + ROW) * 2.0;
+        let t: Vec<[f32; 2]> = scene
+            .in_order()
+            .into_iter()
+            .flat_map(|l| l.geometry.fills.iter().map(|v| v.pos))
+            .filter(|p| top_row.contains(&p[1]))
+            .take(3)
+            .collect();
+        let d = |a: [f32; 2], b: [f32; 2]| (a[0] - b[0]).hypot(a[1] - b[1]);
+        let (a, b, apex) = [(0, 1, 2), (1, 2, 0), (2, 0, 1)]
+            .into_iter()
+            .max_by(|x, y| d(t[x.0], t[x.1]).total_cmp(&d(t[y.0], t[y.1])))
+            .expect("three edges");
+        let mid = [(t[a][0] + t[b][0]) / 2.0, (t[a][1] + t[b][1]) / 2.0];
+        (t[apex][1] - mid[1])
+            .atan2(t[apex][0] - mid[0])
+            .to_degrees()
+    }
+
+    #[test]
+    fn the_expand_scene_catches_the_mark_half_way_round() {
+        // 125 ms into a 250 ms sine-in-out: half of 90 degrees.
+        let (scene, _) = run("tree-view-expand-mid", 2);
+        let angle = turn(&scene);
+        println!("tree-view-expand-mid mark: {angle:.2} deg");
+        assert!((angle - 45.0).abs() < 3.0, "{angle}");
+        let (scene, _) = run("tree-view-expanded", 2);
+        assert_eq!(turn(&scene), 90.0, "an open row points down, no transform");
     }
 }

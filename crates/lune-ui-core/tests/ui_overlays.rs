@@ -1,6 +1,7 @@
 //! The overlay stack (C4): modal capture, Escape and outside-press dismissal on the top overlay,
 //! phases, exit retention per tier through the exit painter, reopening a closing overlay,
-//! replaying recorded content, and overlays above a modal: the `Raised` layer, chosen at open.
+//! replaying recorded content, and overlays above a modal: the `Raised` or `Outside` layer, chosen
+//! at open from the modals under it, and lowered on later frames as those modals leave.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -10,15 +11,18 @@ use lune_ui_core::access::{Node, Role};
 use lune_ui_core::input::{FrameOutput, Key, NamedKey, PointerButton, Repaint};
 use lune_ui_core::motion::{Easing, Kind, Motion, MotionTier, Reduce, Token};
 use lune_ui_core::paint::{LayerId, Rect};
-use lune_ui_core::scene::Scene;
+use lune_ui_core::scene::{Layer, OverlayLayer, Scene};
 use lune_ui_core::testing::UiHarness;
 use lune_ui_core::ui::{
     Dismissal, OverlayFrame, OverlayOptions, OverlayPhase, Response, Sense, Ui, WidgetId,
 };
 use lune_ui_core::widgets::button::ButtonKind;
+use lune_ui_core::widgets::command_palette::{Palette, PaletteRow, PaletteSection};
 use lune_ui_core::widgets::dialog::{Cancel, Dialog, DialogGlass};
 use lune_ui_core::widgets::menu::MenuRow;
 use lune_ui_core::widgets::popover::PopoverOptions;
+use lune_ui_core::widgets::search_picker::PickerOptions;
+use lune_ui_core::widgets::toast::{ToastKind, ToastSpec, Toasts};
 
 const P: PointerButton = PointerButton::Primary;
 const PAGE_BTN: Rect = Rect::new(10.0, 10.0, 80.0, 30.0);
@@ -298,7 +302,7 @@ fn close_run(tier: MotionTier) -> (Vec<f32>, Vec<Repaint>, u64, Scene) {
             return (ps, repaints, t - t0, scene);
         }
         repaints.push(out.repaint);
-        let modal_layer = &scene.layers[LayerId::Modal as usize];
+        let modal_layer = &scene.merged(LayerId::Modal);
         assert_eq!(
             modal_layer.geometry.under.len(),
             1,
@@ -329,7 +333,7 @@ fn an_overlay_the_app_stops_calling_keeps_drawing_until_its_close_ends() {
         }
         assert!(ps.windows(2).all(|w| w[1] > w[0]), "{tier:?}: rising p");
         assert!(ps.iter().all(|p| *p < 1.0));
-        let modal_layer = &scene.layers[LayerId::Modal as usize];
+        let modal_layer = &scene.merged(LayerId::Modal);
         assert!(
             modal_layer.geometry.under.is_empty(),
             "{tier:?}: nothing on its layer"
@@ -420,8 +424,8 @@ fn recorded_content_replays_in_the_exit_painter() {
     let (closing, _) = h.at_ms(1000).frame(|_| {});
     let open_scene = open_scene.expect("ran");
     assert_eq!(
-        closing.layers[LayerId::Modal as usize],
-        open_scene.layers[LayerId::Modal as usize],
+        closing.merged(LayerId::Modal),
+        open_scene.merged(LayerId::Modal),
         "the first exit frame replays the content as drawn"
     );
 }
@@ -511,7 +515,6 @@ fn a_nested_record_keeps_the_outer_recording_whole() {
 
 const WIN: (f32, f32) = (800.0, 600.0);
 const GLASS: DialogGlass = DialogGlass {
-    panel: [0.1, 0.1, 0.12, 1.0],
     fill: [0.2, 0.2, 0.2, 0.62],
     noise: false,
 };
@@ -678,13 +681,13 @@ fn open_child(kind: Child) -> (UiHarness, Bed, FrameOutput) {
 }
 
 fn has_content(scene: &Scene, layer: LayerId) -> bool {
-    let l = &scene.layers[layer as usize];
+    let l = &scene.merged(layer);
     !(l.texts.is_empty() && l.geometry.under.is_empty() && l.geometry.acrylic.is_empty())
 }
 
 /// How much each kind of draw `layer` holds.
 fn counts(scene: &Scene, layer: LayerId) -> (usize, usize, usize, usize) {
-    let l = &scene.layers[layer as usize];
+    let l = &scene.merged(layer);
     let g = &l.geometry;
     (g.acrylic.len(), g.under.len(), g.over.len(), l.texts.len())
 }
@@ -849,7 +852,8 @@ fn marked(ui: &mut Ui<'_>, key: &str, opts: &OverlayOptions) -> Response {
 }
 
 fn fills(scene: &Scene, layer: LayerId) -> usize {
-    scene.layers[layer as usize]
+    scene
+        .merged(layer)
         .geometry
         .under
         .iter()
@@ -985,29 +989,206 @@ fn a_dialog_over_a_dialog_is_raised_takes_input_and_the_first_gets_none() {
 }
 
 #[test]
-fn a_parent_closing_first_leaves_the_child_raised_until_it_closes() {
+fn a_parent_closing_first_leaves_the_child_raised_until_the_parent_is_gone() {
     let mut h = harness();
     let (scene, _) = h.frame(|ui| {
         dialog(ui, "dialog", &modal());
         marked(ui, "child", &popup());
     });
     assert_eq!(fills(&scene, LayerId::Raised), 1);
-    for ms in [10, 1_000, 2_000] {
+    // The dialog stops being called at 10 ms; its exit runs for the close motion.
+    h.at_ms(10);
+    let (scene, _) = h.frame(|ui| {
+        marked(ui, "child", &popup());
+    });
+    assert_eq!(
+        fills(&scene, LayerId::Raised),
+        1,
+        "held while the parent closes"
+    );
+    assert_eq!(fills(&scene, LayerId::Popup), 0);
+    // Its exit is over by 1,000 ms: the reason for the hold is gone, and the child is on Popup.
+    for ms in [1_000, 2_000] {
         h.at_ms(ms);
         let (scene, _) = h.frame(|ui| {
             marked(ui, "child", &popup());
         });
-        assert_eq!(fills(&scene, LayerId::Raised), 1, "held at {ms} ms");
-        assert_eq!(fills(&scene, LayerId::Popup), 0);
+        assert_eq!(fills(&scene, LayerId::Popup), 1, "back on Popup at {ms} ms");
+        assert_eq!(fills(&scene, LayerId::Raised), 0);
     }
+    // A closing child keeps the layer it has.
     h.at_ms(2_010);
     let (scene, _) = h.frame(|_| {});
-    assert_eq!(
-        fills(&scene, LayerId::Raised),
-        1,
-        "its exit is on Raised too"
+    assert_eq!(fills(&scene, LayerId::Popup), 1, "its exit is on Popup too");
+    assert_eq!(fills(&scene, LayerId::Raised), 0);
+}
+
+const CHILD_R: Rect = Rect::new(300.0, 10.0, 50.0, 40.0);
+
+fn fills_at(scene: &Scene, layer: LayerId, r: Rect) -> usize {
+    scene
+        .merged(layer)
+        .geometry
+        .under
+        .iter()
+        .filter(|s| s.rect == r.phys(1.0))
+        .count()
+}
+
+/// A modal `key` that fills `MENU`, holding a popup `pop` that fills `CHILD_R` when `with_child`.
+fn parent_with_child(ui: &mut Ui<'_>, key: &str, with_child: bool) {
+    ui.overlay(
+        key,
+        &modal(),
+        |p, _, _| p.fill(MENU, 0.0, [1, 2, 3, 255]),
+        |ui, _| {
+            ui.painter().fill(MENU, 0.0, [1, 2, 3, 255]);
+            if with_child {
+                ui.overlay(
+                    (key, "pop"),
+                    &popup(),
+                    |p, _, _| p.fill(CHILD_R, 0.0, [4, 5, 6, 255]),
+                    |ui, _| ui.painter().fill(CHILD_R, 0.0, [4, 5, 6, 255]),
+                );
+            }
+        },
     );
-    assert_eq!(fills(&scene, LayerId::Popup), 0);
+}
+
+#[test]
+fn a_dialog_replacing_another_in_one_frame_is_raised_only_during_the_first_ones_exit() {
+    let mut h = harness();
+    parent_with_child_frame(&mut h, 0, Some("a"), None);
+    parent_with_child_frame(&mut h, 1_000, Some("a"), None);
+    // A stops being called; B opens in the same frame, above A, which is still active.
+    let scene = parent_with_child_frame(&mut h, 1_010, None, Some("b"));
+    assert_eq!(fills(&scene, LayerId::Raised), 1, "B is raised over A");
+    assert_eq!(
+        fills_at(&scene, LayerId::Raised, CHILD_R),
+        1,
+        "so is its popover"
+    );
+    assert_eq!(fills(&scene, LayerId::Modal), 1, "A's exit");
+    // Inside A's exit: B and its popover stay on Raised.
+    let scene = parent_with_child_frame(&mut h, 1_020, None, Some("b"));
+    assert_eq!(fills(&scene, LayerId::Raised), 1);
+    assert_eq!(fills_at(&scene, LayerId::Raised, CHILD_R), 1);
+    assert_eq!(fills(&scene, LayerId::Modal), 1, "A's exit");
+    // A's exit is over: B is on Modal, and its popover, with B on the stack, stays on Raised.
+    for ms in [3_000, 3_010] {
+        let scene = parent_with_child_frame(&mut h, ms, None, Some("b"));
+        assert_eq!(fills(&scene, LayerId::Modal), 1, "B on Modal at {ms} ms");
+        assert_eq!(fills(&scene, LayerId::Raised), 0);
+        assert_eq!(
+            fills_at(&scene, LayerId::Raised, CHILD_R),
+            1,
+            "popover on Raised"
+        );
+        assert_eq!(fills_at(&scene, LayerId::Popup, CHILD_R), 0);
+    }
+}
+
+fn parent_with_child_frame(h: &mut UiHarness, ms: u64, a: Option<&str>, b: Option<&str>) -> Scene {
+    h.at_ms(ms)
+        .frame(|ui| {
+            if let Some(key) = a {
+                parent_with_child(ui, key, false);
+            }
+            if let Some(key) = b {
+                parent_with_child(ui, key, true);
+            }
+        })
+        .0
+}
+
+#[test]
+fn a_popover_held_after_its_parent_closed_drops_to_popup_under_a_new_dialog() {
+    let mut h = harness();
+    let frame = |h: &mut UiHarness, ms: u64, dialog: Option<&str>, pop: bool| {
+        let mut clicks = (false, false);
+        let (scene, _) = h.at_ms(ms).frame(|ui| {
+            if let Some(key) = dialog {
+                clicks.0 = marked(ui, key, &modal()).clicked;
+            }
+            if pop {
+                clicks.1 = marked_at(ui, "pop", &popup(), CHILD_R).clicked;
+            }
+        });
+        (scene, clicks)
+    };
+    frame(&mut h, 0, Some("d"), true);
+    frame(&mut h, 1_000, Some("d"), true);
+    // The dialog goes; the popover is still called and held on Raised during its exit.
+    let (scene, _) = frame(&mut h, 1_010, None, true);
+    assert_eq!(fills_at(&scene, LayerId::Raised, CHILD_R), 1);
+    // The exit is over: the popover is back on Popup.
+    let (scene, _) = frame(&mut h, 2_000, None, true);
+    assert_eq!(fills_at(&scene, LayerId::Popup, CHILD_R), 1);
+    // A new dialog opens over it, on Modal, above the popover, and blocks it.
+    let (scene, _) = frame(&mut h, 2_010, Some("n"), true);
+    assert_eq!(fills(&scene, LayerId::Modal), 1);
+    assert_eq!(fills_at(&scene, LayerId::Popup, CHILD_R), 1);
+    let (cx, cy) = (CHILD_R.x + 5.0, CHILD_R.y + 5.0);
+    h.input.pointer_to(cx, cy);
+    frame(&mut h, 2_020, Some("n"), true);
+    h.input.click(P);
+    let (_, clicks) = frame(&mut h, 2_030, Some("n"), true);
+    assert_eq!(clicks, (false, false), "the dialog blocks the popover");
+    h.input.pointer_to(MENU.x + 5.0, MENU.y + 5.0);
+    frame(&mut h, 2_040, Some("n"), true);
+    h.input.click(P);
+    let (_, clicks) = frame(&mut h, 2_050, Some("n"), true);
+    assert_eq!(clicks, (true, false), "the dialog takes its own press");
+}
+
+/// `marked`, but filling and hit-testing `r`.
+fn marked_at(ui: &mut Ui<'_>, key: &str, opts: &OverlayOptions, r: Rect) -> Response {
+    ui.overlay(
+        key,
+        opts,
+        move |p, _, _| p.fill(r, 0.0, [4, 5, 6, 255]),
+        move |ui, _| {
+            ui.painter().fill(r, 0.0, [4, 5, 6, 255]);
+            let id = ui.id((key, "hit"));
+            ui.interact(id, r, Sense::CLICK_FOCUS)
+        },
+    )
+    .1
+}
+
+#[test]
+fn a_child_in_a_nested_dialog_takes_a_press_over_the_dialogs_later_button() {
+    let mut h = harness();
+    let frame = |h: &mut UiHarness, ms: u64| {
+        let mut clicks = (false, false);
+        h.at_ms(ms).frame(|ui| {
+            marked(ui, "lower", &modal());
+            ui.overlay(
+                "upper",
+                &modal(),
+                |_, _, _| {},
+                |ui, _| {
+                    // The child is called first; the footer button, later in call order, sits
+                    // under the same pointer.
+                    clicks.0 = marked(ui, "child", &popup()).clicked;
+                    let id = ui.id("footer");
+                    clicks.1 = ui.interact(id, MENU, Sense::CLICK_FOCUS).clicked;
+                },
+            );
+        });
+        clicks
+    };
+    frame(&mut h, 0);
+    frame(&mut h, 1_000);
+    h.input.pointer_to(MENU.x + 5.0, MENU.y + 5.0);
+    frame(&mut h, 1_010);
+    h.input.click(P);
+    let clicks = frame(&mut h, 1_020);
+    assert_eq!(
+        clicks,
+        (true, false),
+        "the child, opened after the dialog, is above its button"
+    );
 }
 
 #[test]
@@ -1235,8 +1416,8 @@ fn a_child_closing_with_its_dialog_leaves_on_its_own_layer() {
         assert!(!has_content(&scene, LayerId::Popup), "{kind:?}");
     }
     let glass = closing_frame(Child::Menu, true, 30);
-    let b = glass.backdrop.expect("the menu's own exit asks for it");
-    assert_eq!(b.layer, LayerId::Raised as usize);
+    let raised = glass.merged(LayerId::Raised).backdrops;
+    assert_eq!(raised.len(), 1, "the menu's own exit asks for it");
 }
 
 #[test]
@@ -1264,13 +1445,989 @@ fn a_tooltip_inside_a_popover_is_not_in_the_popover_exit() {
     run(&mut h, true);
     h.at_ms(3_000);
     let open = run(&mut h, true);
-    let drawn = open.layers[LayerId::Popup as usize].texts.len();
+    let drawn = open.merged(LayerId::Popup).texts.len();
     assert_eq!(drawn, 2, "the button's label and the tooltip's text");
     h.at_ms(3_010);
     let closing = run(&mut h, false);
     assert_eq!(
-        closing.layers[LayerId::Popup as usize].texts.len(),
+        closing.merged(LayerId::Popup).texts.len(),
         drawn,
         "each exit draws its own, once"
     );
+}
+
+// A layer per overlay: everything of an older overlay draws before anything of a newer one.
+
+/// The overlays of `scene` in their draw order, which `Scene::in_order` gives.
+fn drawn<'s>(scene: &'s Scene) -> Vec<&'s OverlayLayer> {
+    let order = scene.in_order();
+    let place = |l: &Layer| order.iter().position(|o| std::ptr::eq(*o, l));
+    let mut out: Vec<&'s OverlayLayer> = scene.overlays.iter().collect();
+    out.sort_by_key(|o| place(&o.layer).expect("every overlay is in the order"));
+    out
+}
+
+/// A dialog, a popover in it, a list in the popover and a tooltip on the popover's button; `inner`
+/// adds a second popover between the popover and the list, a fifth level.
+fn stack_frame(h: &mut UiHarness, ms: u64, inner: bool) -> (Scene, FrameOutput) {
+    h.at_ms(ms);
+    h.frame(|ui| {
+        ui.dialog("dialog", &DIALOG, &GLASS, |ui, x, y, _| {
+            let at = Rect::new(x, y, 120.0, 24.0);
+            ui.popover(
+                "pop",
+                &PopoverOptions::new(at, (200.0, 60.0)),
+                |ui, rect| {
+                    let button = Rect::new(rect.x + 8.0, rect.y + 8.0, 100.0, 24.0);
+                    let r = ui.button("anchor", button, "anchor", ButtonKind::Secondary);
+                    let aside = Rect::new(600.0, 20.0, 120.0, 24.0);
+                    if inner {
+                        ui.popover(
+                            "inner",
+                            &PopoverOptions::new(aside, (100.0, 40.0)),
+                            |_, _| {},
+                        );
+                    }
+                    let list = Rect::new(600.0, 300.0, 120.0, 24.0);
+                    ui.dropdown("list", list, r.id, &[("one", true), ("two", true)], 0);
+                    ui.tooltip(&r, "hint");
+                },
+            );
+        });
+    })
+}
+
+/// Opens the stack, then holds the pointer on the button until the tooltip is up.
+fn stacked_with_tooltip(inner: bool) -> Scene {
+    let mut h = UiHarness::new((800.0, 600.0));
+    stack_frame(&mut h, 0, inner);
+    let (_, out) = stack_frame(&mut h, 1_000, inner);
+    let (x, y) = centre(&out, "anchor");
+    h.input.pointer_to(x, y);
+    stack_frame(&mut h, 2_000, inner);
+    stack_frame(&mut h, 2_016, inner);
+    // The tooltip's first frame is at opacity 0 and asks for nothing; the next is settled.
+    stack_frame(&mut h, 4_000, inner);
+    stack_frame(&mut h, 5_000, inner).0
+}
+
+#[test]
+fn a_dialog_popover_list_and_tooltip_are_four_layers_in_open_order() {
+    let scene = stacked_with_tooltip(false);
+    let layers = drawn(&scene);
+    let on: Vec<LayerId> = layers.iter().map(|o| o.on).collect();
+    assert_eq!(
+        on,
+        [
+            LayerId::Modal,
+            LayerId::Raised,
+            LayerId::Raised,
+            LayerId::Raised
+        ]
+    );
+    assert!(layers.windows(2).all(|w| w[0].tag < w[1].tag));
+    // Each drew its own text: the dialog's, the button, the two rows and the selected mark, the hint.
+    let texts: Vec<usize> = layers.iter().map(|o| o.layer.texts.len()).collect();
+    assert!(texts[0] >= 3, "{texts:?}");
+    assert_eq!(texts[1..], [1, 3, 1]);
+    let under = &layers[0].layer.geometry.under;
+    assert!(under.iter().any(|s| s.is_frost()), "the card");
+}
+
+#[test]
+fn a_fifth_level_is_a_layer_of_its_own_too() {
+    let scene = stacked_with_tooltip(true);
+    let layers = drawn(&scene);
+    assert_eq!(layers.len(), 5);
+    assert!(layers.windows(2).all(|w| w[0].tag < w[1].tag));
+    let texts: Vec<usize> = layers.iter().map(|o| o.layer.texts.len()).collect();
+    assert_eq!(texts[1..], [1, 0, 3, 1]);
+}
+
+#[test]
+fn an_exit_under_a_newer_overlay_draws_in_its_open_order() {
+    let frame = |h: &mut UiHarness, ms: u64, pop: bool, menu: bool| {
+        h.at_ms(ms);
+        h.frame(|ui| {
+            if pop {
+                let options = PopoverOptions::new(PAGE_BTN, (120.0, 60.0));
+                ui.popover("pop", &options, |_, _| {});
+            }
+            if menu {
+                let row = MenuRow::Item {
+                    glyph: None,
+                    text: "one",
+                    shortcut: "",
+                };
+                ui.menu("menu", &[row], (200.0, 100.0));
+            }
+        })
+        .0
+    };
+    let mut h = harness();
+    frame(&mut h, 0, true, false);
+    frame(&mut h, 300, true, true);
+    frame(&mut h, 1_000, false, true);
+    let scene = frame(&mut h, 1_060, false, true);
+    // The exit runs at the frame's end, after the menu, and its tag still puts it first.
+    let [menu, exit] = scene.overlays.as_slice() else {
+        panic!("the menu and the exit: {:?}", scene.overlays.len());
+    };
+    assert!(exit.tag < menu.tag);
+    assert!(!exit.layer.geometry.under.is_empty(), "the exit drew");
+    assert!(!menu.layer.geometry.under.is_empty(), "the menu drew");
+    let layers = drawn(&scene);
+    assert_eq!(layers[0].tag, exit.tag);
+    assert_eq!(layers[1].tag, menu.tag);
+}
+
+#[test]
+fn what_an_overlay_draws_after_a_child_stays_on_its_own_layer() {
+    let mut h = harness();
+    let fill = |ui: &mut Ui<'_>| ui.painter().fill(MENU, 0.0, [1, 2, 3, 255]);
+    let (scene, _) = h.frame(|ui| {
+        ui.overlay(
+            "parent",
+            &popup(),
+            |_, _, _| {},
+            |ui, _| {
+                fill(ui);
+                ui.overlay("child", &popup(), |_, _, _| {}, |ui, _| fill(ui));
+                fill(ui);
+            },
+        );
+    });
+    let layers = drawn(&scene);
+    assert_eq!(layers.len(), 2);
+    assert_eq!(layers[0].layer.geometry.under.len(), 2, "the parent");
+    assert_eq!(layers[1].layer.geometry.under.len(), 1, "the child");
+    assert!(
+        scene.layers[LayerId::Popup as usize]
+            .geometry
+            .under
+            .is_empty()
+    );
+}
+
+// A surface outside the modals: `Ui::outside_modals` (R5, D7).
+
+/// The place of `layer` in `scene.in_order()`, by identity.
+fn place(scene: &Scene, layer: &Layer) -> usize {
+    scene
+        .in_order()
+        .iter()
+        .position(|o| std::ptr::eq(*o, layer))
+        .expect("the layer is in the draw order")
+}
+
+/// A button in the scope; `dialog` opens `modal()` at `depth` 1, or a second one inside it at 2.
+fn scope_frame(h: &mut UiHarness, depth: u32) -> Response {
+    let mut out = None;
+    h.frame(|ui| {
+        if depth >= 1 {
+            ui.overlay(
+                "parent",
+                &modal(),
+                |_, _, _| {},
+                |ui, _| {
+                    let card = ui.id("parent-card");
+                    ui.interact(card, CARD, Sense::HOVER);
+                    if depth >= 2 {
+                        ui.overlay(
+                            "child",
+                            &modal(),
+                            |_, _, _| {},
+                            |ui, _| {
+                                let card = ui.id("child-card");
+                                ui.interact(card, CARD, Sense::HOVER);
+                            },
+                        );
+                    }
+                },
+            );
+        }
+        out = Some(ui.outside_modals(|ui| {
+            let id = ui.id("scope-button");
+            ui.interact(id, PAGE_BTN, Sense::CLICK_FOCUS)
+        }));
+    });
+    out.expect("frame ran")
+}
+
+#[test]
+fn a_button_in_the_scope_takes_a_press_under_a_modal_and_under_a_nested_one() {
+    for depth in [1, 2] {
+        let mut h = harness();
+        scope_frame(&mut h, depth);
+        h.input.pointer_to(20.0, 20.0);
+        let b = scope_frame(&mut h, depth);
+        assert!(b.hovered, "depth {depth}: hover reaches the scope");
+        h.input.press(P);
+        let b = scope_frame(&mut h, depth);
+        assert!(b.pressed && b.focused, "depth {depth}: the press lands");
+        h.input.release(P);
+        let b = scope_frame(&mut h, depth);
+        assert!(b.clicked, "depth {depth}: the click completes");
+    }
+}
+
+#[test]
+fn a_page_button_beside_the_scope_stays_blocked_by_the_modal() {
+    let mut h = harness();
+    let run = |h: &mut UiHarness| {
+        let mut out = None;
+        h.frame(|ui| {
+            out = Some(page_button(ui));
+            dialog(ui, "dialog", &modal());
+        });
+        out.expect("frame ran")
+    };
+    run(&mut h);
+    h.input.pointer_to(20.0, 20.0).click(P);
+    let b = run(&mut h);
+    assert!(!b.hovered && !b.clicked, "only the scope is exempt");
+}
+
+#[test]
+fn a_blurred_scrim_runs_before_the_scope_so_its_content_is_not_blurred() {
+    let mut h = harness();
+    let (scene, _) = h.frame(|ui| {
+        ui.overlay(
+            "scrim",
+            &modal(),
+            |_, _, _| {},
+            |ui, _| {
+                ui.painter()
+                    .backdrop(Rect::new(0.0, 0.0, 400.0, 300.0), 0.0)
+            },
+        );
+        ui.outside_modals(|ui| ui.painter().fill(PAGE_BTN, 0.0, [9, 9, 9, 255]));
+    });
+    let order = scene.in_order();
+    let stop = order
+        .iter()
+        .position(|l| !l.backdrops.is_empty())
+        .expect("the scrim's request");
+    let scope = place(&scene, &scene.layers[LayerId::Outside as usize]);
+    assert!(
+        !scene.layers[LayerId::Outside as usize]
+            .geometry
+            .under
+            .is_empty()
+    );
+    assert!(
+        stop < scope,
+        "the request is at {stop}, the scope at {scope}"
+    );
+}
+
+#[test]
+fn a_menu_opened_from_the_scope_stays_on_outside_above_it_even_under_a_modal() {
+    let mut h = harness();
+    let fill = |ui: &mut Ui<'_>| ui.painter().fill(MENU, 0.0, [1, 2, 3, 255]);
+    let (scene, _) = h.frame(|ui| {
+        dialog(ui, "dialog", &modal());
+        ui.outside_modals(|ui| {
+            fill(ui);
+            ui.overlay("menu", &popup(), |_, _, _| {}, |ui, _| fill(ui));
+        });
+    });
+    let outside: Vec<_> = scene
+        .overlays
+        .iter()
+        .filter(|o| o.on == LayerId::Outside)
+        .collect();
+    assert_eq!(outside.len(), 1, "the menu is an overlay layer on Outside");
+    assert!(
+        scene
+            .overlays
+            .iter()
+            .all(|o| o.on != LayerId::Raised && o.on != LayerId::Popup)
+    );
+    let base = place(&scene, &scene.layers[LayerId::Outside as usize]);
+    assert!(
+        place(&scene, &outside[0].layer) > base,
+        "above the scope's own drawing"
+    );
+    assert_eq!(
+        scene.layers[LayerId::Outside as usize].geometry.under.len(),
+        1
+    );
+    assert_eq!(outside[0].layer.geometry.under.len(), 1);
+}
+
+#[test]
+fn a_toast_draws_above_the_scope_and_its_menu() {
+    let mut h = harness();
+    let (scene, _) = h.frame(|ui| {
+        ui.outside_modals(|ui| {
+            ui.painter().fill(PAGE_BTN, 0.0, [1, 2, 3, 255]);
+            ui.overlay(
+                "menu",
+                &popup(),
+                |_, _, _| {},
+                |ui, _| ui.painter().fill(MENU, 0.0, [1, 2, 3, 255]),
+            );
+        });
+        ui.painter().on(LayerId::Toast);
+        ui.painter().fill(PAGE_BTN, 0.0, [4, 5, 6, 255]);
+    });
+    let toast = place(&scene, &scene.layers[LayerId::Toast as usize]);
+    for o in scene.overlays.iter().filter(|o| o.on == LayerId::Outside) {
+        assert!(toast > place(&scene, &o.layer));
+    }
+    assert!(toast > place(&scene, &scene.layers[LayerId::Outside as usize]));
+}
+
+#[test]
+fn the_scope_keeps_the_clip_and_transform_and_puts_the_painter_back() {
+    let mut h = harness();
+    let clip = Rect::new(20.0, 20.0, 50.0, 50.0);
+    let probe = Rect::new(0.0, 0.0, 400.0, 300.0);
+    let (scene, _) = h.frame(|ui| {
+        ui.painter().on(LayerId::Page);
+        ui.painter().push_clip(clip);
+        ui.painter().push_translate(5.0, 7.0);
+        ui.outside_modals(|ui| ui.painter().fill(probe, 0.0, [1, 1, 1, 255]));
+        // Back on the layer the scope found, with the same clip and transform.
+        ui.painter().fill(probe, 0.0, [2, 2, 2, 255]);
+    });
+    let shape = |id: LayerId| {
+        let under = &scene.layers[id as usize].geometry.under;
+        assert_eq!(under.len(), 1, "{id:?} holds one fill");
+        under[0]
+    };
+    let (inside, after) = (shape(LayerId::Outside), shape(LayerId::Page));
+    assert!(
+        inside.clip[2] > 0.0,
+        "the scope draws under the caller's clip"
+    );
+    assert_eq!(inside.clip, clip.phys(1.0));
+    assert_eq!(after.clip, inside.clip, "the clip is back as it was");
+    assert_eq!(after.rect, inside.rect, "the transform is back as it was");
+    assert_eq!(inside.rect, Rect::new(5.0, 7.0, 400.0, 300.0).phys(1.0));
+}
+
+/// A dialog with a window-wide scrim region, a card and one button, each filled; `fill` colours
+/// the card. Returns the button's response.
+fn scrimmed(ui: &mut Ui<'_>, key: &str, opts: &OverlayOptions, fill: [u8; 4]) -> Response {
+    ui.overlay(
+        key,
+        opts,
+        |_, _, _| {},
+        |ui, _| {
+            let scrim = ui.id((key, "scrim"));
+            ui.interact(scrim, Rect::new(0.0, 0.0, 400.0, 300.0), Sense::CLICK);
+            ui.painter().fill(CARD, 0.0, fill);
+            let card = ui.id((key, "card"));
+            ui.interact(card, CARD, Sense::HOVER);
+            let ok = ui.id((key, "ok"));
+            ui.interact(ok, Rect::new(160.0, 180.0, 60.0, 24.0), Sense::CLICK_FOCUS)
+        },
+    )
+    .1
+}
+
+/// The scope half is the proof: the old predicate (`h.tag > tag || h.layer > layer`) read the
+/// scrim's tag 1 as above the scope's tag 0 and failed it. The dialog half is a guard: no hit can
+/// read differently there under the two predicates.
+#[test]
+fn pointer_in_reads_true_in_the_scope_under_a_modal_and_false_for_a_dialog_under_an_outside_hit() {
+    let mut h = harness();
+    let run = |h: &mut UiHarness| {
+        let (mut scope, mut dialog_under) = (None, None);
+        h.frame(|ui| {
+            // A modal whose scrim covers the whole window, and a card over the pane's corner.
+            ui.overlay(
+                "modal",
+                &modal(),
+                |_, _, _| {},
+                |ui, _| {
+                    let scrim = ui.id("scrim");
+                    ui.interact(scrim, Rect::new(0.0, 0.0, 400.0, 300.0), Sense::CLICK);
+                    let card = ui.id("card");
+                    ui.interact(card, CARD, Sense::HOVER);
+                    dialog_under = Some(ui.pointer_in(CARD));
+                },
+            );
+            ui.outside_modals(|ui| {
+                let pane = ui.id("pane");
+                ui.interact(pane, PAGE_BTN, Sense::HOVER);
+                scope = Some(ui.pointer_in(PAGE_BTN));
+                // A strip of the scope over the dialog's card.
+                let strip = ui.id("strip");
+                ui.interact(strip, Rect::new(150.0, 100.0, 40.0, 40.0), Sense::HOVER);
+            });
+        });
+        (scope.expect("ran"), dialog_under.expect("ran"))
+    };
+    run(&mut h);
+    h.input.pointer_to(20.0, 20.0);
+    run(&mut h);
+    let (scope, _) = run(&mut h);
+    assert!(
+        scope,
+        "the scope's pane is not covered by the modal's block"
+    );
+    h.input.pointer_to(160.0, 110.0);
+    run(&mut h);
+    let (_, under) = run(&mut h);
+    assert!(
+        !under,
+        "the dialog's card is covered by the scope's strip: Outside draws above Modal"
+    );
+}
+
+#[test]
+fn an_overlay_opened_at_top_level_above_an_outside_modal_draws_and_takes_input_above_it() {
+    let mut h = harness();
+    let run = |h: &mut UiHarness| {
+        let mut err_ok = None;
+        let (scene, _) = h.frame(|ui| {
+            ui.outside_modals(|ui| {
+                scrimmed(ui, "settings", &modal(), [10, 10, 10, 255]);
+            });
+            ui.overlay(
+                "menu",
+                &popup(),
+                |_, _, _| {},
+                |ui, _| ui.painter().fill(MENU, 0.0, [20, 20, 20, 255]),
+            );
+            err_ok = Some(scrimmed(ui, "error", &modal(), [30, 30, 30, 255]));
+        });
+        (scene, err_ok.expect("ran"))
+    };
+    let (scene, _) = run(&mut h);
+    let of = |tag: u32| {
+        scene
+            .overlays
+            .iter()
+            .find(|o| o.tag == tag)
+            .unwrap_or_else(|| panic!("overlay tag {tag}"))
+    };
+    let first = place(&scene, &of(1).layer);
+    for tag in [2, 3] {
+        assert!(
+            place(&scene, &of(tag).layer) > first,
+            "overlay tag {tag} (on {:?}) draws after the Outside modal",
+            of(tag).on
+        );
+    }
+    assert!(of(2).on as usize >= LayerId::Outside as usize);
+    assert!(of(3).on as usize >= LayerId::Outside as usize);
+    h.input.pointer_to(170.0, 190.0);
+    run(&mut h);
+    h.input.press(P);
+    let (_, ok) = run(&mut h);
+    assert!(ok.pressed, "the error dialog's button takes the press");
+    h.input.release(P);
+    let (_, ok) = run(&mut h);
+    assert!(ok.clicked, "and completes the click");
+}
+
+#[test]
+fn an_overlay_put_on_outside_for_a_modal_drops_back_when_that_modal_is_gone() {
+    let mut h = harness();
+    let run = |h: &mut UiHarness, settings: bool| {
+        h.frame(|ui| {
+            if settings {
+                ui.outside_modals(|ui| {
+                    scrimmed(ui, "settings", &modal(), [10, 10, 10, 255]);
+                });
+            }
+            ui.overlay(
+                "menu",
+                &popup(),
+                |_, _, _| {},
+                |ui, _| ui.painter().fill(MENU, 0.0, [20, 20, 20, 255]),
+            );
+        })
+        .0
+    };
+    let on = |scene: &Scene| {
+        scene
+            .overlays
+            .iter()
+            .find(|o| o.tag == 2)
+            .expect("the menu")
+            .on
+    };
+    assert_eq!(on(&run(&mut h, true)), LayerId::Outside);
+    assert_eq!(on(&run(&mut h, true)), LayerId::Outside, "held");
+    // The modal stops being called; its exit runs, then the menu is back on its own layer.
+    let mut scene = run(&mut h, false);
+    for ms in (50..=3_000).step_by(50) {
+        h.at_ms(ms);
+        scene = run(&mut h, false);
+    }
+    assert_eq!(on(&scene), LayerId::Popup, "the reason is gone");
+}
+
+/// The overlay drawn with `tag` in `scene`.
+fn tagged(scene: &Scene, tag: u32) -> &OverlayLayer {
+    scene
+        .overlays
+        .iter()
+        .find(|o| o.tag == tag)
+        .unwrap_or_else(|| panic!("overlay tag {tag}"))
+}
+
+/// A modal with a window-wide scrim region; returns the scrim's response.
+fn scrim_only(ui: &mut Ui<'_>, key: &str) -> Response {
+    ui.overlay(
+        key,
+        &modal(),
+        |_, _, _| {},
+        |ui, _| {
+            let scrim = ui.id((key, "scrim"));
+            ui.interact(scrim, Rect::new(0.0, 0.0, 400.0, 300.0), Sense::CLICK)
+        },
+    )
+    .1
+}
+
+#[test]
+fn a_menu_put_on_outside_drops_to_raised_after_the_outside_modal_and_stays_under_a_newer_dialog() {
+    let mut h = harness();
+    // M (tag 1) at top level, S (tag 2) in the scope, the menu P (tag 3) at top level, and later
+    // the dialog D (tag 4) at top level.
+    let run = |h: &mut UiHarness, settings: bool, dialog: bool| {
+        let (mut item, mut scrim) = (None, None);
+        let (scene, _) = h.frame(|ui| {
+            scrim_only(ui, "app");
+            if settings {
+                ui.outside_modals(|ui| {
+                    scrim_only(ui, "settings");
+                });
+            }
+            ui.overlay(
+                "menu",
+                &popup(),
+                |_, _, _| {},
+                |ui, _| {
+                    ui.painter().fill(MENU, 0.0, [20, 20, 20, 255]);
+                    let id = ui.id("item");
+                    item = Some(ui.interact(id, MENU, Sense::CLICK));
+                },
+            );
+            if dialog {
+                scrim = Some(scrim_only(ui, "error"));
+            }
+        });
+        (scene, item.expect("ran"), scrim)
+    };
+    let (scene, _, _) = run(&mut h, true, false);
+    assert_eq!(
+        tagged(&scene, 3).on,
+        LayerId::Outside,
+        "above the Outside modal"
+    );
+    // The frame S is first not called it is still open; its exit (180 ms) starts at that
+    // frame's finish, so the next frame is mid-exit.
+    h.at_ms(50);
+    run(&mut h, false, false);
+    h.at_ms(100);
+    let (scene, _, _) = run(&mut h, false, false);
+    assert_eq!(
+        tagged(&scene, 3).on,
+        LayerId::Outside,
+        "held while the Outside modal's exit runs"
+    );
+    let mut scene = scene;
+    for ms in (150..=3_000).step_by(50) {
+        h.at_ms(ms);
+        scene = run(&mut h, false, false).0;
+    }
+    assert_eq!(
+        tagged(&scene, 3).on,
+        LayerId::Raised,
+        "the Outside modal is gone, the older modal on Modal is not"
+    );
+    let (scene, _, _) = run(&mut h, false, true);
+    assert_eq!(tagged(&scene, 4).on, LayerId::Raised);
+    assert!(
+        place(&scene, &tagged(&scene, 4).layer) > place(&scene, &tagged(&scene, 3).layer),
+        "the newer dialog draws above the older menu"
+    );
+    for ms in (3_050..=6_000).step_by(50) {
+        h.at_ms(ms);
+        run(&mut h, false, true);
+    }
+    h.input.pointer_to(160.0, 20.0);
+    run(&mut h, false, true);
+    h.input.press(P);
+    let (_, item, scrim) = run(&mut h, false, true);
+    let scrim = scrim.expect("the dialog ran");
+    assert!(
+        scrim.pressed && !item.pressed && !item.hovered,
+        "the dialog's scrim takes a press over the menu (scrim {}, menu {} {})",
+        scrim.pressed,
+        item.pressed,
+        item.hovered
+    );
+}
+
+#[test]
+fn the_scope_is_live_under_a_dialog_put_on_outside_once_the_outside_modal_is_gone() {
+    let mut h = harness();
+    // M (tag 1) at top level, S (tag 2) in the scope, the error dialog E (tag 3) at top level with
+    // a child popup C (tag 4) in its body, and the scope's pane.
+    let run = |h: &mut UiHarness, settings: bool| {
+        let mut pane = None;
+        let (scene, _) = h.frame(|ui| {
+            scrim_only(ui, "app");
+            if settings {
+                ui.outside_modals(|ui| {
+                    scrim_only(ui, "settings");
+                });
+            }
+            ui.overlay(
+                "error",
+                &modal(),
+                |_, _, _| {},
+                |ui, _| {
+                    let scrim = ui.id("error-scrim");
+                    ui.interact(scrim, Rect::new(0.0, 0.0, 400.0, 300.0), Sense::CLICK);
+                    ui.overlay(
+                        "child",
+                        &popup(),
+                        |_, _, _| {},
+                        |ui, _| ui.painter().fill(MENU, 0.0, [20, 20, 20, 255]),
+                    );
+                },
+            );
+            ui.outside_modals(|ui| {
+                let id = ui.id("pane");
+                pane = Some((
+                    ui.interact(id, PAGE_BTN, Sense::CLICK),
+                    ui.pointer_in(PAGE_BTN),
+                ));
+            });
+        });
+        let (resp, inside) = pane.expect("ran");
+        (scene, resp, inside)
+    };
+    let (scene, _, _) = run(&mut h, true);
+    assert_eq!(tagged(&scene, 3).on, LayerId::Outside);
+    assert_eq!(tagged(&scene, 4).on, LayerId::Outside);
+    // The frame S is first not called it is still open; its exit (180 ms) starts at that
+    // frame's finish, so the next frame is mid-exit.
+    h.at_ms(50);
+    run(&mut h, false);
+    h.at_ms(100);
+    let (scene, _, _) = run(&mut h, false);
+    assert_eq!(
+        tagged(&scene, 3).on,
+        LayerId::Outside,
+        "held while the Outside modal's exit runs"
+    );
+    for ms in (150..=3_000).step_by(50) {
+        h.at_ms(ms);
+        run(&mut h, false);
+    }
+    h.input.pointer_to(20.0, 20.0);
+    run(&mut h, false);
+    let (scene, pane, inside) = run(&mut h, false);
+    assert_eq!(
+        tagged(&scene, 3).on,
+        LayerId::Raised,
+        "as if opened over M alone"
+    );
+    assert_eq!(
+        tagged(&scene, 4).on,
+        LayerId::Raised,
+        "the child drops with its parent"
+    );
+    assert!(
+        place(&scene, &tagged(&scene, 4).layer) > place(&scene, &tagged(&scene, 3).layer),
+        "the child stays above its parent"
+    );
+    assert!(
+        pane.hovered && inside,
+        "the scope's pane is live (hovered {}, pointer_in {inside})",
+        pane.hovered
+    );
+}
+
+// One glass routine: every popup and list that floats over app content frosts what is behind it.
+
+/// What a floating surface must show in `scene`: at least one frost, a backdrop request that covers
+/// each frost, and no opaque fill anywhere in the overlays.
+fn assert_glass(scene: &Scene, what: &str) {
+    assert_glass_with(scene, what, false);
+}
+
+/// [`assert_glass`] for a card that holds controls: an opaque fill is allowed where it is content
+/// (a primary button is opaque by design), and not where it covers a whole frost.
+fn assert_card_glass(scene: &Scene, what: &str) {
+    assert_glass_with(scene, what, true);
+}
+
+fn contains(outer: [f32; 4], inner: [f32; 4]) -> bool {
+    outer[0] <= inner[0] + 0.01
+        && outer[1] <= inner[1] + 0.01
+        && outer[0] + outer[2] >= inner[0] + inner[2] - 0.01
+        && outer[1] + outer[3] >= inner[1] + inner[3] - 0.01
+}
+
+fn assert_glass_with(scene: &Scene, what: &str, content_may_be_opaque: bool) {
+    let frosts: Vec<[f32; 4]> = scene
+        .in_order()
+        .into_iter()
+        .flat_map(|l| l.geometry.under.iter())
+        .filter(|s| s.is_frost())
+        .map(|s| s.rect)
+        .collect();
+    assert!(!frosts.is_empty(), "{what}: a frost");
+    for f in &frosts {
+        let covered = scene.backdrops().any(|b| contains(b.rect, *f));
+        assert!(covered, "{what}: a request covers the frost {f:?}");
+    }
+    for o in &scene.overlays {
+        let g = &o.layer.geometry;
+        for s in g.under.iter().chain(&g.over) {
+            let guarded = !content_may_be_opaque || frosts.iter().any(|f| contains(s.rect, *f));
+            assert!(
+                !guarded || s.color[3] < 1.0 - 1e-6,
+                "{what}: an opaque fill {s:?}"
+            );
+        }
+    }
+}
+
+/// Runs `draw` at 0, 1 s, 2 s, 4 s and 5 s (the tooltip's delay passed, every open settled) with the
+/// pointer at `pointer` from the second frame; returns the last scene.
+fn settled(pointer: Option<(f32, f32)>, mut draw: impl FnMut(&mut Ui<'_>)) -> Scene {
+    let mut h = UiHarness::new(WIN);
+    let mut last = Scene::default();
+    for (i, ms) in [0u64, 1_000, 2_000, 2_016, 4_000, 5_000]
+        .into_iter()
+        .enumerate()
+    {
+        if let (true, Some((x, y))) = (i == 1, pointer) {
+            h.input.pointer_to(x, y);
+        }
+        h.at_ms(ms);
+        last = h.frame(&mut draw).0;
+    }
+    last
+}
+
+#[test]
+fn every_floating_surface_is_glass() {
+    let row = MenuRow::Item {
+        glyph: None,
+        text: "one",
+        shortcut: "",
+    };
+    let anchor = Rect::new(100.0, 100.0, 210.0, 32.0);
+    let anchor_id = WidgetId::ROOT.with("combo");
+    assert_glass(
+        &settled(None, |ui| {
+            ui.menu("menu", &[row], (200.0, 100.0));
+        }),
+        "menu",
+    );
+    // The combo's list is `Ui::dropdown`.
+    assert_glass(
+        &settled(None, |ui| {
+            ui.dropdown(
+                "list",
+                anchor,
+                anchor_id,
+                &[("one", true), ("two", true)],
+                0,
+            );
+        }),
+        "dropdown and the combo's list",
+    );
+    assert_glass(
+        &settled(None, |ui| {
+            let o = PopoverOptions::new(PAGE_BTN, (120.0, 60.0));
+            ui.popover("pop", &o, |_, _| {});
+        }),
+        "popover",
+    );
+    assert_glass(
+        &settled(Some((PAGE_BTN.x + 4.0, PAGE_BTN.y + 4.0)), |ui| {
+            let b = page_button(ui);
+            ui.tooltip(&b, "hint");
+        }),
+        "tooltip",
+    );
+    // A dialog's card (the scrim's request covers it), the palette's card, a toast.
+    assert_card_glass(
+        &settled(None, |ui| {
+            ui.dialog("d", &DIALOG, &GLASS, |_, _, _, _| {});
+        }),
+        "dialog card",
+    );
+    let rows = [PaletteRow {
+        key: 1,
+        text: "main.rs",
+        detail: None,
+        icon: None,
+        hint: None,
+        destructive: false,
+    }];
+    let sections = [PaletteSection {
+        title: "FILES",
+        rows: &rows,
+        more: false,
+    }];
+    let mut query = String::new();
+    assert_card_glass(
+        &settled(None, |ui| {
+            let p = Palette {
+                sections: &sections,
+                placeholder: "Search",
+                footer_left: "",
+                error: None,
+                name: "",
+            };
+            ui.command_palette("pal", &mut query, &p, &GLASS);
+        }),
+        "palette card",
+    );
+    let mut toasts = Toasts::default();
+    toasts.push(
+        ToastSpec::new(ToastKind::Info, "Saved"),
+        Duration::from_millis(0),
+    );
+    let mut h = UiHarness::new(WIN);
+    let mut scene = Scene::default();
+    for ms in [0u64, 500, 1_000] {
+        h.at_ms(ms);
+        scene = h
+            .frame(|ui| {
+                ui.toasts("toasts", &mut toasts);
+            })
+            .0;
+    }
+    // The toast sits on the fixed `Toast` layer, which `Scene::overlays` does not list.
+    let g = &scene.merged(LayerId::Toast).geometry;
+    assert!(
+        scene.backdrops().any(|b| g
+            .under
+            .iter()
+            .any(|s| s.is_frost() && contains(b.rect, s.rect))),
+        "a request covers the toast's frost"
+    );
+    assert!(g.under.iter().any(|s| s.is_frost()), "the toast's frost");
+    for s in g.under.iter().chain(&g.over) {
+        assert!(
+            s.color[3] < 1.0 - 1e-6,
+            "an opaque fill on the toast: {s:?}"
+        );
+    }
+    // The search picker opens by a click on its trigger.
+    let mut h = UiHarness::new(WIN);
+    let trigger = Rect::new(100.0, 100.0, 300.0, 36.0);
+    let mut selected = None;
+    let items = ["Apple", "Banana", "Cherry"];
+    let opts = PickerOptions {
+        placeholder: "Find",
+        name: "Fruit",
+        ..PickerOptions::default()
+    };
+    let mut scene = Scene::default();
+    for (i, ms) in [0u64, 16, 32, 500, 1_000].into_iter().enumerate() {
+        if i == 1 {
+            h.input.pointer_to(150.0, 118.0).click(P);
+        }
+        h.at_ms(ms);
+        scene = h
+            .frame(|ui| {
+                ui.search_picker("p", trigger, &items, &mut selected, &opts);
+            })
+            .0;
+    }
+    assert_glass(&scene, "search picker");
+}
+
+#[test]
+fn a_glass_list_in_a_dialog_and_a_menu_in_a_popover_each_ask_on_their_own_layer() {
+    let scene = stacked_with_tooltip(false);
+    let layers = drawn(&scene);
+    // Dialog, popover, list, tooltip: each has one request of its own, and the list's is not on
+    // the popover's layer. The dialog's is its scrim's, which the card is frosted over.
+    let asks: Vec<usize> = layers.iter().map(|o| o.layer.backdrops.len()).collect();
+    assert_eq!(asks, [1, 1, 1, 1], "{asks:?}");
+
+    // A menu opened from a popover's content.
+    let mut h = UiHarness::new(WIN);
+    let mut last = Scene::default();
+    for ms in [0u64, 500, 1_000] {
+        h.at_ms(ms);
+        last = h
+            .frame(|ui| {
+                ui.popover(
+                    "pop",
+                    &PopoverOptions::new(PAGE_BTN, (200.0, 100.0)),
+                    |ui, _| {
+                        let row = MenuRow::Item {
+                            glyph: None,
+                            text: "one",
+                            shortcut: "",
+                        };
+                        ui.menu("menu", &[row], (300.0, 300.0));
+                    },
+                );
+            })
+            .0;
+    }
+    let layers = drawn(&last);
+    assert_eq!(layers.len(), 2);
+    assert!(layers.iter().all(|o| o.layer.backdrops.len() == 1));
+    assert!(layers[0].tag < layers[1].tag);
+    assert_glass(&last, "the menu in the popover");
+}
+
+/// An overlay called inside `with_enabled(false, ..)` draws at the scope's 0.4, and so does its
+/// exit: the scope's look reaches everything drawn inside it, and `enter` does not take it off.
+#[test]
+fn an_overlay_opened_in_a_disabled_scope_draws_and_exits_at_the_disabled_opacity() {
+    const WHITE: [u8; 4] = [255, 255, 255, 255];
+    fn alphas(scene: &Scene, layer: LayerId) -> Vec<f32> {
+        scene
+            .merged(layer)
+            .geometry
+            .under
+            .iter()
+            .map(|s| s.color[3])
+            .collect()
+    }
+    for enabled in [true, false] {
+        let want = if enabled { 1.0 } else { 0.4 };
+        let mut h = harness();
+        let run = |h: &mut UiHarness, ms: u64, called: bool| {
+            h.at_ms(ms);
+            h.frame(|ui| {
+                ui.painter().on(LayerId::Page);
+                if called {
+                    ui.with_enabled(enabled, |ui| {
+                        ui.overlay(
+                            "o",
+                            &popup(),
+                            |p, _, _| p.fill(CARD, 0.0, WHITE),
+                            |ui, _| ui.painter().fill(CARD, 0.0, WHITE),
+                        );
+                    });
+                }
+            })
+            .0
+        };
+        let open = run(&mut h, 0, true);
+        let a = alphas(&open, LayerId::Popup);
+        assert_eq!(a.len(), 1, "enabled {enabled}: {a:?}");
+        assert!((a[0] - want).abs() < 0.01, "enabled {enabled}: {a:?}");
+        // Called no more: the close begins and the exit is drawn in the same frame.
+        let closing = run(&mut h, 10, false);
+        let a = alphas(&closing, LayerId::Popup);
+        assert_eq!(a.len(), 1, "the exit, enabled {enabled}: {a:?}");
+        assert!(
+            (a[0] - want).abs() < 0.01,
+            "the exit, enabled {enabled}: {a:?}"
+        );
+    }
 }

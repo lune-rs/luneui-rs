@@ -332,7 +332,7 @@ impl App {
         // A hosted page's window commands (the window page's caption buttons) are demonstrations:
         // its Close must not close the gallery. The gallery quits on its shortcut.
         out.commands.clear();
-        if output.apply(window, &out) {
+        if output.apply(window, &out, s) {
             event_loop.exit();
         }
         let tray_state = state.tray_state();
@@ -363,8 +363,6 @@ impl App {
         bridge.update(&out, &root);
         let repaint = out.repaint;
         let tweaks = state.frame_params().unwrap_or(FrameTweaks::DEFAULT);
-        let mut display = display;
-        tweaks.apply_noise(&mut display);
         draw_with(r, &display, &view, tweaks.params(size, s))?;
         // The material is the page's to ask for; whether it took is the page's to hear.
         if let Some(wanted) = state.material().filter(|m| *m != self.material) {

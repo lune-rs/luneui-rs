@@ -17,13 +17,13 @@ Core (`lune-ui-core`): `EDGE_BORDER`, `ResizeEdge`, `edge_at`, `DoubleClick` and
 
 - Custom caption, edge resize and double-click handling (R-platform-4).
 - Wane — Variants: none (Windows chrome, D9). Parts: brand (wordmark + version), fill (drag area), caption buttons (minimize, maximize, close). (R-platform-4)
-- Wane — States: active; inactive (`is-inactive`: solid near-black `--glass-inactive` #0b0b0b, page card `--glass-inactive-card` #141414, no blur, caption glyphs quaternary; user, 2026-11-03: dark black, not lune-ui's #333333 grey); caption hover (`--surface-hover`); close hover (`--caption-close-bg` #c42b1c, white glyph). (R-platform-4)
+- Wane — States: active; inactive (`is-inactive`: solid near-black `--glass-inactive` #0b0b0b, page card `--glass-inactive-card` #141414, no blur, caption glyphs quaternary; not ported: an inactive window stays glass, R13, D262; only the caption's glyphs change); caption hover (`--surface-hover`); close hover (`--caption-close-bg` #c42b1c, white glyph). (R-platform-4)
 - Wane — Sizes: Design size 1280 x 800 (`--window-w`, `--window-h`); radius 10 (`--radius-page`); 1 px `--border-subtle`; title strip 32 (`--titlebar-h`) with a 208 wide brand cell (`--sidebar-w`), padding 0 16 0 18, wordmark 14 bold gold, version RznMono 11 tertiary; caption buttons 46 x 32 (`--caption-w`); content grid 208 | 1fr, 10 px gutter (`--gutter`). (R-platform-4)
-- Wane — Behaviour: Drag by the title strip, double-click maximizes, edge resize, minimize / maximize / close. The window layer swaps to the solid inactive colour when it loses focus (`overview-unfocused`). Mouse and keyboard (Alt+Space system menu) come from the OS window. (R-platform-4)
+- Wane — Behaviour: Drag by the title strip, double-click maximizes, edge resize, minimize / maximize / close. The window layer does not swap to a solid colour when it loses focus (`overview-unfocused`): the glass stays (R13, D262). Mouse and keyboard (Alt+Space system menu) come from the OS window. (R-platform-4)
 
 ## Existing code
 
-`crates/lune-ui-core/src/window.rs` (`edge_at`, `DoubleClick`, the Painter-form `caption_buttons` and the shared `CAPTION_BUTTON_WIDTH`, `CAPTION_GLYPH_SIZE`, `caption_rect`); since M11 `Ui::caption_buttons` over `CaptionButton` and `CaptionOptions` in `crates/lune-ui-core/src/widgets/caption.rs` (D240: the Painter form stays, `unfocused` and `chrome` draw through it at zero delta); `crates/lune-ui-winit/src/window.rs:12` (`glass_attributes`), `:28` (`resize_direction`). Integration test `crates/lune-ui-core/tests/window.rs` (edges, 6 px border, double-click gap under 400 ms); `crates/lune-ui-winit/tests/input.rs` covers the direction mapping.
+`crates/lune-ui-core/src/window.rs` (`edge_at`, `DoubleClick`, the Painter-form `caption_buttons` and the shared `CAPTION_BUTTON_WIDTH`, `CAPTION_GLYPH_SIZE`, `caption_rect`, which places the buttons from the window rect's own origin, D266); since M11 `Ui::caption_buttons` over `CaptionButton` and `CaptionOptions` in `crates/lune-ui-core/src/widgets/caption.rs` (D240: the Painter form stays, `unfocused` and `chrome` draw through it at zero delta); `crates/lune-ui-winit/src/window.rs:12` (`glass_attributes`), `:28` (`resize_direction`). Integration test `crates/lune-ui-core/tests/window.rs` (edges, 6 px border, double-click gap under 400 ms); `crates/lune-ui-winit/tests/input.rs` covers the direction mapping.
 
 ## Spec
 
@@ -32,7 +32,7 @@ Core (`lune-ui-core`): `EDGE_BORDER`, `ResizeEdge`, `edge_at`, `DoubleClick` and
 Pinned: Lunegit 33a1dd41, Wane 69931d6, this repo fa2958b, Luneterm 296cfdc. Read: this repo crates/lune-ui-core/src/window.rs:1-99, crates/lune-ui-core/tests/window.rs:1-60, crates/lune-ui-winit/src/window.rs:1-39, crates/lune-ui-winit/src/platform/macos.rs:1-9, platform/windows.rs:1-13, platform/other.rs:1-5,
 crates/lune-ui-core/src/input.rs:61-62,166-181,183-223, crates/lune-ui-core/src/theme.rs:78-81,111-113; Lunegit src/Lunegit.Desktop/Theming/ThemeApplicator.cs:284-301, Views/DiffView.axaml:73-83; Wane docs/ui/components.md:193-205,714, docs/ui/mocks/css/components.css:30-50; Luneterm docs/glass-styling.md:7-28.
 Conflicts: (1) caption glyph colour at rest: the moved code draws `fg_primary` [R crates/lune-ui-core/src/window.rs:89], Wane `--text-secondary` [W docs/ui/mocks/css/components.css:43]; the moved code wins (pixel-gated).
-(2) inactive fill: the moved preset and Lunegit give a solid `#333333`, the tint lightened 20 percent [R crates/lune-ui-core/src/theme.rs:111-113], [L src/Lunegit.Desktop/Theming/ThemeApplicator.cs:284-301], [LT docs/glass-styling.md:24-28]; Wane asks for near-black `#0b0b0b` and a `#141414` card by the user's decision of 2026-11-03 [W docs/ui/components.md:197].
+(2) inactive fill: gone (R13, D262). Lunegit gave a solid `#333333`, the tint lightened 20 percent [L src/Lunegit.Desktop/Theming/ThemeApplicator.cs:284-301], [LT docs/glass-styling.md:24-28], and Wane asked for near-black `#0b0b0b` [W docs/ui/components.md:197]; the user's note R13 says an inactive window stays glass, so no widget has a fill that depends on the window's state.
 The preset keeps `#333333` (a pixel-gated gallery value); Wane's look is a theme value that overrides it (`infra.theme-hot-reload`). A user decision is recorded in the Wane entry, not overruled here.
 Caption sizes agree: 46 x 32 [R crates/lune-ui-core/src/window.rs:87], [W docs/ui/components.md:198]; the close fill `#c42b1c` agrees [R crates/lune-ui-core/src/theme.rs:80], [W docs/ui/components.md:197].
 
@@ -45,7 +45,7 @@ Caption sizes agree: 46 x 32 [R crates/lune-ui-core/src/window.rs:87], [W docs/u
 - Resize direction: each `ResizeEdge` maps to winit's `ResizeDirection` [R crates/lune-ui-winit/src/window.rs:27-39].
 - Window commands the app performs, in order: drag move, drag resize from an edge, minimize, toggle maximize, close, redraw [R crates/lune-ui-core/src/input.rs:166-181]. The helpers do not call them; the app wires hits and edges to commands.
 - Title strip, brand cell and wordmark: app composition; the strip is 32 px high with a 208 px brand cell, padding 0 16 0 18 [W docs/ui/components.md:198,202]; Wane's own status line says the title strip and the wordmark are app composition. Window radius 10 and the 1 px `--border-subtle` are the page card's look [W docs/ui/components.md:198].
-- Active and inactive: while the window is inactive the app swaps the acrylic layers for a solid fill; Lunegit does so with `IsVisible` bound to the window's active state, a hard cut [L src/Lunegit.Desktop/Views/DiffView.axaml:73-83], [LT docs/glass-styling.md:24-28]. The core delivers the focus change as `Event::Focus` [R crates/lune-ui-core/src/input.rs:61-62].
+- Active and inactive: Lunegit swaps the acrylic layers for a solid fill while the window is inactive, with `IsVisible` bound to the window's active state, a hard cut [L src/Lunegit.Desktop/Views/DiffView.axaml:73-83], [LT docs/glass-styling.md:24-28]; the toolkit does not (R13, D262). The caption's own `active` option dims its glyphs. The core delivers the focus change as `Event::Focus` [R crates/lune-ui-core/src/input.rs:61-62].
 - Backdrop: the OS material behind the window is `platform.material`; the in-app blur is `render.blur` [W docs/ui/components.md:204].
 - macOS traffic lights: the mocks do not draw them [W docs/ui/components.md:204]; with a transparent full-size title bar the OS keeps them, so the app's title strip must leave room (Open questions).
 
@@ -61,7 +61,7 @@ Caption sizes agree: 46 x 32 [R crates/lune-ui-core/src/window.rs:87], [W docs/u
 | focus-visible | none: the caption buttons are pointer targets; the keyboard path is the OS (Alt+Space system menu) | [W docs/ui/components.md:199] |
 | disabled | not applicable to the helpers | [derived: no source] |
 | window active | acrylic layers shown | [LT docs/glass-styling.md:7-14] |
-| window inactive | solid fill replaces the layers; caption glyphs quaternary (Wane) | [R crates/lune-ui-core/src/theme.rs:111-113], [W docs/ui/mocks/css/components.css:49] |
+| window inactive | the layers stay; caption glyphs quaternary (Wane) | [D262], [W docs/ui/mocks/css/components.css:49] |
 | edge hover | the matching resize cursor | [R crates/lune-ui-core/src/input.rs:204-216] |
 
 ### Transitions
@@ -95,12 +95,11 @@ The Wane mock eases with `--ease-out`; the animation rules give Linear for hover
 ### Gallery scenes
 
 - `chrome` (existing): the tab-outline chrome in a window.
-- `unfocused` (existing): the inactive window with the solid fill.
 - `glass-off` (existing): glass turned off.
 - Page `window` (M11) holds these seven. `window-caption`: the three caption buttons, rest, settled; `window-caption-maximized` with the restore glyph; `window-caption-hover-min` and `window-caption-hover-close` with the pointer over the button, settled.
 - `window-caption-hover-fade`: the pointer entering a caption button, t = 60 ms (half of `instant`).
 - `window-edges`: the 6 px resize border outlined with its eight regions, settled.
-- `window-inactive-wane`: the inactive window under Wane's theme values (`#0b0b0b`, `#141414`), settled.
+- `window-caption-inactive`: the caption of a window that is not the active one (glyphs in `fg_quaternary`), settled; the glass behind it is the same.
 
 ### Painter primitives
 
@@ -130,7 +129,7 @@ The Wane mock eases with `--ease-out`; the animation rules give Linear for hover
 - Answered (M4, `core.ui`): the `Ui` detects double clicks from the frame's own time (`Response::double_clicked`, `ui_core.rs::double_click_is_strictly_under_400_ms`), so scripted tests need no real clock. `DoubleClick` with an `Instant` stays for an app that has no `Ui`.
 - Still open, a limit: Windows 11 snap layouts on the maximize button need non-client hit-testing from the OS window procedure [W docs/ui/components.md:714]; no helper exists; unverified here (an OS window-procedure hook, an API no consumer has asked for, D237).
 - Still open: space for the macOS traffic lights in the app's title strip: no source gives the inset, and the toolkit draws none.
-- A loaded theme's `WindowFallbackBackground` sets only `Theme::window_fallback` (M10, D207); Lunegit recomputes the inactive window's fill from the glass tint, and that recomputation is the app's, since the toolkit has no inactive-window policy of its own.
+- A loaded theme's `WindowFallbackBackground` is an unknown key (it set `Theme::window_fallback` in M10, D207; the token went with the inactive look, D262), listed in `skipped`.
 
 ## Notes for the planner
 

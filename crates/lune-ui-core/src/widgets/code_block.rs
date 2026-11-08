@@ -11,10 +11,11 @@ use std::time::Duration;
 
 use super::button::IconButton;
 use super::code_editor::{CodeOptions, Look, TEXT_PAD};
+use super::scrollbar::BAR;
 use super::text_lines::{HighlightSpan, Highlighter};
 use crate::access::{Live, Node, Role};
 use crate::code_doc::CodeDoc;
-use crate::color::Rgba;
+use crate::color::with_alpha;
 use crate::icon;
 use crate::motion::{Easing, Kind, Motion, Reduce, Time, Token};
 use crate::paint::Rect;
@@ -129,14 +130,78 @@ struct BlockMem {
     copied_at: Option<Time>,
 }
 
-/// `c` with its alpha scaled by `k` (0 to 1).
-fn faded(c: Rgba, k: f32) -> Rgba {
-    [
-        c[0],
-        c[1],
-        c[2],
-        (f32::from(c[3]) * k.clamp(0.0, 1.0)).round() as u8,
-    ]
+/// A copy control: where it is, what it is called and says, and how plainly the idle icon shows.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct CopyControl<'a> {
+    /// The button's rect: [`COPY_SIDE`] square.
+    pub at: Rect,
+    /// The accessible name of the button.
+    pub name: &'a str,
+    /// What the polite status node says while the check mark shows.
+    pub said: &'a str,
+    /// The idle icon's opacity, 0 to 1; the check mark shows whatever it says. A control at 0 is
+    /// still registered, so Tab reaches it.
+    pub idle: f32,
+    /// Off, the button is inert and nothing is copied.
+    pub enabled: bool,
+}
+
+/// The copy control's side: the icon with its padding.
+pub(crate) const COPY_SIDE: f32 = ICON + 2.0 * BUTTON_PAD;
+/// The room a control takes from a text it sits beside, past [`COPY_SIDE`].
+pub(crate) const COPY_GAP: f32 = BUTTON_GAP;
+
+impl Ui<'_> {
+    /// The copy icon button of `control` under the current scope, its check mark and its status
+    /// node: a click puts `text` on the clipboard, stamps `copied_at` with the frame's time and
+    /// shows the check mark until `hold` has passed. Returns whether it copied this frame. The
+    /// scope must be the control's own: its ids (`copy`, `fade`, `copied`) are made in it.
+    pub(crate) fn copy_control(
+        &mut self,
+        control: &CopyControl<'_>,
+        copied_at: &mut Option<Time>,
+        hold: Duration,
+        text: &str,
+    ) -> bool {
+        let t = *self.theme();
+        let now = self.time();
+        if copied_at.is_some_and(|at| now >= at + hold) {
+            *copied_at = None;
+        }
+        let fade_id = self.scope_id().with("fade");
+        let showing = copied_at.is_some();
+        let mut mark = self.animate_f32(fade_id, f32::from(u8::from(showing)), &COPY_FADE);
+        let icon_color = with_alpha(t.fg_tertiary, (1.0 - mark) * control.idle);
+        let at = control.at;
+        let pressed = self.with_enabled(control.enabled, |ui| {
+            let button = IconButton {
+                glyph: icon::COPY,
+                glyph_size: ICON,
+                color: Some(icon_color),
+                radius: BUTTON_RADIUS,
+                name: control.name,
+            };
+            ui.icon_button("copy", at, &button)
+        });
+        let copied = control.enabled && pressed.clicked;
+        if copied {
+            self.clipboard_write(text.to_owned());
+            *copied_at = Some(now);
+            mark = self.animate_f32(fade_id, 1.0, &COPY_FADE);
+        }
+        if mark > 0.0 {
+            let check = icon::glyph(icon::CHECK, ICON, with_alpha(t.fg_primary, mark));
+            self.painter().text_centered(&check, at);
+        }
+        if let Some(from) = *copied_at {
+            self.request_repaint_at(from + hold);
+            let status = self.id("copied");
+            let mut node = Node::new(status, Role::Status, control.said, at);
+            node.live = Some(Live::Polite);
+            self.node(node);
+        }
+        copied
+    }
 }
 
 impl Ui<'_> {
@@ -163,15 +228,11 @@ impl Ui<'_> {
     ) -> CodeBlockResponse {
         let t = *self.theme();
         let id = self.scope_id();
-        let now = self.time();
         let hold = Duration::from_millis(opts.feedback_ms);
 
         let mut mem = std::mem::take(self.persistent::<BlockMem>(id));
         if mem.doc.text() != text {
             mem.doc.set_text(text);
-            mem.copied_at = None;
-        }
-        if mem.copied_at.is_some_and(|at| now >= at + hold) {
             mem.copied_at = None;
         }
 
@@ -192,7 +253,7 @@ impl Ui<'_> {
         // straight right margin for every line, so no text runs through the icon. The scroll area
         // is the whole box inside the ring: the pointer anywhere over the block reveals the bar,
         // and the bar lies in the bottom padding at the box's edge.
-        let side = ICON + 2.0 * BUTTON_PAD;
+        let side = COPY_SIDE;
         let (ix, iy) = if opts.border {
             (BORDER + BORDERED_INSET, BORDER + BORDERED_INSET)
         } else {
@@ -207,6 +268,15 @@ impl Ui<'_> {
             (rect.h - 2.0 * py).max(0.0),
         );
         let frame = rect.inset(edge, edge);
+        // The horizontal bar lies along the frame's bottom. Where the button reaches into that
+        // band (a block of one line), the track ends `BUTTON_GAP` before the button, so the
+        // thumb never lies under it at any offset.
+        let shares = at.bottom() > frame.bottom() - BAR;
+        let bar_room = if shares {
+            (frame.right() - at.x + BUTTON_GAP).max(0.0)
+        } else {
+            0.0
+        };
         let spans = BlockSpans(opts.spans);
         let code = CodeOptions {
             read_only: true,
@@ -222,45 +292,24 @@ impl Ui<'_> {
             skip_tab: !opts.tab_stop,
             ring: Some(rect),
             frame: Some(frame),
+            bar_room,
         };
         let text_view = self.scope("body", |ui| {
             ui.code_frame(body, &mut mem.doc, &code, None, &look)
         });
 
         // The corner button. Its icon fades out as the check mark fades in.
-        let fade_id = id.with("fade");
-        let showing = mem.copied_at.is_some();
-        let mut mark = self.animate_f32(fade_id, f32::from(u8::from(showing)), &COPY_FADE);
         let has_text = !mem.doc.text().is_empty();
         let name = self.tr("luneui.code-block.copy");
-        let icon_color = faded(t.fg_tertiary, 1.0 - mark);
-        let pressed = self.with_enabled(has_text, |ui| {
-            let button = IconButton {
-                glyph: icon::COPY,
-                glyph_size: ICON,
-                color: Some(icon_color),
-                radius: BUTTON_RADIUS,
-                name,
-            };
-            ui.icon_button("copy", at, &button)
-        });
-        let copied = has_text && pressed.clicked;
-        if copied {
-            self.clipboard_write(mem.doc.text().to_owned());
-            mem.copied_at = Some(now);
-            mark = self.animate_f32(fade_id, 1.0, &COPY_FADE);
-        }
-        if mark > 0.0 {
-            let check = icon::glyph(icon::CHECK, ICON, faded(t.fg_primary, mark));
-            self.painter().text_centered(&check, at);
-        }
-        if let Some(from) = mem.copied_at {
-            self.request_repaint_at(from + hold);
-            let (status, said) = (self.id("copied"), self.tr("luneui.code-block.copied"));
-            let mut node = Node::new(status, Role::Status, said, at);
-            node.live = Some(Live::Polite);
-            self.node(node);
-        }
+        let said = self.tr("luneui.code-block.copied");
+        let control = CopyControl {
+            at,
+            name,
+            said,
+            idle: 1.0,
+            enabled: has_text,
+        };
+        let copied = self.copy_control(&control, &mut mem.copied_at, hold, mem.doc.text());
 
         *self.persistent::<BlockMem>(id) = mem;
         CodeBlockResponse {

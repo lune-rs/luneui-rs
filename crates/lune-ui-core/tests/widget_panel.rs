@@ -5,7 +5,7 @@
 
 use lune_ui_core::access::{Live, Role, SemanticTree, State, Value};
 use lune_ui_core::color::premul;
-use lune_ui_core::input::{FrameOutput, Key, NamedKey};
+use lune_ui_core::input::{FrameOutput, Key, NamedKey, Repaint};
 use lune_ui_core::paint::Rect;
 use lune_ui_core::scene::{Scene, TextItem};
 use lune_ui_core::shortcuts::{Binding, Chord, Scope};
@@ -739,6 +739,47 @@ fn a_flush_body_fill_is_cut_by_the_rounded_clip_at_the_panels_rect() {
     // The ring is not clipped by it: it is drawn after the clip was popped.
     let ring = scene.layers[0].geometry.over.last().expect("ring");
     assert_eq!(ring.round_radius, 0.0);
+}
+
+#[test]
+fn a_fit_panel_cuts_a_flush_body_at_its_final_height_from_the_second_frame() {
+    let red = [200, 0, 0, 255];
+    let mut h = UiHarness::new(WIN);
+    let one = |h: &mut UiHarness| {
+        let mut height = 0.0;
+        let (scene, out) = h.frame(|ui| {
+            let opts = PanelOptions {
+                title: Some("Rows"),
+                kind: PanelKind::Flush,
+                fit: true,
+                ..PanelOptions::default()
+            };
+            height = ui.panel("panel", RECT, &opts, |ui, slot| {
+                if let PanelSlot::Body(r) = slot {
+                    ui.painter().fill(Rect::new(r.x, r.y, r.w, 30.0), 0.0, red);
+                }
+                0.0
+            });
+        });
+        let fills: Vec<_> = scene.layers[0]
+            .geometry
+            .under
+            .iter()
+            .filter(|s| s.color == premul(red))
+            .map(|s| s.round)
+            .collect();
+        (height, fills, out.repaint)
+    };
+    // A title line and its hairline: shorter than the rect given.
+    let (height, fills, repaint) = one(&mut h);
+    assert_eq!(height, 45.0);
+    assert!(height < RECT.h);
+    // The first frame cuts at the rect given and asks for the frame that cuts at the height.
+    assert_eq!(fills, vec![[RECT.x, RECT.y, RECT.w, RECT.h]]);
+    assert_eq!(repaint, Repaint::Now);
+    let (_, fills, repaint) = one(&mut h);
+    assert_eq!(fills, vec![[RECT.x, RECT.y, RECT.w, 45.0]]);
+    assert_eq!(repaint, Repaint::Idle, "a settled panel is idle");
 }
 
 #[test]

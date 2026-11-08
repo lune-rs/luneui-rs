@@ -35,7 +35,7 @@ Conflicts: none between sources; this repo has no settings page. The eight secti
 
 ### Anatomy
 
-- Glass: acrylic at the top-left corner radius 8 only, PANEL levels (tint 0.8, material 0.7) [L src/Lunegit.Desktop/Views/SettingsPageView.axaml:10-18]; solid fallback while the window is inactive [L src/Lunegit.Desktop/Views/SettingsPageView.axaml:20].
+- Glass: acrylic at the top-left corner radius 8 only, PANEL levels (tint 0.8, material 0.7) [L src/Lunegit.Desktop/Views/SettingsPageView.axaml:10-18]; Lunegit's solid fallback while the window is inactive [L src/Lunegit.Desktop/Views/SettingsPageView.axaml:20] is not ported (R13, D262).
 - Banner: docked bottom; padding 20 by 10; fill `StatusWarningDark`; text `StatusWarningLight`; 14 px warning icon 8 px from the text [L src/Lunegit.Desktop/Views/SettingsPageView.axaml:24-40].
 - Banner action: a button with padding 12 by 6, radius 6, 1 px `StatusWarningLight` border [L src/Lunegit.Desktop/Views/SettingsPageView.axaml:41-51].
 - Content host: 20 px margin on all sides, showing the current section [L src/Lunegit.Desktop/Views/SettingsPageView.axaml:56-58].
@@ -48,7 +48,7 @@ Conflicts: none between sources; this repo has no settings page. The eight secti
 | state | look | cite |
 |---|---|---|
 | page, rest | glass page; content host | [L src/Lunegit.Desktop/Views/SettingsPageView.axaml:9-58] |
-| inactive window | solid fallback | [L src/Lunegit.Desktop/Views/SettingsPageView.axaml:20] |
+| inactive window | the same glass (no `active` field) | [D262] |
 | restart required | banner revealed at the bottom | [L src/Lunegit.Desktop/Views/SettingsPageView.axaml:24-27] |
 | row hover | `settings-item` background tween | [L src/Lunegit.Desktop/Themes/Animations.axaml:113-121] |
 | focus-visible | the focused control (widget.*) | [core.focus] |
@@ -98,7 +98,6 @@ Never animated: the section content swap (no motion in the view, [L src/Lunegit.
 - `settings-page-rows` (new): a page with three rows (a toggle, a combo, a stepper), no banner, settled.
 - `settings-page-restart` (new): the banner revealed at the bottom, settled.
 - `settings-page-restart-mid` (new): the banner 125 ms into its reveal (half of base, 250 ms) [L src/Lunegit.Desktop/App.axaml:153].
-- `settings-page-inactive` (new): the page with the window inactive (solid fallback, same corner), settled.
 - `settings-page-disabled` (new): the first row in `with_enabled(false, ..)` (0.4 opacity), the pointer and a click on its toggle: no hover fill, the toggle unchanged, no restart banner, settled.
 
 ### Painter primitives
@@ -112,7 +111,7 @@ Never animated: the section content swap (no motion in the view, [L src/Lunegit.
 - Pixel probes at scale 2: content inset 40 px; banner padding 40 px sides and 20 px top and bottom; page corner radius 16 px at the top-left only.
 - Conformance: the banner reveals in 250 ms, quad-out, opacity only; Reduced reveals in 180 ms; Off snaps.
 - Semantic node: `group` page; banner `status` (polite) holding the action `button`; rows `group`.
-- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_settings_page.rs`: behaviour `a_row_lights_on_hover_and_the_control_keeps_the_press`, `a_hidden_banner_takes_no_height_and_no_node`, `the_action_fires_once_per_press`, `enter_and_space_press_the_focused_action`, `the_content_scrolls_through_a_scroll_area`, `the_section_keeps_its_roles_under_group_rows`, `a_combos_list_draws_above_the_page`; pixel probes `pixel_probes_at_scale_two`, `the_glass_is_the_acrylic_with_one_round_corner`, `the_host_is_inset_20_and_the_banner_docks_below_it`, `inactive_draws_the_fallback_with_the_same_corner_and_no_acrylic`; conformance `the_banner_fades_in_over_base_with_quad_out`, `reveal_conforms_in_three_tiers`, `reduced_fades_over_fast_and_off_snaps`; node `the_banner_is_a_polite_status_holding_the_action_button`; disabled `a_disabled_page_is_disabled_all_the_way_down`.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_settings_page.rs`: behaviour `a_row_lights_on_hover_and_the_control_keeps_the_press`, `a_hidden_banner_takes_no_height_and_no_node`, `the_action_fires_once_per_press`, `enter_and_space_press_the_focused_action`, `the_content_scrolls_through_a_scroll_area`, `the_section_keeps_its_roles_under_group_rows`, `a_combos_list_draws_above_the_page`; pixel probes `pixel_probes_at_scale_two`, `the_glass_is_the_acrylic_with_one_round_corner`, `the_host_is_inset_20_and_the_banner_docks_below_it`, ; conformance `the_banner_fades_in_over_base_with_quad_out`, `reveal_conforms_in_three_tiers`, `reduced_fades_over_fast_and_off_snaps`; node `the_banner_is_a_polite_status_holding_the_action_button`; disabled `a_disabled_page_is_disabled_all_the_way_down`.
 
 ### Build
 

@@ -73,6 +73,7 @@ impl SceneSpec {
             scale: self.scale,
             blur_sigma: 12.0,
             saturation: 1.8,
+            ..FrameParams::default()
         }
     }
 }

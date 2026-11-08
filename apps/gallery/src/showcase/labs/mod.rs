@@ -4,14 +4,13 @@
 //!
 //! - glass: the window, panel and card layers over high-contrast content;
 //! - blur: the backdrop blur over moving content;
-//! - effects: the custom-draw slot, glass off, an unfocused window and the tab outline;
+//! - effects: the custom-draw slot, glass off and the tab outline;
 //! - motion: the fifteen kinds and the seven easings, each replayed on demand;
 //! - tokens: every theme colour, font size and radius;
 //! - clipboard: text copy and paste, on a press only;
 //! - json: the bounded JSON reader on text typed in.
 //!
-//! Only one of them may ask for the backdrop in a frame (one blur a frame): it is the blur
-//! lab's, and the shell asks for none.
+//! Only the blur lab asks for a backdrop; the shell asks for none.
 
 pub(crate) mod blur;
 pub(crate) mod clipboard;

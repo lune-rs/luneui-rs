@@ -1,6 +1,5 @@
-//! The dropdown and popup panel (C4 retrofit, `overlay.dropdown` and `overlay.popup-panel`
-//! acceptance): rest identity with the Painter-API `dropdown`, keyboard highlight, disabled rows,
-//! dismissal, focus restore to the combo, the semantic tree, the panel probe.
+//! The dropdown (C4 retrofit, `overlay.dropdown` acceptance): rest identity with the Painter-API `dropdown`, keyboard highlight, disabled rows,
+//! dismissal, focus restore to the combo, the semantic tree, the glass surface and the row fills.
 
 use lune_ui_core::access::{Action, Role, State};
 use lune_ui_core::color::premul;
@@ -8,13 +7,12 @@ use lune_ui_core::input::{FrameOutput, Key, Modifiers, NamedKey, PointerButton};
 use lune_ui_core::paint::{LayerId, Painter, Rect};
 use lune_ui_core::scene::Scene;
 use lune_ui_core::shortcuts::{Binding, Chord, Scope};
-use lune_ui_core::testing::{FakeText, UiHarness, disabled_violations};
+use lune_ui_core::testing::{FakeText, UiHarness, disabled_violations, flattened};
 use lune_ui_core::theme::DARK;
 use lune_ui_core::ui::WidgetId;
 use lune_ui_core::widgets::dropdown::{
     DropdownOptions, DropdownResponse, dropdown, panel_rect, row_rect,
 };
-use lune_ui_core::widgets::popup_panel;
 
 const WIN: (f32, f32) = (1040.0, 660.0);
 const ANCHOR: Rect = Rect::new(34.0, 100.0, 210.0, 32.0);
@@ -73,7 +71,10 @@ fn at_rest_the_lists_are_the_old_lists() {
         let mut h = UiHarness::new(WIN);
         frame(&mut h, 0, anchor, true, 0);
         let (scene, _) = frame(&mut h, 1000, anchor, true, 0);
-        assert!(scene == old_scene(anchor, 0, None), "{anchor:?}");
+        assert!(
+            flattened(&scene) == old_scene(anchor, 0, None),
+            "{anchor:?}"
+        );
     }
     // The flipped list really is above its anchor.
     let mut text = FakeText;
@@ -90,7 +91,7 @@ fn a_hovered_enabled_row_gets_the_hover_fill_and_a_disabled_one_does_not() {
     h.input.pointer_to(x, y);
     frame(&mut h, 10, ANCHOR, true, 0);
     let (scene, _) = frame(&mut h, 1000, ANCHOR, true, 0);
-    assert!(scene == old_scene(ANCHOR, 0, Some(1)));
+    assert!(flattened(&scene) == old_scene(ANCHOR, 0, Some(1)));
     // Over the disabled row: no hover fill, same as the old list with that hit absent.
     let mut h = UiHarness::new(WIN);
     frame(&mut h, 0, ANCHOR, true, 0);
@@ -98,7 +99,7 @@ fn a_hovered_enabled_row_gets_the_hover_fill_and_a_disabled_one_does_not() {
     h.input.pointer_to(x, y);
     frame(&mut h, 10, ANCHOR, true, 0);
     let (scene, _) = frame(&mut h, 1000, ANCHOR, true, 0);
-    assert!(scene == old_scene(ANCHOR, 0, Some(3)));
+    assert!(flattened(&scene) == old_scene(ANCHOR, 0, Some(3)));
 }
 
 #[test]
@@ -132,7 +133,10 @@ fn the_keyboard_highlight_starts_at_the_selected_row_and_skips_disabled_ones() {
     // Down to row 2 (drawn with the hover fill), Down again stays (row 3 is disabled).
     h.input.key_down(Key::Named(NamedKey::ArrowDown), None);
     let (scene, _) = frame(&mut h, 30, ANCHOR, true, 0);
-    assert!(scene == old_scene(ANCHOR, 0, Some(2)), "row 2 highlighted");
+    assert!(
+        flattened(&scene) == old_scene(ANCHOR, 0, Some(2)),
+        "row 2 highlighted"
+    );
     // One press moves one row per frame; Down again stays (row 3 is disabled).
     h.input.key_down(Key::Named(NamedKey::ArrowDown), None);
     frame(&mut h, 40, ANCHOR, true, 0);
@@ -201,12 +205,7 @@ fn it_opens_and_closes_at_once_and_focus_returns_to_the_combo() {
     assert!(out.dismissed && !open);
     // No exit frame: the first frame without the app's call draws nothing on the popup layer.
     let (_, _, scene) = run(&mut h, 60, &mut open);
-    assert!(
-        scene.layers[LayerId::Popup as usize]
-            .geometry
-            .under
-            .is_empty()
-    );
+    assert!(scene.merged(LayerId::Popup).geometry.under.is_empty());
     // Focus returns when the close settles, one frame later.
     let (_, focused, _) = run(&mut h, 70, &mut open);
     assert!(focused, "focus is back on the combo");
@@ -241,21 +240,6 @@ fn the_semantic_tree_is_a_list_of_list_items() {
     }
 }
 
-#[test]
-fn the_popup_panel_is_16_px_radius_with_a_2_px_ring_in_the_callers_fill() {
-    let mut text = FakeText;
-    let mut p = Painter::<u8>::new(2.0, win(), &mut text, None, DARK);
-    let (bg, border) = ([10, 20, 30, 200], [255, 255, 255, 48]);
-    popup_panel(&mut p, Rect::new(10.0, 10.0, 100.0, 60.0), bg, border);
-    let g = &p.scene.layers[0].geometry;
-    let (fill, ring) = (g.under[0], g.under[1]);
-    assert_eq!(fill.radii, [16.0; 4]);
-    assert_eq!(fill.color, premul(bg));
-    assert_eq!(ring.radii, [16.0; 4]);
-    assert_eq!(ring.params[1], 2.0);
-    assert_eq!(ring.color, premul(border));
-}
-
 fn many() -> Vec<(String, bool)> {
     (0..30).map(|i| (format!("Option {i}"), true)).collect()
 }
@@ -274,10 +258,7 @@ fn with_options(
     (scene, resp, out)
 }
 
-const SCROLLING: DropdownOptions = DropdownOptions {
-    glass: false,
-    max_rows: Some(8),
-};
+const SCROLLING: DropdownOptions = DropdownOptions { max_rows: Some(8) };
 
 fn row_id(i: usize) -> WidgetId {
     WidgetId::ROOT.with("dd").with("list").with(i.to_string())
@@ -304,36 +285,58 @@ fn inside(r: Rect, view: Rect) -> bool {
 }
 
 #[test]
-fn a_glass_dropdown_emits_the_backdrop_and_the_glass_fill() {
-    let glass = DropdownOptions {
-        glass: true,
-        max_rows: None,
-    };
+fn the_list_is_the_glass_surface() {
     let opts = [
         ("RznSans".to_owned(), true),
         ("Sans Serif".to_owned(), true),
     ];
     let mut h = UiHarness::new(WIN);
-    with_options(&mut h, 0, &opts, 0, &glass);
-    let (scene, ..) = with_options(&mut h, 500, &opts, 0, &glass);
-    let popup = LayerId::Popup as usize;
-    let under = &scene.layers[popup].geometry.under;
-    assert_eq!(under[0].color, premul(DARK.menu_glass));
-    assert_eq!(under[0].radii, [9.0; 4]);
-    assert_eq!(under[1].color, premul(DARK.menu_popup_border), "the ring");
-    let b = scene.backdrop.expect("the blur request");
-    assert_eq!(b.layer, popup);
-    assert_eq!(b.rect, under[0].rect);
-    assert_eq!(b.radius, 9.0);
-    // The plain list asks for no blur and keeps its opaque fill.
-    let mut h = UiHarness::new(WIN);
     let plain = DropdownOptions::default();
     with_options(&mut h, 0, &opts, 0, &plain);
     let (scene, ..) = with_options(&mut h, 500, &opts, 0, &plain);
-    assert!(scene.backdrop.is_none());
-    assert_eq!(
-        scene.layers[popup].geometry.under[0].color,
-        premul(DARK.dropdown_bg)
+    let popup = LayerId::Popup;
+    let under = &scene.merged(popup).geometry.under;
+    // The frost of `menu_glass` over the blurred scene, then the ring.
+    assert_eq!(under[0].color, premul(DARK.menu_glass));
+    assert_eq!(under[0].params[2], 2.0, "a frost");
+    assert_eq!(under[0].radii, [9.0; 4]);
+    assert_eq!(under[1].color, premul(DARK.menu_popup_border), "the ring");
+    let b = scene.merged(popup).backdrops[0];
+    assert_eq!(b.rect, under[0].rect);
+    assert_eq!(b.radius, 9.0);
+}
+
+#[test]
+fn a_row_wears_the_menus_hover_and_pressed_fills_at_radius_4() {
+    let fill_of = |scene: &Scene, color| {
+        scene
+            .merged(LayerId::Popup)
+            .geometry
+            .under
+            .iter()
+            .copied()
+            .find(|s| s.color == premul(color) && s.params[2] != 2.0)
+    };
+    let mut text = FakeText;
+    let p = Painter::<u8>::new(1.0, win(), &mut text, None, DARK);
+    let row = row_rect(panel_rect(&p, ANCHOR, OPTIONS.len()), 1);
+    let mut h = UiHarness::new(WIN);
+    frame(&mut h, 0, ANCHOR, true, 0);
+    let (x, y) = row_centre(ANCHOR, 1);
+    h.input.pointer_to(x, y);
+    frame(&mut h, 10, ANCHOR, true, 0);
+    let (hover, _) = frame(&mut h, 20, ANCHOR, true, 0);
+    let fill = fill_of(&hover, DARK.menu_item_hover).expect("the hover fill");
+    assert_eq!(fill.radii, [4.0; 4]);
+    assert_eq!(fill.rect, [row.x, row.y, row.w, row.h]);
+    assert!(fill_of(&hover, DARK.menu_item_pressed).is_none());
+    h.input.press(P);
+    let (down, _) = frame(&mut h, 30, ANCHOR, true, 0);
+    let fill = fill_of(&down, DARK.menu_item_pressed).expect("the pressed fill");
+    assert_eq!(fill.radii, [4.0; 4]);
+    assert!(
+        fill_of(&down, DARK.menu_item_hover).is_none(),
+        "pressed replaces hover"
     );
 }
 
@@ -356,7 +359,7 @@ fn max_rows_caps_the_panel_and_a_short_list_does_not_scroll() {
     let mut h = UiHarness::new(WIN);
     with_options(&mut h, 0, &many(), 0, &SCROLLING);
     let (scene, _, out) = with_options(&mut h, 500, &many(), 0, &SCROLLING);
-    let fill = scene.layers[LayerId::Popup as usize].geometry.under[0];
+    let fill = scene.merged(LayerId::Popup).geometry.under[0];
     assert_eq!(fill.rect[3], panel.h, "eight rows and the padding");
     assert!(inside(row_bounds(&out, 7), view));
     assert!(!inside(row_bounds(&out, 8), view), "the ninth is below");

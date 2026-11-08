@@ -64,6 +64,7 @@ fn every_slot_is_prepared_once_and_rendered_once_per_item() {
         scale: 2.0,
         blur_sigma: 4.0,
         saturation: 1.0,
+        ..FrameParams::default()
     };
     let (mut used, mut unused) = (Counter::default(), Counter::default());
     FrameRenderer::new(&mut gpu, FORMAT)

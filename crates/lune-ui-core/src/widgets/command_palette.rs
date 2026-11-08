@@ -410,7 +410,7 @@ impl<'p, 'q> Body<'p, 'q> {
         }
     }
 
-    /// Everything on the card after the acrylic.
+    /// Everything on the card after the frost.
     fn draw<'a>(&self, ui: &mut Ui<'a>, query: &mut String, mem: &mut PaletteMem) -> Outcome {
         let t = *ui.theme();
         let palette = self.palette;
@@ -696,7 +696,7 @@ impl<'a> Ui<'a> {
                 palette.name
             },
             description: None,
-            scrim_blur: false,
+            scrim_blur: true,
             glass,
             initial_focus: Some(search_id),
             default_action: false,

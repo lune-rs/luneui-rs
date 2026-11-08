@@ -16,7 +16,7 @@ The card that holds a screen: header with title and actions, scrolling body, opt
 ## Needs
 
 - Wane — Variants: with footer (`c-page__footer`, the wizard) (R-layout-1)
-- Wane — States: inactive window: the card background becomes the solid inactive colour. A disabled primary in the footer keeps its place. (R-layout-1)
+- Wane — States: inactive window: the card background becomes the solid inactive colour (not ported: R13, D262). A disabled primary in the footer keeps its place. (R-layout-1)
 - Wane — Sizes: Radius 8 (`--radius-panel`), 1 px `--border-subtle`, fill `--glass-card` (rgba 50 50 50 .808, Lunegit's main-content acrylic: black tint 0.8, material 0.7); margin 0 10 10 6; header padding 16, title 18/24 Medium bright, subtitle 13/20 tertiary, actions right with 8 gap; body padding 0 16 16; footer padding 12 16, top hairline, secondary action left, primary group right. (R-layout-1)
 - Wane — Behaviour: The body scrolls vertically only (`widget.scrollbar`); the layout responds to width, never to height (`?full=1` grows the window to the content). The footer stays pinned. (R-layout-1)
 
@@ -36,7 +36,7 @@ Pinned: Lunegit 33a1dd41, Wane 69931d6, this repo fa2958b. Read: `crates/lune-ui
 Conflicts (winner):
 - Card layer: Wane `--glass-card` 50 50 50 .808 is Lunegit's content acrylic (tint 0.8, material 0.7) [W docs/ui/components.md:235-248]; the moved CARD layer is tint 1.0, material 0.8 [R crates/lune-ui-core/src/theme.rs:105-109]; the moved PANEL layer is tint 0.8, material 0.7 [R crates/lune-ui-core/src/theme.rs:98-102] and matches the Lunegit values exactly. The look follows Lunegit (CLAUDE.md), so the page card uses the PANEL values (tint 0.8, material 0.7), decided in [D53].
 - Radius: 8 in Wane [W docs/ui/components.md:235-248], the moved CARD_CORNER_RADIUS [R crates/lune-ui-core/src/theme.rs:115] and Lunegit's side and settings hosts [L src/Lunegit.Desktop/Views/SidePanelView.axaml:9; src/Lunegit.Desktop/Views/SettingsPageView.axaml:10]. All agree.
-- Inactive window: the solid inactive fill is `INACTIVE_FALLBACK` #333333FF [R crates/lune-ui-core/src/theme.rs:113], which Wane's "solid inactive colour" names without a value; the moved value wins.
+- Inactive window: the card stays glass; the solid inactive fill (`INACTIVE_FALLBACK`) is gone (R13, D262).
 
 ### Anatomy
 
@@ -44,7 +44,7 @@ Conflicts (winner):
 - Header: padding 16; title 18/24 Medium, `fg_bright` ([D58]); subtitle 13/20 tertiary; actions at the right, 8 apart, aligned to the heading's top (`align-items: flex-start`) [W docs/ui/components.md:235-248; docs/ui/mocks/css/components.css:88].
 - Body: padding 0 16 16; vertical scroll only, with `widget.scrollbar` [W docs/ui/components.md:235-248].
 - Footer: padding 12 16; top hairline; secondary action left, primary group right [W docs/ui/components.md:235-248].
-- Inactive window: the card is the solid `INACTIVE_FALLBACK` #333333FF instead of the acrylic [R crates/lune-ui-core/src/theme.rs:111-113].
+- Inactive window: the same acrylic; `PageOptions` has no `active` (D262).
 - Lunegit's content acrylic: `ExperimentalAcrylicMaterial`, tint Black, tint 0.8, material 0.7 [L src/Lunegit.Desktop/Views/RepositoryContentView.axaml:52-56].
 
 ### States
@@ -52,7 +52,7 @@ Conflicts (winner):
 | state | look | cite |
 |---|---|---|
 | active | acrylic card with the PANEL values (tint 0.8, material 0.7, [D53]) | [R crates/lune-ui-core/src/theme.rs:98-109] |
-| inactive window | solid #333333FF; no acrylic | [R crates/lune-ui-core/src/theme.rs:113], [W docs/ui/components.md:235-248] |
+| inactive window | the same acrylic | [D262] |
 | footer primary disabled | the primary keeps its place; the disabled look is the button's (widget.button) | [W docs/ui/components.md:235-248] |
 | body scrolling | scrollbar visible while scrolling (widget.scrollbar) | [W docs/ui/components.md:235-248] |
 | focus-visible | not on the card; the focused control inside it | [core.focus] |
@@ -98,7 +98,6 @@ None: title, subtitle and actions are app text.
 
 - `page-header-footer` (new, at 2x and at 1x): card with title, subtitle, two header actions, a short body and a footer with a secondary and a primary button, settled.
 - `page-body-scroll` (new): body taller than the card with no footer, scrolled 300 px, settled; the zebra rows run edge to edge and the card's rounded clip cuts them at the bottom corners.
-- `page-inactive` (new): the same card with the window inactive (solid fill), settled.
 - `page-swap-opacity` (new): page content swap at t = 175 ms (half of moderate, 350 ms) [L src/Lunegit.Desktop/Themes/Animations.axaml:300], [L src/Lunegit.Desktop/App.axaml:154].
 - `page-swap-reduced` (new): the same swap under Reduced at t = 90 ms (half of the mapped `fast`): the opacity in flight, no slide.
 
@@ -111,16 +110,16 @@ None: title, subtitle and actions are app text.
 ### Acceptance
 
 - Behaviour (scripted input, injected time): a wheel scroll moves the body offset and clamps at the ends; the footer stays put; Tab order is header, body, footer.
-- Pixel probes at scale 2: radius 16 px; 1 px ring at 2 px; margin 20 px right, 20 px bottom, 12 px left; header padding 32 px; inactive fill #333333FF.
+- Pixel probes at scale 2: radius 16 px; 1 px ring at 2 px; margin 20 px right, 20 px bottom, 12 px left; header padding 32 px.
 - Conformance: page swap reaches opacity 1 and offset 0 at 350 ms; Reduced fades opacity only.
 - Semantic node: `group` named by the title; scroll-area role on the body.
-- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_page.rs`: behaviour `a_wheel_scroll_moves_the_body_clamps_at_the_end_and_the_footer_stays`, `tab_order_is_header_body_footer`, `the_body_scrolls_vertically_only`, `the_scroll_offset_survives_keep_alive`, `a_new_key_scrolls_the_body_back_to_the_top`; pixel probes `pixel_probes_at_scale_two`, `the_card_is_the_acrylic_with_the_margin_and_radius_and_a_ring_last`, `inactive_draws_the_fallback_fill_and_no_acrylic`, `the_header_is_padded_16_and_the_title_is_elided_left_of_the_actions`, `the_body_is_cut_by_the_rounded_clip_at_the_cards_rect`; conformance `swap_conforms_in_three_tiers`, `reduced_fades_the_opacity_only_and_off_snaps`, `a_swap_fades_the_body_in_and_slides_it_up_and_leaves_the_rest_alone`, `the_first_frame_of_a_page_does_not_animate`; node `the_nodes_are_a_group_a_scroll_area_and_a_footer_group`; `a_disabled_page_is_disabled_all_the_way_down`.
+- Tests, bullet by bullet. `crates/lune-ui-core/tests/widget_page.rs`: behaviour `a_wheel_scroll_moves_the_body_clamps_at_the_end_and_the_footer_stays`, `tab_order_is_header_body_footer`, `the_body_scrolls_vertically_only`, `the_scroll_offset_survives_keep_alive`, `a_new_key_scrolls_the_body_back_to_the_top`; pixel probes `pixel_probes_at_scale_two`, `the_card_is_the_acrylic_with_the_margin_and_radius_and_a_ring_last`, `the_header_is_padded_16_and_the_title_is_elided_left_of_the_actions`, `the_body_is_cut_by_the_rounded_clip_at_the_cards_rect`; conformance `swap_conforms_in_three_tiers`, `reduced_fades_the_opacity_only_and_off_snaps`, `a_swap_fades_the_body_in_and_slides_it_up_and_leaves_the_rest_alone`, `the_first_frame_of_a_page_does_not_animate`; node `the_nodes_are_a_group_a_scroll_area_and_a_footer_group`; `a_disabled_page_is_disabled_all_the_way_down`.
 
 ### Build
 
 - Milestone: M7.
 - Depends on: core.acrylic, core.theme, core.ui, widget.scrollbar, widget.button, motion.transitions.
-- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_page.rs::a_wheel_scroll_moves_the_body_clamps_at_the_end_and_the_footer_stays, crates/lune-ui-core/tests/widget_page.rs::tab_order_is_header_body_footer, crates/lune-ui-core/tests/widget_page.rs::pixel_probes_at_scale_two, crates/lune-ui-core/tests/widget_page.rs::inactive_draws_the_fallback_fill_and_no_acrylic, crates/lune-ui-core/tests/widget_page.rs::swap_conforms_in_three_tiers, crates/lune-ui-core/tests/widget_page.rs::the_nodes_are_a_group_a_scroll_area_and_a_footer_group`; page `page`; unverified here: none.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/widget_page.rs::a_wheel_scroll_moves_the_body_clamps_at_the_end_and_the_footer_stays, crates/lune-ui-core/tests/widget_page.rs::tab_order_is_header_body_footer, crates/lune-ui-core/tests/widget_page.rs::pixel_probes_at_scale_two, crates/lune-ui-core/tests/widget_page.rs::swap_conforms_in_three_tiers, crates/lune-ui-core/tests/widget_page.rs::the_nodes_are_a_group_a_scroll_area_and_a_footer_group`; page `page`; unverified here: none.
 
 ## Open questions
 

@@ -10,7 +10,7 @@ use lune_ui_core::motion::{MotionTier, conformance};
 use lune_ui_core::paint::{LayerId, Painter, Rect};
 use lune_ui_core::scene::{Scene, Shape};
 use lune_ui_core::shortcuts::{Binding, Chord, Mods, Scope};
-use lune_ui_core::testing::{FakeText, UiHarness, disabled_violations};
+use lune_ui_core::testing::{FakeText, UiHarness, disabled_violations, flattened};
 use lune_ui_core::text::{Spec, Style, TextKey};
 use lune_ui_core::theme::DARK;
 use lune_ui_core::ui::{Sense, Ui, WidgetId};
@@ -118,7 +118,10 @@ fn settled_with_the_pointer_over_item_one_is_the_old_menu_at_rest() {
     ui_frame(&mut h, 10, true);
     let (scene, _, repaint) = ui_frame(&mut h, 1000, true);
     assert_eq!(repaint, Repaint::Idle);
-    assert_eq!(scene, old_scene(menu_open_anim(1.0), true, Some(1)));
+    assert_eq!(
+        flattened(&scene),
+        old_scene(menu_open_anim(1.0), true, Some(1))
+    );
 }
 
 #[test]
@@ -127,7 +130,10 @@ fn opened_at_zero_and_drawn_at_90_ms_is_the_old_menu_at_half_progress() {
     ui_frame(&mut h, 0, true);
     let (scene, _, repaint) = ui_frame(&mut h, 90, true);
     assert_eq!(repaint, Repaint::Now);
-    assert_eq!(scene, old_scene(menu_open_anim(0.09 / 0.18), true, None));
+    assert_eq!(
+        flattened(&scene),
+        old_scene(menu_open_anim(0.09 / 0.18), true, None)
+    );
     assert_eq!(0.09_f32 / 0.18, 0.5);
 }
 
@@ -140,7 +146,7 @@ fn closing_drawn_60_ms_after_the_app_stopped_is_the_old_menu_at_half() {
     let (scene, _, repaint) = ui_frame(&mut h, 1060, false);
     assert_eq!(repaint, Repaint::Now);
     let anim = menu_close_anim(0.06 / 0.12).expect("closing");
-    assert_eq!(scene, old_scene(anim, false, None));
+    assert_eq!(flattened(&scene), old_scene(anim, false, None));
 }
 
 /// Opens, settles, stops calling at 1000 ms and steps 10 ms frames; returns the ms until idle
@@ -154,7 +160,7 @@ fn close_run(tier: MotionTier) -> (u64, Vec<f32>) {
     let mut t = 1000;
     loop {
         let (scene, _, repaint) = ui_frame(&mut h, t, false);
-        let g = &scene.layers[LayerId::Popup as usize].geometry;
+        let g = &scene.merged(LayerId::Popup).geometry;
         if let Some(s) = g.under.first() {
             alphas.push(s.color[3]);
         }
@@ -198,7 +204,7 @@ fn reduced_fades_opacity_only() {
         let mut p = Painter::<u8>::new(1.0, win(), &mut text, None, DARK);
         menu_layout(&mut p, &ROWS, AT).panel
     };
-    let fill = scene.layers[LayerId::Popup as usize].geometry.under[0];
+    let fill = scene.merged(LayerId::Popup).geometry.under[0];
     // Opacity moves, the rect does not (no scale, no offset).
     assert_eq!(fill.rect, [panel.x, panel.y, panel.w, panel.h]);
     assert!(fill.color[3] < 1.0);
@@ -214,7 +220,8 @@ fn the_curves_conform_under_every_tier_and_opacity_is_monotone_through_the_ui() 
     }
     let mut h = UiHarness::new(WIN);
     ui_frame(&mut h, 0, true);
-    let rest = old_scene(menu_open_anim(1.0), true, None).layers[LayerId::Popup as usize]
+    let rest = old_scene(menu_open_anim(1.0), true, None)
+        .merged(LayerId::Popup)
         .geometry
         .under[0]
         .color[3];
@@ -222,7 +229,7 @@ fn the_curves_conform_under_every_tier_and_opacity_is_monotone_through_the_ui() 
     for k in 1..=15_u64 {
         let dt = (k * 1000 + 30) / 60;
         let (scene, _, repaint) = ui_frame(&mut h, dt, true);
-        let a = scene.layers[LayerId::Popup as usize].geometry.under[0].color[3];
+        let a = scene.merged(LayerId::Popup).geometry.under[0].color[3];
         assert!(a >= last && a.is_finite(), "{dt}: {a} after {last}");
         last = a;
         if dt >= 180 + 17 {
@@ -418,7 +425,7 @@ fn draw(h: &mut UiHarness, ms: u64, rows: &[MenuRow<'_>]) -> (Scene, MenuRespons
 /// The shapes filling row rects on the popup layer, as `(row, shape)`.
 fn row_fills(scene: &Scene, rows: &[MenuRow<'_>]) -> Vec<(usize, Shape)> {
     let rects = layout_of(rows).rows;
-    let under = &scene.layers[LayerId::Popup as usize].geometry.under;
+    let under = &scene.merged(LayerId::Popup).geometry.under;
     let mut fills = Vec::new();
     for (i, r) in rects.iter().enumerate() {
         for s in under {
@@ -839,7 +846,7 @@ fn a_wide_header_widens_the_panel() {
 
 /// The texts on the popup layer.
 fn text_keys(scene: &Scene) -> Vec<TextKey> {
-    let layer = &scene.layers[LayerId::Popup as usize];
+    let layer = &scene.merged(LayerId::Popup);
     layer.texts.iter().map(|t| t.key).collect()
 }
 
@@ -929,7 +936,8 @@ fn the_header_dot_is_the_status_dot_in_its_tone() {
     let (scene, _, _) = draw(&mut h, 310, &VARIANTS);
     let r = layout_of(&VARIANTS).rows[0];
     let want = [r.x + 8.0, r.y + 6.0 + 10.0 - 4.0, 8.0, 8.0];
-    let dot = scene.layers[LayerId::Popup as usize]
+    let layer = scene.merged(LayerId::Popup);
+    let dot = layer
         .geometry
         .under
         .iter()
@@ -1154,7 +1162,7 @@ fn the_row_hover_conforms_under_every_tier_and_fades_through_the_ui() {
 
 #[test]
 fn the_exit_painter_snaps_the_fill_and_keeps_the_variants() {
-    let under = |scene: &Scene| scene.layers[LayerId::Popup as usize].geometry.under.len();
+    let under = |scene: &Scene| scene.merged(LayerId::Popup).geometry.under.len();
     let mut h = keyboard_open(&VARIANTS);
     let (open, _, _) = draw(&mut h, 310, &VARIANTS);
     assert_eq!(lit(&open, &VARIANTS), [1]);
@@ -1199,7 +1207,7 @@ fn at_scale_2_the_panel_is_380_wide_with_radius_18_rows_56_high_and_separators_2
     h.input.pointer_to(x, y);
     draw(&mut h, 300, &rows);
     let (scene, _, _) = draw(&mut h, 600, &rows);
-    let under = &scene.layers[LayerId::Popup as usize].geometry.under;
+    let under = &scene.merged(LayerId::Popup).geometry.under;
     let panel = under
         .iter()
         .max_by(|a, b| (a.rect[2] * a.rect[3]).total_cmp(&(b.rect[2] * b.rect[3])))

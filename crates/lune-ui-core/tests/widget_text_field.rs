@@ -412,15 +412,12 @@ mod edit {
         over[0]
     }
 
-    /// The fills in the text selection's colour.
-    fn selection_fills(scene: &Scene) -> Vec<Shape> {
+    /// The bounds of each selection shape (scale 1); no flat fill has the selection's colour.
+    fn selection_fills(scene: &Scene) -> Vec<Rect> {
         let fill = premul(DARK.text_selection);
         let g = &scene.layers[0].geometry;
-        g.under
-            .iter()
-            .filter(|s| s.color == fill)
-            .copied()
-            .collect()
+        assert!(!g.under.iter().chain(&g.over).any(|s| s.color == fill));
+        lune_ui_core::testing::fill_shapes(g, DARK.text_selection)
     }
 
     /// Text x of column `n` of the field at rest.
@@ -650,8 +647,9 @@ mod edit {
         assert_eq!(selection(&out), (1, 5));
         let fills = selection_fills(&scene);
         assert_eq!(fills.len(), 1);
-        assert_eq!(fills[0].rect[0], column(1));
-        assert_eq!(fills[0].rect[2], 4.0 * glyph());
+        let pad = DARK.selection_pad;
+        assert_eq!(fills[0].x, column(1) - pad);
+        assert_eq!(fills[0].w, 4.0 * glyph() + 2.0 * pad);
         h.input.release(PointerButton::Primary);
         plain(&mut h, &mut text);
         // Shift-press extends from the anchor.
@@ -833,7 +831,11 @@ mod edit {
         let dots = "\u{2022}".repeat(MASK_DOTS);
         let style = Style::ui(DARK.font_base, DARK.fg_primary);
         let w = FakeText.measure(&Spec::plain(dots, style), 1.0).0;
-        assert_eq!((fills[0].rect[0], fills[0].rect[2]), (RECT.x + 10.0, w));
+        let pad = DARK.selection_pad;
+        assert_eq!(
+            (fills[0].x, fills[0].w),
+            (RECT.x + 10.0 - pad, w + 2.0 * pad)
+        );
         chord(&mut h, "x");
         let (_, r, out) = run(&mut h, &mut text, &opts);
         assert!(out.clipboard.is_empty() && !r.response.changed);

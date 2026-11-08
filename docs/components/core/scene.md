@@ -11,7 +11,7 @@ summary: Plain-data Scene the painter builds and a renderer consumes; the draw-o
 
 ## What it is
 
-`Scene` (six `Layer`s and an optional `BackdropRequest`), `LayerGeometry` (acrylic, under, over shapes and strokes), `Shape`, `StrokeVertex`, `TextItem`, `CustomItem`, `LayerId`, `LAYER_COUNT`, `SCENE_LAYERS` and `FrameParams`. Std only, in physical pixels; the records mirror the GPU's field by field and the wgpu adapter copies them into its own Pod structs. This is the renderer seam: the data, not a trait. The draw-order contract is in the module doc: layers back to front; in a layer acrylic, under shapes, custom items, text, over shapes, strokes; layers under `SCENE_LAYERS` render offscreen, which a backdrop request blurs.
+`Scene` (seven fixed `Layer`s, an `OverlayLayer` per overlay; a `Layer` holds its `BackdropRequest`s), `LayerGeometry` (acrylic, under, over shapes and strokes), `Shape`, `StrokeVertex`, `TextItem`, `CustomItem`, `LayerId`, `LAYER_COUNT`, `SCENE_LAYERS`, `FrameParams` (size, scale, blur sigma, saturation, `noise_opacity`, and `BlurLimits { kernel_cap, downsample }`; D264). Std only, in physical pixels; the records mirror the GPU's field by field and the wgpu adapter copies them into its own Pod structs. This is the renderer seam: the data, not a trait. The draw-order contract is in the module doc: layers back to front in `Scene::in_order`, each fixed layer followed by the overlays on it in open order ([D256]); in a layer acrylic, under shapes, custom items, text, over shapes, strokes; layers under `SCENE_LAYERS` render offscreen, which a backdrop request blurs.
 
 ## Needs
 
@@ -32,9 +32,9 @@ Conflicts: none.
 
 ### Anatomy
 
-- Layers in draw order: `Base` 0, `Page` 1, `Popup` 2, `Modal` 3, `Raised` 4, `Toast` 5 [R crates/lune-ui-core/src/scene.rs `LayerId`]. `Raised` holds an overlay opened above an active modal; the `Ui` chooses it at open ([D137]).
+- Layers in draw order: `Base` 0, `Page` 1, `Popup` 2, `Modal` 3, `Raised` 4, `Toast` 5 [R crates/lune-ui-core/src/scene.rs `LayerId`]. `Raised` holds an overlay opened above an active modal; the `Ui` chooses it at open ([D137]). `scene.layers[id as usize]` is what was drawn on `id` outside any overlay; `Scene::merged(id)` folds in the overlays on it, for tests and inspection ([D256]).
 - `LAYER_COUNT` 6 [R crates/lune-ui-core/src/scene.rs].
-- `SCENE_LAYERS` 2: the layers under a popup draw to an offscreen scene so a glass menu can blur them. `Scene::split()` is `SCENE_LAYERS`, or the backdrop request's `layer` when that is higher, so a glass surface blurs everything under it; `BackdropRequest` carries `layer`, `sigma` and `saturation` (0 means the frame's). One backdrop per frame: of two, the lower layer keeps it ([D138]).
+- `SCENE_LAYERS` 2: the layers under a popup draw to an offscreen scene so a glass menu can blur them. `Scene::floor()` is that place in `Scene::in_order`. A layer with `BackdropRequest`s is a stop: what is drawn before it is blurred, then its requests draw; a request below the floor stops at the floor. A request carries `sigma` and `saturation` (0 means the frame's), and every request stands ([D257]).
 - Items per layer: `Shape` (31), `StrokeVertex` (43), `LayerGeometry` (55), `TextItem` (63), `CustomItem` (74), `Layer` (82), `BackdropRequest` (91), `Scene` (99), `FrameParams` (107) [R crates/lune-ui-core/src/scene.rs:31-107].
 
 ### States
@@ -80,13 +80,13 @@ n/a — text items carry strings from the caller.
 
 - The draw order: `crates/lune-ui-core/src/testing/recording.rs::records_the_documented_draw_order` (acrylic, under, path fills, customs, images, text, over, strokes inside a layer; the backdrop at the split).
 - Items land on the layer set by `Painter::on`, for every kind, under the clip and `Xform`: `crates/lune-ui-core/tests/painter.rs::fills_rings_and_backdrops_take_the_layer_clip_scale_and_alpha_of_the_xform`, `strokes_fans_and_polygons_take_the_layer_clip_scale_and_alpha_of_the_xform`, `text_takes_the_layer_clip_scale_and_alpha_of_the_xform`, `image_lands_on_the_current_layer_under_the_clip_and_xform`, `text_rotated_lands_on_the_current_layer_under_the_clip_and_xform` (each asserts the other layers stay empty), and the paint.rs unit test `custom_lands_on_the_current_layer` for customs.
-- The split: `painter.rs::the_recording_renderer_puts_the_backdrop_at_the_split`, `of_two_backdrops_the_lower_layer_keeps_it_in_either_draw_order`.
+- The stops: `painter.rs::the_recording_renderer_puts_a_backdrop_before_its_layer_and_no_lower_than_the_floor`, `backdrops_on_two_layers_both_stand_in_draw_order_whichever_came_first`.
 
 ### Build
 
 - Milestone: M11 (done standard; code exists).
 - Depends on: core.painter, render.frame.
-- Done (D47, M11): tests `crates/lune-ui-core/src/testing/recording.rs::records_the_documented_draw_order, crates/lune-ui-core/tests/painter.rs::fills_rings_and_backdrops_take_the_layer_clip_scale_and_alpha_of_the_xform, crates/lune-ui-core/tests/painter.rs::image_lands_on_the_current_layer_under_the_clip_and_xform, crates/lune-ui-core/tests/painter.rs::the_recording_renderer_puts_the_backdrop_at_the_split`; page n/a (plain data; drawn by the legacy scenes `menu`, `dialog-confirm`, `custom-draw`); unverified here: none.
+- Done (D47, M11): tests `crates/lune-ui-core/src/testing/recording.rs::records_the_documented_draw_order, crates/lune-ui-core/tests/painter.rs::fills_rings_and_backdrops_take_the_layer_clip_scale_and_alpha_of_the_xform, crates/lune-ui-core/tests/painter.rs::image_lands_on_the_current_layer_under_the_clip_and_xform, crates/lune-ui-core/tests/painter.rs::the_recording_renderer_puts_a_backdrop_before_its_layer_and_no_lower_than_the_floor`; page n/a (plain data; drawn by the legacy scenes `menu`, `dialog-confirm`, `custom-draw`); unverified here: none.
 
 ## Open questions
 

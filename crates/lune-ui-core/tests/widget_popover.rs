@@ -130,7 +130,8 @@ fn open_one(h: &mut UiHarness, ms: u64) -> Out {
 }
 
 fn popup_fill_alpha(scene: &Scene) -> Option<f32> {
-    scene.layers[LayerId::Popup as usize]
+    scene
+        .merged(LayerId::Popup)
         .geometry
         .under
         .first()
@@ -175,7 +176,7 @@ fn the_popover_sits_where_place_says_and_reports_it() {
     let out = open_one(&mut h, 400);
     let pl = out.placement.expect("placed");
     assert_eq!(pl, place(&req(ANCHOR, SIZE)));
-    let panel = &out.scene.layers[LayerId::Popup as usize].geometry.under[0];
+    let panel = &out.scene.merged(LayerId::Popup).geometry.under[0];
     assert_eq!(panel.rect[..2], [pl.rect.x, pl.rect.y]);
 }
 
@@ -306,10 +307,7 @@ fn a_popover_the_app_stops_calling_finishes_its_dismiss_then_idles() {
             "{tier:?}: {alphas:?}"
         );
         assert!(
-            last.layers[LayerId::Popup as usize]
-                .geometry
-                .under
-                .is_empty(),
+            last.merged(LayerId::Popup).geometry.under.is_empty(),
             "{tier:?}: nothing drawn once idle"
         );
     }
@@ -322,8 +320,8 @@ fn the_exit_replays_the_content_and_hits_nothing() {
     let open = open_one(&mut h, 300);
     let closing = run(&mut h, 1000, &[], |_| {});
     let (o, c) = (
-        &open.scene.layers[LayerId::Popup as usize].geometry.under,
-        &closing.scene.layers[LayerId::Popup as usize].geometry.under,
+        &open.scene.merged(LayerId::Popup).geometry.under,
+        &closing.scene.merged(LayerId::Popup).geometry.under,
     );
     assert_eq!(o.len(), c.len());
     assert_eq!(o[0].radii, c[0].radii);
@@ -368,7 +366,7 @@ fn reduced_fades_opacity_only_and_off_snaps() {
     open_one(&mut h, 0);
     let out = open_one(&mut h, 40);
     let pl = out.placement.expect("placed");
-    let fill = out.scene.layers[LayerId::Popup as usize].geometry.under[0];
+    let fill = out.scene.merged(LayerId::Popup).geometry.under[0];
     assert_eq!(fill.rect, [pl.rect.x, pl.rect.y, pl.rect.w, pl.rect.h]);
     assert!(fill.color[3] < 1.0);
 
@@ -384,7 +382,7 @@ fn full_tier_opens_from_4_px_lower_at_97_percent() {
     let mut h = UiHarness::new(WIN);
     let first = open_one(&mut h, 0);
     let pl = first.placement.expect("placed");
-    let fill = first.scene.layers[LayerId::Popup as usize].geometry.under[0];
+    let fill = first.scene.merged(LayerId::Popup).geometry.under[0];
     assert!(
         (fill.rect[1] - (pl.rect.y + 4.0)).abs() < 1e-3,
         "{:?}",
@@ -399,17 +397,20 @@ fn pixel_probes_at_scale_2() {
     h.input.set_scale(2.0);
     open_one(&mut h, 0);
     let out = open_one(&mut h, 400);
-    let fill = out.scene.layers[LayerId::Popup as usize].geometry.under[0];
+    let fill = out.scene.merged(LayerId::Popup).geometry.under[0];
     // Gap: 4 logical px = 8 device px under the anchor.
     assert_eq!(fill.rect[1] - ANCHOR.bottom() * 2.0, 8.0);
-    assert_eq!(fill.radii, [16.0; 4], "surface radius 16 device px");
+    assert_eq!(
+        fill.radii, [18.0; 4],
+        "surface radius 9 logical px, 18 device px"
+    );
     // Margin: 8 logical px = 16 device px from the window edge when shifted.
     let mut h = UiHarness::new(WIN);
     h.input.set_scale(2.0);
     let edge = Rect::new(790.0, 100.0, 200.0, 32.0);
     run(&mut h, 0, &[("pop", edge)], |_| {});
     let out = run(&mut h, 400, &[("pop", edge)], |_| {});
-    let fill = out.scene.layers[LayerId::Popup as usize].geometry.under[0];
+    let fill = out.scene.merged(LayerId::Popup).geometry.under[0];
     assert_eq!(WIN.0 * 2.0 - (fill.rect[0] + fill.rect[2]), 16.0);
     // And the flipped-clamped one sits on the top margin.
     let mut h = UiHarness::new(WIN);
@@ -418,7 +419,7 @@ fn pixel_probes_at_scale_2() {
     let near_top = Rect::new(100.0, 20.0, 200.0, 32.0);
     run(&mut h, 0, &[("pop", near_top)], tall);
     let out = run(&mut h, 400, &[("pop", near_top)], tall);
-    let fill = out.scene.layers[LayerId::Popup as usize].geometry.under[0];
+    let fill = out.scene.merged(LayerId::Popup).geometry.under[0];
     assert_eq!(fill.rect[1], 16.0);
 }
 
@@ -429,10 +430,7 @@ fn surface_none_draws_nothing_of_its_own() {
     run(&mut h, 0, &[("pop", ANCHOR)], none);
     let out = run(&mut h, 400, &[("pop", ANCHOR)], none);
     assert!(
-        out.scene.layers[LayerId::Popup as usize]
-            .geometry
-            .under
-            .is_empty(),
+        out.scene.merged(LayerId::Popup).geometry.under.is_empty(),
         "the content here draws no shape"
     );
 }
@@ -494,23 +492,27 @@ fn a_popover_anchored_on_a_response_in_a_scrolled_area_opens_at_it_on_screen() {
 #[test]
 fn a_glass_popover_blurs_what_is_under_it_and_replays_the_blur_while_it_closes() {
     let glass = |o: &mut PopoverOptions| o.surface = Surface::Glass;
-    let popup = LayerId::Popup as usize;
+    let popup = LayerId::Popup;
     let mut h = UiHarness::new(WIN);
     run(&mut h, 0, &[("pop", ANCHOR)], glass);
     let out = run(&mut h, 400, &[("pop", ANCHOR)], glass);
     let pl = out.placement.expect("placed");
-    let under = &out.scene.layers[popup].geometry.under;
+    let under = &out.scene.merged(popup).geometry.under;
     assert_eq!(under[0].color, premul(DARK.menu_glass));
     assert_eq!(under[0].radii, [9.0; 4]);
     assert_eq!(under[1].color, premul(DARK.menu_popup_border), "the ring");
-    let open = out.scene.backdrop.expect("the blur request");
-    assert_eq!(open.layer, popup);
+    let open = out.scene.merged(popup).backdrops[0];
     assert_eq!(open.rect, [pl.rect.x, pl.rect.y, pl.rect.w, pl.rect.h]);
     assert_eq!(open.radius, 9.0);
     // The app stops calling it: the blur is replayed with the fade, then gone.
     run(&mut h, 1000, &[], |_| {});
     let closing = run(&mut h, 1060, &[], |_| {});
-    let blur = closing.scene.backdrop.expect("blur while it fades");
+    let blur = closing
+        .scene
+        .backdrops()
+        .next()
+        .copied()
+        .expect("blur while it fades");
     assert!(
         blur.alpha < open.alpha,
         "{} against {}",
@@ -523,9 +525,19 @@ fn a_glass_popover_blurs_what_is_under_it_and_replays_the_blur_while_it_closes()
     );
     assert_eq!(closing.repaint, Some(Repaint::Now));
     let idle = run(&mut h, 1300, &[], |_| {});
-    assert!(idle.scene.backdrop.is_none());
-    // The default surface asks for no blur.
+    assert!(idle.scene.backdrops().next().is_none());
+    // The default surface is the glass one; `Surface::None` asks for no blur.
     let mut h = UiHarness::new(WIN);
     open_one(&mut h, 0);
-    assert!(open_one(&mut h, 400).scene.backdrop.is_none());
+    let dflt = open_one(&mut h, 400);
+    assert_eq!(dflt.scene.backdrops().count(), 1);
+    assert_eq!(
+        dflt.scene.merged(popup).geometry.under[0].color,
+        premul(DARK.menu_glass)
+    );
+    let mut h = UiHarness::new(WIN);
+    let none = |o: &mut PopoverOptions| o.surface = Surface::None;
+    run(&mut h, 0, &[("pop", ANCHOR)], none);
+    let out = run(&mut h, 400, &[("pop", ANCHOR)], none);
+    assert!(out.scene.backdrops().next().is_none());
 }

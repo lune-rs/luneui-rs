@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use super::tone::Tone;
 use crate::access::{Node, Role, Value};
-use crate::color::Rgba;
+use crate::color::{Rgba, with_alpha};
 use crate::motion::{MotionTier, Time};
 use crate::paint::{Painter, Rect};
 use crate::text::{Font, Spec, Style};
@@ -111,10 +111,6 @@ pub fn indeterminate_at(tier: MotionTier, t: Time) -> Indeterminate {
     }
 }
 
-fn faded(c: Rgba, opacity: f32) -> Rgba {
-    [c[0], c[1], c[2], (f32::from(c[3]) * opacity).round() as u8]
-}
-
 /// Draws a determinate bar in `track` at `fraction` (clamped): the track, then the fill from the
 /// left, whose width is the fraction of the track's. No fill op at 0. The ends are semicircles of
 /// the track's own height (4 px gives `RADIUS`). Public for the stat meter.
@@ -156,11 +152,7 @@ pub fn paint_indeterminate<H: Copy + PartialEq>(
             p.pop_clip();
         }
         Indeterminate::Fade(opacity) => {
-            p.fill(
-                track,
-                RADIUS_INDETERMINATE,
-                faded(color, opacity.clamp(0.0, 1.0)),
-            );
+            p.fill(track, RADIUS_INDETERMINATE, with_alpha(color, opacity));
         }
     }
 }

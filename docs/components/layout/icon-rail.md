@@ -49,11 +49,11 @@ Conflicts: none. Wane and this repo have no icon rail.
 | rest | transparent button, icon `ForegroundMuted` | [L src/Lunegit.Desktop/Views/IconRailView.axaml:24-28] |
 | hover | background tween (Instant, linear) to the hover fill; the fill value is not read | [L src/Lunegit.Desktop/Themes/Animations.axaml:39-46] |
 | pressed | scale 0.98 | [L src/Lunegit.Desktop/Themes/Animations.axaml:59-60] |
-| panel active | not in the markup (the buttons toggle; no active class); open question | open question |
+| panel active | `surface_selected` fill, `fg_primary` glyph, `Pressed` in the node (the toolkit's addition: Lunegit's markup has no active class) | [D149] |
 | commit with uncommitted changes | dot shown | [L src/Lunegit.Desktop/Views/IconRailView.axaml:109] |
 | notifications with unread items | badge shown | [L src/Lunegit.Desktop/Views/IconRailView.axaml:46-53] |
-| focus-visible | not in the markup; open question | open question |
-| disabled | not in the markup; open question | open question |
+| focus-visible | the button's ring | [D149] |
+| disabled | n/a in Lunegit (no button is disabled); the toolkit draws a disabled item at 0.4 and inert, and the arrows skip it | [D149] |
 
 ### Transitions
 
@@ -132,7 +132,7 @@ Dropped by [D149] (app text, hard rule 1): the keys below name an app's panels; 
 
 ## Open questions
 
-None. Closed by [D149]: the rail is a toolkit component (`Ui::icon_rail`, `RailItem`). Hover #10 and pressed #20 are the toolbar action's (`App.axaml:469-483`); focus-visible is the button's ring. The dot is 8 x 8, radius 4, `dirty_indicator` #D98A3D at (27, 7) from the button's top left (Lunegit margin 0,-3,-5,0 on a 20 px glyph panel); the badge is at least 16 wide and 16 high, radius 8, `count_badge` #E74856, 9 px bold `on_accent` text, right edge at x 34, top at y 10, "99+" above 99; both scale with the press and neither is animated; a count of 0 shows none. The count's name is the item's `note`. No keyboard shortcuts of its own: the app's `Binding`s. Active look (the toolkit's addition, Lunegit has none): `surface_selected` fill and `fg_primary` glyph, `Pressed` in the node. The rail draws no glass: the app's layer sits behind it. Each button has a tooltip of its name.
+None. Closed by [D149]: the rail is a toolkit component (`Ui::icon_rail`, `RailItem`). Hover #10 and pressed #20 are the toolbar action's (`App.axaml:469-483`); focus-visible is the button's ring. The dot is 8 x 8, radius 4, `dirty_indicator` #D98A3D at (27, 7) from the button's top left (Lunegit margin 0,-3,-5,0 on a 20 px glyph panel); the badge is at least 16 wide and 16 high, radius 8, `count_badge` #E74856, 9 px bold `on_accent` text, right edge at x 38, top at y 2 so it sits on the glyph's top right corner and grows leftward, "99+" above 99 (a deliberate deviation from Lunegit, [D273]: its badge box is x 18..34, y 10..26, inside the glyph, but it is `IsVisible="False"`, so nobody ever saw it there); both scale with the press and neither is animated; a count of 0 shows none. The count's name is the item's `note`. No keyboard shortcuts of its own: the app's `Binding`s. Active look (the toolkit's addition, Lunegit has none): `surface_selected` fill and `fg_primary` glyph, `Pressed` in the node. The rail draws no glass: the app's layer sits behind it. Each button has a tooltip of its name.
 
 ## Notes for the planner
 

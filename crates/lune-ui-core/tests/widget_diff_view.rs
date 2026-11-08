@@ -12,7 +12,9 @@ use lune_ui_core::input::{
 use lune_ui_core::motion::{MotionTier, conformance};
 use lune_ui_core::paint::Rect;
 use lune_ui_core::scene::{Scene, Shape};
-use lune_ui_core::testing::{ScriptedInput, UiHarness, disabled_violations};
+use lune_ui_core::testing::{
+    ScriptedInput, UiHarness, disabled_violations, fill_covers, fill_shapes,
+};
 use lune_ui_core::text::{Spec, Style};
 use lune_ui_core::theme::DARK;
 use lune_ui_core::ui::WidgetId;
@@ -283,13 +285,17 @@ fn copy(h: &mut UiHarness, lines: &[DiffLine<'_>], s: &Setup) -> Vec<String> {
 }
 
 fn texts(scene: &Scene) -> Vec<lune_ui_core::scene::TextItem> {
-    scene.layers.iter().flat_map(|l| l.texts.clone()).collect()
+    scene
+        .in_order()
+        .into_iter()
+        .flat_map(|l| l.texts.clone())
+        .collect()
 }
 
 fn under(scene: &Scene) -> Vec<Shape> {
     scene
-        .layers
-        .iter()
+        .in_order()
+        .into_iter()
         .flat_map(|l| l.geometry.under.clone())
         .collect()
 }
@@ -304,6 +310,29 @@ fn fills_of(scene: &Scene, color: [u8; 4]) -> Vec<Shape> {
         .into_iter()
         .filter(|s| same_color(s.color, want))
         .collect()
+}
+
+/// The diff's selection colour: the accent at 0x33.
+const fn sel_color() -> [u8; 4] {
+    [DARK.accent[0], DARK.accent[1], DARK.accent[2], 0x33]
+}
+
+/// The bounds of each selection shape of the diff's colour (physical px, padding included);
+/// none of its flat fills has that colour.
+fn selections(scene: &Scene) -> Vec<Rect> {
+    let want = premul(sel_color());
+    let mut out = Vec::new();
+    for l in scene.in_order() {
+        let g = &l.geometry;
+        assert!(
+            !g.under
+                .iter()
+                .chain(&g.over)
+                .any(|s| same_color(s.color, want))
+        );
+        out.extend(fill_shapes(g, sel_color()));
+    }
+    out
 }
 
 fn code_style(color: [u8; 4]) -> Style {
@@ -1003,11 +1032,14 @@ fn marks_draw_under_the_selection_and_the_text() {
     let r = run(&mut h, &lines, &s);
     let order: Vec<[f32; 4]> = under(&r.scene).into_iter().map(|s| s.color).collect();
     let pos = |c: [u8; 4]| order.iter().position(|o| same_color(*o, premul(c)));
-    let accent = [DARK.accent[0], DARK.accent[1], DARK.accent[2], 0x33];
-    let (fill, mark, sel) = (pos(DARK.diff_added), pos(DARK.diff_added_mark), pos(accent));
-    assert!(fill < mark, "fill then marks: {fill:?} {mark:?}");
-    assert!(mark < sel, "marks then selection: {mark:?} {sel:?}");
-    assert!(sel.is_some());
+    let (fill, mark) = (pos(DARK.diff_added), pos(DARK.diff_added_mark));
+    assert!(
+        fill.is_some() && fill < mark,
+        "fill then marks: {fill:?} {mark:?}"
+    );
+    // The selection is a path fill: a layer draws those after every shape under the text, so
+    // over the marks (`LayerGeometry::fills`).
+    assert_eq!(selections(&r.scene).len(), 1);
 }
 
 // The rows' look.
@@ -1060,12 +1092,62 @@ fn a_row_has_no_hover_and_the_selection_is_the_accent_at_0x33() {
     click(&mut h, over_row(1), NONE);
     run(&mut h, &lines, &s);
     let r = settle(&mut h, &lines, &s, &mut ms);
-    let accent = [DARK.accent[0], DARK.accent[1], DARK.accent[2], 0x33];
-    let sel = fills_of(&r.scene, accent);
-    assert_eq!(sel.len(), 1);
-    assert_eq!(sel[0].rect, [DIFF.x, DIFF.y + ROW, DIFF.w, ROW]);
+    let sel = selections(&r.scene);
+    let pad = DARK.selection_pad;
+    assert_eq!(
+        sel,
+        [Rect::new(
+            DIFF.x - pad,
+            DIFF.y + ROW,
+            DIFF.w + 2.0 * pad,
+            ROW
+        )]
+    );
     assert!(fills_of(&r.scene, DARK.surface_selected).is_empty());
     assert!(fills_of(&r.scene, DARK.surface_active).is_empty());
+}
+
+#[test]
+fn selected_rows_that_touch_are_one_shape_and_a_selection_past_the_view_is_open() {
+    let lines = big(40);
+    let s = setup();
+    let mut h = harness();
+    run(&mut h, &lines, &s);
+    click(&mut h, over_row(1), NONE);
+    run(&mut h, &lines, &s);
+    click(&mut h, over_row(3), SHIFT);
+    run(&mut h, &lines, &s);
+    let r = run(&mut h, &lines, &s);
+    let pad = DARK.selection_pad;
+    assert_eq!(
+        selections(&r.scene),
+        [Rect::new(
+            DIFF.x - pad,
+            DIFF.y + ROW,
+            DIFF.w + 2.0 * pad,
+            3.0 * ROW
+        )],
+        "rows 1 to 3 joined"
+    );
+    // Rows 1 to the last, the view at the end: the shape is the rows in view only, flat at the
+    // top where it runs on out of view, rounded at the last row.
+    key(&mut h, NamedKey::End, SHIFT);
+    run(&mut h, &lines, &s);
+    let mut ms = 0;
+    let r = settle(&mut h, &lines, &s, &mut ms);
+    let sel = selections(&r.scene);
+    assert_eq!(sel.len(), 1, "{sel:?}");
+    let f = sel[0];
+    assert!(f.h <= DIFF.h + 2.0 * ROW, "the rows in view: {f:?}");
+    assert!((f.bottom() - DIFF.bottom()).abs() < 1.0, "{f:?}");
+    let g = &r.scene.layers[0].geometry;
+    let covers = |x: f32, y: f32| fill_covers(g, sel_color(), [x, y]);
+    assert!(covers(f.x + 0.3, f.y + 0.3), "a square top corner");
+    assert!(
+        !covers(f.x + 0.3, f.bottom() - 0.3),
+        "a round bottom corner"
+    );
+    assert!(covers(f.x + 0.3, f.bottom() - ROW / 2.0), "the instrument");
 }
 
 // Wrap and the horizontal offset.
@@ -1518,19 +1600,18 @@ fn rows_never_animate_a_selection_change_is_there_in_its_frame() {
     run(&mut h, &lines, &s);
     click(&mut h, over_row(2), NONE);
     let r = run(&mut h, &lines, &s);
-    let accent = [DARK.accent[0], DARK.accent[1], DARK.accent[2], 0x33];
-    let sel = fills_of(&r.scene, accent);
+    // `selections` finds the shape in the exact colour: at full alpha in its first frame.
+    let sel = selections(&r.scene);
     assert_eq!(
         sel.len(),
         1,
         "the overlay at full alpha in the frame it appears"
     );
-    assert_eq!(sel[0].color, premul(accent));
     let mut ms = 0;
     let settled = settle(&mut h, &lines, &s, &mut ms);
     assert_eq!(
-        fills_of(&settled.scene, accent)[0].color,
-        sel[0].color,
+        selections(&settled.scene),
+        sel,
         "and it does not change after"
     );
     // A mode switch replaces the rows at once.

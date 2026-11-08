@@ -465,6 +465,36 @@ fn a_press_on_an_actionable_link_raises_it_once_and_starts_no_selection() {
     assert_eq!(r.out.cursor, CursorIcon::Pointer, "the hand over a link");
 }
 
+/// A press raises the link; the document is disabled while the button is held; the release after
+/// it raises nothing more (the capture outlives the frame in which the response lies).
+#[test]
+fn a_press_held_across_a_disabled_frame_then_released_raises_the_link_once() {
+    let items = link_doc();
+    let blocks = [MdBlock::Paragraph(&items)];
+    let mut h = drawn(&blocks, &live());
+    let (x, y) = on_link();
+    h.input.pointer_to(x, y).press(P);
+    let r = run(&mut h, &blocks, &live());
+    assert_eq!(
+        r.r.link.as_deref(),
+        Some("docs/a.md"),
+        "instrument: the press raises it"
+    );
+    let mut off = None;
+    h.frame(|ui| {
+        ui.with_enabled(false, |ui| {
+            off = Some(ui.markdown("m", RECT, &blocks, &live()));
+        });
+    });
+    assert_eq!(off.expect("ran").link, None, "disabled");
+    h.input.release(P);
+    let r = run(&mut h, &blocks, &live());
+    assert_eq!(
+        r.r.link, None,
+        "the release is the end of the press, not a click"
+    );
+}
+
 #[test]
 fn a_press_beside_the_link_selects_text_and_raises_nothing() {
     let items = link_doc();
