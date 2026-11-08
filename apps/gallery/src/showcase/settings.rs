@@ -15,6 +15,7 @@ use lune_ui::color::Rgba;
 use lune_ui::lunegit_dark::THEME;
 use lune_ui::material::Material;
 use lune_ui::motion::MotionTier;
+use lune_ui::near_black;
 use lune_ui::paint::Rect;
 use lune_ui::scene::BlurLimits;
 use lune_ui::text::{Spec, Style};
@@ -29,30 +30,44 @@ use super::knobs::Knobs;
 use crate::page::{FrameTweaks, PageState};
 use crate::scenes::{BLUR_SATURATION, BLUR_SIGMA};
 
-/// The theme the gallery starts under, and the five files of Lunegit it can load.
-pub(crate) const THEMES: [(&str, Option<&[u8]>); 6] = [
-    ("Lunegit dark (preset)", None),
+/// Where a theme in [`THEMES`] comes from.
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum ThemeSource {
+    /// A preset value, and the OS material it brings (`None` leaves the window's own choice).
+    Preset(&'static Theme, Option<Material>),
+    /// A theme file's bytes, loaded over the dark preset.
+    File(&'static [u8]),
+}
+
+/// The theme the gallery starts under, the five files of Lunegit it can load, and the near-black
+/// preset, which brings its own OS material.
+pub(crate) const THEMES: [(&str, ThemeSource); 7] = [
+    ("Lunegit dark (preset)", ThemeSource::Preset(&THEME, None)),
     (
         "Dark Modern",
-        Some(include_bytes!(
+        ThemeSource::File(include_bytes!(
             "../../assets/lunegit/themes/dark-modern.json"
         )),
     ),
     (
         "Blue",
-        Some(include_bytes!("../../assets/lunegit/themes/blue.json")),
+        ThemeSource::File(include_bytes!("../../assets/lunegit/themes/blue.json")),
     ),
     (
         "Green",
-        Some(include_bytes!("../../assets/lunegit/themes/green.json")),
+        ThemeSource::File(include_bytes!("../../assets/lunegit/themes/green.json")),
     ),
     (
         "Orange",
-        Some(include_bytes!("../../assets/lunegit/themes/orange.json")),
+        ThemeSource::File(include_bytes!("../../assets/lunegit/themes/orange.json")),
     ),
     (
         "Purple",
-        Some(include_bytes!("../../assets/lunegit/themes/purple.json")),
+        ThemeSource::File(include_bytes!("../../assets/lunegit/themes/purple.json")),
+    ),
+    (
+        "Near-black glass (preset)",
+        ThemeSource::Preset(&near_black::THEME, Some(near_black::MATERIAL)),
     ),
 ];
 
@@ -77,7 +92,7 @@ pub(crate) const DOWNSAMPLES: [u32; 3] = [2, 4, 8];
 pub(crate) const SATURATION_MAX: f32 = 3.0;
 
 /// The OS materials, in the order the pane lists them.
-pub(crate) const MATERIALS: [(&str, Material); 5] = [
+pub(crate) const MATERIALS: [(&str, Material); 6] = [
     ("Vibrancy", Material::Vibrancy),
     (
         "Vibrancy, follows the window",
@@ -86,6 +101,7 @@ pub(crate) const MATERIALS: [(&str, Material); 5] = [
     ("Liquid, clear", Material::LiquidClear),
     ("Liquid, regular", Material::LiquidRegular),
     ("Opaque", Material::Opaque),
+    ("Near-black (UltraDark)", near_black::MATERIAL),
 ];
 
 /// The motion durations the pane edits, in milliseconds: the theme's five tokens and the
@@ -213,14 +229,20 @@ impl Default for Settings {
 impl Settings {
     /// Chooses the theme `THEMES[index]`. A file that does not load leaves the preset and says why.
     pub(crate) fn set_theme(&mut self, index: usize) {
-        let Some((_, file)) = THEMES.get(index) else {
+        let Some((_, source)) = THEMES.get(index) else {
             return;
         };
         self.theme = index;
         self.theme_note = None;
-        self.base = match file {
-            None => THEME,
-            Some(bytes) => match Theme::from_json(bytes, &DARK) {
+        self.base = match *source {
+            ThemeSource::Preset(theme, material) => {
+                if let Some(material) = material {
+                    self.material = material;
+                    self.material_note = None;
+                }
+                *theme
+            }
+            ThemeSource::File(bytes) => match Theme::from_json(bytes, &DARK) {
                 Ok(loaded) => loaded.theme,
                 Err(e) => {
                     self.theme_note = Some(format!("did not load: {e:?}"));
@@ -838,6 +860,52 @@ mod tests {
         let mut s = Settings::default();
         s.set_theme(2);
         assert_ne!(s.theme(), THEME, "the blue file is not the preset");
+    }
+
+    #[test]
+    fn the_near_black_entries_are_last_and_blue_stays_at_two() {
+        assert_eq!(THEMES.len(), 7);
+        assert_eq!(THEMES[2].0, "Blue");
+        assert_eq!(THEMES[6].0, "Near-black glass (preset)");
+        assert_eq!(MATERIALS.len(), 6);
+        assert_eq!(
+            MATERIALS[5],
+            ("Near-black (UltraDark)", near_black::MATERIAL)
+        );
+    }
+
+    #[test]
+    fn selecting_near_black_sets_its_theme_and_material() {
+        let mut s = Settings {
+            material_note: Some("earlier note".to_owned()),
+            ..Settings::default()
+        };
+        s.set_theme(6);
+        assert_eq!(s.theme_note, None);
+        assert_eq!(s.theme(), near_black::THEME);
+        assert_eq!(s.material, near_black::MATERIAL);
+        assert_eq!(s.material_note, None);
+        let radio = MATERIALS.iter().position(|(_, m)| *m == s.material);
+        assert_eq!(
+            radio,
+            Some(5),
+            "the material radio shows the near-black entry"
+        );
+        s.material = Material::Opaque;
+        assert_eq!(
+            s.material,
+            Material::Opaque,
+            "the radio still changes it by hand"
+        );
+    }
+
+    #[test]
+    fn selecting_the_other_themes_leaves_the_material_alone() {
+        let mut s = Settings::default();
+        s.set_theme(2);
+        assert_eq!(s.material, Material::Vibrancy);
+        s.set_theme(0);
+        assert_eq!(s.material, Material::Vibrancy);
     }
 
     #[test]

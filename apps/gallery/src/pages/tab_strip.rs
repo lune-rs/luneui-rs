@@ -9,6 +9,7 @@
 use lune_ui::input::NamedKey;
 use lune_ui::lunegit_dark::THEME;
 use lune_ui::motion::MotionTier;
+use lune_ui::near_black;
 use lune_ui::paint::Rect;
 use lune_ui::text::{Spec, Style};
 use lune_ui::ui::Ui;
@@ -37,7 +38,8 @@ const INSET: f32 = 24.0;
 const CARD_W: f32 = 720.0;
 const CARD_H: f32 = 300.0;
 /// The header's darker band, punched out by the outline. The toolkit's look has no token for it:
-/// the header layer is a material of the preset, so the app chooses it (D131).
+/// the header layer is a material of the preset, so the app chooses it (D131). Under the
+/// near-black glass the band is a lighter wash instead (`near_black::HEADER_TINT`).
 const HEADER_TINT: [u8; 4] = [0x00, 0x00, 0x00, 0x24];
 
 /// The inner card's top-left corner in the window: the page card's, plus [`INSET`].
@@ -173,6 +175,11 @@ impl PageState for Demo {
                 progress: i.progress,
             })
             .collect();
+        let header_tint = if ui.theme().glass == near_black::GLASS {
+            near_black::HEADER_TINT
+        } else {
+            HEADER_TINT
+        };
         let opts = TabStripOptions {
             active: self.active.map(TabKey),
             panel_focused: self.panel_focused,
@@ -181,7 +188,7 @@ impl PageState for Demo {
             card: inner,
             menu_extra: if self.extra { &["Duplicate Tab"] } else { &[] },
             name: "Sessions",
-            header_tint: self.tint.then_some(HEADER_TINT),
+            header_tint: self.tint.then_some(header_tint),
         };
         let events = ui.tab_strip("strip", strip, &tabs, &opts).events;
         for event in events {
