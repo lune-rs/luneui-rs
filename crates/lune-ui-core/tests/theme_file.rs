@@ -2,12 +2,19 @@
 //! the derived tokens, the acrylic level and the hard cut a theme swap makes of colour transitions.
 //! The known answers on the real files are in the gallery's file tests.
 
+use lune_ui_core::GlassLayer;
+use lune_ui_core::backdrop::{
+    LiquidStyle, MacosMaterial, Material, MaterialAppearance, MaterialState, OsMaterial,
+    VibrancyEffect, WindowsMaterial,
+};
 use lune_ui_core::color::Rgba;
 use lune_ui_core::input::Repaint;
 use lune_ui_core::motion::{Kind, Motion};
 use lune_ui_core::paint::Rect;
 use lune_ui_core::testing::UiHarness;
-use lune_ui_core::theme::{AcrylicLevel, COLOR_KEYS, DARK, Skip, Theme, ThemeError, ThemeFile};
+use lune_ui_core::theme::{
+    AcrylicLevel, COLOR_KEYS, DARK, Skip, Theme, ThemeError, ThemeFile, near_black,
+};
 
 fn load(json: &str) -> ThemeFile {
     match Theme::from_json(json.as_bytes(), &DARK) {
@@ -429,6 +436,416 @@ fn optional_fields_and_unknown_top_level_keys() {
 #[test]
 fn nothing_panics_on_a_damaged_file() {
     let json = br##"{"name":"t","author":"a","version":1,"colors":{"AccentPrimaryColor":"#FF71B0F7","GlassTintColor":"#1A0E08"},"acrylic":{"GlassTintDarkOpacity":0.5}}"##;
+    for n in 0..json.len() {
+        let _ = Theme::from_json(&json[..n], &DARK);
+        let mut cut = json.to_vec();
+        cut.remove(n);
+        let _ = Theme::from_json(&cut, &DARK);
+        let mut flip = json.to_vec();
+        flip[n] ^= 0xFF;
+        let _ = Theme::from_json(&flip, &DARK);
+    }
+}
+
+// --- Glass section --------------------------------------------------------------------------
+
+fn with_glass(glass: &str) -> String {
+    format!(r#"{{"name":"t","colors":{{}},"acrylic":{{}},"glass":{glass}}}"#)
+}
+
+fn colour_text(c: Rgba) -> String {
+    hex(c).replacen('#', "\"#", 1) + "\""
+}
+
+/// A layer as the file writes it, from the layer's own fields.
+fn layer_json(l: &GlassLayer) -> String {
+    format!(
+        r#"{{"tint":{},"tintOpacity":{},"materialOpacity":{},"midPoint":{},"whiteMaxOpacity":{},"midPointMaxOpacity":{},"blackMaxOpacity":{}}}"#,
+        colour_text(l.tint),
+        l.tint_opacity,
+        l.material_opacity,
+        l.curve.mid_point,
+        l.curve.white_max_opacity,
+        l.curve.mid_point_max_opacity,
+        l.curve.black_max_opacity,
+    )
+}
+
+fn effect_name(e: VibrancyEffect) -> &'static str {
+    // Exhaustive: a new effect does not compile until it has a name here (and in the loader).
+    match e {
+        VibrancyEffect::AppearanceBased => "AppearanceBased",
+        VibrancyEffect::Light => "Light",
+        VibrancyEffect::Dark => "Dark",
+        VibrancyEffect::Titlebar => "Titlebar",
+        VibrancyEffect::Selection => "Selection",
+        VibrancyEffect::Menu => "Menu",
+        VibrancyEffect::Popover => "Popover",
+        VibrancyEffect::Sidebar => "Sidebar",
+        VibrancyEffect::MediumLight => "MediumLight",
+        VibrancyEffect::UltraDark => "UltraDark",
+        VibrancyEffect::HeaderView => "HeaderView",
+        VibrancyEffect::Sheet => "Sheet",
+        VibrancyEffect::WindowBackground => "WindowBackground",
+        VibrancyEffect::HudWindow => "HudWindow",
+        VibrancyEffect::FullScreenUI => "FullScreenUI",
+        VibrancyEffect::Tooltip => "Tooltip",
+        VibrancyEffect::ContentBackground => "ContentBackground",
+        VibrancyEffect::UnderWindowBackground => "UnderWindowBackground",
+        VibrancyEffect::UnderPageBackground => "UnderPageBackground",
+    }
+}
+
+const ALL_EFFECTS: [VibrancyEffect; 19] = [
+    VibrancyEffect::AppearanceBased,
+    VibrancyEffect::Light,
+    VibrancyEffect::Dark,
+    VibrancyEffect::Titlebar,
+    VibrancyEffect::Selection,
+    VibrancyEffect::Menu,
+    VibrancyEffect::Popover,
+    VibrancyEffect::Sidebar,
+    VibrancyEffect::MediumLight,
+    VibrancyEffect::UltraDark,
+    VibrancyEffect::HeaderView,
+    VibrancyEffect::Sheet,
+    VibrancyEffect::WindowBackground,
+    VibrancyEffect::HudWindow,
+    VibrancyEffect::FullScreenUI,
+    VibrancyEffect::Tooltip,
+    VibrancyEffect::ContentBackground,
+    VibrancyEffect::UnderWindowBackground,
+    VibrancyEffect::UnderPageBackground,
+];
+
+/// The near-black material as the file writes it, from the constant's own fields.
+fn near_black_material_json() -> String {
+    let Material::Custom(OsMaterial {
+        macos:
+            Some(MacosMaterial::Vibrancy {
+                effect,
+                state,
+                appearance: None,
+            }),
+        windows:
+            Some(WindowsMaterial::Acrylic {
+                tint: Some(tint),
+                dark: Some(dark),
+            }),
+    }) = near_black::MATERIAL
+    else {
+        panic!("near_black::MATERIAL changed shape: update this helper");
+    };
+    format!(
+        r#"{{"macos":{{"kind":"vibrancy","effect":"{effect:?}","state":"{state:?}"}},"windows":{{"kind":"acrylic","tint":{},"dark":{dark}}}}}"#,
+        colour_text(tint),
+    )
+}
+
+#[test]
+fn a_file_built_from_the_near_black_constants_loads_as_near_black() {
+    // Retuning a constant needs no change here: the file is written from the constants.
+    let glass = format!(
+        r#"{{"window":{},"panel":{},"card":{},"material":{}}}"#,
+        layer_json(&near_black::WINDOW),
+        layer_json(&near_black::PANEL),
+        layer_json(&near_black::CARD),
+        near_black_material_json(),
+    );
+    let f = load(&with_glass(&glass));
+    assert_eq!(f.skipped, []);
+    assert_eq!(f.theme, near_black::THEME);
+    assert_eq!(f.material, Some(near_black::MATERIAL));
+}
+
+#[test]
+fn a_file_without_glass_has_no_material_and_changes_no_glass() {
+    let f = load(&with_colors(""));
+    assert_eq!(f.material, None);
+    assert_eq!(f.theme, DARK);
+    assert_eq!(f.skipped, []);
+    let empty = load(&with_glass("{}"));
+    assert_eq!(
+        (empty.theme, empty.material, empty.skipped),
+        (DARK, None, vec![])
+    );
+}
+
+#[test]
+fn each_layer_key_sets_exactly_its_field() {
+    type Set = fn(&mut GlassLayer, f64);
+    let keys: [(&str, Set); 6] = [
+        ("tintOpacity", |l, n| l.tint_opacity = n as f32),
+        ("materialOpacity", |l, n| l.material_opacity = n as f32),
+        ("midPoint", |l, n| l.curve.mid_point = n),
+        ("whiteMaxOpacity", |l, n| l.curve.white_max_opacity = n),
+        ("midPointMaxOpacity", |l, n| {
+            l.curve.mid_point_max_opacity = n
+        }),
+        ("blackMaxOpacity", |l, n| l.curve.black_max_opacity = n),
+    ];
+    for (key, set) in keys {
+        for layer in ["window", "panel", "card"] {
+            let f = load(&with_glass(&format!(r#"{{"{layer}":{{"{key}":0.33}}}}"#)));
+            let mut want = DARK;
+            let target = match layer {
+                "window" => &mut want.glass.window,
+                "panel" => &mut want.glass.panel,
+                _ => &mut want.glass.card,
+            };
+            set(target, 0.33);
+            assert_eq!(f.theme, want, "{layer}.{key}");
+            assert_eq!(f.skipped, [], "{layer}.{key}");
+        }
+    }
+    let f = load(&with_glass(r##"{"card":{"tint":"#102030"}}"##));
+    let mut want = DARK;
+    want.glass.card.tint = [0x10, 0x20, 0x30, 0xFF];
+    assert_eq!(f.theme, want);
+    let f = load(&with_glass(r##"{"card":{"tint":"#80102030"}}"##));
+    want.glass.card.tint = [0x10, 0x20, 0x30, 0x80];
+    assert_eq!(f.theme, want);
+}
+
+#[test]
+fn glass_wins_over_the_acrylic_keys_it_overlaps() {
+    let json = r#"{"name":"t","colors":{},"acrylic":{"GlassMaterialDarkOpacity":0.2,"GlassTintDarkOpacity":0.3},"glass":{"window":{"materialOpacity":0.9}}}"#;
+    let f = load(json);
+    assert_eq!(f.theme.glass.window.material_opacity, 0.9);
+    assert_eq!(f.theme.glass.window.tint_opacity, 0.3);
+}
+
+#[test]
+fn layer_numbers_accept_zero_and_one_and_skip_outside_the_range() {
+    for ok in ["0.0", "1.0", "0", "1"] {
+        let f = load(&with_glass(&format!(
+            r#"{{"panel":{{"blackMaxOpacity":{ok}}}}}"#
+        )));
+        assert_eq!(f.skipped, [], "{ok}");
+    }
+    for bad in [
+        "1.0001", "-0.1", "2", "-1e-9", "1e300", r#""0.5""#, "null", "true", "[]",
+    ] {
+        let f = load(&with_glass(&format!(
+            r#"{{"panel":{{"blackMaxOpacity":{bad},"midPoint":0.25}}}}"#
+        )));
+        assert_eq!(
+            f.skipped,
+            [Skip::BadGlass("panel.blackMaxOpacity".to_string())],
+            "{bad}"
+        );
+        // The field is untouched and the sibling member still applies.
+        assert_eq!(
+            f.theme.glass.panel.curve.black_max_opacity, DARK.glass.panel.curve.black_max_opacity,
+            "{bad}"
+        );
+        assert_eq!(f.theme.glass.panel.curve.mid_point, 0.25, "{bad}");
+    }
+}
+
+#[test]
+fn bad_layer_values_and_unknown_keys_are_skipped_by_path() {
+    let f = load(&with_glass(
+        r##"{"window":{"tint":"red","foo":1,"tintOpacity":0.5},"card":3,"panel":null,"nope":{}}"##,
+    ));
+    assert_eq!(
+        f.skipped,
+        [
+            Skip::BadGlass("window.tint".to_string()),
+            Skip::UnknownGlass("window.foo".to_string()),
+            Skip::BadGlass("card".to_string()),
+            Skip::BadGlass("panel".to_string()),
+            Skip::UnknownGlass("nope".to_string()),
+        ]
+    );
+    assert_eq!(f.theme.glass.window.tint, DARK.glass.window.tint);
+    assert_eq!(f.theme.glass.window.tint_opacity, 0.5);
+    assert_eq!(f.material, None);
+}
+
+#[test]
+fn glass_of_the_wrong_type_is_an_error() {
+    for bad in ["[]", "1", "null", r#""x""#, "true"] {
+        assert_eq!(
+            error(&with_glass(bad)),
+            ThemeError::WrongType("glass"),
+            "{bad}"
+        );
+    }
+}
+
+#[test]
+fn a_curve_midpoint_at_either_end_draws_without_a_panic() {
+    for mid in ["0.0", "1.0"] {
+        for tint in ["#000000", "#FFFFFF", "#808080", "#FF0000", "#7F7F00"] {
+            let f = load(&with_glass(&format!(
+                r#"{{"window":{{"tint":"{tint}","midPoint":{mid}}},"panel":{{"midPoint":{mid}}}}}"#
+            )));
+            for l in [
+                f.theme.glass.window,
+                f.theme.glass.panel,
+                f.theme.glass.card,
+            ] {
+                let p = l.premultiplied();
+                assert!(p.iter().all(|v| v.is_finite()), "{mid} {tint}: {p:?}");
+            }
+        }
+    }
+}
+
+#[test]
+fn a_preset_material_string_loads_to_that_preset() {
+    for (name, want) in [
+        ("Vibrancy", Material::Vibrancy),
+        ("VibrancyFollowsWindow", Material::VibrancyFollowsWindow),
+        ("LiquidClear", Material::LiquidClear),
+        ("LiquidRegular", Material::LiquidRegular),
+        ("Opaque", Material::Opaque),
+    ] {
+        let f = load(&with_glass(&format!(r#"{{"material":"{name}"}}"#)));
+        assert_eq!(f.material, Some(want), "{name}");
+        assert_eq!(f.skipped, [], "{name}");
+        // The Theme is untouched: the material is not a drawing value.
+        assert_eq!(f.theme, DARK, "{name}");
+    }
+}
+
+#[test]
+fn every_vibrancy_effect_loads_by_its_name() {
+    for e in ALL_EFFECTS {
+        let f = load(&with_glass(&format!(
+            r#"{{"material":{{"macos":{{"kind":"vibrancy","effect":"{}","state":"Inactive","appearance":"Light"}}}}}}"#,
+            effect_name(e)
+        )));
+        assert_eq!(
+            f.material,
+            Some(Material::Custom(OsMaterial {
+                macos: Some(MacosMaterial::Vibrancy {
+                    effect: e,
+                    state: MaterialState::Inactive,
+                    appearance: Some(MaterialAppearance::Light),
+                }),
+                windows: None,
+            })),
+            "{e:?}"
+        );
+    }
+}
+
+#[test]
+fn the_other_material_forms_load() {
+    let f = load(&with_glass(
+        r##"{"material":{"macos":{"kind":"liquid","style":"Regular","tint":"#80102030","opaque":true},"windows":{"kind":"mica","dark":false}}}"##,
+    ));
+    assert_eq!(
+        f.material,
+        Some(Material::Custom(OsMaterial {
+            macos: Some(MacosMaterial::Liquid {
+                style: LiquidStyle::Regular,
+                tint: Some([0x10, 0x20, 0x30, 0x80]),
+                opaque: Some(true),
+            }),
+            windows: Some(WindowsMaterial::Mica { dark: Some(false) }),
+        }))
+    );
+    for (kind, want) in [
+        ("tabbed", WindowsMaterial::Tabbed { dark: None }),
+        (
+            "acrylic",
+            WindowsMaterial::Acrylic {
+                tint: None,
+                dark: None,
+            },
+        ),
+    ] {
+        let f = load(&with_glass(&format!(
+            r#"{{"material":{{"windows":{{"kind":"{kind}"}}}}}}"#
+        )));
+        assert_eq!(
+            f.material,
+            Some(Material::Custom(OsMaterial {
+                macos: None,
+                windows: Some(want)
+            }))
+        );
+    }
+    let f = load(&with_glass(r#"{"material":{}}"#));
+    assert_eq!(
+        f.material,
+        Some(Material::Custom(OsMaterial {
+            macos: None,
+            windows: None
+        }))
+    );
+}
+
+#[test]
+fn a_fault_in_the_material_leaves_no_material_and_one_skip() {
+    let cases = [
+        (
+            r#"{"macos":{"kind":"vibrancy","effect":"Nope","state":"Active"}}"#,
+            "material.macos.effect",
+        ),
+        (
+            r#"{"macos":{"kind":"vibrancy","effect":"UltraDark"}}"#,
+            "material.macos.state",
+        ),
+        (
+            r#"{"macos":{"kind":"vibrancy","effect":"UltraDark","state":"Active","appearance":"Blue"}}"#,
+            "material.macos.appearance",
+        ),
+        (r#"{"macos":{"effect":"UltraDark"}}"#, "material.macos.kind"),
+        (r#"{"macos":{"kind":"glass"}}"#, "material.macos.kind"),
+        (r#"{"macos":{"kind":"liquid"}}"#, "material.macos.style"),
+        (
+            r#"{"macos":{"kind":"liquid","style":"Clear","tint":"nope"}}"#,
+            "material.macos.tint",
+        ),
+        (
+            r#"{"macos":{"kind":"liquid","style":"Clear","opaque":"yes"}}"#,
+            "material.macos.opaque",
+        ),
+        // A key of the other kind, and a key of no kind.
+        (
+            r#"{"macos":{"kind":"liquid","style":"Clear","effect":"Light"}}"#,
+            "material.macos",
+        ),
+        (
+            r##"{"windows":{"kind":"mica","tint":"#000000"}}"##,
+            "material.windows",
+        ),
+        (
+            r#"{"windows":{"kind":"acrylic","dark":1}}"#,
+            "material.windows.dark",
+        ),
+        (r#"{"windows":{"kind":"x"}}"#, "material.windows.kind"),
+        (r#"{"windows":3}"#, "material.windows"),
+        (r#"{"linux":{}}"#, "material"),
+        (r#""Vibrancyy""#, "material"),
+        (r#""vibrancy""#, "material"),
+        ("3", "material"),
+        ("null", "material"),
+        ("[]", "material"),
+    ];
+    for (material, path) in cases {
+        // A valid first half proves nothing of the material applies when its second half is bad.
+        let f = load(&with_glass(&format!(
+            r#"{{"material":{material},"window":{{"midPoint":0.25}}}}"#
+        )));
+        assert_eq!(f.material, None, "{material}");
+        assert_eq!(
+            f.skipped,
+            [Skip::BadMaterial(path.to_string())],
+            "{material}"
+        );
+        // The layers still apply.
+        assert_eq!(f.theme.glass.window.curve.mid_point, 0.25, "{material}");
+    }
+}
+
+#[test]
+fn a_hostile_glass_section_cannot_panic_or_escape_its_range() {
+    let json = br##"{"name":"t","colors":{},"acrylic":{},"glass":{"window":{"tint":"#80102030","tintOpacity":0.5,"midPoint":0.0},"material":{"macos":{"kind":"vibrancy","effect":"UltraDark","state":"Active"},"windows":{"kind":"acrylic","tint":"#A0000000","dark":true}}}}"##;
     for n in 0..json.len() {
         let _ = Theme::from_json(&json[..n], &DARK);
         let mut cut = json.to_vec();
