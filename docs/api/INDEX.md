@@ -126,7 +126,7 @@ Each crate has a page per module (`<crate>/<module path>.md`; the root is `index
 
 ### `lune-ui-winit` (`lune_ui_winit`)
 
-5 modules, 19 items. Left out and counted: 112 blanket impls, 104 items of the omitted impls, 22 items of the trait impls shown as one line, 54 synthetic impls.
+5 modules, 19 items. Left out and counted: 112 blanket impls, 1 intra-doc links left unlinked (private or unresolvable target), 104 items of the omitted impls, 22 items of the trait impls shown as one line, 54 synthetic impls.
 
 | Module | Items |
 | --- | --- |

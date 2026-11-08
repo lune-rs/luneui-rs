@@ -6,7 +6,7 @@
 
 Custom draw items: app-owned GPU drawing that sits inside a painted layer.
 
-The painter records a [`CustomItem`](../lune-ui-core/scene.md#struct.CustomItem) with [`Painter::custom`](lune_ui_core::paint::Painter::custom).
+The painter records a [`CustomItem`](../lune-ui-core/scene.md#struct.CustomItem) with [`Painter::custom`](../lune-ui-core/paint.md#method.Painter.custom).
 [`FrameRenderer::draw_with`](frame.md#method.FrameRenderer.draw_with) draws it after that
 layer's acrylic and under shapes and before its text, with the scissor set to the item's
 clip. Because the item lives in a layer, a popup's backdrop blur sees it when the layer is

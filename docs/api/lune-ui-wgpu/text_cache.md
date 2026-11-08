@@ -44,7 +44,7 @@ Source: `crates/lune-ui-wgpu/src/text_cache.rs:70`
 - <a id="method.TextCache.new"></a>`pub fn new(font_data: &[&[u8]], ui_family: &str, mono_family: &str) -> Self`
 
   `font_data` is loaded in order; `ui_family` and `mono_family` are the family names
-  that [`Font::Ui`] and [`Font::Mono`] resolve to. The caller supplies all of it; this
+  that [`Font::Ui`](../lune-ui-core/text.md#variant.Font.Ui) and [`Font::Mono`](../lune-ui-core/text.md#variant.Font.Mono) resolve to. The caller supplies all of it; this
   crate embeds no fonts; with none, every text is an empty layout of zero size. The locale is `en-US`; see [`TextCache::with_locale`](text_cache.md#method.TextCache.with_locale).
 
 - <a id="method.TextCache.rasterize"></a>`pub fn rasterize(&mut self, key: TextKey, swash: &mut SwashCache) -> Option<TextRaster>`

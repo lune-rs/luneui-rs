@@ -103,10 +103,21 @@ pub(crate) fn summary(docs: &str) -> String {
     s.replace('|', "\\|")
 }
 
+/// What a key of an item's `links` map comes to.
+pub(crate) enum Link {
+    /// A page and anchor to point at.
+    Url(String),
+    /// A link rustdoc found but no page can be pointed at (a private or unresolvable target).
+    /// An inline link `[text](dest)` becomes its text, since `dest` would be a dead link; a
+    /// shortcut link stays as written. The caller counts these.
+    Dead,
+    /// Not an intra-doc link at all (an ordinary URL, plain brackets).
+    Unknown,
+}
+
 /// Rewrites intra-doc links outside code. `resolve` maps the key rustdoc recorded for a link (the
-/// destination as written, or the link text for a shortcut link) to a URL; `None` leaves the
-/// link as written.
-pub(crate) fn rewrite_links(docs: &str, resolve: &dyn Fn(&str) -> Option<String>) -> String {
+/// destination as written, or the link text for a shortcut link) to a [`Link`].
+pub(crate) fn rewrite_links(docs: &str, resolve: &dyn Fn(&str) -> Link) -> String {
     let mut out = String::with_capacity(docs.len());
     for (code, text) in segments(docs) {
         if code {
@@ -119,7 +130,7 @@ pub(crate) fn rewrite_links(docs: &str, resolve: &dyn Fn(&str) -> Option<String>
 }
 
 /// `[label]: destination` lines whose destination resolves.
-fn definitions(text: &str, resolve: &dyn Fn(&str) -> Option<String>) -> String {
+fn definitions(text: &str, resolve: &dyn Fn(&str) -> Link) -> String {
     let mut out = String::with_capacity(text.len());
     for line in text.split_inclusive('\n') {
         let t = line.trim_start_matches(' ');
@@ -131,7 +142,7 @@ fn definitions(text: &str, resolve: &dyn Fn(&str) -> Option<String>) -> String {
             let dest_start = rest.len() - rest.trim_start().len();
             let dest: &str = rest.split_whitespace().next().unwrap_or("");
             if !dest.is_empty()
-                && let Some(url) = resolve(dest)
+                && let Link::Url(url) = resolve(dest)
             {
                 out.push_str(&line[..line.len() - t.len() + close + 2 + dest_start]);
                 out.push_str(&url);
@@ -144,7 +155,7 @@ fn definitions(text: &str, resolve: &dyn Fn(&str) -> Option<String>) -> String {
     out
 }
 
-fn rewrite_prose(text: &str, resolve: &dyn Fn(&str) -> Option<String>) -> String {
+fn rewrite_prose(text: &str, resolve: &dyn Fn(&str) -> Link) -> String {
     let b = text.as_bytes();
     let mut out = String::with_capacity(text.len());
     let mut i = 0;
@@ -229,11 +240,7 @@ fn close_bracket(text: &str, open: usize) -> Option<usize> {
 }
 
 /// A link starting at the `[` at `open`: the text to write and the index after what it replaces.
-fn link_at(
-    text: &str,
-    open: usize,
-    resolve: &dyn Fn(&str) -> Option<String>,
-) -> Option<(String, usize)> {
+fn link_at(text: &str, open: usize, resolve: &dyn Fn(&str) -> Link) -> Option<(String, usize)> {
     let close = close_bracket(text, open)?;
     let label = &text[open + 1..close];
     let b = text.as_bytes();
@@ -242,21 +249,26 @@ fn link_at(
             let end = close + 1 + text[close + 1..].find(')')?;
             let dest_full = &text[close + 2..end];
             let dest = dest_full.split_whitespace().next()?;
-            let url = resolve(dest)?;
             let title = dest_full[dest_full.find(dest)? + dest.len()..].to_string();
-            Some((format!("[{label}]({url}{title})"), end + 1))
+            match resolve(dest) {
+                Link::Url(url) => Some((format!("[{label}]({url}{title})"), end + 1)),
+                Link::Dead => Some((label.to_string(), end + 1)),
+                Link::Unknown => None,
+            }
         }
         Some(b'[') => {
             let end = close + 1 + text[close + 1..].find(']')?;
             let l2 = &text[close + 2..end];
             let key = if l2.is_empty() { label } else { l2 };
-            let url = resolve(key)?;
-            Some((format!("[{label}]({url})"), end + 1))
+            match resolve(key) {
+                Link::Url(url) => Some((format!("[{label}]({url})"), end + 1)),
+                Link::Dead | Link::Unknown => None,
+            }
         }
-        _ => {
-            let url = resolve(label)?;
-            Some((format!("[{label}]({url})"), close + 1))
-        }
+        _ => match resolve(label) {
+            Link::Url(url) => Some((format!("[{label}]({url})"), close + 1)),
+            Link::Dead | Link::Unknown => None,
+        },
     }
 }
 
@@ -297,12 +309,13 @@ mod tests {
         assert_eq!(demote(docs, 1), "````\n```\n# x\n```\n````\n## Real\n");
     }
 
-    fn resolver(key: &str) -> Option<String> {
+    fn resolver(key: &str) -> Link {
         match key {
-            "`Foo`" => Some("a.md#struct.Foo".into()),
-            "Foo::bar" => Some("a.md#method.Foo.bar".into()),
-            "crate::Foo" => Some("a.md#struct.Foo".into()),
-            _ => None,
+            "`Foo`" => Link::Url("a.md#struct.Foo".into()),
+            "Foo::bar" => Link::Url("a.md#method.Foo.bar".into()),
+            "crate::Foo" => Link::Url("a.md#struct.Foo".into()),
+            "Gone::x" | "`Gone`" => Link::Dead,
+            _ => Link::Unknown,
         }
     }
 
@@ -317,8 +330,14 @@ mod tests {
     }
 
     #[test]
+    fn a_dead_inline_link_keeps_its_text_and_a_dead_shortcut_stays() {
+        let got = rewrite_links("see [the x](Gone::x) and [`Gone`] there\n", &resolver);
+        assert_eq!(got, "see the x and [`Gone`] there\n");
+    }
+
+    #[test]
     fn a_link_text_can_wrap_over_a_line() {
-        let got = rewrite_links("a [`Foo`][] b [the\nbar](Foo::bar)\n", &|k| resolver(k));
+        let got = rewrite_links("a [`Foo`][] b [the\nbar](Foo::bar)\n", &resolver);
         assert_eq!(
             got,
             "a [`Foo`](a.md#struct.Foo) b [the\nbar](a.md#method.Foo.bar)\n"

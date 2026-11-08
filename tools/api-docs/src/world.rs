@@ -109,6 +109,28 @@ impl World {
         })
     }
 
+    /// The one struct, enum, union or trait at `path` (`lune_ui_core::paint::Painter`, whose first
+    /// segment is a loaded crate's library name), or `None` when there is none or more than one.
+    pub(crate) fn type_by_path(&self, path: &[String]) -> Option<ItemRef> {
+        let first = path.first()?;
+        let ci = self.crates.iter().position(|k| k.lib == first.as_str())?;
+        let mut found = None;
+        for kind in [
+            ItemKind::Struct,
+            ItemKind::Enum,
+            ItemKind::Union,
+            ItemKind::Trait,
+        ] {
+            if let Some(id) = self.crates[ci].by_path.get(&(path.to_vec(), kind)) {
+                if found.is_some() {
+                    return None;
+                }
+                found = Some((ci, *id));
+            }
+        }
+        found
+    }
+
     /// The item a crate's id names, as a reference into the loaded crates: an item of the crate
     /// itself, or one of another loaded crate found by its canonical path. `None` when the id
     /// names something outside the five crates.

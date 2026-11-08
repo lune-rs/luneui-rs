@@ -565,7 +565,10 @@ Source: `crates/lune-ui-core/src/backdrop.rs:234`
 
     - <a id="structfield.WindowsMaterial.Acrylic.dark"></a>`dark: Option<bool>`
 
-      Asks DWM for the dark (`Some(true)`) or light variant; `None` leaves the system's.
+      Asks DWM for the dark (`Some(true)`) or light variant. A `Some` stays on the window
+      until a later `Some` changes it: no clear and no later `apply` resets it. `None` does
+      not touch the flag, so it leaves whatever the window has (the system's, the app's own
+      or an earlier `Some`).
 
 - <a id="variant.WindowsMaterial.Mica"></a>`Mica { dark: Option<bool> }`
 
@@ -573,7 +576,10 @@ Source: `crates/lune-ui-core/src/backdrop.rs:234`
 
     - <a id="structfield.WindowsMaterial.Mica.dark"></a>`dark: Option<bool>`
 
-      Asks DWM for the dark (`Some(true)`) or light variant; `None` leaves the system's.
+      Asks DWM for the dark (`Some(true)`) or light variant. A `Some` stays on the window
+      until a later `Some` changes it: no clear and no later `apply` resets it. `None` does
+      not touch the flag, so it leaves whatever the window has (the system's, the app's own
+      or an earlier `Some`).
 
 - <a id="variant.WindowsMaterial.Tabbed"></a>`Tabbed { dark: Option<bool> }`
 
@@ -581,7 +587,10 @@ Source: `crates/lune-ui-core/src/backdrop.rs:234`
 
     - <a id="structfield.WindowsMaterial.Tabbed.dark"></a>`dark: Option<bool>`
 
-      Asks DWM for the dark (`Some(true)`) or light variant; `None` leaves the system's.
+      Asks DWM for the dark (`Some(true)`) or light variant. A `Some` stays on the window
+      until a later `Some` changes it: no clear and no later `apply` resets it. `None` does
+      not touch the flag, so it leaves whatever the window has (the system's, the app's own
+      or an earlier `Some`).
 
 **Trait implementations**
 
@@ -603,7 +612,7 @@ pub trait Backdrop { .. }
 
 Applies an OS backdrop to a native window. One implementation per platform.
 
-Source: `crates/lune-ui-core/src/backdrop.rs:256`
+Source: `crates/lune-ui-core/src/backdrop.rs:265`
 
 **Required items**
 

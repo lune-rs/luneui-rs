@@ -237,17 +237,26 @@ pub enum WindowsMaterial {
         /// A tint over the acrylic. Honoured only on Windows builds 17763 to 22522; newer builds
         /// ignore it.
         tint: Option<Rgba>,
-        /// Asks DWM for the dark (`Some(true)`) or light variant; `None` leaves the system's.
+        /// Asks DWM for the dark (`Some(true)`) or light variant. A `Some` stays on the window
+        /// until a later `Some` changes it: no clear and no later `apply` resets it. `None` does
+        /// not touch the flag, so it leaves whatever the window has (the system's, the app's own
+        /// or an earlier `Some`).
         dark: Option<bool>,
     },
     /// Mica.
     Mica {
-        /// Asks DWM for the dark (`Some(true)`) or light variant; `None` leaves the system's.
+        /// Asks DWM for the dark (`Some(true)`) or light variant. A `Some` stays on the window
+        /// until a later `Some` changes it: no clear and no later `apply` resets it. `None` does
+        /// not touch the flag, so it leaves whatever the window has (the system's, the app's own
+        /// or an earlier `Some`).
         dark: Option<bool>,
     },
     /// Tabbed Mica.
     Tabbed {
-        /// Asks DWM for the dark (`Some(true)`) or light variant; `None` leaves the system's.
+        /// Asks DWM for the dark (`Some(true)`) or light variant. A `Some` stays on the window
+        /// until a later `Some` changes it: no clear and no later `apply` resets it. `None` does
+        /// not touch the flag, so it leaves whatever the window has (the system's, the app's own
+        /// or an earlier `Some`).
         dark: Option<bool>,
     },
 }

@@ -1,11 +1,12 @@
 //! Writing the pages, and counting what was written against what the JSON holds.
 
+use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Write;
 
 use rustdoc_types::{Item, ItemEnum, Visibility};
 
-use crate::docs;
+use crate::docs::{self, Link};
 use crate::plan::{Members, Page, PageKey, Placed, Plan, Row, variant_fields};
 use crate::sig;
 use crate::view::{KIND_ORDER, Kind};
@@ -38,8 +39,13 @@ struct Renderer<'a> {
     /// Items left out on purpose, with their class.
     skipped: HashMap<ItemRef, &'static str>,
     counts: Counts,
+    /// Intra-doc links with no page to point at, by the crate whose doc comment holds them.
+    dead_links: RefCell<BTreeMap<usize, u32>>,
     problems: Vec<String>,
 }
+
+/// The named class of an intra-doc link that cannot be pointed at a page.
+const DEAD_LINKS: &str = "intra-doc links left unlinked (private or unresolvable target)";
 
 macro_rules! put {
     ($out:expr) => {{ let _ = writeln!($out); }};
@@ -79,6 +85,7 @@ pub(crate) fn render(w: &World, plan: &Plan) -> Res<Rendered> {
         expected: HashSet::new(),
         skipped: HashMap::new(),
         counts: Counts::default(),
+        dead_links: RefCell::new(BTreeMap::new()),
         problems: Vec::new(),
     };
     let mut files = BTreeMap::new();
@@ -90,6 +97,9 @@ pub(crate) fn render(w: &World, plan: &Plan) -> Res<Rendered> {
         }
     }
     r.check_complete();
+    for (ci, n) in r.dead_links.borrow().iter() {
+        r.counts.skipped.insert((*ci, DEAD_LINKS), *n);
+    }
     let index = r.index_md();
     files.insert("INDEX.md".to_string(), index);
     Ok(Rendered {
@@ -121,17 +131,91 @@ impl Renderer<'_> {
         })
     }
 
+    /// What a key of `it`'s `links` map points at, as a URL from file `from`. A link rustdoc
+    /// found but no page can be pointed at is `Dead`, and counted when `count` is set.
+    fn link_of(&self, it: &Item, cn: usize, from: &str, key: &str, count: bool) -> Link {
+        let Some(id) = it.links.get(key) else {
+            return Link::Unknown;
+        };
+        let url = self
+            .w
+            .locate(cn, *id)
+            .and_then(|t| self.url(from, t))
+            .or_else(|| self.member_url(cn, from, key));
+        match url {
+            Some(u) => Link::Url(u),
+            None => {
+                if count {
+                    *self.dead_links.borrow_mut().entry(cn).or_insert(0) += 1;
+                }
+                Link::Dead
+            }
+        }
+    }
+
+    /// A link to a member of a type (`Scene::in_order`, `lune_ui_core::paint::Painter::custom`)
+    /// whose id the JSON does not give for a type of another crate: the type is found by its
+    /// path, or by its name when exactly one documented type has it, and the member by its name
+    /// among that type's own members. Anything but exactly one match is `None`.
+    fn member_url(&self, cn: usize, from: &str, key: &str) -> Option<String> {
+        let mut k = key.trim_matches('`');
+        if let Some((_, rest)) = k.split_once('@') {
+            k = rest;
+        }
+        let k = k.trim_end_matches("()");
+        let mut segs: Vec<String> = k.split("::").map(str::to_string).collect();
+        let member = segs.pop()?;
+        let name = segs.last()?.clone();
+        if segs[0] == "crate" {
+            segs[0] = self.w.crates[cn].lib.to_string();
+        }
+        let parent = if segs.len() > 1 {
+            self.w.type_by_path(&segs)?
+        } else {
+            let mut found = None;
+            for page in self.plan.pages.values() {
+                for p in &page.body {
+                    let is_type = matches!(
+                        p.kind,
+                        Kind::Struct | Kind::Enum | Kind::Union | Kind::Trait
+                    );
+                    if is_type && p.name == name {
+                        if found.is_some() {
+                            return None;
+                        }
+                        found = Some(p.item);
+                    }
+                }
+            }
+            found?
+        };
+        let m = self.plan.members.get(&parent)?;
+        let mut hits = Vec::new();
+        let own = m
+            .fields
+            .iter()
+            .chain(&m.variants)
+            .chain(&m.trait_items)
+            .chain(m.inherent.iter().flat_map(|(_, items)| items));
+        for r in own {
+            if self.w.item(*r).ok()?.name.as_deref() == Some(member.as_str()) {
+                hits.push(*r);
+            }
+        }
+        if hits.len() == 1 {
+            self.url(from, hits[0])
+        } else {
+            None
+        }
+    }
+
     /// The doc comment of `it` (an item of crate `cn`) with links to this reference and its
     /// headings moved down by `by`.
     fn docs_of(&self, it: &Item, cn: usize, from: &str, by: usize) -> String {
         let Some(d) = &it.docs else {
             return String::new();
         };
-        let resolve = |key: &str| {
-            let id = it.links.get(key)?;
-            let target = self.w.locate(cn, *id)?;
-            self.url(from, target)
-        };
+        let resolve = |key: &str| self.link_of(it, cn, from, key, true);
         docs::demote(&docs::rewrite_links(d, &resolve), by)
     }
 
@@ -139,11 +223,7 @@ impl Renderer<'_> {
         let Some(d) = &it.docs else {
             return String::new();
         };
-        let resolve = |key: &str| {
-            let id = it.links.get(key)?;
-            let target = self.w.locate(cn, *id)?;
-            self.url(from, target)
-        };
+        let resolve = |key: &str| self.link_of(it, cn, from, key, false);
         docs::summary(&docs::rewrite_links(d, &resolve))
     }
 

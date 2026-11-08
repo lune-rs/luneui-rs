@@ -52,9 +52,9 @@ Source: `crates/lune-ui-wgpu/src/frame.rs:22`
   ) -> Result<(), String>
   ```
 
-  Draws one painted `scene` into `target`, in [`Scene::in_order`]'s order. Each layer with
+  Draws one painted `scene` into `target`, in [`Scene::in_order`](../lune-ui-core/scene.md#method.Scene.in_order)'s order. Each layer with
   backdrop requests is a stop: what is drawn so far is blurred, the requests draw and the
-  layer follows. Up to the last stop, and at least to [`Scene::floor`], the frame renders
+  layer follows. Up to the last stop, and at least to [`Scene::floor`](../lune-ui-core/scene.md#method.Scene.floor), the frame renders
   offscreen; that is blitted to `target` and the rest draws over it.
 
 - <a id="method.FrameRenderer.draw_with"></a>
