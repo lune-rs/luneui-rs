@@ -21,6 +21,10 @@ pub(super) fn apply(window: &winit::window::Window, material: Material) -> Resul
         Material::Vibrancy | Material::VibrancyFollowsWindow => apply_acrylic(window, None),
         Material::LiquidClear => apply_mica(window, Some(true)),
         Material::LiquidRegular => apply_tabbed(window, Some(true)),
+        // Step 4 maps the descriptor.
+        Material::Custom(_) => Err(window_vibrancy::Error::UnsupportedPlatform(
+            "custom material",
+        )),
         Material::Opaque => Ok(()),
     };
     result.map_err(|e| e.to_string())

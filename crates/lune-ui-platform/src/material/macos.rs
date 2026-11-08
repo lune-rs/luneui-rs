@@ -62,6 +62,10 @@ fn apply_with_radius(
         Material::LiquidRegular => {
             apply_liquid_glass(&frame, liquid(NSGlassEffectViewStyle::Regular, radius))
         }
+        // Step 4 maps the descriptor.
+        Material::Custom(_) => Err(window_vibrancy::Error::UnsupportedPlatform(
+            "custom material",
+        )),
         Material::Opaque => Ok(()),
     };
     result.map_err(|e| e.to_string())
