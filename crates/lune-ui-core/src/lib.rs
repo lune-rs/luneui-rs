@@ -67,3 +67,4 @@ pub mod window;
 
 pub use backdrop::{Backdrop, BackdropKind, GlassLayer, LuminosityCurve};
 pub use theme::lunegit_dark;
+pub use theme::near_black;

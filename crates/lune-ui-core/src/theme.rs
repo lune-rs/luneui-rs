@@ -411,6 +411,8 @@ pub mod lunegit_dark {
     pub const CARD_CORNER_RADIUS: f32 = 8.0;
 }
 
+pub mod near_black;
+
 #[cfg(test)]
 mod tests {
     use super::lunegit_dark::{CARD, PANEL, THEME, WINDOW};
