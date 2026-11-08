@@ -17,8 +17,9 @@ use lune_ui_core::theme::DARK;
 use lune_ui_core::ui::WidgetId;
 use lune_ui_core::widgets::button::ButtonKind;
 use lune_ui_core::widgets::tree_view::{
-    CHEVRON, ChevronStyle, GuideStyle, INDENT, MARK_DROP, PAD_LEFT, ROW, TreeOptions, TreeResponse,
-    TreeRow, TreeState, guide_paths, straight_paths,
+    CHEVRON, ChevronStyle, GuideStub, GuideStyle, INDENT, LABEL_GAP, MARK_DROP, PAD_LEFT, ROW,
+    STUB_GAP, TreeOptions, TreeResponse, TreeRow, TreeState, column, guide_paths, straight_paths,
+    stub_end,
 };
 
 const WIN: (f32, f32) = (500.0, 400.0);
@@ -64,6 +65,7 @@ fn opts<'a>(rows: &'a [TreeRow<'a>]) -> TreeOptions<'a> {
         guides: true,
         guide_style: GuideStyle::Elbow,
         chevron: ChevronStyle::Triangle,
+        stub: GuideStub::Label,
         toggle_on_row: false,
     }
 }
@@ -145,10 +147,7 @@ fn top_of(out: &FrameOutput, key: u64) -> f32 {
 
 /// The centre of the chevron of the row at `y` of `depth`.
 fn chevron_at(depth: u16, y: f32) -> (f32, f32) {
-    (
-        TREE.x + PAD_LEFT + f32::from(depth) * INDENT + CHEVRON / 2.0,
-        y + ROW / 2.0,
-    )
+    (TREE.x + column(depth), y + ROW / 2.0)
 }
 
 fn click(h: &mut UiHarness, rows: &[TreeRow<'_>], ms: u64, at: (f32, f32)) -> Run {
@@ -341,12 +340,13 @@ fn a_selection_scrolled_out_of_view_is_kept() {
 }
 
 // The guide's geometry, computed by hand from
-// elbow x = floor((depth - 1) * 16 + 8) + 0.5, stub = depth * 16, cy = h / 2, r = 3.5.
+// elbow x = floor((depth - 1) * 16 + 15) + 0.5 (under the parent's mark), stub = 8 + depth * 16 - 1,
+// cy = h / 2, r = 3.5.
 
 #[test]
 fn the_guide_of_a_last_child_is_one_line_turning_into_the_stub() {
-    for (depth, x, stub) in [(1, 8.5, 16.0), (2, 24.5, 32.0), (3, 40.5, 48.0)] {
-        let paths = guide_paths(depth, true, &[], 28.0);
+    for (depth, x, stub) in [(1, 15.5, 23.0), (2, 31.5, 39.0), (3, 47.5, 55.0)] {
+        let paths = guide_paths(depth, true, &[], 28.0, stub);
         assert_eq!(paths.len(), 1, "depth {depth}");
         let p = &paths[0];
         assert_eq!(p[0], [x, 0.0]);
@@ -364,8 +364,8 @@ fn the_guide_of_a_last_child_is_one_line_turning_into_the_stub() {
 
 #[test]
 fn the_guide_of_a_child_with_a_next_sibling_is_a_trunk_and_a_branch() {
-    for (depth, x, stub) in [(1, 8.5, 16.0), (2, 24.5, 32.0), (3, 40.5, 48.0)] {
-        let paths = guide_paths(depth, false, &[], 28.0);
+    for (depth, x, stub) in [(1, 15.5, 23.0), (2, 31.5, 39.0), (3, 47.5, 55.0)] {
+        let paths = guide_paths(depth, false, &[], 28.0, stub);
         assert_eq!(paths.len(), 2, "depth {depth}");
         assert_eq!(paths[0], [[x, 0.0], [x, 28.0]], "the whole row");
         let b = &paths[1];
@@ -376,13 +376,72 @@ fn the_guide_of_a_child_with_a_next_sibling_is_a_trunk_and_a_branch() {
 }
 
 #[test]
+fn a_leaf_stub_reaches_its_label_by_default_and_stops_short_when_asked() {
+    // A tree with marks: a leaf's stub crosses its empty slot to `LABEL_GAP` before the label,
+    // or stops `STUB_GAP` before the slot; a row with a mark always stops before the slot.
+    let label_x = |d: u16| PAD_LEFT + f32::from(d) * INDENT + CHEVRON + 4.0;
+    for d in 1..4u16 {
+        assert_eq!(stub_end(d, true, GuideStub::Label), label_x(d) - LABEL_GAP);
+        assert_eq!(
+            stub_end(d, true, GuideStub::Short),
+            PAD_LEFT + f32::from(d) * INDENT - STUB_GAP
+        );
+        for reach in [GuideStub::Label, GuideStub::Short] {
+            assert_eq!(
+                stub_end(d, false, reach),
+                PAD_LEFT + f32::from(d) * INDENT - STUB_GAP
+            );
+        }
+    }
+
+    // Drawn: a1x (a leaf at depth 2) ends at 54 by default and 39 with `Short`; a1 (with a mark,
+    // depth 1) ends at 23 either way. The cap is a half disc at the stub's end.
+    let caps = |stub: GuideStub| -> Vec<f32> {
+        let mut h = UiHarness::new(WIN);
+        let o = TreeOptions {
+            stub,
+            ..opts(&ROWS)
+        };
+        let f = run_with(&mut h, &o, |st| {
+            st.expanded.extend([A, A1]);
+        });
+        let mut xs: Vec<f32> = f
+            .scene
+            .in_order()
+            .into_iter()
+            .flat_map(|l| {
+                l.geometry
+                    .under
+                    .iter()
+                    .filter(|s| s.radii == [0.0, 0.5, 0.5, 0.0])
+                    .map(|s| s.rect[0] - TREE.x)
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        xs.sort_by(f32::total_cmp);
+        xs.dedup();
+        xs
+    };
+    assert_eq!(
+        caps(GuideStub::Label),
+        vec![23.0, 38.0, 54.0],
+        "a1; a2; a1x and a1y"
+    );
+    assert_eq!(
+        caps(GuideStub::Short),
+        vec![23.0, 39.0],
+        "every stub stops before the slot"
+    );
+}
+
+#[test]
 fn ancestor_lines_are_full_height_at_their_columns() {
-    let paths = guide_paths(3, true, &[0, 1], 28.0);
-    assert_eq!(paths[0], [[8.5, 0.0], [8.5, 28.0]]);
-    assert_eq!(paths[1], [[24.5, 0.0], [24.5, 28.0]]);
-    assert_eq!(paths[2][0], [40.5, 0.0]);
+    let paths = guide_paths(3, true, &[0, 1], 28.0, 55.0);
+    assert_eq!(paths[0], [[15.5, 0.0], [15.5, 28.0]]);
+    assert_eq!(paths[1], [[31.5, 0.0], [31.5, 28.0]]);
+    assert_eq!(paths[2][0], [47.5, 0.0]);
     assert!(
-        guide_paths(0, true, &[], 28.0).is_empty(),
+        guide_paths(0, true, &[], 28.0, 7.0).is_empty(),
         "a top row has none"
     );
 }
@@ -394,7 +453,7 @@ fn the_guides_follow_siblings_across_a_collapsed_one_and_stop_at_the_last() {
     let f = run_with(&mut h, &opts(&ROWS), |st| {
         st.expanded.insert(A);
     });
-    let x = TREE.x + 8.5;
+    let x = TREE.x + 15.5;
     let y = TREE.y;
     assert!(
         has_line(&f.scene, x, y + ROW, y + 2.0 * ROW),
@@ -439,7 +498,7 @@ fn a_branch_starts_at_the_trunks_edge_so_the_translucent_line_does_not_double() 
     let f = run_with(&mut h, &opts(&ROWS), |st| {
         st.expanded.insert(A);
     });
-    let x = TREE.x + 8.5;
+    let x = TREE.x + 15.5;
     let branch: Vec<_> = segments(&f.scene)
         .into_iter()
         .filter(|(a, b)| a[0] != b[0])
@@ -501,7 +560,7 @@ fn the_probes_at_scale_two() {
 
     // The elbow's curve spans 7 device px each way.
     let row = TREE.y + 3.0 * ROW;
-    let (cx, cy) = (TREE.x + 24.5, row + 14.0);
+    let (cx, cy) = (TREE.x + 31.5, row + 14.0);
     let curve: Vec<_> = segments(&f.scene)
         .into_iter()
         .map(|(a, _)| a)
@@ -516,8 +575,9 @@ fn the_probes_at_scale_two() {
     let top = curve.iter().map(|p| p[1]).fold(f32::INFINITY, f32::min);
     assert_eq!(cy * 2.0 - top, 7.0, "the curve starts r above the stub");
 
-    // The stub's free end has its round cap: a half disc, one device px past the end.
-    let stub = (TREE.x + 32.0) * 2.0;
+    // The stub's free end has its round cap: a half disc, one device px past the end. a1y is a
+    // leaf, so its stub crosses the empty mark slot to 4 px before its text: 8 + 32 + 14 + 4 - 4.
+    let stub = (TREE.x + 54.0) * 2.0;
     let cap = geometry
         .under
         .iter()
@@ -1703,9 +1763,9 @@ fn each_guide_style_draws_what_it_says_at_depth_3() {
         xs
     };
 
-    // Straight: exactly one full height line per depth above the row, at `k x 16 + 8.5`.
+    // Straight: exactly one full height line per depth above the row, at `k x 16 + 15.5`.
     let straight = rows(GuideStyle::Straight);
-    let want: Vec<f32> = (0..3).map(|k| TREE.x + k as f32 * INDENT + 8.5).collect();
+    let want: Vec<f32> = (0..3).map(|k| TREE.x + k as f32 * INDENT + 15.5).collect();
     assert_eq!(verticals(&straight), want);
     assert!(
         segments(&straight)
@@ -1857,8 +1917,8 @@ fn the_triangle_records_a_fill_and_no_glyph_and_sits_on_the_label_line() {
         (5.5, 7.5),
         "closed: 5.5 wide, 7.5 tall, pointing right"
     );
-    let slot_centre = TREE.x + PAD_LEFT + CHEVRON / 2.0;
-    assert_eq!((l + r) / 2.0, slot_centre);
+    // On guide column 0, so a guide drops from the triangle's centre.
+    assert_eq!((l + r) / 2.0, TREE.x + column(0));
     assert_eq!((top + b) / 2.0, TREE.y + ROW / 2.0 + MARK_DROP);
     assert_eq!(turn_degrees(t), 0.0);
     let colour = f.scene.in_order()[0].geometry.fills[0].color;

@@ -12,7 +12,7 @@ use lune_ui::paint::Rect;
 use lune_ui::text::{Spec, Style};
 use lune_ui::ui::Ui;
 use lune_ui::widgets::tree_view::{
-    ChevronStyle, GuideStyle, ROW, TreeOptions, TreeRow, TreeRowCtx,
+    ChevronStyle, GuideStub, GuideStyle, ROW, TreeOptions, TreeRow, TreeRowCtx,
 };
 
 use super::{caption, card, heading, on_card};
@@ -96,6 +96,7 @@ struct Live {
     toggle_on_row: bool,
     guide_style: GuideStyle,
     chevron: ChevronStyle,
+    stub: GuideStub,
 }
 
 fn state(open: &'static [u64], selected: Option<u64>) -> Box<dyn PageState> {
@@ -117,6 +118,7 @@ fn styled(
         toggle_on_row: false,
         guide_style,
         chevron,
+        stub: GuideStub::Label,
     })
 }
 
@@ -130,6 +132,7 @@ fn disabled() -> Box<dyn PageState> {
         toggle_on_row: false,
         guide_style: GuideStyle::Elbow,
         chevron: ChevronStyle::Triangle,
+        stub: GuideStub::Label,
     })
 }
 
@@ -195,6 +198,7 @@ impl PageState for Live {
             guides: self.guides,
             guide_style: self.guide_style,
             chevron: self.chevron,
+            stub: self.stub,
             toggle_on_row: self.toggle_on_row,
         };
         let tree = on_card(c, TREE);
@@ -232,6 +236,10 @@ impl PageState for Live {
         let mut mark = self.chevron as usize;
         if panel.choice(ui, "Disclosure mark", &["Triangle", "Chevron"], &mut mark) {
             self.chevron = [ChevronStyle::Triangle, ChevronStyle::Chevron][mark];
+        }
+        let mut stub = self.stub as usize;
+        if panel.choice(ui, "Leaf stub", &["To the label", "Short"], &mut stub) {
+            self.stub = [GuideStub::Label, GuideStub::Short][stub];
         }
         panel.toggle(ui, "A press on a row toggles it", &mut self.toggle_on_row);
         let mut enabled = !self.disabled;

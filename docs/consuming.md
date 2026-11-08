@@ -22,7 +22,7 @@ the full sha) is true:
 | `apps/` (the gallery), `tools/`, `docs/` | not the toolkit |
 | `crates/*/tests` | the tests of `lune-ui-wgpu` read the gallery's fonts, so they cannot compile in a snapshot; the repo's own gate runs them |
 | `Cargo.lock` | the consumer's lock rules; ours names packages the snapshot does not hold |
-| `apps/gallery/assets/lunegit/` (Lunegit's theme and locale files) | Lunegit has no open licence (D206). The script fails (exit 1) on any staged path under `assets/lunegit`, and on any exported file whose blob equals a fixture's, under any name |
+| `apps/gallery/assets/lunegit/` (Lunegit's theme and locale files) | gallery test data, not toolkit code (D206; licensed MIT OR Apache-2.0 since D284). The script fails (exit 1) on any staged path under `assets/lunegit`, and on any exported file whose blob equals a fixture's, under any name |
 
 Exit codes: 0 done, 1 a check failed (the destination is as it was), 2 usage or setup (also a
 non-empty destination that is not an earlier snapshot, left untouched). A destination holding a
@@ -160,7 +160,7 @@ A consumer that has not yet adopted the toolkit needs none of it. One that vendo
 | `RingKind::PrimaryButton`, `Edge::on_accent`, `Theme::on_accent_text`, `accent_hover` | gone | the buttons follow Lunegit's dialog buttons: primary on `surface_input`, secondary clear, press scale on the ghost only (D269) |
 | `lunegit_dark::TAB_HEADER_HEIGHT`, `BODY_PADDING` | gone | read by nothing in the repo (D276) |
 | `Tab::progress` draws a spinner; `SPINNER_SIZE`, `SPINNER_MARGIN` | `Tab::progress` shines the title in that tone; the constants are gone | the tab is no wider (D270) |
-| `TreeOptions { guides, .. }` | add `guide_style: GuideStyle`, `chevron: ChevronStyle` (`..Default::default()`) | `Theme::tree_guide` colours the guides (D271) |
+| `TreeOptions { guides, .. }` | add `guide_style: GuideStyle`, `chevron: ChevronStyle`, `stub: GuideStub` (`..Default::default()`) | `Theme::tree_guide` colours the guides (D271) |
 | a text selection drawn by each widget | `widgets::selection::paint(p, rows, open, color)` over `Painter::fill_joined`; `Theme::selection_radius`, `selection_pad` | D272 |
 | `KvOptions { .. }` | add `copy: bool` (off by default) | D275 |
 | `SidePanelOptions { .. }` | add `card_moves: bool` (off by default) | D281 |

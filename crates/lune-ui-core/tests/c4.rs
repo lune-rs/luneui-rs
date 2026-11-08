@@ -1283,7 +1283,9 @@ mod m7 {
     use lune_ui_core::widgets::split_panes::{Pane, SplitOptions, SplitSide};
     use lune_ui_core::widgets::toast::{ToastAction, ToastKind, ToastSpec, Toasts};
     use lune_ui_core::widgets::tone::Tone;
-    use lune_ui_core::widgets::tree_view::{ChevronStyle, GuideStyle, TreeOptions, TreeRow};
+    use lune_ui_core::widgets::tree_view::{
+        ChevronStyle, GuideStub, GuideStyle, TreeOptions, TreeRow,
+    };
 
     const M7_WIN: (f32, f32) = (1240.0, 900.0);
     const RAIL: Rect = Rect::new(0.0, 0.0, 48.0, 420.0);
@@ -1507,6 +1509,7 @@ mod m7 {
                         guides: true,
                         guide_style: GuideStyle::Elbow,
                         chevron: ChevronStyle::Triangle,
+                        stub: GuideStub::Label,
                         toggle_on_row: false,
                     },
                     |_, _| {},
@@ -3526,7 +3529,9 @@ mod nested_wheel {
     use lune_ui_core::widgets::text_area::AreaOptions;
     use lune_ui_core::widgets::toast::{ToastKind, ToastSpec, Toasts};
     use lune_ui_core::widgets::tone::Tone;
-    use lune_ui_core::widgets::tree_view::{ChevronStyle, GuideStyle, TreeOptions, TreeRow};
+    use lune_ui_core::widgets::tree_view::{
+        ChevronStyle, GuideStub, GuideStyle, TreeOptions, TreeRow,
+    };
     use lune_ui_core::widgets::virtual_list::{Heights, ListOptions, RowKey, SelectionMode};
 
     /// F11: two non-modal overlays on one layer. The wheel over the part where the later one
@@ -3705,6 +3710,7 @@ mod nested_wheel {
                 guides: false,
                 guide_style: GuideStyle::Elbow,
                 chevron: ChevronStyle::Triangle,
+                stub: GuideStub::Label,
                 toggle_on_row: false,
             };
             ui.tree_view("t", INNER, &o, |_, _| {});
@@ -3971,7 +3977,9 @@ mod m10 {
     use lune_ui_core::widgets::tab_strip::{BusyCue, Tab, TabKey, TabStripOptions};
     use lune_ui_core::widgets::toast::{ToastKind, ToastSpec, Toasts};
     use lune_ui_core::widgets::tone::Tone;
-    use lune_ui_core::widgets::tree_view::{ChevronStyle, GuideStyle, TreeOptions, TreeRow};
+    use lune_ui_core::widgets::tree_view::{
+        ChevronStyle, GuideStub, GuideStyle, TreeOptions, TreeRow,
+    };
     use std::time::Duration;
 
     type Rgb = [u8; 3];
@@ -4542,6 +4550,7 @@ mod m10 {
                         guides: true,
                         guide_style: GuideStyle::Elbow,
                         chevron: ChevronStyle::Triangle,
+                        stub: GuideStub::Label,
                         toggle_on_row: false,
                     },
                     |_, _| {},

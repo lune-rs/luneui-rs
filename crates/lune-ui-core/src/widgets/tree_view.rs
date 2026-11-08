@@ -59,8 +59,13 @@ pub const CHEVRON: f32 = 14.0;
 /// The space after the chevron slot, and after a glyph.
 pub const CHEVRON_GAP: f32 = 4.0;
 pub const GLYPH_GAP: f32 = 6.0;
-/// Where a guide column's line sits inside its indent.
-pub const COLUMN_CENTRE: f32 = 8.0;
+/// Where a guide column's line sits inside its indent: under the centre of the mark slot of the
+/// row it comes from, so a line drops from the middle of its parent's triangle or chevron.
+pub const COLUMN_CENTRE: f32 = PAD_LEFT + CHEVRON / 2.0;
+/// The space between the end of a short elbow stub and the row's content ([`GuideStub::Short`]).
+pub const STUB_GAP: f32 = 1.0;
+/// The space between the end of a long stub and the label it points at ([`GuideStub::Label`]).
+pub const LABEL_GAP: f32 = 4.0;
 /// The guide's width.
 pub const GUIDE_WIDTH: f32 = 1.0;
 /// The elbow's corner radius.
@@ -117,6 +122,18 @@ pub enum GuideStyle {
     OnHover,
 }
 
+/// How far an elbow's stub reaches into a row with no mark of its own, in a tree that keeps a
+/// mark slot on every row. A row with a mark always stops its stub before the mark's slot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum GuideStub {
+    /// Across the empty mark slot, to [`LABEL_GAP`] before the glyph or text, so the line
+    /// points at the label.
+    #[default]
+    Label,
+    /// To [`STUB_GAP`] before the mark slot, as on a row with a mark; the empty slot stays bare.
+    Short,
+}
+
 /// How the disclosure mark of a row with children is drawn.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ChevronStyle {
@@ -140,6 +157,9 @@ pub struct TreeOptions<'a> {
     pub guide_style: GuideStyle,
     /// How the disclosure mark looks.
     pub chevron: ChevronStyle,
+    /// How far the elbow's stub reaches into a row with no mark ([`GuideStyle::Elbow`] and
+    /// [`GuideStyle::OnHover`]; `Straight` has no stub).
+    pub stub: GuideStub,
     /// A press anywhere on a row with children toggles it, not only on its chevron.
     pub toggle_on_row: bool,
 }
@@ -213,8 +233,13 @@ impl TreeState {
 /// height line per column in `ancestors` (column `k` is the line of the rows at depth `k + 1`),
 /// then the row's own. Not last: a trunk through the row and a branch off it. Last: one line that
 /// turns into the stub. A row at depth 0 has no guide of its own.
-pub fn guide_paths(depth: u16, last: bool, ancestors: &[u16], height: f32) -> Vec<Vec<[f32; 2]>> {
-    let column = |k: u16| (f32::from(k) * INDENT + COLUMN_CENTRE).floor() + 0.5;
+pub fn guide_paths(
+    depth: u16,
+    last: bool,
+    ancestors: &[u16],
+    height: f32,
+    stub: f32,
+) -> Vec<Vec<[f32; 2]>> {
     let mut paths: Vec<Vec<[f32; 2]>> = ancestors
         .iter()
         .map(|k| vec![[column(*k), 0.0], [column(*k), height]])
@@ -223,7 +248,6 @@ pub fn guide_paths(depth: u16, last: bool, ancestors: &[u16], height: f32) -> Ve
         return paths;
     }
     let x = column(depth - 1);
-    let stub = f32::from(depth) * INDENT;
     let cy = height / 2.0;
     let r = elbow_radius(x, stub, cy);
     let mut branch: Vec<[f32; 2]> = (0..=ELBOW_STEPS)
@@ -244,11 +268,27 @@ pub fn guide_paths(depth: u16, last: bool, ancestors: &[u16], height: f32) -> Ve
 /// `k + 1`, as in [`guide_paths`]). A row at depth 0 has none.
 pub fn straight_paths(depth: u16, height: f32) -> Vec<Vec<[f32; 2]>> {
     (0..depth)
-        .map(|k| {
-            let x = (f32::from(k) * INDENT + COLUMN_CENTRE).floor() + 0.5;
-            vec![[x, 0.0], [x, height]]
-        })
+        .map(|k| vec![[column(k), 0.0], [column(k), height]])
         .collect()
+}
+
+/// Where the elbow's stub of a row at `depth` ends, from the row's left edge. `bare` is a row
+/// with no mark in a tree that keeps a mark slot: [`GuideStub::Label`] carries its stub across
+/// the empty slot to [`LABEL_GAP`] before the label; otherwise it ends [`STUB_GAP`] before the
+/// row's content.
+pub fn stub_end(depth: u16, bare: bool, stub: GuideStub) -> f32 {
+    if bare && stub == GuideStub::Label {
+        content_x(depth) + CHEVRON + CHEVRON_GAP - LABEL_GAP
+    } else {
+        content_x(depth) - STUB_GAP
+    }
+}
+
+/// The x of guide column `k`, from the row's left edge: the centre of the mark slot at depth `k`,
+/// snapped to a pixel's centre so the 1 px line is crisp. The mark of a row at depth `k` is
+/// centred here too, so the line meets its tip.
+pub fn column(k: u16) -> f32 {
+    (f32::from(k) * INDENT + COLUMN_CENTRE).floor() + 0.5
 }
 
 fn elbow_radius(x: f32, stub: f32, cy: f32) -> f32 {
@@ -279,6 +319,9 @@ fn clear_of_trunk(branch: &[[f32; 2]], x: f32) -> Vec<[f32; 2]> {
 struct GuideLook {
     straight: bool,
     color: Rgba,
+    /// The stub's reach, and whether the tree keeps a mark slot on every row.
+    stub: GuideStub,
+    slot: bool,
 }
 
 /// Draws the guide of a row in `slot`. The stroke has square ends, so the elbow's stub gets its
@@ -286,10 +329,11 @@ struct GuideLook {
 fn paint_guide<H: Copy + PartialEq>(
     p: &mut Painter<'_, H>,
     slot: Rect,
-    depth: u16,
+    row: &TreeRow<'_>,
     guide: &RowGuide,
     look: GuideLook,
 ) {
+    let depth = row.depth;
     let color = look.color;
     let style = StrokeStyle::solid(color, GUIDE_WIDTH);
     let at = |q: &[f32; 2]| [slot.x + q[0], slot.y + q[1]];
@@ -300,7 +344,8 @@ fn paint_guide<H: Copy + PartialEq>(
         }
         return;
     }
-    let paths = guide_paths(depth, guide.last, &guide.ancestors, slot.h);
+    let stub = stub_end(depth, look.slot && !row.has_children, look.stub);
+    let paths = guide_paths(depth, guide.last, &guide.ancestors, slot.h, stub);
     let own_branch = (depth > 0 && !guide.last).then(|| paths.len() - 1);
     for (i, path) in paths.iter().enumerate() {
         let path = if own_branch == Some(i) {
@@ -313,7 +358,7 @@ fn paint_guide<H: Copy + PartialEq>(
     }
     if depth > 0 {
         let half = GUIDE_WIDTH / 2.0;
-        let (x, y) = (slot.x + f32::from(depth) * INDENT, slot.y + slot.h / 2.0);
+        let (x, y) = (slot.x + stub, slot.y + slot.h / 2.0);
         let cap = Rect::new(x, y - half, half, GUIDE_WIDTH);
         p.fill_radii(cap, [0.0, half, half, 0.0], color);
     }
@@ -391,7 +436,10 @@ fn paint_content<H: Copy + PartialEq>(
     let mut x = slot.x + content_x(look.row.depth);
     if look.slot {
         if look.row.has_children {
-            let centre = [x + CHEVRON / 2.0, slot.y + slot.h / 2.0 + MARK_DROP];
+            let centre = [
+                slot.x + column(look.row.depth),
+                slot.y + slot.h / 2.0 + MARK_DROP,
+            ];
             paint_mark(p, centre, look.mark.0, look.turn, look.mark.1);
         }
         x += CHEVRON + CHEVRON_GAP;
@@ -1130,6 +1178,8 @@ impl Ui<'_> {
                 c[3] = (f32::from(c[3]) * f.fade.clamp(0.0, 1.0)).round() as u8;
                 c
             },
+            stub: f.opts.stub,
+            slot: any_children,
         };
         // The mark's turn: the block's own fraction on its row, else the state the last walk saw
         // (a press changes `expanded` after the walk, so its mark turns from the next frame, with
@@ -1181,7 +1231,7 @@ impl Ui<'_> {
                         .fill(slot, ROW_RADIUS, row_fill(&theme, false, true));
                 }
                 if let Some(g) = guides.get(n) {
-                    paint_guide(self.painter(), slot, row.depth, g, guide_look);
+                    paint_guide(self.painter(), slot, row, g, guide_look);
                 }
                 paint_content(self.painter(), &theme, slot, &l);
             }
@@ -1207,7 +1257,7 @@ impl Ui<'_> {
                 self.painter().fill(b.slot, ROW_RADIUS, fill);
             }
             if let Some(g) = guides.get(b.view) {
-                paint_guide(self.painter(), b.slot, row.depth, g, guide_look);
+                paint_guide(self.painter(), b.slot, row, g, guide_look);
             }
             let mut mark = theme.fg_tertiary;
             if style == ChevronStyle::Chevron && row.has_children {
