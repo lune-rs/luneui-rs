@@ -121,7 +121,7 @@ Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, r
 ## Git
 
 - Worktree per orchestrated task; commit per change.
-- No remote is configured yet; nothing is pushed until the user says so.
+- Remote `origin`: github.com/lune-rs/luneui-rs (public, D284). Push only when the user asks; never force-push.
 
 ## Read on demand
 

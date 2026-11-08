@@ -6,10 +6,10 @@ Origin: the Lunegit repository, commit 33a1dd41, copied byte for byte with `git 
   src/Lunegit.Infrastructure/Localization/en.json
   src/Lunegit.Desktop/SampleLanguages/{de,es,fr,ja,ko,ms,pt-BR,ru,zh-CN}.json
 
-No open-source or other licence is granted for these files. They are Lunegit's, kept here only
-so the toolkit's tests run on the real files a user's app would load. They are outside the
-workspace's `MIT OR Apache-2.0` licence: that licence covers this repository's own code and
-documents, not these files.
+Licence: the owner of Lunegit licenses these files, as copied here, under either of the MIT
+licence or the Apache License 2.0, at your option, the same terms as the rest of this
+repository (LICENSE-MIT, LICENSE-APACHE). Granted 2026-11-08 (DECISIONS.md D284).
 
-Before any public release of this repository the owner of Lunegit must license these files or
-they must be removed; an export of the toolkit must leave them out.
+They are kept so the toolkit's tests run on the real files a user's app would load. They are
+gallery test fixtures, not part of the toolkit's crates; an exported snapshot still leaves them
+out (scripts/export-snapshot.sh).

@@ -1,7 +1,7 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-08 (library pass closed on branch `orch/library-pass`)
+Last updated: 2026-11-08 (library pass merged to main; published at github.com/lune-rs/luneui-rs)
 
 ## Now
 
@@ -39,7 +39,7 @@ proves clicks, the OS material swap and the feel of speed and zoom; the tests on
   `scripts/check-targets.sh`: all exit 0. The test totals of `cargo test --workspace` are the orchestrator's final gate's; step 26 did not re-run them (docs only).
 - Library pass, the pixel gate: `scripts/pixel-gate.sh --base 04dd5c9` at 435a7ca: 438 files identical, 0 differ. Against the pass's base, `--base 1340d15` with the nine `--removed` ids and the allow list of D282:
   the result is the orchestrator's final gate's (`scripts/pixel-gate.sh` header and regex now accept a scene that exists only at a fractional scale, as `ui-controls@1.5x`; step 26's own run was not finished when this was written).
-- Look values still provisional (D11; the user's answer to step 25 was open when this was written): `menu_popup_border` #FFFFFF1F (R8), `menu_glass` alpha 157 (R9), the tab shine 1800 ms and a 48 px band (R3), `tree_guide` #FFFFFF14 (R15).
+- Look values settled by the user after a live run (step 25, Q2): `menu_popup_border` #FFFFFF1F (R8), `menu_glass` alpha 157 (R9), the tab shine 1800 ms and a 48 px band (R3), `tree_guide` #FFFFFF14 (R15). Then, from the same run, D283: a tree guide drops from the centre of its parent's mark, and a leaf's stub reaches its label (`GuideStub::Label`, default; `Short` kept as an option).
   A pick changes one constant or token and re-runs the gate once with the same allow lists.
 - Release size (M11, not re-read): `cargo build --release -p gallery` at a9d1292, `wc -c target/release/gallery` (macOS, strip, fat LTO): 9,869,520 bytes, against 9,869,408 at
   the M10 tip (+112) and 9,448,688 at the M9 merge. Also in `docs/consuming.md`. The library pass added no dependency.
@@ -106,15 +106,15 @@ fit panel's clip, the nits F2 to F7 of M6 and M8, and the Library follow-ups the
 
 ## Next
 
-1. The user's call on the four provisional look values (see Readings), then a hands-on run of `cargo run -p gallery` (see Unverified here).
+1. The rest of a hands-on run of `cargo run -p gallery` (see Unverified here); the look values are settled.
 2. Luneterm's M9 adopts the toolkit through `docs/consuming.md`: vendor `scripts/export-snapshot.sh`'s output, switch crate by crate (version 0.2.0 lets the in-tree `lune-ui` and the snapshot stand
    in one lock), use the migration maps (the Luneterm one and "API changes of the library pass"); its own OS runs close `platform.material` and `render.surface`. Luneterm itself is not changed by this repo.
-3. Before any public release: license or remove Lunegit's theme and locale fixtures, which are bundled with no open licence (D206, Q19); the export already leaves them out.
-4. The user's calls, all reversible and taken at the recommended option: the final tray glyph (`platform.tray-icon`), column resize and reorder in the table (D163, Q15), and three taken calls to
-   confirm: the Windows popover activates (D224, Q17), the tray icon is a CPU raster (D218, Q18), the Lunegit fixtures stay bundled (Q19).
-5. CI stays out (D15): the repo has no remote.
+3. The Lunegit fixtures are licensed MIT OR Apache-2.0 (D284); the export still leaves them out.
+4. The user's calls, all reversible and taken at the recommended option: the final tray glyph (`platform.tray-icon`), column resize and reorder in the table (D163, Q15), and two taken calls to
+   confirm: the Windows popover activates (D224, Q17), the tray icon is a CPU raster (D218, Q18).
+5. CI stays out (D15) until the user asks; the remote is `origin`, github.com/lune-rs/luneui-rs (public).
 
 ## Blockers / open questions
 
-- None blocking. Open: the four look values above (reversible).
+- None.
 - Wane's OS behaviours (close-to-tray, single instance, autostart, notifications) are assumed app-side and documented (answer 2026-11-03, reversible).
