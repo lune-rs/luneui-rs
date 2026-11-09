@@ -488,17 +488,25 @@ const SCENES: &[UiScene] = &[
         capture_ms: 125,
         expect: Expect::Moving,
     },
-    // Half of `fast` after the activation: the notch is between the two tabs.
+    // Half of `fast` after the strip first draws the new active key: the click frame draws the old
+    // key (the page applies the activation after the strip), the empty step at 16 ms is that first
+    // frame (progress 0), and 90 ms later the notch is half way between the two tabs.
     UiScene {
         id: "tab-strip-switch-mid",
         scale: 2.0,
         tier: MotionTier::Full,
         state: rest,
-        script: &[Step {
-            at_ms: 0,
-            events: &[Ev::PointerAt(tab_mid(2), MID_Y), Ev::Click],
-        }],
-        capture_ms: 90,
+        script: &[
+            Step {
+                at_ms: 0,
+                events: &[Ev::PointerAt(tab_mid(2), MID_Y), Ev::Click],
+            },
+            Step {
+                at_ms: 16,
+                events: &[],
+            },
+        ],
+        capture_ms: 106,
         expect: Expect::Moving,
     },
 ];
