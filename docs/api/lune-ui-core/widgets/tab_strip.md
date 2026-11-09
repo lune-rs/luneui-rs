@@ -14,6 +14,9 @@ order are the app's. One frame computes the layout once, and everything reads it
   gesture ends the frame the strip's tab list stops matching the one it froze.
 - The active tab's drawn x comes from one place too: the tab's paint records it and the outline
   reads it, so the notch follows a dragged tab.
+- A change of the active key slides the notch from where it was drawn to the new tab
+  ([`SLIDE`](tab_strip.md#constant.SLIDE)); nothing else does (a drag, a reorder, a tab opened or closed, a new title), so
+  the notch is on its tab every other frame.
 - Every id comes from a [`TabKey`](tab_strip.md#struct.TabKey), never an index, so applying a `Reorder` or removing a tab
   moves no state to another tab.
 
@@ -35,7 +38,7 @@ pub struct Tab<'a> {
 
 One tab.
 
-Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:89`
+Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:95`
 
 **Fields**
 
@@ -69,7 +72,7 @@ pub struct TabKey(pub u64);
 
 The app's identity of a tab: stable across a reorder.
 
-Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:85`
+Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:91`
 
 **Fields**
 
@@ -103,7 +106,7 @@ pub struct TabStripOptions<'a> {
 
 What a strip shows besides its tabs.
 
-Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:113`
+Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:119`
 
 **Fields**
 
@@ -158,7 +161,7 @@ pub struct TabStripResponse {
 
 What [`Ui::tab_strip`](../ui.md#method.Ui.tab_strip) returns.
 
-Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:153`
+Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:159`
 
 **Fields**
 
@@ -188,7 +191,7 @@ pub enum BusyCue {
 
 The outline's treatment while the active tab is busy.
 
-Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:101`
+Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:107`
 
 **Variants**
 
@@ -232,7 +235,7 @@ pub enum TabEvent {
 
 What the user asked for this frame.
 
-Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:134`
+Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:140`
 
 **Variants**
 
@@ -278,7 +281,7 @@ pub fn busy_treatment(cue: BusyCue, tier: MotionTier) -> Option<BusyCue>
 
 The treatment that runs for `cue` under `tier`: Reduced forces the breath, Off is static.
 
-Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:158`
+Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:164`
 
 ## Constants
 
@@ -291,7 +294,7 @@ pub const BRUSH: Motion;
 
 The outline brush between focused and unfocused.
 
-Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:69`
+Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:75`
 
 <a id="constant.CLOSE_GLYPH"></a>
 ### Constant `CLOSE_GLYPH`
@@ -300,7 +303,7 @@ Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:69`
 pub const CLOSE_GLYPH: f32 = 10.0;
 ```
 
-Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:46`
+Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:49`
 
 <a id="constant.CLOSE_SIZE"></a>
 ### Constant `CLOSE_SIZE`
@@ -311,7 +314,7 @@ pub const CLOSE_SIZE: f32 = 20.0;
 
 The close button and its glyph.
 
-Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:45`
+Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:48`
 
 <a id="constant.COMET_FRACTION"></a>
 ### Constant `COMET_FRACTION`
@@ -322,7 +325,7 @@ pub const COMET_FRACTION: f32 = 0.14;
 
 The dash of [`BusyCue::Comet`](tab_strip.md#variant.BusyCue.Comet), as a fraction of the contour.
 
-Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:51`
+Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:54`
 
 <a id="constant.CONTENT_SWAP"></a>
 ### Constant `CONTENT_SWAP`
@@ -334,7 +337,7 @@ pub const CONTENT_SWAP: Motion;
 The card body's crossfade on an activation, which the app draws: base, sine in and out, fast
 under Reduced and nothing under Off.
 
-Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:75`
+Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:81`
 
 <a id="constant.FOCUS"></a>
 ### Constant `FOCUS`
@@ -345,7 +348,7 @@ pub const FOCUS: Motion;
 
 The tab's focus ring.
 
-Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:67`
+Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:70`
 
 <a id="constant.GAP"></a>
 ### Constant `GAP`
@@ -356,7 +359,7 @@ pub const GAP: f32 = 5.0;
 
 Between tabs only: the first tab sits flush in the card's corner.
 
-Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:41`
+Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:44`
 
 <a id="constant.HEIGHT"></a>
 ### Constant `HEIGHT`
@@ -367,7 +370,7 @@ pub const HEIGHT: f32 = 32.0;
 
 The strip's height and the outline's seam.
 
-Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:36`
+Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:39`
 
 <a id="constant.HOVER"></a>
 ### Constant `HOVER`
@@ -378,7 +381,7 @@ pub const HOVER: Motion;
 
 The tab fill and the close button's opacity.
 
-Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:65`
+Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:68`
 
 <a id="constant.MAX_WIDTH"></a>
 ### Constant `MAX_WIDTH`
@@ -387,7 +390,7 @@ Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:65`
 pub const MAX_WIDTH: f32 = 270.0;
 ```
 
-Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:39`
+Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:42`
 
 <a id="constant.MIN_NOTCH"></a>
 ### Constant `MIN_NOTCH`
@@ -398,7 +401,7 @@ pub const MIN_NOTCH: f32 = 12.0;
 
 Under this visible width the active tab has no notch (twice the flare radius).
 
-Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:55`
+Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:58`
 
 <a id="constant.MIN_WIDTH"></a>
 ### Constant `MIN_WIDTH`
@@ -409,7 +412,7 @@ pub const MIN_WIDTH: f32 = 108.0;
 
 The narrowest and widest tab.
 
-Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:38`
+Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:41`
 
 <a id="constant.NEW_GLYPH"></a>
 ### Constant `NEW_GLYPH`
@@ -418,7 +421,7 @@ Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:38`
 pub const NEW_GLYPH: f32 = 14.0;
 ```
 
-Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:49`
+Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:52`
 
 <a id="constant.NEW_SIZE"></a>
 ### Constant `NEW_SIZE`
@@ -429,7 +432,7 @@ pub const NEW_SIZE: f32 = 20.0;
 
 The new-tab button and its glyph.
 
-Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:48`
+Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:51`
 
 <a id="constant.RADIUS"></a>
 ### Constant `RADIUS`
@@ -440,7 +443,19 @@ pub const RADIUS: f32 = 8.0;
 
 A tab's top corners; its bottom corners are square.
 
-Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:43`
+Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:46`
+
+<a id="constant.SLIDE"></a>
+### Constant `SLIDE`
+
+```rust
+pub const SLIDE: Motion;
+```
+
+The active tab's notch moving to another tab: the progress of a switch, which restarts only
+when the active key changes.
+
+Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:73`
 
 <a id="constant.SWEEP_PASSES"></a>
 ### Constant `SWEEP_PASSES`
@@ -451,5 +466,5 @@ pub const SWEEP_PASSES: [(f32, f32); 2];
 
 The sweep's two passes, widest first: width and opacity.
 
-Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:53`
+Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:56`
 

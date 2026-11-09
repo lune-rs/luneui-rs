@@ -12,7 +12,7 @@ Each crate has a page per module (`<crate>/<module path>.md`; the root is `index
 
 ### `lune-ui-core` (`lune_ui_core`)
 
-92 modules, 1084 items. Left out and counted: 3252 blanket impls, 4686 items of the omitted impls, 1250 items of the trait impls shown as one line, 2178 synthetic impls.
+92 modules, 1085 items. Left out and counted: 3252 blanket impls, 4686 items of the omitted impls, 1250 items of the trait impls shown as one line, 2178 synthetic impls.
 
 | Module | Items |
 | --- | --- |
@@ -95,7 +95,7 @@ Each crate has a page per module (`<crate>/<module path>.md`; the root is `index
 | [`lune_ui_core::widgets::status_dot`](lune-ui-core/widgets/status_dot.md) | 3 |
 | [`lune_ui_core::widgets::stepper`](lune-ui-core/widgets/stepper.md) | 11 |
 | [`lune_ui_core::widgets::steps`](lune-ui-core/widgets/steps.md) | 10 |
-| [`lune_ui_core::widgets::tab_strip`](lune-ui-core/widgets/tab_strip.md) | 23 |
+| [`lune_ui_core::widgets::tab_strip`](lune-ui-core/widgets/tab_strip.md) | 24 |
 | [`lune_ui_core::widgets::table`](lune-ui-core/widgets/table.md) | 18 |
 | [`lune_ui_core::widgets::text_area`](lune-ui-core/widgets/text_area.md) | 1 |
 | [`lune_ui_core::widgets::text_lines`](lune-ui-core/widgets/text_lines.md) | 3 |
@@ -1092,6 +1092,7 @@ Every top-level item of the four owning crates, by name.
 - [`Size`](lune-ui-core/layout.md#enum.Size) - enum, `lune_ui_core::layout`
 - [`Skip`](lune-ui-core/theme.md#enum.Skip) - enum, `lune_ui_core::theme`
 - [`SLIDE`](lune-ui-core/drag.md#constant.SLIDE) - constant, `lune_ui_core::drag`
+- [`SLIDE`](lune-ui-core/widgets/tab_strip.md#constant.SLIDE) - constant, `lune_ui_core::widgets::tab_strip`
 - [`SliderLook`](lune-ui-core/widgets/slider.md#struct.SliderLook) - struct, `lune_ui_core::widgets::slider`
 - [`SliderOptions`](lune-ui-core/widgets/slider.md#struct.SliderOptions) - struct, `lune_ui_core::widgets::slider`
 - [`SliderState`](lune-ui-core/widgets/slider.md#struct.SliderState) - struct, `lune_ui_core::widgets::slider`
