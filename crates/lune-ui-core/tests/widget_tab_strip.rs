@@ -278,11 +278,74 @@ fn widths_follow_the_title_within_the_limits_and_the_gap_is_between_tabs_only() 
     let r = run(&mut h, &mut app);
     let s = slots(&r.out.tree);
     assert_eq!(s[0].2, MIN_WIDTH);
-    assert_eq!(s[1].2, 18.0 + 165.0);
+    assert_eq!(
+        s[1].2,
+        46.0 + 165.0,
+        "the close column is part of a closable tab"
+    );
     assert_eq!(s[2].2, MAX_WIDTH);
     assert_eq!(s[0].1, STRIP.x, "the first tab is flush left");
     assert_eq!(s[1].1, s[0].1 + s[0].2 + GAP);
     assert_eq!(s[2].1, s[1].1 + s[1].2 + GAP);
+}
+
+/// A title `n` characters wide (5.5 px each in the fake text).
+fn chars(n: usize) -> String {
+    "m".repeat(n)
+}
+
+#[test]
+fn hover_and_activation_move_no_slot_for_titles_from_90_to_224_px() {
+    // 17 to 41 characters: 93.5 to 225.5 px of title, from under the minimum to over the maximum.
+    let titles: Vec<String> = (17..=41).step_by(4).map(chars).collect();
+    let refs: Vec<&str> = titles.iter().map(String::as_str).collect();
+    let mut app = App::new(&refs, Some(0));
+    let mut h = bench(&mut app);
+    let rest = slots(&run(&mut h, &mut app).out.tree);
+    for name in &refs {
+        let at = mid(&run(&mut h, &mut app).out.tree, name);
+        h.input.pointer_to(at.0, at.1);
+        run(&mut h, &mut app);
+        assert_eq!(slots(&run(&mut h, &mut app).out.tree), rest, "hover {name}");
+    }
+    h.input.pointer_to(WIN.0 - 1.0, WIN.1 - 1.0);
+    for i in 1..refs.len() as u64 {
+        app.active = Some(i);
+        run(&mut h, &mut app);
+        assert_eq!(slots(&run(&mut h, &mut app).out.tree), rest, "active {i}");
+    }
+}
+
+#[test]
+fn the_elided_title_is_the_same_hovered_or_not() {
+    let wide = "x".repeat(100);
+    let mut app = App::new(&[&wide, &long('b')], Some(1));
+    let mut h = bench(&mut app);
+    let titles = |r: &Run| -> Vec<(u64, u32)> {
+        r.scene.layers[0]
+            .texts
+            .iter()
+            .map(|t| (t.key.0, t.x.to_bits()))
+            .collect()
+    };
+    let rest = titles(&run(&mut h, &mut app));
+    let at = mid(&run(&mut h, &mut app).out.tree, &wide);
+    h.input.pointer_to(at.0, at.1);
+    run(&mut h, &mut app);
+    assert_eq!(titles(&run(&mut h, &mut app)), rest);
+}
+
+#[test]
+fn a_tab_that_is_not_closable_reserves_no_close_column() {
+    let mut app = App::new(&["a", &long('b')], None);
+    app.tabs[1].2 = false;
+    let mut h = bench(&mut app);
+    let s = slots(&run(&mut h, &mut app).out.tree);
+    assert_eq!(s[1].2, 18.0 + 165.0);
+    let at = mid(&run(&mut h, &mut app).out.tree, &long('b'));
+    h.input.pointer_to(at.0, at.1);
+    run(&mut h, &mut app);
+    assert_eq!(slots(&run(&mut h, &mut app).out.tree), s);
 }
 
 #[test]
@@ -482,6 +545,8 @@ fn assert_frozen_through_a_press(titles: &[&str], active: u64, pressed: &str) {
     }
     h.input.release(PRIMARY);
     run(&mut h, &mut app);
+    // An activation moves no width, so the layout is live again when a title change moves one.
+    app.tabs[0].1 = "short".to_owned();
     let after = run(&mut h, &mut app);
     assert_ne!(
         slots(&after.out.tree),

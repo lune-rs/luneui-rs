@@ -163,7 +163,8 @@ pub fn busy_treatment(cue: BusyCue, tier: MotionTier) -> Option<BusyCue> {
     }
 }
 
-/// A tab's width with a title `title` wide: the padding and the close button it shows, within
+/// A tab's width with a title `title` wide: the padding and the close column it reserves (a
+/// closable tab reserves it hovered or not, so a hover or an activation moves no slot), within
 /// [`MIN_WIDTH`] and [`MAX_WIDTH`]. Rounded up, so a title that fits is not elided.
 fn tab_width(title: f32, close: bool) -> f32 {
     (chrome_width(close) + title.ceil()).clamp(MIN_WIDTH, MAX_WIDTH)
@@ -394,7 +395,7 @@ impl Ui<'_> {
         let widths = st
             .frozen
             .as_ref()
-            .map_or_else(|| self.measured_widths(tabs, &items), |f| f.widths.clone());
+            .map_or_else(|| self.measured_widths(tabs), |f| f.widths.clone());
         let (xs, extent) = slots(&widths);
 
         let new_rect = Rect::new(
@@ -479,13 +480,12 @@ impl Ui<'_> {
     }
 
     /// Every tab's width from its measured title.
-    fn measured_widths(&mut self, tabs: &[Tab<'_>], items: &[Item]) -> Vec<f64> {
+    fn measured_widths(&mut self, tabs: &[Tab<'_>]) -> Vec<f64> {
         tabs.iter()
-            .zip(items)
-            .map(|(tab, item)| {
+            .map(|tab| {
                 let spec = title_spec(self, tab.title, false);
                 let title = self.painter().measure(&spec).0;
-                f64::from(tab_width(title, item.close))
+                f64::from(tab_width(title, tab.closable))
             })
             .collect()
     }
@@ -706,11 +706,12 @@ impl Ui<'_> {
             p.fill_radii(rect, [RADIUS, RADIUS, 0.0, 0.0], fill);
         }
         let x = rect.x + PAD_LEFT;
+        // The column is reserved whether or not the button shows, so the title never re-elides.
         let room = rect.right()
             - x
             - TITLE_MARGIN
             - PAD_RIGHT
-            - if item.close {
+            - if tab.closable {
                 CLOSE_SIZE + CLOSE_MARGIN
             } else {
                 0.0
