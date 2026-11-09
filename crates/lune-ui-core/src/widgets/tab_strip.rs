@@ -8,6 +8,9 @@
 //!   gesture ends the frame the strip's tab list stops matching the one it froze.
 //! - The active tab's drawn x comes from one place too: the tab's paint records it and the outline
 //!   reads it, so the notch follows a dragged tab.
+//! - A change of the active key slides the notch from where it was drawn to the new tab
+//!   ([`SLIDE`]); nothing else does (a drag, a reorder, a tab opened or closed, a new title), so
+//!   the notch is on its tab every other frame.
 //! - Every id comes from a [`TabKey`], never an index, so applying a `Reorder` or removing a tab
 //!   moves no state to another tab.
 
@@ -65,6 +68,9 @@ const NEW_MARGIN: f32 = 6.0;
 pub const HOVER: Motion = Motion::of(Kind::Hover);
 /// The tab's focus ring.
 pub const FOCUS: Motion = Motion::of(Kind::Focus);
+/// The active tab's notch moving to another tab: the progress of a switch, which restarts only
+/// when the active key changes.
+pub const SLIDE: Motion = Motion::of(Kind::Move);
 /// The outline brush between focused and unfocused.
 pub const BRUSH: Motion = Motion {
     token: Token::Instant,
@@ -163,7 +169,8 @@ pub fn busy_treatment(cue: BusyCue, tier: MotionTier) -> Option<BusyCue> {
     }
 }
 
-/// A tab's width with a title `title` wide: the padding and the close button it shows, within
+/// A tab's width with a title `title` wide: the padding and the close column it reserves (a
+/// closable tab reserves it hovered or not, so a hover or an activation moves no slot), within
 /// [`MIN_WIDTH`] and [`MAX_WIDTH`]. Rounded up, so a title that fits is not elided.
 fn tab_width(title: f32, close: bool) -> f32 {
     (chrome_width(close) + title.ceil()).clamp(MIN_WIDTH, MAX_WIDTH)
@@ -306,6 +313,11 @@ struct StripState {
     menu: Option<(TabKey, (f32, f32))>,
     /// The `active` already revealed.
     revealed: Option<TabKey>,
+    /// The active tab last drawn and its drawn span (left and width in content space, the drag
+    /// shift included): where a switch slides from.
+    shown: Option<(TabKey, (f32, f32))>,
+    /// Where the slide in flight started.
+    slide_from: Option<(f32, f32)>,
 }
 
 /// One tab's ids and what the frame made of its layout.
@@ -322,15 +334,22 @@ struct Item {
 #[derive(Debug)]
 struct Laid {
     responses: Vec<Response>,
-    /// The active tab's drawn left edge and width, in the strip's space.
+    /// The active tab's live left edge and width, in content space (the scroll offset not
+    /// applied), where its slot and any drag shift put it.
     active: Option<(f32, f32)>,
+    /// The scroll offset the content was drawn at.
+    offset: f64,
     scroll_by: f64,
 }
 
 impl Ui<'_> {
     /// A tab strip under `key` over `rect` (normally [`HEIGHT`] high, at the top of `opts.card`),
-    /// with the new-tab button at its right end. Call it every frame. Read `events` and apply them
-    /// to the app's list; the strip never changes it. See the module docs.
+    /// with the new-tab button after the last tab, or at the right end when the tabs overflow.
+    /// The strip is only as wide as its tabs, so a press in the space after them reaches whatever
+    /// is under the strip. A closable tab reserves its close column, so a hover or an activation
+    /// moves no tab; a change of `opts.active` slides the outline's notch to the new tab ([`SLIDE`]).
+    /// Call it every frame. Read `events` and apply them to the app's list; the strip never
+    /// changes it. See the module docs.
     pub fn tab_strip(
         &mut self,
         key: impl Hash,
@@ -394,16 +413,22 @@ impl Ui<'_> {
         let widths = st
             .frozen
             .as_ref()
-            .map_or_else(|| self.measured_widths(tabs, &items), |f| f.widths.clone());
+            .map_or_else(|| self.measured_widths(tabs), |f| f.widths.clone());
         let (xs, extent) = slots(&widths);
 
+        // The new-tab button follows the last tab and stops at the right end when the tabs
+        // overflow. The viewport is only as wide as the tabs, so the space after them is no
+        // region of the strip and a press there reaches whatever the app put under it.
+        let pinned = rect.right() - NEW_MARGIN - NEW_SIZE;
+        let room = f64::from((pinned - rect.x).max(0.0));
+        let new_x = (rect.x + extent as f32 + NEW_MARGIN).min(pinned);
         let new_rect = Rect::new(
-            rect.right() - NEW_MARGIN - NEW_SIZE,
+            new_x,
             rect.y + (rect.h - NEW_SIZE) / 2.0,
             NEW_SIZE,
             NEW_SIZE,
         );
-        let viewport = Rect::new(rect.x, rect.y, (new_rect.x - rect.x).max(0.0), rect.h);
+        let viewport = Rect::new(rect.x, rect.y, extent.min(room) as f32, rect.h);
 
         // A reveal scrolls the slots under a held pointer, so it waits for the gesture to end.
         if !st.drag.is_active() && st.revealed != opts.active {
@@ -425,10 +450,7 @@ impl Ui<'_> {
         // Window space, taken outside the area: inside it the transform holds the scroll too.
         let origin = f64::from(self.painter().transformed(viewport).x);
         let area = ScrollOptions {
-            bars: (
-                Bars::Hidden.unless_fits(extent, f64::from(viewport.w)),
-                Bars::Disabled,
-            ),
+            bars: (Bars::Hidden.unless_fits(extent, room), Bars::Disabled),
             wheel_x: true,
             extent: Some((extent, f64::from(viewport.h))),
             ..ScrollOptions::default()
@@ -454,7 +476,11 @@ impl Ui<'_> {
             self.scroll_shift_x("tabs", laid.scroll_by);
         }
 
-        self.paint_outline(viewport, opts, laid.active);
+        let span = self.slid_span(tabs, active, laid.active, st);
+        let drawn = span.map(|(x, w)| ((f64::from(x) - laid.offset) as f32, w));
+        // Up to the button, not the fitted viewport: a slide may start where a closed tab was.
+        let clip = Rect::new(viewport.x, viewport.y, room as f32, viewport.h);
+        self.paint_outline(clip, opts, drawn);
 
         let new_button = IconButton {
             glyph: icon::ADD,
@@ -478,14 +504,50 @@ impl Ui<'_> {
         self.strip_menu(tabs, opts, st, events);
     }
 
+    /// The active tab's span to draw (content space): the live one, or while a switch slides the
+    /// mix of the span drawn before it and the live one. Only a change of the active key starts a
+    /// slide, so a drag, a drop, a reorder, a tab opened or closed beside it and a title change
+    /// leave the notch exactly on its tab, and so do the first frame and a gap in the active tab.
+    fn slid_span(
+        &mut self,
+        tabs: &[Tab<'_>],
+        active: Option<usize>,
+        live: Option<(f32, f32)>,
+        st: &mut StripState,
+    ) -> Option<(f32, f32)> {
+        let id = self.id("slide");
+        let (Some(i), Some(live)) = (active, live) else {
+            st.shown = None;
+            st.slide_from = None;
+            self.snap_f32(id, 1.0);
+            return None;
+        };
+        let key = tabs[i].key;
+        if let Some((prev, span)) = st.shown
+            && prev != key
+        {
+            st.slide_from = Some(span);
+            self.snap_f32(id, 0.0);
+        }
+        let p = self.animate_f32(id, 1.0, &SLIDE);
+        let drawn = match st.slide_from {
+            Some((x, w)) if p < 1.0 => (x + (live.0 - x) * p, w + (live.1 - w) * p),
+            _ => {
+                st.slide_from = None;
+                live
+            }
+        };
+        st.shown = Some((key, drawn));
+        Some(drawn)
+    }
+
     /// Every tab's width from its measured title.
-    fn measured_widths(&mut self, tabs: &[Tab<'_>], items: &[Item]) -> Vec<f64> {
+    fn measured_widths(&mut self, tabs: &[Tab<'_>]) -> Vec<f64> {
         tabs.iter()
-            .zip(items)
-            .map(|(tab, item)| {
+            .map(|tab| {
                 let spec = title_spec(self, tab.title, false);
                 let title = self.painter().measure(&spec).0;
-                f64::from(tab_width(title, item.close))
+                f64::from(tab_width(title, tab.closable))
             })
             .collect()
     }
@@ -660,7 +722,7 @@ impl Ui<'_> {
         for i in order {
             let rect = slot(xs[i] + f64::from(shifts[i]), i);
             if f.active == Some(i) {
-                active = Some(((f64::from(rect.x) - view.offset.0) as f32, rect.w));
+                active = Some((rect.x, rect.w));
             }
             let looks = TabLooks {
                 resp: &responses[i],
@@ -673,6 +735,7 @@ impl Ui<'_> {
         Laid {
             responses,
             active,
+            offset: view.offset.0,
             scroll_by,
         }
     }
@@ -706,11 +769,12 @@ impl Ui<'_> {
             p.fill_radii(rect, [RADIUS, RADIUS, 0.0, 0.0], fill);
         }
         let x = rect.x + PAD_LEFT;
+        // The column is reserved whether or not the button shows, so the title never re-elides.
         let room = rect.right()
             - x
             - TITLE_MARGIN
             - PAD_RIGHT
-            - if item.close {
+            - if tab.closable {
                 CLOSE_SIZE + CLOSE_MARGIN
             } else {
                 0.0
@@ -752,7 +816,8 @@ impl Ui<'_> {
         focus_ring::paint(p, rect, RingKind::Edge { radius: RADIUS }, ring);
     }
 
-    /// The header tint, the loop and the busy cue. `active` is the tab's drawn left and width.
+    /// The header tint, the loop and the busy cue. `active` is the tab's drawn left and width;
+    /// `viewport` is the area the notch is clipped to.
     fn paint_outline(
         &mut self,
         viewport: Rect,

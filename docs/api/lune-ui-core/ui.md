@@ -1296,8 +1296,12 @@ Source: `crates/lune-ui-core/src/ui.rs:116`
   ```
 
   A tab strip under `key` over `rect` (normally [`HEIGHT`](widgets/tab_strip.md#constant.HEIGHT) high, at the top of `opts.card`),
-  with the new-tab button at its right end. Call it every frame. Read `events` and apply them
-  to the app's list; the strip never changes it. See the module docs.
+  with the new-tab button after the last tab, or at the right end when the tabs overflow.
+  The strip is only as wide as its tabs, so a press in the space after them reaches whatever
+  is under the strip. A closable tab reserves its close column, so a hover or an activation
+  moves no tab; a change of `opts.active` slides the outline's notch to the new tab ([`SLIDE`](widgets/tab_strip.md#constant.SLIDE)).
+  Call it every frame. Read `events` and apply them to the app's list; the strip never
+  changes it. See the module docs.
 
 `impl Ui<'_>`
 

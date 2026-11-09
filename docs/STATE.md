@@ -1,15 +1,17 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-09 (library pass merged to main; dark-glass merged and pushed at 9f1421f; published at github.com/lune-rs/luneui-rs)
+Last updated: 2026-11-09 (tab strip: reserved close column, `+` after the last tab, notch slide; on branch `orch/tab-strip-plus-and-slide`, not yet merged; library pass and dark-glass are on main, published at github.com/lune-rs/luneui-rs)
 
 ## Now
 
 Program toolkit-v1 closed with M11 (merged at 10f503e); the gallery showcase task and the library pass followed. The toolkit is five crates (`lune-ui-core`, the adapters
 `lune-ui-wgpu`, `lune-ui-winit`, `lune-ui-platform`, and the facade `lune-ui`), workspace version 0.2.0 (D238, still: no consumer had adopted it, so the library pass changed
-the API with no bump). `apps/gallery` has 82 pages and 438 scene names (the first 14 are the legacy Painter-API scenes). The catalogue holds 97 entries: 91 `done`, 2 `in-progress`,
+the API with no bump). `apps/gallery` has 82 pages and 439 scene names (the first 14 are the legacy Painter-API scenes). The catalogue holds 97 entries: 91 `done`, 2 `in-progress`,
 4 `external`. Milestone merges to main: M4 d9fe71f, M5 1aeaf1b, M6 a75a708, M7 662d310, M8 2474248, M9 8f499d0, M10 55cfaaf, M11 10f503e (M1 to M3: the extraction, the seams and the catalogue).
 `docs/architecture.md` has the module map, the pages and "API changes since M1"; `docs/consuming.md` how an app vendors the toolkit and, for the library pass, the migration map of its API changes.
+
+Tab strip (task `luneui-rs/tab-strip-plus-and-slide`, D289 to D291; on its branch, merge and push wait for the user's yes): a closable tab reserves its close column, so a hover or an activation moves no tab (D289, a Lunegit deviation); the new-tab button follows the last tab and is pinned at the right end only on overflow, and the viewport is fitted to the tabs, so the strip's empty space reaches the app under it (D290); the active tab's notch slides on a change of the active key (`tab_strip::SLIDE`, D291; scene `tab-strip-switch-mid`, 439 scene names). The pixel gate (`--base main`) moved exactly the `tab-strip-*` scenes (14 by the button's place, `tab-strip-content-swap` also by the slide) and left `tab-strip-overflow` identical; those 15 are the `--allow` list of D290. The feel of the slide is the user's to check with `cargo run -p gallery`.
 
 Dark glass (task `luneui-rs/dark-glass`, D285 to D288; merged at 9f1421f): the OS glass is data (`Material::Custom(OsMaterial)`, `Material::os_material`); a theme file may carry an optional `glass` section (layers, curve, material); `theme::near_black` is the approved near-black look as one file, floating surfaces included (`MENU_GLASS`, D288). The gallery lists it in the materials and themes panes, and its tab header uses `near_black::HEADER_TINT` under that glass. Lunegit's preset is unchanged. The pixel gate was not run (no component's drawing changed, D254): the five `showcase-*` scenes move by design and are checked by eye. Unverified here: `UltraDark` under a Light system appearance on macOS, and every Windows result (the Windows code compiles; nothing ran there). Step 7 added `docs/api/` (D287): the whole public API as generated Markdown, a page per module, from rustdoc JSON by `tools/api-docs`; `scripts/gen-api-docs.sh --check` is in the gate, so it cannot go stale. Start at `docs/api/INDEX.md`.
 
