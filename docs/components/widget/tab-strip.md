@@ -148,6 +148,7 @@ The confirm and rename dialog texts, "Duplicate Tab" and "Copy Working Directory
 - `tab-strip-slide`: neighbour sliding, t = 90 ms (half of `fast`).
 - `tab-strip-settle`: released tab settling, t = 90 ms.
 - `tab-strip-content-swap`: activation of tab 3, outgoing and incoming content at t = 125 ms (half of `base`).
+- `tab-strip-switch-mid`: the same activation at t = 90 ms (half of `fast`): the notch is between the two tabs, moving.
 
 ### Painter primitives
 

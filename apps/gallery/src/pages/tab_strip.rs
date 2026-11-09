@@ -488,6 +488,19 @@ const SCENES: &[UiScene] = &[
         capture_ms: 125,
         expect: Expect::Moving,
     },
+    // Half of `fast` after the activation: the notch is between the two tabs.
+    UiScene {
+        id: "tab-strip-switch-mid",
+        scale: 2.0,
+        tier: MotionTier::Full,
+        state: rest,
+        script: &[Step {
+            at_ms: 0,
+            events: &[Ev::PointerAt(tab_mid(2), MID_Y), Ev::Click],
+        }],
+        capture_ms: 90,
+        expect: Expect::Moving,
+    },
 ];
 
 /// Hover, a click on each end, keys, a drag and a drop.

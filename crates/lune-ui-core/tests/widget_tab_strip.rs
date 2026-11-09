@@ -8,6 +8,7 @@ use lune_ui_core::access::{AccessAction, Action, Node, Role, SemanticTree, State
 use lune_ui_core::chrome;
 use lune_ui_core::color::premul;
 use lune_ui_core::drag::{SETTLE, SLIDE};
+
 use lune_ui_core::input::{FrameOutput, Key, NamedKey, PointerButton, Repaint};
 use lune_ui_core::motion::{MotionTier, Token, conformance};
 use lune_ui_core::paint::{Rect, polyline_length};
@@ -20,8 +21,8 @@ use lune_ui_core::ui::{Sense, Ui, WidgetId};
 use lune_ui_core::widgets::progress::breath_opacity;
 use lune_ui_core::widgets::shine;
 use lune_ui_core::widgets::tab_strip::{
-    BRUSH, BusyCue, CONTENT_SWAP, FOCUS, GAP, HOVER, MAX_WIDTH, MIN_WIDTH, Tab, TabEvent, TabKey,
-    TabStripOptions,
+    BRUSH, BusyCue, CONTENT_SWAP, FOCUS, GAP, HOVER, MAX_WIDTH, MIN_WIDTH, SLIDE as NOTCH_SLIDE,
+    Tab, TabEvent, TabKey, TabStripOptions,
 };
 use lune_ui_core::widgets::tone::Tone;
 
@@ -1096,6 +1097,9 @@ fn the_notch_wraps_the_active_tab_and_a_flush_tab_keeps_the_card_corner() {
     let (l, rt) = (b.x - CARD.x, b.right() - CARD.x);
     assert_loop(&r.scene, Some((l, rt)));
     app.active = Some(0);
+    run(&mut h, &mut app);
+    // The switch slides; once it is over the notch is on the flush tab.
+    h.at_ms(1000);
     let r = run(&mut h, &mut app);
     assert_loop(&r.scene, Some((0.0, MIN_WIDTH)));
 }
@@ -1115,6 +1119,208 @@ fn the_notch_follows_the_dragged_active_tab() {
     let x = drawn_x(&r.scene, "t0");
     assert!((x - (CARD.x + 46.0)).abs() < 0.01, "{x}");
     assert_loop(&r.scene, Some((46.0, 46.0 + MIN_WIDTH)));
+}
+
+// The notch's slide.
+
+/// A tab's span in the card's space, from the tree.
+fn span_of(tree: &SemanticTree, name: &str) -> (f32, f32) {
+    let b = tab_node(tree, name).bounds;
+    (b.x - CARD.x, b.right() - CARD.x)
+}
+
+fn mix(a: (f32, f32), b: (f32, f32), p: f32) -> (f32, f32) {
+    (a.0 + (b.0 - a.0) * p, a.1 + (b.1 - a.1) * p)
+}
+
+/// A strip of `n` tabs with `from` active, settled at 0 ms, and its tree.
+fn slide_bench(tier: MotionTier, n: u64, from: u64) -> (UiHarness, App, SemanticTree) {
+    let mut app = App::of(n, Some(from));
+    let mut h = UiHarness::new(WIN);
+    h.tier = tier;
+    h.at_ms(0);
+    let tree = run(&mut h, &mut app).out.tree;
+    h.input.pointer_to(WIN.0 - 1.0, WIN.1 - 1.0);
+    for ms in [30, 60, 90] {
+        h.at_ms(ms);
+        run(&mut h, &mut app);
+    }
+    (h, app, tree)
+}
+
+/// The frames after the switch was applied: the first is the key's change (the notch is where it
+/// was), the middle is half way, and the last is on the new tab with nothing left to draw.
+fn assert_slides(h: &mut UiHarness, app: &mut App, from: (f32, f32), to: (f32, f32)) {
+    h.at_ms(200);
+    let r = run(h, app);
+    assert_loop(&r.scene, Some(from));
+    assert_eq!(r.out.repaint, Repaint::Now);
+    h.at_ms(290);
+    let r = run(h, app);
+    assert_loop(&r.scene, Some(mix(from, to, 0.5)));
+    assert_eq!(r.out.repaint, Repaint::Now);
+    h.at_ms(700);
+    let r = run(h, app);
+    assert_loop(&r.scene, Some(to));
+    h.at_ms(716);
+    let r = run(h, app);
+    assert_loop(&r.scene, Some(to));
+    assert_eq!(r.out.repaint, Repaint::Idle, "nothing left to draw");
+}
+
+#[test]
+fn a_click_slides_the_notch_to_the_new_tab() {
+    let (mut h, mut app, tree) = slide_bench(MotionTier::Full, 4, 1);
+    let (from, to) = (span_of(&tree, "t1"), span_of(&tree, "t3"));
+    h.at_ms(100);
+    press_at(&mut h, mid(&tree, "t3"));
+    assert_eq!(activations(&run(&mut h, &mut app).events), 1);
+    h.input.release(PRIMARY);
+    h.input.pointer_to(WIN.0 - 1.0, WIN.1 - 1.0);
+    assert_slides(&mut h, &mut app, from, to);
+}
+
+#[test]
+fn enter_on_a_roving_tab_slides_the_notch() {
+    let (mut h, mut app, tree) = slide_bench(MotionTier::Full, 4, 0);
+    let (from, to) = (span_of(&tree, "t0"), span_of(&tree, "t1"));
+    h.at_ms(60);
+    tab_in(&mut h, &mut app);
+    key(&mut h, NamedKey::ArrowRight);
+    run(&mut h, &mut app);
+    h.at_ms(100);
+    key(&mut h, NamedKey::Enter);
+    let r = run(&mut h, &mut app);
+    assert_eq!(activations(&r.events), 1);
+    assert_eq!(app.active, Some(1));
+    // The ring and the slide: only the notch is asserted here, so skip the idle check.
+    h.at_ms(200);
+    assert_loop(&run(&mut h, &mut app).scene, Some(from));
+    h.at_ms(290);
+    assert_loop(&run(&mut h, &mut app).scene, Some(mix(from, to, 0.5)));
+    h.at_ms(700);
+    assert_loop(&run(&mut h, &mut app).scene, Some(to));
+}
+
+#[test]
+fn closing_the_active_tab_slides_the_notch_to_the_one_that_takes_over() {
+    let (mut h, mut app, tree) = slide_bench(MotionTier::Full, 4, 1);
+    let (from, to) = (span_of(&tree, "t1"), span_of(&tree, "t0"));
+    app.tabs.remove(1);
+    app.active = Some(0);
+    assert_slides(&mut h, &mut app, from, to);
+}
+
+#[test]
+fn closing_the_last_active_tab_keeps_the_notch_for_the_whole_slide() {
+    let (mut h, mut app, tree) = slide_bench(MotionTier::Full, 4, 3);
+    let (from, to) = (span_of(&tree, "t3"), span_of(&tree, "t2"));
+    app.tabs.pop();
+    app.active = Some(2);
+    // The old span lies past the tabs that are left, where the viewport no longer reaches.
+    assert_slides(&mut h, &mut app, from, to);
+}
+
+#[test]
+fn a_second_switch_mid_slide_continues_from_where_the_notch_is() {
+    let (mut h, mut app, tree) = slide_bench(MotionTier::Full, 4, 0);
+    let (a, b) = (span_of(&tree, "t0"), span_of(&tree, "t3"));
+    let c = span_of(&tree, "t1");
+    app.active = Some(3);
+    h.at_ms(200);
+    run(&mut h, &mut app);
+    h.at_ms(290);
+    assert_loop(&run(&mut h, &mut app).scene, Some(mix(a, b, 0.5)));
+    app.active = Some(1);
+    assert_loop(&run(&mut h, &mut app).scene, Some(mix(a, b, 0.5)));
+    h.at_ms(380);
+    assert_loop(
+        &run(&mut h, &mut app).scene,
+        Some(mix(mix(a, b, 0.5), c, 0.5)),
+    );
+    h.at_ms(900);
+    assert_loop(&run(&mut h, &mut app).scene, Some(c));
+}
+
+#[test]
+fn reduced_and_off_switch_in_one_frame() {
+    for tier in [MotionTier::Reduced, MotionTier::Off] {
+        let (mut h, mut app, tree) = slide_bench(tier, 4, 1);
+        app.active = Some(3);
+        h.at_ms(200);
+        let r = run(&mut h, &mut app);
+        assert_loop(&r.scene, Some(span_of(&tree, "t3")));
+        // The old tab's close button may still fade; the notch does not.
+        h.at_ms(1000);
+        assert_eq!(run(&mut h, &mut app).out.repaint, Repaint::Idle, "{tier:?}");
+    }
+}
+
+#[test]
+fn the_first_frame_and_an_active_tab_that_comes_and_goes_do_not_slide() {
+    let mut app = App::of(4, Some(2));
+    let mut h = UiHarness::new(WIN);
+    h.at_ms(0);
+    let r = run(&mut h, &mut app);
+    let (t2, t1) = (span_of(&r.out.tree, "t2"), span_of(&r.out.tree, "t1"));
+    assert_loop(&r.scene, Some(t2));
+    h.at_ms(16);
+    assert_eq!(run(&mut h, &mut app).out.repaint, Repaint::Idle);
+    app.active = None;
+    h.at_ms(100);
+    assert_loop(&run(&mut h, &mut app).scene, None);
+    app.active = Some(1);
+    h.at_ms(116);
+    let r = run(&mut h, &mut app);
+    assert_loop(&r.scene, Some(t1));
+}
+
+#[test]
+fn a_reorder_drag_and_its_drop_keep_the_notch_on_the_active_tab_each_frame() {
+    let mut app = App::of(4, Some(0));
+    let mut h = bench(&mut app);
+    let tree = run(&mut h, &mut app).out.tree;
+    let at = mid(&tree, "t0");
+    let mut ms = 0;
+    let on_tab = |h: &mut UiHarness, app: &mut App, ms: &mut u64| {
+        tick(h, ms);
+        let r = run(h, app);
+        let x = drawn_x(&r.scene, "t0") - CARD.x;
+        assert_loop(&r.scene, Some((x, x + MIN_WIDTH)));
+    };
+    press_at(&mut h, at);
+    on_tab(&mut h, &mut app, &mut ms);
+    h.input.pointer_to(at.0 + 4.0, at.1);
+    on_tab(&mut h, &mut app, &mut ms);
+    h.input.pointer_to(at.0 + 240.0, at.1);
+    for _ in 0..25 {
+        on_tab(&mut h, &mut app, &mut ms);
+    }
+    h.input.release(PRIMARY);
+    for _ in 0..30 {
+        on_tab(&mut h, &mut app, &mut ms);
+    }
+    assert_eq!(app.tabs[2].0, 0, "the drop was applied");
+}
+
+#[test]
+fn a_tab_opened_or_closed_left_of_the_active_one_and_a_title_change_do_not_slide() {
+    let (mut h, mut app, _) = slide_bench(MotionTier::Full, 4, 2);
+    let mut ms = 100;
+    let mut exact = |h: &mut UiHarness, app: &mut App, name: &str| {
+        ms += 16;
+        h.at_ms(ms);
+        let r = run(h, app);
+        assert_loop(&r.scene, Some(span_of(&r.out.tree, name)));
+    };
+    app.tabs.insert(0, (99, "new".to_owned(), true, None));
+    exact(&mut h, &mut app, "t2");
+    app.tabs.remove(0);
+    exact(&mut h, &mut app, "t2");
+    app.tabs[2].1 = "a longer title".to_owned();
+    exact(&mut h, &mut app, "a longer title");
+    app.tabs[2].1 = "x".to_owned();
+    exact(&mut h, &mut app, "x");
 }
 
 #[test]
@@ -1751,6 +1957,7 @@ fn every_motion_row_conforms_under_every_tier() {
             (FOCUS, "focus"),
             (BRUSH, "brush"),
             (SLIDE, "slide"),
+            (NOTCH_SLIDE, "notch slide"),
             (SETTLE, "settle"),
             (CONTENT_SWAP, "content swap"),
         ] {
