@@ -330,8 +330,9 @@ struct Laid {
 
 impl Ui<'_> {
     /// A tab strip under `key` over `rect` (normally [`HEIGHT`] high, at the top of `opts.card`),
-    /// with the new-tab button at its right end. Call it every frame. Read `events` and apply them
-    /// to the app's list; the strip never changes it. See the module docs.
+    /// with the new-tab button after the last tab, or at the right end when the tabs overflow.
+    /// Call it every frame. Read `events` and apply them to the app's list; the strip never
+    /// changes it. See the module docs.
     pub fn tab_strip(
         &mut self,
         key: impl Hash,
@@ -398,13 +399,19 @@ impl Ui<'_> {
             .map_or_else(|| self.measured_widths(tabs), |f| f.widths.clone());
         let (xs, extent) = slots(&widths);
 
+        // The new-tab button follows the last tab and stops at the right end when the tabs
+        // overflow. The viewport is only as wide as the tabs, so the space after them is no
+        // region of the strip and a press there reaches whatever the app put under it.
+        let pinned = rect.right() - NEW_MARGIN - NEW_SIZE;
+        let room = f64::from((pinned - rect.x).max(0.0));
+        let new_x = (rect.x + extent as f32 + NEW_MARGIN).min(pinned);
         let new_rect = Rect::new(
-            rect.right() - NEW_MARGIN - NEW_SIZE,
+            new_x,
             rect.y + (rect.h - NEW_SIZE) / 2.0,
             NEW_SIZE,
             NEW_SIZE,
         );
-        let viewport = Rect::new(rect.x, rect.y, (new_rect.x - rect.x).max(0.0), rect.h);
+        let viewport = Rect::new(rect.x, rect.y, extent.min(room) as f32, rect.h);
 
         // A reveal scrolls the slots under a held pointer, so it waits for the gesture to end.
         if !st.drag.is_active() && st.revealed != opts.active {
@@ -426,10 +433,7 @@ impl Ui<'_> {
         // Window space, taken outside the area: inside it the transform holds the scroll too.
         let origin = f64::from(self.painter().transformed(viewport).x);
         let area = ScrollOptions {
-            bars: (
-                Bars::Hidden.unless_fits(extent, f64::from(viewport.w)),
-                Bars::Disabled,
-            ),
+            bars: (Bars::Hidden.unless_fits(extent, room), Bars::Disabled),
             wheel_x: true,
             extent: Some((extent, f64::from(viewport.h))),
             ..ScrollOptions::default()

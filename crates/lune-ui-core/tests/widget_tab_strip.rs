@@ -16,7 +16,7 @@ use lune_ui_core::shortcuts::{Binding, Chord, Scope};
 use lune_ui_core::testing::UiHarness;
 use lune_ui_core::text::{Spec, Style};
 use lune_ui_core::theme::DARK;
-use lune_ui_core::ui::{Ui, WidgetId};
+use lune_ui_core::ui::{Sense, Ui, WidgetId};
 use lune_ui_core::widgets::progress::breath_opacity;
 use lune_ui_core::widgets::shine;
 use lune_ui_core::widgets::tab_strip::{
@@ -445,22 +445,131 @@ fn a_press_on_the_close_button_closes_and_neither_activates_nor_arms_a_drag() {
     assert_eq!(r.events, vec![TabEvent::Close(TabKey(0))]);
 }
 
+/// The new-tab button's bounds in a frame's tree.
+fn new_bounds(tree: &SemanticTree) -> Rect {
+    nodes(tree, Role::Button)
+        .iter()
+        .find(|n| n.name == "New tab")
+        .map(|n| n.bounds)
+        .expect("new")
+}
+
 #[test]
 fn the_new_tab_button_reports_new() {
     let mut app = App::of(1, Some(0));
     let mut h = bench(&mut app);
     let r = run(&mut h, &mut app);
-    let new = nodes(&r.out.tree, Role::Button)
-        .iter()
-        .find(|n| n.name == "New tab")
-        .map(|n| n.bounds)
-        .expect("new");
+    let new = new_bounds(&r.out.tree);
     assert_eq!((new.w, new.h), (20.0, 20.0));
-    assert_eq!(new.right(), STRIP.right() - 6.0);
+    assert_eq!(new.x, STRIP.x + MIN_WIDTH + 6.0, "after the last tab");
     h.input.pointer_to(new.x + 10.0, new.y + 10.0);
     run(&mut h, &mut app);
     h.input.click(PRIMARY);
     assert_eq!(run(&mut h, &mut app).events, vec![TabEvent::New]);
+}
+
+#[test]
+fn the_new_tab_button_follows_the_last_tab_by_6_px() {
+    let mut app = App::new(&[&long('a'), "b", &long('c')], Some(0));
+    let mut h = bench(&mut app);
+    let tree = run(&mut h, &mut app).out.tree;
+    let last = slots(&tree).pop().expect("a tab");
+    let new = new_bounds(&tree);
+    assert_eq!(new.x, last.1 + last.2 + 6.0);
+    assert_eq!(new.y, STRIP.y + (STRIP.h - 20.0) / 2.0);
+    // A tab closed or added moves it with the strip's end.
+    app.tabs.pop();
+    let tree = run(&mut h, &mut app).out.tree;
+    let last = slots(&tree).pop().expect("a tab");
+    assert_eq!(new_bounds(&tree).x, last.1 + last.2 + 6.0);
+}
+
+#[test]
+fn with_no_tabs_the_new_tab_button_sits_6_px_in_from_the_strip() {
+    let mut app = App::of(0, None);
+    let mut h = bench(&mut app);
+    let new = new_bounds(&run(&mut h, &mut app).out.tree);
+    assert_eq!(new.x, STRIP.x + 6.0);
+}
+
+#[test]
+fn on_overflow_the_new_tab_button_is_pinned_at_the_right_end() {
+    let mut app = App::of(12, Some(0));
+    let mut h = bench(&mut app);
+    let tree = run(&mut h, &mut app).out.tree;
+    let new = new_bounds(&tree);
+    assert_eq!(new.right(), STRIP.right() - 6.0);
+    // The viewport is what it was: it ends at the button's left edge.
+    let area = nodes(&tree, Role::ScrollArea)[0];
+    assert_eq!(area.bounds.right(), VIEW_RIGHT);
+    h.input.pointer_to(new.x + 10.0, new.y + 10.0);
+    run(&mut h, &mut app);
+    h.input.click(PRIMARY);
+    assert_eq!(run(&mut h, &mut app).events, vec![TabEvent::New]);
+}
+
+/// A frame with an app region over the whole strip, registered first so the strip's own regions
+/// win where they exist. Returns what the region saw and whether it was the hovered one.
+fn under_frame(h: &mut UiHarness, app: &mut App) -> (bool, bool, Vec<TabEvent>) {
+    let mut seen = (false, false);
+    let mut events = Vec::new();
+    h.frame(|ui| {
+        let id = ui.id("under");
+        let hovered = ui.painter().hover == Some(id);
+        let resp = ui.interact(id, STRIP, Sense::CLICK);
+        seen = (resp.press_started, hovered);
+        events = draw(ui, app);
+    });
+    app.take(&events);
+    (seen.0, seen.1, events)
+}
+
+#[test]
+fn a_press_in_the_empty_strip_space_reaches_the_region_under_it() {
+    let mut app = App::of(2, Some(0));
+    let mut h = bench(&mut app);
+    let tree = run(&mut h, &mut app).out.tree;
+    let last = slots(&tree).pop().expect("a tab");
+    let new = new_bounds(&tree);
+    let end = last.1 + last.2;
+    // Between the last tab and the button, and between the button and the strip's right end.
+    for x in [end + 3.0, new.right() + 10.0, STRIP.right() - 2.0] {
+        let mut h = bench(&mut app);
+        h.input.pointer_to(x, Y);
+        under_frame(&mut h, &mut app);
+        let (_, hovered, _) = under_frame(&mut h, &mut app);
+        assert!(hovered, "the app region is the hovered one at {x}");
+        h.input.press(PRIMARY);
+        let (pressed, _, events) = under_frame(&mut h, &mut app);
+        assert!(pressed, "the app region gets the press at {x}");
+        assert!(events.is_empty(), "the strip reports nothing at {x}");
+    }
+}
+
+#[test]
+fn nothing_of_the_strip_is_hovered_in_its_empty_space() {
+    let mut app = App::of(2, Some(0));
+    let mut h = bench(&mut app);
+    let tree = run(&mut h, &mut app).out.tree;
+    let last = slots(&tree).pop().expect("a tab");
+    h.input.pointer_to(last.1 + last.2 + 3.0, Y);
+    run(&mut h, &mut app);
+    let mut hover = None;
+    h.frame(|ui| {
+        hover = Some(ui.painter().hover);
+        draw(ui, &app);
+    });
+    assert_eq!(hover, Some(None));
+}
+
+#[test]
+fn on_overflow_the_wheel_still_scrolls_the_strip() {
+    let mut app = App::of(12, Some(0));
+    let mut h = bench(&mut app);
+    h.input.pointer_to(100.0, Y);
+    run(&mut h, &mut app);
+    h.input.scroll_pixels(0.0, -40.0);
+    assert_eq!(offset(&run(&mut h, &mut app).out.tree), 40.0);
 }
 
 // The gesture.
