@@ -111,7 +111,7 @@ pub struct BlurLimits {
 The limits of the backdrop blur: how coarse its working picture is and how wide its kernel may
 grow.
 
-Source: `crates/lune-ui-core/src/scene.rs:330`
+Source: `crates/lune-ui-core/src/scene.rs:336`
 
 **Fields**
 
@@ -201,6 +201,7 @@ pub struct FrameParams {
     pub saturation: f32,
     pub noise_opacity: f32,
     pub blur: BlurLimits,
+    pub text: TextRendering,
 }
 ```
 
@@ -234,6 +235,12 @@ Source: `crates/lune-ui-core/src/scene.rs:285`
 - <a id="structfield.FrameParams.blur"></a>`pub blur: BlurLimits`
 
   The limits of the backdrop blur.
+
+- <a id="structfield.FrameParams.text"></a>`pub text: TextRendering`
+
+  How glyphs are rasterized this frame: smoothing, hinting and stem darkening. The renderer
+  reads [`TextRendering::effective`](text.md#method.TextRendering.effective) once per draw; a change takes effect on the next frame
+  and no cached glyph from another setting is ever drawn.
 
 **Methods and associated items**
 

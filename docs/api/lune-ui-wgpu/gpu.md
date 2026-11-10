@@ -26,7 +26,7 @@ pub struct Globals {
 The uniform block of the shape and stroke pipelines: the target size in physical px, the scale
 and the opacity of the noise texture.
 
-Source: `crates/lune-ui-wgpu/src/gpu.rs:23`
+Source: `crates/lune-ui-wgpu/src/gpu.rs:24`
 
 **Fields**
 
@@ -62,7 +62,7 @@ colour target format the pipelines and one glyph atlas. Holds no window and no s
 target is a [`FrameRenderer`](frame.md#struct.FrameRenderer) (plus a
 [`WindowSurface`](surface.md#struct.WindowSurface) for a window).
 
-Source: `crates/lune-ui-wgpu/src/gpu.rs:109`
+Source: `crates/lune-ui-wgpu/src/gpu.rs:110`
 
 **Fields**
 
@@ -81,7 +81,14 @@ Source: `crates/lune-ui-wgpu/src/gpu.rs:109`
 - <a id="method.Gpu.end_frame"></a>`pub fn end_frame(&mut self, text: &mut TextCache)`
 
   Per-app-frame housekeeping, once after every target of the frame drew: trims every glyph
-  atlas and ages the text cache.
+  atlas and ages the text cache. A rasterised text is kept while its shaped text is cached and,
+  when the frame drew, while its text setting was one the frame drew with, so a setting that
+  changes every frame (a slider drag) holds one raster per text, not one per value.
+
+- <a id="method.Gpu.glyph_atlas_size"></a>`pub fn glyph_atlas_size(&self) -> u32`
+
+  The largest side in px of any glyph atlas texture of any target format. A diagnostic for
+  tests: the atlas grows while a frame needs more glyphs than fit.
 
 - <a id="method.Gpu.image_count"></a>`pub fn image_count(&self) -> usize`
 
@@ -150,5 +157,5 @@ The wgpu instance. `display` is the windowing system's display handle (an event 
 display handle, say); `None` for a headless instance. On Windows this is DX12 presented
 through a DirectComposition visual, the wgpu path that supports a transparent window.
 
-Source: `crates/lune-ui-wgpu/src/gpu.rs:202`
+Source: `crates/lune-ui-wgpu/src/gpu.rs:206`
 

@@ -9,6 +9,7 @@ use std::cell::RefCell;
 
 use lune_ui_core::paint::{Painter, Rect};
 use lune_ui_core::testing::FakeText;
+use lune_ui_core::text::TextRendering;
 use lune_ui_core::theme::DARK;
 use lune_ui_wgpu::custom::{CustomDraw, CustomFrame};
 use lune_ui_wgpu::dump;
@@ -81,6 +82,7 @@ fn every_slot_is_prepared_once_and_rendered_once_per_item() {
         size: SIZE,
         scale: 2.0,
         format: FORMAT,
+        text: TextRendering::default(),
     };
     assert_eq!(used.prepared, [frame], "prepared once");
     assert_eq!(

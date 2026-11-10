@@ -18,7 +18,7 @@
 use crate::acrylic::NOISE_OPACITY;
 use crate::image::{Fit, ImageAlign, ImageId};
 use crate::paint::Rect;
-use crate::text::TextKey;
+use crate::text::{TextKey, TextRendering};
 
 /// Draw order, back to front. Each layer interleaves shapes and text correctly.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -296,10 +296,15 @@ pub struct FrameParams {
     pub noise_opacity: f32,
     /// The limits of the backdrop blur.
     pub blur: BlurLimits,
+    /// How glyphs are rasterized this frame: smoothing, hinting and stem darkening. The renderer
+    /// reads [`TextRendering::effective`] once per draw; a change takes effect on the next frame
+    /// and no cached glyph from another setting is ever drawn.
+    pub text: TextRendering,
 }
 
 impl Default for FrameParams {
-    /// A zero-sized frame with Avalonia's noise and the blur's default limits.
+    /// A zero-sized frame with Avalonia's noise, the blur's default limits and
+    /// [`TextRendering::SMOOTH`] text.
     fn default() -> Self {
         Self {
             size: (0, 0),
@@ -308,6 +313,7 @@ impl Default for FrameParams {
             saturation: 0.0,
             noise_opacity: NOISE_OPACITY,
             blur: BlurLimits::default(),
+            text: TextRendering::SMOOTH,
         }
     }
 }
@@ -383,6 +389,7 @@ mod tests {
         let p = FrameParams::default();
         assert_eq!(p.noise_opacity, NOISE_OPACITY);
         assert_eq!(p.noise_opacity, 0.0225);
+        assert_eq!(p.text, TextRendering::SMOOTH);
         assert_eq!((p.blur.kernel_cap, p.blur.downsample), (48.0, 8));
         assert_eq!(
             p.blur,

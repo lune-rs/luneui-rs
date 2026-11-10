@@ -23,7 +23,7 @@ use lune_ui::scene::{BlurLimits, FrameParams, Scene};
 use lune_ui::shortcuts::Shortcuts;
 use lune_ui::strings::{DisplayFormat, StringTable};
 use lune_ui::testing::ScriptedInput;
-use lune_ui::text::TextSystem;
+use lune_ui::text::{TextRendering, TextSystem};
 use lune_ui::theme::Theme;
 use lune_ui::tray::TrayState;
 use lune_ui::ui::{FrameConfig, Ui, UiStore, WidgetId};
@@ -232,6 +232,7 @@ impl FrameTweaks {
             saturation: self.saturation,
             noise_opacity: self.noise,
             blur: self.blur,
+            text: TextRendering::default(),
         }
     }
 }

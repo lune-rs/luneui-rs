@@ -111,7 +111,7 @@ Each crate has a page per module (`<crate>/<module path>.md`; the root is `index
 
 ### `lune-ui-wgpu` (`lune_ui_wgpu`)
 
-9 modules, 16 items. Left out and counted: 151 blanket impls, 106 items of the omitted impls, 23 items of the trait impls shown as one line, 60 synthetic impls.
+9 modules, 16 items. Left out and counted: 151 blanket impls, 1 intra-doc links left unlinked (private or unresolvable target), 106 items of the omitted impls, 23 items of the trait impls shown as one line, 60 synthetic impls.
 
 | Module | Items |
 | --- | --- |

@@ -144,15 +144,17 @@ impl FrameRenderer {
         {
             return Err(format!("custom draw slot {} not supplied", bad.slot));
         }
+        let rendering = params.text.effective();
         let custom_frame = CustomFrame {
             size: params.size,
             scale: params.scale,
             format: self.format,
+            text: rendering,
         };
         for c in customs.iter_mut() {
             c.prepare(&gpu.device, &gpu.queue, &custom_frame);
         }
-        gpu.ensure_text_images(&layers, text);
+        gpu.ensure_text_images(&layers, text, rendering);
         let customs: &[&mut dyn CustomDraw] = customs;
         let FrameParams {
             size,
@@ -164,13 +166,13 @@ impl FrameRenderer {
         let noise = params.noise();
         let limits = params.blur.effective();
         let (stops, plans) = stops_of(&layers, floor, blur_sigma, saturation);
-        // Disjoint borrows: the format's atlas and the rasterizer cache are the only shared state
+        // Disjoint borrows: the format's atlas and the glyph rasterizer are the only shared state
         // this draw writes.
         let Gpu {
             device,
             queue,
             formats,
-            swash,
+            glyphs,
             ..
         } = gpu;
         let atlas = &mut formats[self.format_index].atlas;
@@ -206,7 +208,16 @@ impl FrameRenderer {
                 })
             });
             renderer
-                .prepare(device, queue, fonts, atlas, &self.viewport, areas, swash)
+                .prepare(
+                    device,
+                    queue,
+                    fonts,
+                    atlas,
+                    &self.viewport,
+                    areas,
+                    glyphs,
+                    rendering,
+                )
                 .map_err(|e| e.to_string())?;
         }
 
@@ -221,7 +232,7 @@ impl FrameRenderer {
         );
         let gpu: &Gpu = gpu;
         let fs = &gpu.formats[self.format_index];
-        let uploaded = gpu.upload(&layers);
+        let uploaded = gpu.upload(&layers, rendering);
         self.blur
             .prepare(&gpu.device, &gpu.blur, size, limits.downsample);
         self.blur

@@ -24,12 +24,13 @@ pub struct CustomFrame {
     pub size: (u32, u32),
     pub scale: f32,
     pub format: wgpu::TextureFormat,
+    pub text: lune_ui_core::text::TextRendering,
 }
 ```
 
 What the current frame is drawn at; handed to [`CustomDraw`](custom.md#trait.CustomDraw) on both calls.
 
-Source: `crates/lune-ui-wgpu/src/custom.rs:13`
+Source: `crates/lune-ui-wgpu/src/custom.rs:14`
 
 **Fields**
 
@@ -44,6 +45,13 @@ Source: `crates/lune-ui-wgpu/src/custom.rs:13`
 - <a id="structfield.CustomFrame.format"></a>`pub format: wgpu::TextureFormat`
 
   Colour format of the pass the item renders into.
+
+- <a id="structfield.CustomFrame.text"></a>`pub text: lune_ui_core::text::TextRendering`
+
+  How glyphs are rasterized this frame: the frame's
+  `TextRendering::effective` value. An app's own
+  glyph renderer rasterizes with it (see [`GlyphRasterizer`](raster.md#struct.GlyphRasterizer))
+  and keys its glyph cache by the glyph's `GlyphParams`.
 
 **Trait implementations**
 
@@ -65,7 +73,7 @@ pub trait CustomDraw { .. }
 App-owned drawing. The app passes one implementation per slot to
 [`FrameRenderer::draw_with`](frame.md#method.FrameRenderer.draw_with).
 
-Source: `crates/lune-ui-wgpu/src/custom.rs:24`
+Source: `crates/lune-ui-wgpu/src/custom.rs:30`
 
 **Required items**
 

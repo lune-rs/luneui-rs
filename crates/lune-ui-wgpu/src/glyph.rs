@@ -6,7 +6,9 @@
 //! custom glyphs, the depth callback and the colour-mode choice are removed (the atlas keeps the
 //! web colour mode the toolkit always used), `RenderError` and the unused `Default` of `TextBounds`
 //! are removed, the cosmic-text re-exports are dropped, the vertex and uniform structs derive
-//! `bytemuck` traits (the two raw byte casts of the original are replaced by `bytemuck` calls).
+//! `bytemuck` traits (the two raw byte casts of the original are replaced by `bytemuck` calls);
+//! atlas entries are keyed by `GlyphKey` (cosmic-text's key and the glyph's `GlyphParams`) and
+//! rasterized through `GlyphRasterizer`.
 
 mod atlas;
 mod cache;
@@ -17,8 +19,9 @@ use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
 use bytemuck::{Pod, Zeroable};
-use cosmic_text::{Buffer, Color};
+use cosmic_text::{Buffer, CacheKey, Color};
 use etagere::AllocId;
+use lune_ui_core::text::GlyphParams;
 use wgpu::{Device, Queue};
 
 pub(crate) use atlas::TextAtlas;
@@ -48,6 +51,15 @@ pub(crate) enum ContentType {
     Color,
     /// Each pixel contains a single 8 bit channel.
     Mask,
+}
+
+/// What an atlas entry is keyed by: cosmic-text's glyph key and the `GlyphParams` the glyph was
+/// rasterized with, so two settings coexist in an atlas and a re-upload (`grow`) re-creates each
+/// entry from its own key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) struct GlyphKey {
+    pub(crate) glyph: CacheKey,
+    pub(crate) params: GlyphParams,
 }
 
 pub(crate) enum GpuCacheStatus {

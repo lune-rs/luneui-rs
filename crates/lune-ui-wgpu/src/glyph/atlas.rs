@@ -3,11 +3,12 @@
 //!
 //! Vendored from glyphon 0.12.0, `src/text_atlas.rs`, MIT (`licenses/glyphon-LICENSE-MIT`);
 //! changes: items are `pub(crate)`, imports point at the parent module, custom glyphs are removed
-//! (the cache key is cosmic-text's `CacheKey`), the colour mode is fixed to the web one (a
+//! (the cache key is `GlyphKey`: cosmic-text's `CacheKey` and the glyph's `GlyphParams`, and a
+//! re-upload rasterizes through `GlyphRasterizer`), the colour mode is fixed to the web one (a
 //! non-sRGB colour texture), `TextAtlas::new` replaces `with_color_mode`, two `unwrap` calls
 //! became `expect` and a `let ... else` that skips a glyph that cannot be re-rasterized.
 
-use cosmic_text::{CacheKey, FontSystem, SwashCache};
+use cosmic_text::FontSystem;
 use etagere::{Allocation, BucketedAtlasAllocator, size2};
 use lru::LruCache;
 use rustc_hash::FxHasher;
@@ -19,7 +20,8 @@ use wgpu::{
     TextureViewDescriptor,
 };
 
-use super::{Cache, ContentType, GlyphDetails, GpuCacheStatus, State};
+use super::{Cache, ContentType, GlyphDetails, GlyphKey, GpuCacheStatus, State};
+use crate::raster::GlyphRasterizer;
 
 type Hasher = BuildHasherDefault<FxHasher>;
 
@@ -29,8 +31,8 @@ pub(crate) struct InnerAtlas {
     pub(crate) texture_view: TextureView,
     pub(crate) packer: BucketedAtlasAllocator,
     pub(crate) size: u32,
-    pub(crate) glyph_cache: LruCache<CacheKey, GlyphDetails, Hasher>,
-    pub(crate) glyphs_in_use: HashSet<CacheKey, Hasher>,
+    pub(crate) glyph_cache: LruCache<GlyphKey, GlyphDetails, Hasher>,
+    pub(crate) glyphs_in_use: HashSet<GlyphKey, Hasher>,
     pub(crate) max_texture_dimension_2d: u32,
 }
 
@@ -118,6 +120,11 @@ impl InnerAtlas {
         }
     }
 
+    /// The side in px of this atlas texture.
+    pub(crate) fn side(&self) -> u32 {
+        self.size
+    }
+
     pub(crate) fn num_channels(&self) -> usize {
         self.kind.num_channels()
     }
@@ -126,7 +133,7 @@ impl InnerAtlas {
         &mut self,
         state: &State,
         font_system: &mut FontSystem,
-        cache: &mut SwashCache,
+        glyphs: &mut GlyphRasterizer,
     ) -> bool {
         if self.size >= self.max_texture_dimension_2d {
             return false;
@@ -156,14 +163,15 @@ impl InnerAtlas {
         });
 
         // Re-upload glyphs
-        for (&cache_key, glyph) in &self.glyph_cache {
+        for (&key, glyph) in &self.glyph_cache {
             let (x, y) = match glyph.gpu_cache {
                 GpuCacheStatus::InAtlas { x, y, .. } => (x, y),
                 GpuCacheStatus::SkipRasterization => continue,
             };
 
-            // A glyph that was rasterized once rasterizes again; if the font is gone, skip it.
-            let Some(image) = cache.get_image_uncached(font_system, cache_key) else {
+            // A glyph that was rasterized once rasterizes again, with the key's own params, not
+            // the frame's; if the font is gone, skip it.
+            let Some(image) = glyphs.image(font_system, key.glyph, key.params) else {
                 continue;
             };
             let width = image.placement.width as usize;
@@ -265,6 +273,11 @@ impl TextAtlas {
         }
     }
 
+    /// The larger side in px of the two atlas textures.
+    pub(crate) fn max_side(&self) -> u32 {
+        self.color_atlas.side().max(self.mask_atlas.side())
+    }
+
     pub(crate) fn trim(&mut self) {
         self.mask_atlas.trim();
         self.color_atlas.trim();
@@ -274,12 +287,12 @@ impl TextAtlas {
         &mut self,
         state: &State,
         font_system: &mut FontSystem,
-        cache: &mut SwashCache,
+        glyphs: &mut GlyphRasterizer,
         content_type: ContentType,
     ) -> bool {
         let did_grow = match content_type {
-            ContentType::Mask => self.mask_atlas.grow(state, font_system, cache),
-            ContentType::Color => self.color_atlas.grow(state, font_system, cache),
+            ContentType::Mask => self.mask_atlas.grow(state, font_system, glyphs),
+            ContentType::Color => self.color_atlas.grow(state, font_system, glyphs),
         };
 
         if did_grow {

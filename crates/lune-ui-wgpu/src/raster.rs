@@ -73,7 +73,6 @@ impl GlyphRasterizer {
     }
 
     /// The cosmic-text cache this rasterizer draws rule 1 and 2 images with.
-    #[allow(dead_code)] // reason: the rotated-text path at `GlyphParams::OFF` takes it in a later change
     pub(crate) fn swash(&mut self) -> &mut SwashCache {
         &mut self.swash
     }
