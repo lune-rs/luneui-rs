@@ -8,7 +8,8 @@
 //! - [`gpu`] (the GPU every target shares), [`frame`] (one target's renderer: the scene → blur →
 //!   target pass sequence), [`blur`] (backdrop blur), [`surface`] (a window's swapchain), [`dump`]
 //!   (offscreen targets and PNG readback), [`custom`] (app-owned GPU drawing inside a layer);
-//! - [`text_cache`] (the cosmic-text system behind the core's `TextSystem` seam).
+//! - [`text_cache`] (the cosmic-text system behind the core's `TextSystem` seam), [`raster`] (the
+//!   glyph rasterizer: hinting and stem darkening per glyph).
 //!
 //! The per-platform choices (the Windows DX12 backend) are in the private `platform` module.
 
@@ -22,5 +23,6 @@ mod glyph;
 pub mod gpu;
 mod images;
 mod platform;
+pub mod raster;
 pub mod surface;
 pub mod text_cache;

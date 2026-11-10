@@ -38,9 +38,11 @@ pub mod access {
     pub use lune_ui_winit::access::*;
 }
 
-/// Text: the core's specs and `TextSystem` seam, and the glyphon `TextCache` that implements it.
+/// Text: the core's specs and `TextSystem` seam, the cosmic-text `TextCache` that implements it, and
+/// the `GlyphRasterizer` that rasterizes a glyph with the core's `GlyphParams`.
 pub mod text {
     pub use lune_ui_core::text::*;
+    pub use lune_ui_wgpu::raster::GlyphRasterizer;
     pub use lune_ui_wgpu::text_cache::TextCache;
 }
 

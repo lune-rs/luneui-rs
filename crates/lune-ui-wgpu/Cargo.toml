@@ -11,6 +11,7 @@ license.workspace = true
 lune-ui-core = { path = "../lune-ui-core" }
 wgpu = "30"
 cosmic-text = "0.19"
+swash = "0.2"
 etagere = "0.3"
 lru = { version = "0.16", default-features = false }
 rustc-hash = "2"

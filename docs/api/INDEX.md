@@ -111,7 +111,7 @@ Each crate has a page per module (`<crate>/<module path>.md`; the root is `index
 
 ### `lune-ui-wgpu` (`lune_ui_wgpu`)
 
-8 modules, 15 items. Left out and counted: 137 blanket impls, 97 items of the omitted impls, 21 items of the trait impls shown as one line, 54 synthetic impls.
+9 modules, 16 items. Left out and counted: 151 blanket impls, 106 items of the omitted impls, 23 items of the trait impls shown as one line, 60 synthetic impls.
 
 | Module | Items |
 | --- | --- |
@@ -121,6 +121,7 @@ Each crate has a page per module (`<crate>/<module path>.md`; the root is `index
 | [`lune_ui_wgpu::dump`](lune-ui-wgpu/dump.md) | 3 |
 | [`lune_ui_wgpu::frame`](lune-ui-wgpu/frame.md) | 1 |
 | [`lune_ui_wgpu::gpu`](lune-ui-wgpu/gpu.md) | 3 |
+| [`lune_ui_wgpu::raster`](lune-ui-wgpu/raster.md) | 1 |
 | [`lune_ui_wgpu::surface`](lune-ui-wgpu/surface.md) | 2 |
 | [`lune_ui_wgpu::text_cache`](lune-ui-wgpu/text_cache.md) | 3 |
 
@@ -149,14 +150,14 @@ Each crate has a page per module (`<crate>/<module path>.md`; the root is `index
 
 ### `lune-ui` (`lune_ui`)
 
-6 modules, 125 re-exports shown as links.
+6 modules, 126 re-exports shown as links.
 
 | Module | Re-exports |
 | --- | --- |
 | [`lune_ui`](lune-ui/index.md) | 35 |
 | [`lune_ui::access`](lune-ui/access.md) | 19 |
 | [`lune_ui::input`](lune-ui/input.md) | 27 |
-| [`lune_ui::text`](lune-ui/text.md) | 15 |
+| [`lune_ui::text`](lune-ui/text.md) | 16 |
 | [`lune_ui::tray`](lune-ui/tray.md) | 18 |
 | [`lune_ui::window`](lune-ui/window.md) | 11 |
 
@@ -563,6 +564,7 @@ Every top-level item of the four owning crates, by name.
 - [`glyph`](lune-ui-core/icon.md#fn.glyph) - function, `lune_ui_core::icon`
 - [`GLYPH_GAP`](lune-ui-core/widgets/tree_view.md#constant.GLYPH_GAP) - constant, `lune_ui_core::widgets::tree_view`
 - [`GlyphParams`](lune-ui-core/text.md#struct.GlyphParams) - struct, `lune_ui_core::text`
+- [`GlyphRasterizer`](lune-ui-wgpu/raster.md#struct.GlyphRasterizer) - struct, `lune_ui_wgpu::raster`
 - [`GlyphTone`](lune-ui-core/tray.md#enum.GlyphTone) - enum, `lune_ui_core::tray`
 - [`Gpu`](lune-ui-wgpu/gpu.md#struct.Gpu) - struct, `lune_ui_wgpu::gpu`
 - [`Grid`](lune-ui-core/layout.md#struct.Grid) - struct, `lune_ui_core::layout`

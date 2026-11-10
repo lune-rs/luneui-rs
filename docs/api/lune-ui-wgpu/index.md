@@ -14,7 +14,8 @@ Modules:
 - [`gpu`](gpu.md) (the GPU every target shares), [`frame`](frame.md) (one target's renderer: the scene → blur →
   target pass sequence), [`blur`](blur.md) (backdrop blur), [`surface`](surface.md) (a window's swapchain), [`dump`](dump.md)
   (offscreen targets and PNG readback), [`custom`](custom.md) (app-owned GPU drawing inside a layer);
-- [`text_cache`](text_cache.md) (the cosmic-text system behind the core's `TextSystem` seam).
+- [`text_cache`](text_cache.md) (the cosmic-text system behind the core's `TextSystem` seam), [`raster`](raster.md) (the
+  glyph rasterizer: hinting and stem darkening per glyph).
 
 The per-platform choices (the Windows DX12 backend) are in the private `platform` module.
 
@@ -27,6 +28,7 @@ Source: `crates/lune-ui-wgpu/src/lib.rs:1`
 - [`dump`](dump.md) - Offscreen render targets and GPU readback to PNG: the frame-dump building blocks.
 - [`frame`](frame.md) - The frame renderer of one target: its uniforms, viewport, text renderers and blur textures, and the scene → blur → target pass sequence.
 - [`gpu`](gpu.md) - The shared GPU: device, queue, the noise texture and, per colour target format, the shape and stroke pipelines, the blur pipelines and one glyph atlas.
+- [`raster`](raster.md) - The glyph rasterizer: one glyph's coverage image for a cosmic-text cache key and the [`GlyphParams`](../lune-ui-core/text.md#struct.GlyphParams) (hinting and stem darkening) it is drawn with.
 - [`surface`](surface.md) - A window's swapchain: the surface, its configuration, and acquire / present.
 - [`text_cache`](text_cache.md) - The cosmic-text system: a shaped-buffer cache behind [`TextSystem`](../lune-ui-core/text.md#trait.TextSystem).
 

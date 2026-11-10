@@ -21,7 +21,7 @@ Source: `crates/lune-ui/src/lib.rs:1`
 
 - [`access`](access.md) - Accessibility: the core's semantic tree and actions and, with the `accesskit` feature, the bridge to the OS accessibility API (`lune-ui-winit`).
 - [`input`](input.md) - Input: the core's plain-data `RawInput` and `FrameOutput`, and the winit translation and output.
-- [`text`](text.md) - Text: the core's specs and `TextSystem` seam, and the glyphon `TextCache` that implements it.
+- [`text`](text.md) - Text: the core's specs and `TextSystem` seam, the cosmic-text `TextCache` that implements it, and the `GlyphRasterizer` that rasterizes a glyph with the core's `GlyphParams`.
 - [`tray`](tray.md) - The tray: the core's icon raster, placement and click rules, and the OS item (`lune-ui-platform`).
 - [`window`](window.md) - Window helpers: the core's edge resize, double click and caption buttons, and the winit glass attributes and resize direction.
 
