@@ -14,11 +14,14 @@ Source: `crates/lune-ui/src/lib.rs:42`
 | --- | --- | --- |
 | `CaretPos` | Struct | [`lune_ui_core::text::CaretPos`](../lune-ui-core/text.md#struct.CaretPos) |
 | `Font` | Enum | [`lune_ui_core::text::Font`](../lune-ui-core/text.md#enum.Font) |
+| `GlyphParams` | Struct | [`lune_ui_core::text::rendering::GlyphParams`](../lune-ui-core/text.md#struct.GlyphParams) |
 | `LineSpan` | Struct | [`lune_ui_core::text::LineSpan`](../lune-ui-core/text.md#struct.LineSpan) |
 | `Spec` | Struct | [`lune_ui_core::text::Spec`](../lune-ui-core/text.md#struct.Spec) |
+| `StemDarkening` | Struct | [`lune_ui_core::text::rendering::StemDarkening`](../lune-ui-core/text.md#struct.StemDarkening) |
 | `Style` | Struct | [`lune_ui_core::text::Style`](../lune-ui-core/text.md#struct.Style) |
 | `TextCache` | Struct | [`lune_ui_wgpu::text_cache::TextCache`](../lune-ui-wgpu/text_cache.md#struct.TextCache) |
 | `TextKey` | Struct | [`lune_ui_core::text::TextKey`](../lune-ui-core/text.md#struct.TextKey) |
+| `TextRendering` | Struct | [`lune_ui_core::text::rendering::TextRendering`](../lune-ui-core/text.md#struct.TextRendering) |
 | `TextSystem` | Trait | [`lune_ui_core::text::TextSystem`](../lune-ui-core/text.md#trait.TextSystem) |
 | `Unit` | Enum | [`lune_ui_core::text::Unit`](../lune-ui-core/text.md#enum.Unit) |
 | `clamp_to_boundary` | Function | [`lune_ui_core::text::clamp_to_boundary`](../lune-ui-core/text.md#fn.clamp_to_boundary) |

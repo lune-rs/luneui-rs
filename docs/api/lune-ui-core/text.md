@@ -26,7 +26,7 @@ pub struct CaretPos {
 
 Where the caret goes at a byte offset of a spec's text, in logical px.
 
-Source: `crates/lune-ui-core/src/text.rs:129`
+Source: `crates/lune-ui-core/src/text.rs:133`
 
 **Fields**
 
@@ -54,6 +54,52 @@ Source: `crates/lune-ui-core/src/text.rs:129`
 - `impl PartialEq for CaretPos`
 - `impl StructuralPartialEq for CaretPos`
 
+<a id="struct.GlyphParams"></a>
+### Struct `GlyphParams`
+
+```rust
+pub struct GlyphParams {
+    // some fields omitted
+}
+```
+
+What one glyph is rasterized with: its hinting and how far it grows on each side. Built from a
+[`TextRendering`](text.md#struct.TextRendering) and the glyph's size, it keys the glyph atlas, so two settings that give a
+glyph the same values share one raster.
+
+Source: `crates/lune-ui-core/src/text/rendering.rs:141`
+
+**Methods and associated items**
+
+`impl GlyphParams`
+
+- <a id="associatedconstant.GlyphParams.OFF"></a>`const OFF: GlyphParams = _;`
+
+  Hinted, no growth: what the toolkit rasterized before smoothing existed.
+
+- <a id="method.GlyphParams.dilation"></a>`pub fn dilation(self) -> [f32; 2]`
+
+  The growth a side in px, x then y.
+
+- <a id="method.GlyphParams.hinting"></a>`pub fn hinting(self) -> bool`
+
+  Whether the outline is hinted.
+
+- <a id="method.GlyphParams.new"></a>`pub fn new(hinting: bool, dilation: [f32; 2]) -> GlyphParams`
+
+  Params with `hinting` and a growth of `dilation` px a side, x then y. A component that is
+  not finite or not positive is 0; one above [`StemDarkening::MAX_PX`](text.md#associatedconstant.StemDarkening.MAX_PX) is `MAX_PX`.
+
+**Trait implementations**
+
+- `impl Clone for GlyphParams`
+- `impl Copy for GlyphParams`
+- `impl Debug for GlyphParams`
+- `impl Eq for GlyphParams`
+- `impl Hash for GlyphParams`
+- `impl PartialEq for GlyphParams`
+- `impl StructuralPartialEq for GlyphParams`
+
 <a id="struct.LineSpan"></a>
 ### Struct `LineSpan`
 
@@ -71,7 +117,7 @@ ending is not part of it) and its place, in logical px. An offset belongs to the
 `start` is at or before it, so the rows are in text order and a line's first row starts at the
 line's start, also when a leading space was dropped at a wrap and its first glyph comes later.
 
-Source: `crates/lune-ui-core/src/text.rs:145`
+Source: `crates/lune-ui-core/src/text.rs:149`
 
 **Fields**
 
@@ -103,7 +149,7 @@ pub struct Spec {
 
 Text to draw: one or more styled runs; `wrap` is a width in logical px.
 
-Source: `crates/lune-ui-core/src/text.rs:89`
+Source: `crates/lune-ui-core/src/text.rs:93`
 
 **Fields**
 
@@ -135,6 +181,72 @@ Source: `crates/lune-ui-core/src/text.rs:89`
 - `impl PartialEq for Spec`
 - `impl StructuralPartialEq for Spec`
 
+<a id="struct.StemDarkening"></a>
+### Struct `StemDarkening`
+
+```rust
+pub struct StemDarkening {
+    pub factors: [f32; 2],
+    pub max_px: [f32; 2],
+    pub max_ppem: f32,
+}
+```
+
+Stem darkening: how far an outline glyph is grown on each side before it is filled, so thin
+stems do not look washed out at small sizes. The growth is `factors` in px per ppem (pixels per
+em), capped at `max_px`, and none above `max_ppem`. Each pair is x then y.
+
+Source: `crates/lune-ui-core/src/text/rendering.rs:9`
+
+**Fields**
+
+- <a id="structfield.StemDarkening.factors"></a>`pub factors: [f32; 2]`
+
+  Growth a side in px per ppem, x then y.
+
+- <a id="structfield.StemDarkening.max_px"></a>`pub max_px: [f32; 2]`
+
+  The most a side grows, in px, x then y. [`Self::effective`](text.md#method.StemDarkening.effective) holds it to [`Self::MAX_PX`](text.md#associatedconstant.StemDarkening.MAX_PX).
+
+- <a id="structfield.StemDarkening.max_ppem"></a>`pub max_ppem: f32`
+
+  No growth above this size, in ppem.
+
+**Methods and associated items**
+
+`impl StemDarkening`
+
+- <a id="associatedconstant.StemDarkening.MACOS"></a>`const MACOS: StemDarkening = _;`
+
+  The numbers Pathfinder uses (servo/pathfinder, `content/src/effects.rs`, "should match
+  macOS 10.13"): 0.0121 px per ppem in x, 1.25 times that in y, at most 0.3 px a side, none
+  above 72 ppem.
+
+- <a id="associatedconstant.StemDarkening.MAX_PX"></a>`const MAX_PX: f32 = 1.0;`
+
+  The most a side may grow, in px. A mask is at most two of these wider than its glyph, so no
+  value can make a huge one.
+
+- <a id="method.StemDarkening.at"></a>`pub fn at(self, ppem: f32) -> [f32; 2]`
+
+  How far a glyph of `ppem` grows on each side, in px, x then y, from the effective value.
+  Zero when `ppem` is not finite, not positive or above `max_ppem`.
+
+- <a id="method.StemDarkening.effective"></a>`pub fn effective(self) -> StemDarkening`
+
+  The value as the rasterizer uses it. Each of the five numbers that is not finite or is
+  negative is the matching number of [`Self::MACOS`](text.md#associatedconstant.StemDarkening.MACOS); a `max_px` above [`Self::MAX_PX`](text.md#associatedconstant.StemDarkening.MAX_PX) is
+  `MAX_PX`; `-0.0` is `0.0`. Nothing else changes.
+
+**Trait implementations**
+
+- `impl Clone for StemDarkening`
+- `impl Copy for StemDarkening`
+- `impl Debug for StemDarkening`
+- `impl Default for StemDarkening`
+- `impl PartialEq for StemDarkening`
+- `impl StructuralPartialEq for StemDarkening`
+
 <a id="struct.Style"></a>
 ### Struct `Style`
 
@@ -151,7 +263,7 @@ pub struct Style {
 
 Font, size and colour for a run of text. Sizes are logical pixels.
 
-Source: `crates/lune-ui-core/src/text.rs:18`
+Source: `crates/lune-ui-core/src/text.rs:22`
 
 **Fields**
 
@@ -210,7 +322,7 @@ pub struct TextKey(pub u64);
 
 Identifies one prepared (shaped) text: equal spec and scale give an equal key.
 
-Source: `crates/lune-ui-core/src/text.rs:125`
+Source: `crates/lune-ui-core/src/text.rs:129`
 
 **Fields**
 
@@ -226,6 +338,69 @@ Source: `crates/lune-ui-core/src/text.rs:125`
 - `impl PartialEq for TextKey`
 - `impl StructuralPartialEq for TextKey`
 
+<a id="struct.TextRendering"></a>
+### Struct `TextRendering`
+
+```rust
+pub struct TextRendering {
+    pub smoothing: bool,
+    pub hinting: bool,
+    pub stem_darkening: StemDarkening,
+}
+```
+
+How the toolkit rasterizes text glyphs. An app passes it in every frame's parameters.
+
+Source: `crates/lune-ui-core/src/text/rendering.rs:80`
+
+**Fields**
+
+- <a id="structfield.TextRendering.smoothing"></a>`pub smoothing: bool`
+
+  Whether the smoothing look is on. When false, glyphs are rasterized as the toolkit always
+  did (hinted, not darkened) and `hinting` and `stem_darkening` are ignored.
+
+- <a id="structfield.TextRendering.hinting"></a>`pub hinting: bool`
+
+  The toolkit's rasterization hinting: glyph outlines snapped to the pixel grid when drawn.
+  It is not the text shaper's metrics hinting (cosmic-text's `Buffer::set_hinting`, which the
+  toolkit never sets).
+
+- <a id="structfield.TextRendering.stem_darkening"></a>`pub stem_darkening: StemDarkening`
+
+  How far outline glyphs are grown before they are filled.
+
+**Methods and associated items**
+
+`impl TextRendering`
+
+- <a id="associatedconstant.TextRendering.OFF"></a>`const OFF: TextRendering = _;`
+
+  The look before smoothing existed: hinted, no darkening.
+
+- <a id="associatedconstant.TextRendering.SMOOTH"></a>`const SMOOTH: TextRendering = _;`
+
+  The default: smoothing on, no hinting, the macOS stem darkening.
+
+- <a id="method.TextRendering.effective"></a>`pub fn effective(self) -> TextRendering`
+
+  The setting as the rasterizer uses it. Smoothing off is exactly [`Self::OFF`](text.md#associatedconstant.TextRendering.OFF); otherwise
+  the stem darkening is its [`StemDarkening::effective`](text.md#method.StemDarkening.effective) value.
+
+- <a id="method.TextRendering.glyph_params"></a>`pub fn glyph_params(self, ppem: f32) -> GlyphParams`
+
+  What a glyph of `ppem` is rasterized with under this setting: [`GlyphParams::OFF`](text.md#associatedconstant.GlyphParams.OFF) when
+  smoothing is off, else the hinting flag and the darkening at `ppem`.
+
+**Trait implementations**
+
+- `impl Clone for TextRendering`
+- `impl Copy for TextRendering`
+- `impl Debug for TextRendering`
+- `impl Default for TextRendering`
+- `impl PartialEq for TextRendering`
+- `impl StructuralPartialEq for TextRendering`
+
 ## Enums
 
 <a id="enum.Font"></a>
@@ -240,7 +415,7 @@ pub enum Font {
 
 Which family a run is shaped in.
 
-Source: `crates/lune-ui-core/src/text.rs:11`
+Source: `crates/lune-ui-core/src/text.rs:15`
 
 **Variants**
 
@@ -270,7 +445,7 @@ pub enum Unit {
 
 A kind of text boundary for [`TextSystem::segments`](text.md#tymethod.TextSystem.segments).
 
-Source: `crates/lune-ui-core/src/text.rs:154`
+Source: `crates/lune-ui-core/src/text.rs:158`
 
 **Variants**
 
@@ -312,7 +487,7 @@ the end or to the character's start. Nothing panics, and a system with nothing t
 two runs) or a lone `\r`, whatever else the text holds, and the offsets count it as the bytes
 it is in the spec.
 
-Source: `crates/lune-ui-core/src/text.rs:172`
+Source: `crates/lune-ui-core/src/text.rs:176`
 
 **Required items**
 
@@ -360,7 +535,7 @@ pub fn clamp_to_boundary(text: &str, offset: usize) -> usize
 
 `offset` clamped into `text` and down to a character boundary.
 
-Source: `crates/lune-ui-core/src/text.rs:207`
+Source: `crates/lune-ui-core/src/text.rs:211`
 
 <a id="fn.elide"></a>
 ### Function `elide`
@@ -381,7 +556,7 @@ The search reads carets of the shaped `spec`, so it shapes no prefix. A caret ig
 cut changes (kerning across it, joining, the order of mixed-direction text), so the result is
 measured, and only a result that is over `max_w` searches again by measuring.
 
-Source: `crates/lune-ui-core/src/text.rs:271`
+Source: `crates/lune-ui-core/src/text.rs:275`
 
 <a id="fn.joined_text"></a>
 ### Function `joined_text`
@@ -392,5 +567,5 @@ pub fn joined_text(spec: &Spec) -> String
 
 The runs of `spec` joined into one string: the text the offsets of [`TextSystem`](text.md#trait.TextSystem) index.
 
-Source: `crates/lune-ui-core/src/text.rs:202`
+Source: `crates/lune-ui-core/src/text.rs:206`
 
