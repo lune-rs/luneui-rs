@@ -20,7 +20,7 @@ pub fn glyph(glyph: &str, size: f32, color: Rgba) -> Spec
 
 Text spec for one icon glyph at `size`.
 
-Source: `crates/lune-ui-core/src/icon.rs:39`
+Source: `crates/lune-ui-core/src/icon.rs:41`
 
 ## Constants
 
@@ -31,7 +31,7 @@ Source: `crates/lune-ui-core/src/icon.rs:39`
 pub const ACCOUNT: &str = "\u{eb99}";
 ```
 
-Source: `crates/lune-ui-core/src/icon.rs:35`
+Source: `crates/lune-ui-core/src/icon.rs:37`
 
 <a id="constant.ADD"></a>
 ### Constant `ADD`
@@ -49,7 +49,7 @@ Source: `crates/lune-ui-core/src/icon.rs:7`
 pub const ARROW_DOWN: &str = "\u{ea9a}";
 ```
 
-Source: `crates/lune-ui-core/src/icon.rs:34`
+Source: `crates/lune-ui-core/src/icon.rs:36`
 
 <a id="constant.ARROW_LEFT"></a>
 ### Constant `ARROW_LEFT`
@@ -67,7 +67,7 @@ Source: `crates/lune-ui-core/src/icon.rs:17`
 pub const ARROW_UP: &str = "\u{eaa1}";
 ```
 
-Source: `crates/lune-ui-core/src/icon.rs:33`
+Source: `crates/lune-ui-core/src/icon.rs:35`
 
 <a id="constant.CALENDAR"></a>
 ### Constant `CALENDAR`
@@ -148,7 +148,7 @@ Source: `crates/lune-ui-core/src/icon.rs:21`
 pub const CIRCLE_SLASH: &str = "\u{eabd}";
 ```
 
-Source: `crates/lune-ui-core/src/icon.rs:32`
+Source: `crates/lune-ui-core/src/icon.rs:34`
 
 <a id="constant.CLEAR_ALL"></a>
 ### Constant `CLEAR_ALL`
@@ -167,6 +167,17 @@ pub const CLOSE: &str = "\u{ea76}";
 ```
 
 Source: `crates/lune-ui-core/src/icon.rs:27`
+
+<a id="constant.CLOSE_ALL"></a>
+### Constant `CLOSE_ALL`
+
+```rust
+pub const CLOSE_ALL: &str = "\u{eac1}";
+```
+
+`cod-close_all`, two stacked crosses.
+
+Source: `crates/lune-ui-core/src/icon.rs:33`
 
 <a id="constant.COPY"></a>
 ### Constant `COPY`
@@ -229,7 +240,7 @@ Source: `crates/lune-ui-core/src/icon.rs:15`
 pub const NOTE: &str = "\u{eb26}";
 ```
 
-Source: `crates/lune-ui-core/src/icon.rs:36`
+Source: `crates/lune-ui-core/src/icon.rs:38`
 
 <a id="constant.REMOVE"></a>
 ### Constant `REMOVE`

@@ -63,6 +63,7 @@ Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, r
 - Extend, don't patch: new OS glass = a `material` submodule of `lune-ui-platform`; new overlay or widget = a new module plus
   a catalogue file; new look = a `Theme` value. App-specific drawing goes through the `CustomDraw`
   hook, not into the toolkit (D8).
+- A widget never builds or runs a context menu: it reports a secondary click and the show-menu action as `context` on its response, and the app opens the menu with `Ui::menu` (D292).
 - A composite with one tab stop (radio group, star rating, nav list, tab strip, table header, board cards) uses roving focus: `Sense.skip_tab`,
   `Ui::rove_stop`, `rove_keys`, `rove_focus` (D113); text that must fit a width goes through `text::elide` / `Painter::elide`
   (D114). A drag ghost draws one layer group above its source, out of any `record` (`Ui::drag_ghost`, D168).

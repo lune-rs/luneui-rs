@@ -6,6 +6,7 @@
 //! tab `i` starts at `TAB_X + i * 113`. Tabs are found by coordinates because a tab's id comes from
 //! its key, which no string path names.
 
+use lune_ui::icon;
 use lune_ui::input::NamedKey;
 use lune_ui::lunegit_dark::THEME;
 use lune_ui::motion::MotionTier;
@@ -13,6 +14,7 @@ use lune_ui::near_black;
 use lune_ui::paint::Rect;
 use lune_ui::text::{Spec, Style};
 use lune_ui::ui::Ui;
+use lune_ui::widgets::menu::MenuRow;
 use lune_ui::widgets::tab_strip::{
     BusyCue, CONTENT_SWAP, GAP, HEIGHT, MIN_WIDTH, Tab, TabEvent, TabKey, TabStripOptions,
 };
@@ -79,9 +81,21 @@ struct Demo {
     panel_focused: bool,
     busy: Option<BusyCue>,
     tone: Tone,
-    /// The header's darker band, and the menu's extra entry.
+    /// The header's darker band.
     tint: bool,
-    extra: bool,
+    /// The tab the open context menu is for, and where it opened (window space). The strip opens
+    /// no menu: it reports `context`, and the page builds its own with `Ui::menu`.
+    menu: Option<(TabKey, (f32, f32))>,
+}
+
+/// What a row of the page's tab menu does.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Pick {
+    Close,
+    CloseOthers,
+    CloseAll,
+    Rename,
+    Duplicate,
 }
 
 fn numbered(n: u64) -> Vec<Item> {
@@ -99,7 +113,7 @@ impl Demo {
             busy: None,
             tone: Tone::Neutral,
             tint: true,
-            extra: true,
+            menu: None,
         }
     }
 
@@ -117,15 +131,68 @@ impl Demo {
                 let item = self.items.remove(from);
                 self.items.insert(to, item);
             }
-            TabEvent::CloseOthers(k) => {
-                self.items.retain(|i| i.key == k.0);
-                self.active = Some(k.0);
+        }
+    }
+
+    /// The open menu: its rows are the page's own, with icons (no two draw the same shape); a pick
+    /// runs the page's handling, and the menu closes on a pick, a dismissal or its tab's removal.
+    fn tab_menu(&mut self, ui: &mut Ui<'_>) {
+        let Some((key, at)) = self.menu else {
+            return;
+        };
+        if !self.items.iter().any(|i| i.key == key.0) {
+            self.menu = None;
+            return;
+        }
+        let item = |glyph: Option<&'static str>, text| MenuRow::Item {
+            glyph,
+            text,
+            shortcut: "",
+        };
+        let mut rows = Vec::new();
+        let mut picks = Vec::new();
+        // Close is for a closable tab: here every tab is.
+        for (pick, row) in [
+            (Pick::Close, item(Some(icon::CLOSE), "Close")),
+            (
+                Pick::CloseOthers,
+                item(Some(icon::CLOSE_ALL), "Close Others"),
+            ),
+            (Pick::CloseAll, item(Some(icon::CLEAR_ALL), "Close All")),
+        ] {
+            picks.push(Some(pick));
+            rows.push(row);
+        }
+        picks.push(None);
+        rows.push(MenuRow::Separator);
+        for (pick, row) in [
+            (Pick::Rename, item(Some(icon::EDIT), "Rename\u{2026}")),
+            (Pick::Duplicate, item(None, "Duplicate Tab")),
+        ] {
+            picks.push(Some(pick));
+            rows.push(row);
+        }
+        let response = ui.menu("tab-menu", &rows, at);
+        if let Some(pick) = response
+            .picked
+            .and_then(|i| picks.get(i).copied().flatten())
+        {
+            match pick {
+                Pick::Close => self.close(key),
+                Pick::CloseOthers => {
+                    self.items.retain(|i| i.key == key.0);
+                    self.active = Some(key.0);
+                }
+                Pick::CloseAll => {
+                    self.items.clear();
+                    self.active = None;
+                }
+                // The page holds no names to edit and no state to copy.
+                Pick::Rename | Pick::Duplicate => {}
             }
-            TabEvent::CloseAll => {
-                self.items.clear();
-                self.active = None;
-            }
-            TabEvent::Rename(_) | TabEvent::MenuExtra(..) => {}
+        }
+        if response.picked.is_some() || response.dismissed {
+            self.menu = None;
         }
     }
 
@@ -186,14 +253,23 @@ impl PageState for Demo {
             busy: self.busy,
             busy_tone: self.tone,
             card: inner,
-            menu_extra: if self.extra { &["Duplicate Tab"] } else { &[] },
             name: "Sessions",
             header_tint: self.tint.then_some(header_tint),
         };
-        let events = ui.tab_strip("strip", strip, &tabs, &opts).events;
-        for event in events {
+        let response = ui.tab_strip("strip", strip, &tabs, &opts);
+        for event in response.events {
             self.apply(event);
         }
+        if let Some((key, rect)) = response.context {
+            // Where the pointer is when it is over the tab, else under the tab's left edge (a
+            // show-menu action from assistive technology).
+            let at = ui
+                .pointer_pos()
+                .filter(|q| rect.contains(*q))
+                .unwrap_or((rect.x, rect.bottom()));
+            self.menu = Some((key, at));
+        }
+        self.tab_menu(ui);
         let body = Rect::new(inner.x, inner.y + HEIGHT, inner.w, inner.h - HEIGHT);
         self.body(ui, body);
     }
@@ -201,7 +277,6 @@ impl PageState for Demo {
     fn knobs(&mut self, ui: &mut Ui<'_>, panel: &mut Knobs<'_>) {
         panel.toggle(ui, "Panel focused", &mut self.panel_focused);
         panel.toggle(ui, "Header tint", &mut self.tint);
-        panel.toggle(ui, "Extra menu entry", &mut self.extra);
         let cues = [
             ("None", None),
             ("Sweep", Some(BusyCue::Sweep)),

@@ -281,7 +281,6 @@ dialog's disabled confirm. A disabled radio option takes its keys, and the arrow
 
 Not checked, from reading only:
 
-- The tab strip's menu (`menu`): the strip closes it when it turns disabled (`disabling_the_strip_closes_an_open_menu` pins that), so no widget holds the key focus afterwards and the keys of the closed menu reach the shortcuts for the frame in which it closed. A menu opened in a disabled scope is the `menu` row, which holds. Ran in a scratch probe at M11 (`c4::m11` with the menu as a stop: Up, Down, Home, End, Enter and Space reached a `Global` binding); not a reader that takes a key, so no row.
 - `free_drag_gesture`: no library caller, not run.
 - Keys outside the 27, such as Alt word moves in a text field and Control chords. D157 leaves chords to the shortcuts where it applies.
 - A closure host (`dialog` body, `popover`, `panel`, `page`, `side_panel`, `form_field`, `setting_row`, and a table's cell closure) reads no key: what it
@@ -540,8 +539,7 @@ into `platform/` files (step 8), and `Gpu::new` takes an optional compatible sur
 device needs no window (steps 3 and 4). The limits that remain are choices with a row or an entry,
 not missing parts (D237, D245): text cannot be cut by a rounded clip (it gets the bounding rect) and draws above the
 fills of its layer, so overlapping labels show through during a drag; the bundled fonts have no bold,
-CJK or italic face; the tab strip closes its menu when
-disabled; the API gaps marked in the entries. `docs/STATE.md`, "Carried limits", lists them with
+CJK or italic face; the API gaps marked in the entries. `docs/STATE.md`, "Carried limits", lists them with
 the milestone limits. What nothing here verifies is real typing with an input method, bidi caret
 placement, a screen reader, and the Windows and Linux run time (`docs/STATE.md`, "Unverified here").
 

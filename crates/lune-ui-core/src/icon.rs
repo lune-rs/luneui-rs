@@ -29,6 +29,8 @@ pub const CHEVRON_RIGHT: &str = "\u{eab6}";
 pub const WARNING: &str = "\u{ea6c}";
 pub const ERROR: &str = "\u{ea87}";
 pub const CLEAR_ALL: &str = "\u{eabf}";
+/// `cod-close_all`, two stacked crosses.
+pub const CLOSE_ALL: &str = "\u{eac1}";
 pub const CIRCLE_SLASH: &str = "\u{eabd}";
 pub const ARROW_UP: &str = "\u{eaa1}";
 pub const ARROW_DOWN: &str = "\u{ea9a}";
