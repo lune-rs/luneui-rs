@@ -1,9 +1,9 @@
-//! The glyphon text system: a shaped-buffer cache behind [`TextSystem`].
+//! The cosmic-text system: a shaped-buffer cache behind [`TextSystem`].
 
 use std::borrow::Cow;
 use std::collections::HashMap;
 
-use glyphon::{
+use cosmic_text::{
     Attrs, Buffer, Color, Cursor, Family, FontSystem, Metrics, Shaping, Style as FontStyle,
     SwashCache, Weight, Wrap,
 };
@@ -64,7 +64,7 @@ struct Row {
     right: f32,
 }
 
-/// The glyphon [`TextSystem`]: shaped buffers keyed by [`TextKey`], so the UI can be drawn
+/// The cosmic-text [`TextSystem`]: shaped buffers keyed by [`TextKey`], so the UI can be drawn
 /// immediate-mode. One cache serves any number of targets and scales.
 #[derive(Debug)]
 pub struct TextCache {
@@ -92,7 +92,7 @@ impl TextCache {
         mono_family: &str,
         locale: &str,
     ) -> Self {
-        let mut db = glyphon::fontdb::Database::new();
+        let mut db = cosmic_text::fontdb::Database::new();
         for data in font_data {
             db.load_font_data(data.to_vec());
         }
@@ -106,7 +106,7 @@ impl TextCache {
         }
     }
 
-    /// The font system (for glyphon's `prepare`) alongside a lookup of shaped buffers.
+    /// The font system (for the glyph renderer's `prepare`) alongside a lookup of shaped buffers.
     pub fn split<'a>(
         &'a mut self,
     ) -> (
@@ -307,7 +307,7 @@ fn rows_of(buffer: &Buffer, joined: &str, height: f32) -> Vec<Row> {
 }
 
 /// The byte range of a layout run's glyphs in its buffer line (empty for an empty line).
-fn glyph_range(glyphs: &[glyphon::LayoutGlyph]) -> (usize, usize) {
+fn glyph_range(glyphs: &[cosmic_text::LayoutGlyph]) -> (usize, usize) {
     let start = glyphs.iter().map(|g| g.start).min().unwrap_or(0);
     let end = glyphs.iter().map(|g| g.end).max().unwrap_or(0);
     (start, end)
@@ -320,7 +320,7 @@ fn glyph_range(glyphs: &[glyphon::LayoutGlyph]) -> (usize, usize) {
 /// right half and back to the start in the second glyph's left half. `None` when `x` is in no such
 /// cluster. Only a glyph under `x` looks for its siblings, so a row of `n` glyphs costs `O(n)` a
 /// call, not `O(n^2)`; an `x` in a gap between two glyphs of one cluster is left to `Buffer::hit`.
-fn cluster_hit(run: &glyphon::LayoutRun, x: f32) -> Option<usize> {
+fn cluster_hit(run: &cosmic_text::LayoutRun, x: f32) -> Option<usize> {
     run.glyphs.iter().find_map(|g| {
         if x < g.x || x > g.x + g.w {
             return None;

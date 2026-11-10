@@ -4,7 +4,7 @@
 
 [API reference](../INDEX.md) / parent [`lune_ui_wgpu`](index.md)
 
-The glyphon text system: a shaped-buffer cache behind [`TextSystem`](../lune-ui-core/text.md#trait.TextSystem).
+The cosmic-text system: a shaped-buffer cache behind [`TextSystem`](../lune-ui-core/text.md#trait.TextSystem).
 
 Source: `crates/lune-ui-wgpu/src/text_cache.rs:1`
 
@@ -15,19 +15,19 @@ Source: `crates/lune-ui-wgpu/src/text_cache.rs:1`
 
 ```rust
 pub struct TextCache {
-    pub fonts: glyphon::FontSystem,
+    pub fonts: cosmic_text::FontSystem,
     // some fields omitted
 }
 ```
 
-The glyphon [`TextSystem`](../lune-ui-core/text.md#trait.TextSystem): shaped buffers keyed by [`TextKey`](../lune-ui-core/text.md#struct.TextKey), so the UI can be drawn
+The cosmic-text [`TextSystem`](../lune-ui-core/text.md#trait.TextSystem): shaped buffers keyed by [`TextKey`](../lune-ui-core/text.md#struct.TextKey), so the UI can be drawn
 immediate-mode. One cache serves any number of targets and scales.
 
 Source: `crates/lune-ui-wgpu/src/text_cache.rs:70`
 
 **Fields**
 
-- <a id="structfield.TextCache.fonts"></a>`pub fonts: glyphon::FontSystem`
+- <a id="structfield.TextCache.fonts"></a>`pub fonts: cosmic_text::FontSystem`
 
 **Methods and associated items**
 
@@ -55,7 +55,7 @@ Source: `crates/lune-ui-wgpu/src/text_cache.rs:70`
 
 - <a id="method.TextCache.split"></a>`pub fn split<'a>(&'a mut self) -> (&'a mut FontSystem, impl Fn(TextKey) -> Option<&'a Buffer> + 'a)`
 
-  The font system (for glyphon's `prepare`) alongside a lookup of shaped buffers.
+  The font system (for the glyph renderer's `prepare`) alongside a lookup of shaped buffers.
 
 - <a id="method.TextCache.with_locale"></a>`pub fn with_locale(font_data: &[&[u8]], ui_family: &str, mono_family: &str, locale: &str) -> Self`
 

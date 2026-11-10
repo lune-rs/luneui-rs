@@ -5,10 +5,11 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use bytemuck::{Pod, Zeroable};
-use glyphon::{Cache, SwashCache, TextAtlas};
+use cosmic_text::SwashCache;
 use wgpu::util::DeviceExt;
 
 use crate::blur;
+use crate::glyph::{Cache, TextAtlas};
 use crate::images::{GpuImageInstance, ImageResources};
 use crate::platform;
 use crate::text_cache::TextCache;
@@ -481,13 +482,7 @@ impl Gpu {
             cache: None,
             multiview_mask: None,
         });
-        let atlas = TextAtlas::with_color_mode(
-            device,
-            &self.queue,
-            &self.glyph_cache,
-            format,
-            glyphon::ColorMode::Web,
-        );
+        let atlas = TextAtlas::new(device, &self.queue, &self.glyph_cache, format);
         FormatState {
             format,
             acrylic_pipeline,

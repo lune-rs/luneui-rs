@@ -8,10 +8,11 @@
 //! number of renderers share one [`Gpu`]; everything a draw writes belongs to its renderer, except
 //! the shared glyph atlas of its format and the glyph rasterizer cache.
 
-use glyphon::{Color, Resolution, TextArea, TextBounds, TextRenderer, Viewport};
+use cosmic_text::Color;
 
 use crate::blur::{Blur, BlurPlan};
 use crate::custom::{CustomDraw, CustomFrame, CustomItem};
+use crate::glyph::{Resolution, TextArea, TextBounds, TextRenderer, Viewport};
 use crate::gpu::{Globals, Gpu};
 use crate::text_cache::TextCache;
 use lune_ui_core::scene::{LAYER_COUNT, Layer, Scene};
@@ -202,7 +203,6 @@ impl FrameRenderer {
                         bottom: (c.bottom() * s) as i32,
                     },
                     default_color: Color::rgb(0xCC, 0xCC, 0xCC),
-                    custom_glyphs: &[],
                 })
             });
             renderer
@@ -257,9 +257,7 @@ impl FrameRenderer {
                 fs.draw_below_text(pass, globals, &uploaded, i);
                 draw_customs(pass, &layer.customs, customs, &custom_frame);
                 fs.draw_images(pass, globals, &uploaded, i);
-                self.layers[i]
-                    .render(&fs.atlas, &self.viewport, pass)
-                    .map_err(|e| e.to_string())?;
+                self.layers[i].render(&fs.atlas, &self.viewport, pass);
                 fs.draw_above_text(pass, globals, &uploaded, i);
             }
             Ok::<(), String>(())
