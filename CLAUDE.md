@@ -24,7 +24,7 @@ for the extraction; Luneterm's `docs/architecture.md` sections "lune-ui modules"
 - Catalogue index (regenerate after adding or editing a component file): `scripts/gen-component-index.sh`
 - Acceptance bench (milestone acceptance only; a recorded reading that no gate, merge or fix waits on, and is not re-run to settle load noise, D235; runnable on a busy machine, D85: each run judged on its own p99 <= 16.6 ms and worst frame <= 33 ms, a page OVER only in at least half its runs, the self-test spread and load printed beside every verdict; exit 0): `cargo run --release -p gallery -- --bench` (`--runs 5` is the default; `--size 3456x2234` is report-only)
 - Gate (before every commit; must be green): `cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && cargo clippy -p lune-ui-winit --all-targets -- -D warnings && cargo test -p lune-ui-winit && scripts/check-boundaries.sh && scripts/gen-component-index.sh --check && scripts/gen-api-docs.sh --check`
-- Showcase (the gallery's window; Cmd or Ctrl `]` and `[` walk the pages, Cmd or Ctrl `Q` quits): `cargo run -p gallery`
+- Showcase (the gallery's window; Cmd or Ctrl `]` and `[` walk the pages, Cmd or Ctrl `Q` quits; its global settings include text smoothing, hinting and stem darkening): `cargo run -p gallery`
 - Pixel gate (a change to a component's drawing; gallery-only work is checked by eye, D254): `scripts/pixel-gate.sh [--base <rev>] [--allow <id>…] [--removed <id>…]` dumps
   every scene `gallery --list` prints (438 at the library pass's close; the first 14 are the legacy Painter-API scenes) for `<rev>`
   (default `HEAD`) and for the working tree and compares them
@@ -32,7 +32,9 @@ for the extraction; Luneterm's `docs/architecture.md` sections "lune-ui modules"
   and give the reason in a DECISIONS.md row in the same commit. A scene whose subject is gone is named with `--removed <id>` (D260): it must be in
   the base's dump and not in the candidate's list, and its base files move aside; any other missing scene fails. Exit 0 pass, 1 delta, 2 setup error.
   The working tree dumps headless (no window); a base from before M2 step 4 (`52b11d6` and older)
-  opens a hidden window, so such a gate needs a logged-in macOS GUI session.
+  opens a hidden window, so such a gate needs a logged-in macOS GUI session. Text smoothing is on by default
+  since 0.4.0 (D296): `gallery --dump` reads `LUNEUI_GALLERY_TEXT` (`on`, `off`; anything else exits 2), and a gate
+  against a base from before it runs as `LUNEUI_GALLERY_TEXT=off scripts/pixel-gate.sh --base <rev>` (smoothing off draws that look).
 - Platform smoke (needs a logged-in macOS or Windows GUI session; puts a tray item up for about 2 s; not in the gate; exit 0 held, 1 failed, 2 no session): `cargo run -p gallery -- --smoke-platform`
 - Dump the scenes by hand: `cargo run -p gallery -- --dump <dir>` (`-- --list` prints the scene names)
 - M1-only proof against Luneterm's 18-scene spike gate: `scripts/pixel-gate-luneterm.sh` (its full run
@@ -48,8 +50,8 @@ Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, r
 
 ## Architecture rules
 
-- Swap points: text shaping (glyphon), GPU renderer (wgpu), OS glass (`Material`), windowing (winit).
-  Each sits behind a core type in the pure `lune-ui-core` (no dependencies; no wgpu, winit or glyphon
+- Swap points: text shaping (cosmic-text) with the toolkit's own glyph rasterizer (`GlyphRasterizer`, D294 to D296), GPU renderer (wgpu), OS glass (`Material`), windowing (winit).
+  Each sits behind a core type in the pure `lune-ui-core` (no dependencies; no wgpu, winit or cosmic-text
   types in its signatures): `Scene` (display list), `TextSystem`, `ImageStore` (pictures the renderer draws),
   `RawInput`/`FrameOutput`, `Backdrop`.
   Crates: `lune-ui-core`; adapters `lune-ui-wgpu`, `lune-ui-winit`, `lune-ui-platform`; the facade

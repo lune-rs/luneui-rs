@@ -11,7 +11,7 @@ summary: Painter: ordered layers, fills, rings, strokes, acrylic, text, clip, tr
 
 ## What it is
 
-`Painter<H>`: immediate-mode layers (`LAYER_COUNT`), `fill`, `fill_radii`, `fill_over`, `ring`, `acrylic`, `custom`, `text`, `text_in`, `text_centered`, `measure`, `stroke`, clip (`set_clip`), transform (`set_xform`), and `hit`/`hovered` over an app-defined hit type `H`. Also `Rect`, `StrokeStyle`, `polyline_length`. The painter builds a `Scene` (`Painter.scene`, see `core.scene`) and shapes text through `&mut dyn TextSystem` (`Painter::new(s, window, text, hover, theme)`); it has no GPU, window or glyphon type in its signature.
+`Painter<H>`: immediate-mode layers (`LAYER_COUNT`), `fill`, `fill_radii`, `fill_over`, `ring`, `acrylic`, `custom`, `text`, `text_in`, `text_centered`, `measure`, `stroke`, clip (`set_clip`), transform (`set_xform`), and `hit`/`hovered` over an app-defined hit type `H`. Also `Rect`, `StrokeStyle`, `polyline_length`. The painter builds a `Scene` (`Painter.scene`, see `core.scene`) and shapes text through `&mut dyn TextSystem` (`Painter::new(s, window, text, hover, theme)`); it has no GPU, window or cosmic-text type in its signature.
 
 ## Needs
 

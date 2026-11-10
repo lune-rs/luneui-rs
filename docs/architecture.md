@@ -3,7 +3,7 @@
 State after the library pass (M11 closed the program): the toolkit is five crates. A pure core (`lune-ui-core`, no
 dependencies) holds the painter, the display list, the per-window `Ui` frame, the motion system,
 the string table, the semantic tree, widgets, the theme and the four seam types; three adapter
-crates implement the seams on wgpu/glyphon, winit and the OS glass; the facade `lune-ui` re-exports
+crates implement the seams on wgpu and cosmic-text, winit and the OS glass; the facade `lune-ui` re-exports
 all of them under the module paths the toolkit has always had (D9, D24 to D38). The code moved from
 Luneterm 296cfdc's `crates/lune-ui` in M1 (D10), was cut along its seams in M2, and gained the `Ui`,
 motion, strings and accessibility data in M4 (D59 to D80), and in M5 gained the shared pieces every later component
@@ -32,7 +32,7 @@ the clip (D265); small APIs (D266, D267); buttons, the tab shine, the tree look,
 | Path | What |
 |---|---|
 | `crates/lune-ui-core` | Pure core: painter, `Scene`, `Ui` frame, motion, strings, semantic tree, widgets, theme, `TextSystem`, `RawInput`/`FrameOutput`, `Backdrop`, fakes. No dependencies |
-| `crates/lune-ui-wgpu` | wgpu renderer and glyphon text: one shared `Gpu` (which is also the `ImageStore`), per-target `FrameRenderer`, `WindowSurface`, dumps, `TextCache` |
+| `crates/lune-ui-wgpu` | wgpu renderer and text: one shared `Gpu` (which is also the `ImageStore`), per-target `FrameRenderer`, `WindowSurface`, dumps, `TextCache`, `GlyphRasterizer`, the vendored glyph renderer (`glyph`) |
 | `crates/lune-ui-winit` | winit adapter: input translation, output application, glass window attributes |
 | `crates/lune-ui-platform` | OS glass (`Material`) per platform, the tray item, the popover window; the only crate with `unsafe` |
 | `crates/lune-ui` | Facade: `lib.rs` only, re-exports the four crates at the old paths |
@@ -64,6 +64,7 @@ app passes time, sizes, fonts, theme, scale and hit values in), so frames are de
 | `paint` (`paint.rs`, `paint/path.rs`) | Immediate-mode painter: seven layers, clip and rounded clip (`push_clip_rounded`), a transform stack (D66) and `push_translate`, the seven M5 primitives (image, rotate, dash, rounded clip, sector, path fill, arc; D105), hit regions generic over the app's hit type `H` and tagged with the overlay they belong to, an op recorder (`start_recording`, `take_recording`, replayed by exit painters), faded acrylic (on the fixed `Base` layer only: above it, or in an overlay, `acrylic` is a `frost`, D258), `acrylic_radii` (one radius per corner), `frost` and `frost_radii` (a premultiplied over-fill with noise), `fill_joined` (parts triangulated alone, one fringe round the outline; D272), `clip_rect`, `backdrop_with` (the glass's own layer, sigma and saturation; every request stands, D257), `on` (the layer only: the clip stack stays, D265) and the crate-private `enter` (an overlay's own draw layer, D256), `stroke_sweep` and `stroke_comet` over `StrokeStyle.mode` (the busy cue's conic arc and dash, D122), `Painter::elide` (see `text`); builds a `Scene`; holds `&mut dyn TextSystem` | `Painter<H>`, `Rect`, `StrokeStyle`, `Xform`, `Ops` |
 | `scene` (`scene.rs`) | The display list: plain data plus the draw-order contract | `Scene`, `Layer`, `LayerGeometry`, `Shape`, `Acrylic` (a shape and its opacity, D61), `StrokeVertex`, `TextItem`, `CustomItem`, `BackdropRequest` (rect, radius, alpha, `sigma`, `saturation`; a `Layer` holds its own), `ImageItem`, `RoundClip`, `LayerId` (Base, Page, Popup, Modal, Raised, Outside, Toast; D54, D137, D259), `OverlayLayer` (an overlay's own layer, D256), `LAYER_COUNT` (7), `SCENE_LAYERS`, `Scene::in_order`, `Scene::merged`, `Scene::backdrops`, `Scene::floor`, `FrameParams` (with `noise_opacity` and `blur: BlurLimits`, D264) |
 | `text` (`text.rs`) | Text specs and the text seam, with the caret, hit, line and segment queries (D86, D94) | `TextSystem` (`prepare`, `measure`, `caret`, `hit`, `lines`, `segments`), `TextKey`, `Spec`, `Style`, `Font`, `CaretPos`, `LineSpan`, `Unit`, `elide` (D114: one line cut on a grapheme boundary, U+2026 in the last kept run's style, found by binary search over `caret`; a spec that fits comes back unchanged) |
+| `text::rendering` (`text/rendering.rs`) | How glyphs are rasterized: the setting an app passes per frame and the values one glyph is rasterized with; pure (D296) | `TextRendering` (`SMOOTH`, `OFF`), `StemDarkening` (`MACOS`), `GlyphParams` |
 | `input` (`input.rs`) | The input seam: what the app hands in, what the toolkit asks back | `RawInput`, `Event` (with `Access`, `ClipboardText`, `ClipboardUnavailable` and, since M10, `FileHover`, `FileHoverCancelled`, `FileDrop`: a `PathBuf` and the last pointer position, nothing opens the path; D211), `Key`, `NamedKey`, `Modifiers`, `ImeEvent`, `FocusEvent`, `Keymap` (`MAC`, `PC`; D92), `FrameOutput` (with `repaint`, `clipboard`, `tree`, `focused`, `cursor`, `ime_area`, `fired`), `Repaint`, `ClipboardRequest`, `WindowCommand`, `CursorIcon` (with `ALL`), `printable` |
 | `image` (`image.rs`) | The picture seam: the app decodes, registers by id, releases explicitly; fit geometry | `ImageStore`, `ImageData`, `ImageId`, `ImageError`, `Fit`, `ImageAlign`, `image_rect` |
 | `layout` (`layout.rs`) | Pure stack, row, column and grid helpers: rects out, nothing drawn or stored (D108) | `stack`, `row`, `column`, `grid`, `Size`, `Align`, `Insets`, `Track` |
@@ -330,7 +331,9 @@ monotone steps, the exact end and that it finishes within its duration plus one 
 | `surface` (`surface.rs`) | A window's swapchain; no winit dependency | `WindowSurface`, `Acquired` |
 | `dump` (`dump.rs`) | Offscreen targets and GPU readback to PNG; no screen capture | `target`, `read_rgba`, `write_png` |
 | `custom` (`custom.rs`) | App-owned GPU drawing inside a painted layer (the hook for app-specific drawing, D8) | `CustomDraw`, `CustomFrame`, `CustomItem` |
-| `text_cache` (`text_cache.rs`) | glyphon shaping behind the core's `TextSystem`, including the caret, hit, line and segment queries, which read one row list per shaped text (`unicode-segmentation`, D86; D112) | `TextCache` |
+| `text_cache` (`text_cache.rs`) | cosmic-text shaping behind the core's `TextSystem`, including the caret, hit, line and segment queries, which read one row list per shaped text (`unicode-segmentation`, D86; D112) | `TextCache` |
+| `raster` (`raster.rs`) | The one glyph rasterizer: cosmic-text's image for `GlyphParams::OFF` and for colour glyphs, otherwise the outline filled again, dilated and re-centred (`swash`, D295); an app's own glyph renderer calls it too | `GlyphRasterizer` |
+| `glyph` (`glyph.rs`, `glyph/`; private) | glyphon 0.12.0's renderer (atlas, pipeline cache, viewport, text renderer, shader), vendored as is bar the changes in each file's header (MIT, D294); the atlas is keyed by `GlyphKey { CacheKey, GlyphParams }` and re-rasterizes through `GlyphRasterizer` (D296) | none public |
 | `platform` (private; `platform/{windows,other}.rs`) | The Windows DX12 backend choice | `configure` |
 
 Asset: `assets/acrylic-noise.png` (Avalonia's texture). Tests: `tests/text.rs` (text contract),
@@ -378,7 +381,7 @@ and a contract test the real adapter passes too (R-nfr-8).
 | Seam | Core model | Adapter | Fake | Contract test |
 |---|---|---|---|---|
 | Display list (renderer) | `scene::Scene` data and its draw-order contract (a draw layer per overlay, a blur per glass request; D256, D257); no renderer trait (D25) | `lune-ui-wgpu`: `Gpu::upload`, `FrameRenderer::draw` | `RecordingRenderer` | `records_the_documented_draw_order` (`testing/recording.rs`); two-target pixel equality in `lune-ui-wgpu/tests/targets.rs`; `tests/overlay_order.rs` and `tests/stacked_glass.rs` (the order of overlays and the stacked blur, on the GPU) |
-| Text shaping | `text::TextSystem` (`prepare(spec, scale)`, `measure`, `caret`, `hit`, `lines`, `segments`) | `lune-ui-wgpu`: `TextCache` over glyphon | `FakeText` | `text_system_contract`, run in `lune-ui-wgpu/tests/text.rs` and on the fake |
+| Text shaping | `text::TextSystem` (`prepare(spec, scale)`, `measure`, `caret`, `hit`, `lines`, `segments`) | `lune-ui-wgpu`: `TextCache` over cosmic-text; the glyphs are rasterized by `GlyphRasterizer` from the frame's `text::TextRendering` (D295, D296) | `FakeText` | `text_system_contract`, run in `lune-ui-wgpu/tests/text.rs` and on the fake |
 | Pictures | `image::ImageStore` (`register`, `release`); the app decodes | `lune-ui-wgpu`: `Gpu` | `FakeImages` | `image_store_contract` (`testing/images.rs`), run on the fake and in `lune-ui-wgpu/tests/images.rs` |
 | Input and output | `input::{RawInput, FrameOutput}` | `lune-ui-winit`: `Translator`, `OutputState` | `ScriptedInput` | `lune-ui-winit/tests/input.rs` (translator and scripted input agree) |
 | OS glass | `backdrop::Backdrop` (`best_supported`, `apply`) | `lune-ui-platform`: `WindowBackdrop` over `apply` | `NullMaterial` | `backdrop_contract`, run on `NullMaterial`; OS glass is not run headless |
@@ -398,7 +401,9 @@ DECISIONS D15 to D23, D38, D213, D216 and D222 record each). Each crate's allowe
 | `lune-ui-core` | path | every other crate | none: it declares no dependency |
 | `winit` | 0.30.13 | lune-ui-winit, lune-ui-platform, gallery | windowing |
 | `wgpu` | 30.0.1 | lune-ui-wgpu, gallery | GPU renderer |
-| `glyphon` | 0.12.0 (with `cosmic-text` 0.19.0) | lune-ui-wgpu | text shaping and rendering |
+| `cosmic-text` | 0.19.0 | lune-ui-wgpu | text shaping |
+| `swash` | 0.2.10 (default features; already in the lock through cosmic-text) | lune-ui-wgpu | the outline fill of `GlyphRasterizer` (D295) |
+| `etagere`, `lru`, `rustc-hash` | 0.3.0, 0.16.4 (`default-features = false`), 2.1.3 | lune-ui-wgpu | the vendored glyph atlas (D294) |
 | `bytemuck` | 1.25.2 | lune-ui-wgpu | casting vertex data |
 | `png` | 0.18.1 | lune-ui-wgpu, dump-compare | frame dumps, compare |
 | `window-vibrancy` | 0.8.1 (macOS, Windows) | lune-ui-platform | OS glass |
@@ -420,7 +425,9 @@ One `Gpu` and one `TextCache` serve the whole app; each window adds its own stat
 
 - per app: `Gpu` (device, queue, noise texture, per-format pipelines and glyph atlas) and `TextCache`
   (text scale is a per-call argument, so windows at different scales keep their entries side by
-  side instead of re-shaping everything on each scale change, D27);
+  side instead of re-shaping everything on each scale change, D27); the text-rendering setting is
+  not state but a frame value, `FrameParams.text`, so each window may pass its own and the atlas keeps
+  glyphs of several settings side by side (D296);
 - per window: a `WindowSurface` (swapchain), a `FrameRenderer` (everything a draw writes: globals,
   viewport, text renderers, blur textures, so two targets never share a write that lands at the next
   submit, D28), a `Painter` building a `Scene` and its hit list each frame, a `Translator`
@@ -565,6 +572,14 @@ From M1 to M3:
 - `theme::DARK`, a neutral alias of `lunegit_dark::THEME`;
 - new: `RawInput`, `FrameOutput`, `Translator`, `OutputState`, `Backdrop::apply`, `WindowBackdrop`,
   the `testing` module.
+
+Since 0.3.0 (font smoothing, D294 to D297; the workspace version is 0.4.0; `docs/consuming.md`, "0.3.0 to 0.4.0", is the migration map):
+
+- `FrameParams` gains `text: lune_ui_core::text::TextRendering` (default `TextRendering::SMOOTH`: no hinting and stem darkening, the look is new) and `CustomFrame` gains
+  `text`, the effective setting; `TextRendering::OFF` draws the 0.3.0 look. New in the core: `TextRendering`, `StemDarkening`, `GlyphParams` (pure values, D296);
+- `lune-ui-wgpu`: `GlyphRasterizer` (also `lune_ui::text::GlyphRasterizer`), `TextCache::rasterize(key, &mut GlyphRasterizer, TextRendering)` (was `rasterize(key, swash)`),
+  `Gpu::glyph_atlas_size` (a diagnostic). The private `glyph` module is glyphon's renderer, vendored; `glyphon` is not in the tree (D294);
+- the gallery: a TEXT section in the showcase's global settings, and `--dump` reads `LUNEUI_GALLERY_TEXT` (D296).
 
 Since the library pass (D255 to D282; the workspace version stays 0.2.0, no consumer had adopted it; `docs/consuming.md`, "API changes of the library pass", is the same list as a migration map):
 
@@ -784,6 +799,13 @@ the 14 legacy names first, then the Ui pages' scenes: 62 names after M4, 152 aft
 pixel, max channel delta including alpha; a file missing from the candidate, a file only in the
 candidate (unless `--allow-new`), a size or colour-type mismatch or a delta above `N` (default 0)
 exits 1; it prints `N files, M identical, K differ, max delta D`.
+
+Text smoothing (D296) moved every text scene by design. Its gate is a method: `gallery --dump` reads `LUNEUI_GALLERY_TEXT` (`on` is `TextRendering::SMOOTH`, `off` is
+`TextRendering::OFF`, unset is each scene's own value; any other value exits 2 before any dump), and
+`LUNEUI_GALLERY_TEXT=off scripts/pixel-gate.sh --base 2c0e25c` (with `--allow` for the five `showcase-*` scenes, whose settings pane gained the text knobs, D254) must read zero delta:
+smoothing off is 0.3.0's look at the final commit. That is zero delta on N of M scenes with the five showcase scenes unchecked (by eye); the counts are in `docs/STATE.md`. A dump at the default
+against that base is a record of what the new look moved, not a gate. `tests/text_rendering.rs` R6 is the machine check that the setting does not reach drawing that has no text.
+The vendoring of glyphon's renderer (D294) was gated at zero delta against `2c0e25c` before any look changed (439 of 439 identical).
 
 Re-baselining: a deliberate look change passes the gate with `--allow <id>` for the scenes it
 moves, and records the reason in `docs/DECISIONS.md` in the same commit (hard rule 8). Dumps are not

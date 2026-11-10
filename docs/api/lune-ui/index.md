@@ -8,7 +8,7 @@ App-agnostic glass UI toolkit: the facade. It re-exports the five crates under t
 toolkit has always had, so apps write `lune_ui::…` whichever crate holds the item:
 
 - `lune-ui-core`: the painter, display list, widgets, theme and seam types (no GPU or window);
-- `lune-ui-wgpu`: the shared GPU, frame renderers, window surfaces, dumps and glyphon text;
+- `lune-ui-wgpu`: the shared GPU, frame renderers, window surfaces, dumps, text shaping and glyph rendering;
 - `lune-ui-winit`: window attributes, input translation and output;
 - `lune-ui-platform`: the OS glass material, the tray item and the popover window.
 

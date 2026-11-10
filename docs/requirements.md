@@ -66,6 +66,10 @@ and 4 `external`. Ids no entry cites are met by a script, a rule or a manifest, 
 - R-text-5 [new] Text selection, caret movement, undo and redo, and clipboard in text fields. The
   existing `field` draws a placeholder and a caret when focused and has no selection. Resolved:
   `text.text-edit` (M5), with the clipboard through `platform.clipboard` (M10).
+- R-text-6 [new] Font smoothing: how glyphs are rasterized (smoothing, hinting, stem darkening) is a
+  setting the app passes per frame, on by default with a macOS-like look, the same on every OS, and
+  readable by an app's own glyph renderer so both draw the same glyphs. Resolved: `text.rendering`
+  (D294 to D297).
 
 ### Render
 

@@ -53,8 +53,8 @@ neither has had a full run, and Linux has no tray.
 
 | crate | what it holds | depends on |
 |---|---|---|
-| `lune-ui-core` | painter, scene, widgets, theme, text editing, the seam types and their fakes | nothing (no wgpu, winit or glyphon types) |
-| `lune-ui-wgpu` | GPU device, frame renderer, window surfaces, blur and glass, glyphon text | core, wgpu, glyphon |
+| `lune-ui-core` | painter, scene, widgets, theme, text editing, the seam types and their fakes | nothing (no wgpu, winit or cosmic-text types) |
+| `lune-ui-wgpu` | GPU device, frame renderer, window surfaces, blur and glass, text rendering with its own glyph rasterizer | core, wgpu, cosmic-text, swash |
 | `lune-ui-winit` | window attributes, input translation, output | core, winit |
 | `lune-ui-platform` | OS glass materials, tray item, popover window (the only `unsafe` code) | core, OS crates |
 | `lune-ui` | the facade: one `lune_ui::<module>` path for everything | the four above |

@@ -13,9 +13,9 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | planned | 0 |
 | stub | 0 |
 | in-progress | 2 |
-| done | 91 |
+| done | 92 |
 | external | 4 |
-| **total** | **97** |
+| **total** | **98** |
 
 ## core
 
@@ -137,7 +137,8 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | [text.diff-view](text/diff-view.md) | Diff view (unified, split, hunk actions) | done | lunegit, wane | Unified and split diff over an app-supplied line model: line numbers, add and remove tints, hunk header rows with actions, row selection, intra-line marks |
 | [text.ime](text/ime.md) | IME composition input | done | luneterm, lunegit, wane | IME composition in text widgets: preedit drawn inline at the caret, commit, candidate-window area, byte offsets from the platform |
 | [text.markdown-preview](text/markdown-preview.md) | Markdown preview | done | lunegit | Renders an app-supplied Markdown block model: headings, paragraphs with inline marks, lists with task boxes, quotes, tables, code, images; links raise an event |
-| [text.shaping](text/shaping.md) | Shaped-text cache | done | luneterm | TextSystem seam in core; glyphon TextCache behind it, keyed by content and scale; the app registers its fonts |
+| [text.rendering](text/rendering.md) | Text rendering (font smoothing) | done | any | How glyphs are rasterized, a frame value (smoothing, hinting, stem darkening) on by default; one public rasterizer shared with an app's own glyph renderer |
+| [text.shaping](text/shaping.md) | Shaped-text cache | done | luneterm | TextSystem seam in core; cosmic-text TextCache behind it, keyed by content and scale; the app registers its fonts |
 | [text.text-edit](text/text-edit.md) | Text editing engine | done | any | Caret, selection, word and line navigation, undo and redo, clipboard through FrameOutput and preedit for single- and multi-line text |
 
 ## motion

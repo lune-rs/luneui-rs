@@ -1,6 +1,6 @@
 [package]
 name = "lune-ui-wgpu"
-description = "wgpu renderer for the glass UI toolkit: one shared GPU, per-target frame renderers, window surfaces, glyph rendering"
+description = "wgpu renderer for the glass UI toolkit: one shared GPU, per-target frame renderers, window surfaces, glyph rasterizing and rendering"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

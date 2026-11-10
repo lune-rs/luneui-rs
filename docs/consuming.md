@@ -44,7 +44,7 @@ Depend on the facade `lune-ui`: it re-exports the four adapters under the paths 
 `popover`, `material`, `testing`, `lunegit_dark`, ...). The snapshot builds as a path dependency with
 `cargo check --offline` from a scratch consumer, and `cargo metadata --offline` passes inside it.
 
-**The version is 0.3.0 (D238, D293).** Luneterm's own in-tree `crates/lune-ui` is 0.1.0; two packages named
+**The version is 0.4.0 (D238, D293, D297).** Luneterm's own in-tree `crates/lune-ui` is 0.1.0; two packages named
 `lune-ui` at one version cannot stand in one lock. At 0.2.0 and later they can, so a port goes crate by crate
 instead of in one commit. Keep the in-tree crate until the last importer has moved, then delete it.
 
@@ -86,7 +86,8 @@ and the popover on a logged-in session.
 
 An app measures its own. The toolkit's figure for the gallery's release build (`cargo build --release -p gallery`,
 the repo's `[profile.release]`: fat LTO, one codegen unit, abort on panic, stripped; the size of `target/release/gallery`
-on macOS, read with `wc -c`) is **9,869,520 bytes** at a9d1292, the M11 close. It was 9,448,688 at the M9 merge (8f499d0)
+on macOS, read with `wc -c`) is **10,118,544 bytes** after the font-smoothing work's steps 1 and 3 (D294, D295; 10,118,576 at 2c0e25c before vendoring glyphon's renderer, and
+unchanged by the rasterizer, since nothing in the gallery called it yet; the later steps added no dependency and were not re-read). It was 9,869,520 bytes at a9d1292, the M11 close, 9,448,688 at the M9 merge (8f499d0)
 and 9,869,408 at the M10 tip; the M10 growth is the AccessKit bridge, the tray stack and `arboard` (DECISIONS D216, D213).
 The figure covers the gallery with every feature on, including `accesskit`; an app that leaves the feature off is smaller.
 `docs/STATE.md` keeps the latest reading.
@@ -144,6 +145,23 @@ D292, D293. The tab strip no longer builds a context menu: it reports the right-
 | (the strip's menu opened by itself) | `let r = ui.tab_strip(..); if let Some((key, rect)) = r.context { menu = Some((key, ui.pointer_pos().filter(\|q\| rect.contains(*q)).unwrap_or((rect.x, rect.bottom())))) }`, then each frame while `menu` is `Some`: `ui.menu("tab-menu", &rows, at)`; run `picked` (an index into `rows`), and clear `menu` on a pick or `dismissed` | the gallery's `pages/tab_strip.rs` (`Demo::tab_menu`) is the worked example, with icons |
 | `TabStripResponse` derives `Eq` | derives `PartialEq` only | it holds a `Rect` |
 | the strings `luneui.tab-strip.menu.close`, `.close-others`, `.close-all`, `.rename` | gone | delete them from a language file: an unknown toolkit key is rejected at insert (`StringError::UnknownToolkitKey`) |
+
+## 0.3.0 to 0.4.0: text smoothing
+
+D294 to D297. Glyphs are rasterized by the toolkit now, with a setting the app passes each frame. The default look changed: text is unhinted with stem darkening (macOS-like), on every OS.
+`glyphon` is no longer in the toolkit's tree: its renderer is vendored into `lune-ui-wgpu` (D294), and `cosmic-text` is a direct dependency of it.
+
+| old | new | note |
+| --- | --- | --- |
+| `FrameParams { .. }` literal | add `text`, or start from `..FrameParams::default()` | `FrameParams.text: TextRendering`, how glyphs are rasterized this frame (D296) |
+| the 0.3.0 look (hinted glyphs, no darkening) | `text: TextRendering::OFF` | the default is `TextRendering::SMOOTH` (smoothing on, no hinting, Pathfinder's stem-darkening numbers, no blend gamma); `OFF` is exactly the old pixels. An app that wants hinting at 1x passes `TextRendering { hinting: true, ..TextRendering::SMOOTH }` for that window's frames |
+| `CustomFrame { size, scale, format }` | add `text` | new: the frame's effective setting (`TextRendering::effective`, a bad value already fixed), for an app's own glyph renderer |
+| `TextCache::rasterize(key, swash)` | `rasterize(key, glyphs, rendering)` | `glyphs: &mut GlyphRasterizer`, `rendering: TextRendering`; `OFF` keeps the `Buffer::draw` code, anything else draws per glyph through the rasterizer |
+| an app's own glyph renderer that calls cosmic-text's `SwashCache` and sets `DISABLE_HINTING` itself | `GlyphRasterizer::image(fonts, key, frame.text.glyph_params(ppem))` | `lune_ui::text::GlyphRasterizer`; do not set `DISABLE_HINTING` (the rasterizer does, from `GlyphParams::hinting`); key the app's glyph cache by `GlyphParams` as well as the cosmic-text `CacheKey`, or a toggle serves stale glyphs (D296) |
+| cosmic-text | the app resolves it to the toolkit's version (0.19; `cargo tree -i cosmic-text` in the app lists one version) and passes the same `FontSystem` and `CacheKey` to `GlyphRasterizer::image` | the toolkit does not re-export cosmic-text (D297) |
+| (no glyph atlas diagnostic) | `Gpu::glyph_atlas_size` | new, for tests: the largest side in px of any glyph atlas texture (it grows when a frame needs more glyphs than fit) |
+| `glyphon` in the lock | gone: `cosmic-text`, `etagere`, `lru`, `rustc-hash`, `swash` are direct dependencies of `lune-ui-wgpu` at the versions already locked | no package is added to the lock; a snapshot consumer's lock follows the same list |
+| the pixel gate against a 0.3.0 base | `LUNEUI_GALLERY_TEXT=off scripts/pixel-gate.sh --base <rev>` | the gallery's dumps read the variable (`on`, `off`) |
 
 ## API changes of the library pass
 

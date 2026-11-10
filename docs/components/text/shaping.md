@@ -6,12 +6,12 @@ status: done
 consumers: luneterm
 source: crates/lune-ui-core/src/text.rs, crates/lune-ui-wgpu/src/text_cache.rs
 owner: —
-summary: TextSystem seam in core; glyphon TextCache behind it, keyed by content and scale; the app registers its fonts
+summary: TextSystem seam in core; cosmic-text TextCache behind it, keyed by content and scale; the app registers its fonts
 ---
 
 ## What it is
 
-Core: the `TextSystem` trait (`prepare(spec, scale)` returns a `TextKey` and a logical size; `measure`), plus `Font`, `Style` and `Spec` that describe the text to shape. Adapter: `TextCache` (`lune-ui-wgpu`) implements `TextSystem` over glyphon, with `new`, `split` and `end_frame`; the scale is a per-call argument, so one cache serves every window and entries of several scales coexist until the 180-frame age-out. Fakes: `testing::FakeText` and `testing::text_system_contract`.
+Core: the `TextSystem` trait (`prepare(spec, scale)` returns a `TextKey` and a logical size; `measure`), plus `Font`, `Style` and `Spec` that describe the text to shape. Adapter: `TextCache` (`lune-ui-wgpu`) implements `TextSystem` over cosmic-text (the glyphs are rasterized and drawn by the toolkit's own renderer, `text.rendering`), with `new`, `split` and `end_frame`; the scale is a per-call argument, so one cache serves every window and entries of several scales coexist until the 180-frame age-out. Fakes: `testing::FakeText` and `testing::text_system_contract`.
 
 ## Needs
 
@@ -36,7 +36,7 @@ Conflicts: none.
 - Sizes are logical pixels; the scale is an argument of each call [R crates/lune-ui-core/src/text.rs:1-3].
 - `Style::ui(size, color)`, `Style::mono(size, line, color)`, `.medium()`, `.bold()` [R crates/lune-ui-core/src/text.rs:26,36,46,53].
 - `Spec::plain`, `Spec::wrapped(width)`, and a `cache_key(scale)` [R crates/lune-ui-core/src/text.rs:77,84,91].
-- Shaping: glyphon, a shaped-buffer cache behind `TextSystem` [R crates/lune-ui-wgpu/src/text_cache.rs:1,19,31,60].
+- Shaping: cosmic-text, a shaped-buffer cache behind `TextSystem` [R crates/lune-ui-wgpu/src/text_cache.rs:1,19,31,60].
 - Fonts bundled: RznSans (UI, OFL 1.1, `licenses/RznSans-OFL-1.1.txt`) and RobotoMono Nerd Font Mono (terminal, Apache 2.0) [THIRD_PARTY_NOTICES.md:9-10].
 
 ### States
@@ -91,7 +91,7 @@ n/a — the strings belong to the caller's `Spec`.
 ## Open questions
 
 - Still open, a limit: no bold face is bundled, so bold shows as medium (D237: the bundled-font limit stays; a consumer that wants bold bundles the face and passes it to `TextCache::new`). A shaping feature such as `tnum` is not covered either, and no consumer has asked for it.
-- None on the seam (M2 step 5): the trait has no glyphon type in its signature. `R-text-5` (selection, caret) is covered since M5 by the caret, hit, lines and segments queries (D86, D94); a shaping feature such as `tnum` is not covered yet.
+- None on the seam (M2 step 5): the trait has no cosmic-text type in its signature. `R-text-5` (selection, caret) is covered since M5 by the caret, hit, lines and segments queries (D86, D94); a shaping feature such as `tnum` is not covered yet.
 
 ## Notes for the planner
 
