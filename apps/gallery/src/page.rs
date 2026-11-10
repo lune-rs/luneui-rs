@@ -209,6 +209,8 @@ pub(crate) struct FrameTweaks {
     pub(crate) noise: f32,
     /// The blur kernel's cap and the divisor of its working picture.
     pub(crate) blur: BlurLimits,
+    /// How glyphs are rasterized: smoothing, hinting and stem darkening.
+    pub(crate) text: TextRendering,
 }
 
 impl FrameTweaks {
@@ -221,6 +223,7 @@ impl FrameTweaks {
             kernel_cap: BlurLimits::KERNEL_CAP,
             downsample: BlurLimits::DOWNSAMPLE,
         },
+        text: TextRendering::SMOOTH,
     };
 
     /// The renderer's frame parameters for a target of `size` physical pixels at scale `scale`.
@@ -232,7 +235,7 @@ impl FrameTweaks {
             saturation: self.saturation,
             noise_opacity: self.noise,
             blur: self.blur,
-            text: TextRendering::default(),
+            text: self.text,
         }
     }
 }

@@ -18,7 +18,7 @@ use lune_ui::motion::MotionTier;
 use lune_ui::near_black;
 use lune_ui::paint::Rect;
 use lune_ui::scene::BlurLimits;
-use lune_ui::text::{Spec, Style};
+use lune_ui::text::{Spec, Style, TextRendering};
 use lune_ui::theme::{AcrylicLevel, DARK, Theme, ThemeGlass};
 use lune_ui::ui::{Sense, Ui};
 use lune_ui::widgets::button::ButtonKind;
@@ -195,6 +195,8 @@ pub(crate) struct Settings {
     pub(crate) kernel_cap: f32,
     pub(crate) downsample: u32,
     pub(crate) saturation: f32,
+    /// How glyphs are rasterized: smoothing, hinting and stem darkening.
+    pub(crate) text: TextRendering,
     pub(crate) material: Material,
     /// What came of the last attempt to put `material` on the window.
     pub(crate) material_note: Option<String>,
@@ -219,6 +221,7 @@ impl Default for Settings {
             kernel_cap: BlurLimits::KERNEL_CAP,
             downsample: BlurLimits::DOWNSAMPLE,
             saturation: BLUR_SATURATION,
+            text: TextRendering::SMOOTH,
             // The material the window is created with.
             material: Material::Vibrancy,
             material_note: None,
@@ -334,6 +337,7 @@ impl Settings {
                 kernel_cap: self.kernel_cap,
                 downsample: self.downsample,
             },
+            text: self.text,
         }
     }
 
@@ -668,6 +672,67 @@ impl Settings {
         }
         let radius = kernel_radius(self.sigma, self.kernel_cap, self.downsample);
         col.note(ui, &format!("The kernel is {radius:.0} texels a side."));
+
+        col.section(ui, "TEXT");
+        col.toggle(
+            ui,
+            "text-smoothing",
+            "Font smoothing",
+            &mut self.text.smoothing,
+        );
+        col.toggle(ui, "text-hinting", "Hinting", &mut self.text.hinting);
+        col.slider(
+            ui,
+            "darken-x",
+            "Darken x",
+            &mut self.text.stem_darkening.factors[0],
+            (0.0, 0.03, 0.0005),
+            |v| format!("{v:.4}"),
+        );
+        col.slider(
+            ui,
+            "darken-y",
+            "Darken y",
+            &mut self.text.stem_darkening.factors[1],
+            (0.0, 0.03, 0.0005),
+            |v| format!("{v:.4}"),
+        );
+        col.slider(
+            ui,
+            "max-x",
+            "Max x",
+            &mut self.text.stem_darkening.max_px[0],
+            (0.0, 1.0, 0.05),
+            |v| format!("{v:.2} px"),
+        );
+        col.slider(
+            ui,
+            "max-y",
+            "Max y",
+            &mut self.text.stem_darkening.max_px[1],
+            (0.0, 1.0, 0.05),
+            |v| format!("{v:.2} px"),
+        );
+        col.slider(
+            ui,
+            "max-ppem",
+            "Up to ppem",
+            &mut self.text.stem_darkening.max_ppem,
+            (0.0, 144.0, 1.0),
+            |v| format!("{v:.0}"),
+        );
+        let (d13, d26) = (
+            self.text.glyph_params(13.0).dilation(),
+            self.text.glyph_params(26.0).dilation(),
+        );
+        col.note(
+            ui,
+            &format!(
+                "13 px text grows {:.3} x {:.3} px a side at 1x, {:.3} x {:.3} at 2x.",
+                d13[0], d13[1], d26[0], d26[1]
+            ),
+        );
+        col.note(ui, "Off draws hinted glyphs with no darkening.");
 
         col.section(ui, "OS MATERIAL");
         let options: Vec<RadioOption<'_>> = MATERIALS
@@ -1061,6 +1126,23 @@ mod tests {
                 ..FrameTweaks::DEFAULT
             }
         );
+    }
+
+    #[test]
+    fn the_text_knobs_reach_the_frame_and_reset_restores_smooth() {
+        let mut s = Settings::default();
+        assert_eq!(s.tweaks().params((10, 10), 1.0).text, TextRendering::SMOOTH);
+        s.text.smoothing = false;
+        let p = s.tweaks().params((10, 10), 1.0);
+        assert!(!p.text.smoothing);
+        assert_eq!(p.text.effective(), TextRendering::OFF);
+        s.text.smoothing = true;
+        s.text.stem_darkening.factors[0] = 0.02;
+        let p = s.tweaks().params((10, 10), 1.0);
+        assert_eq!(p.text.stem_darkening.factors[0], 0.02);
+        assert_ne!(p.text, TextRendering::SMOOTH);
+        s.reset();
+        assert_eq!(s.tweaks().params((10, 10), 1.0).text, TextRendering::SMOOTH);
     }
 
     #[test]
