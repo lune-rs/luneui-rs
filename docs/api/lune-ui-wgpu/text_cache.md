@@ -4,7 +4,7 @@
 
 [API reference](../INDEX.md) / parent [`lune_ui_wgpu`](index.md)
 
-The glyphon text system: a shaped-buffer cache behind [`TextSystem`](../lune-ui-core/text.md#trait.TextSystem).
+The cosmic-text system: a shaped-buffer cache behind [`TextSystem`](../lune-ui-core/text.md#trait.TextSystem).
 
 Source: `crates/lune-ui-wgpu/src/text_cache.rs:1`
 
@@ -15,19 +15,19 @@ Source: `crates/lune-ui-wgpu/src/text_cache.rs:1`
 
 ```rust
 pub struct TextCache {
-    pub fonts: glyphon::FontSystem,
+    pub fonts: cosmic_text::FontSystem,
     // some fields omitted
 }
 ```
 
-The glyphon [`TextSystem`](../lune-ui-core/text.md#trait.TextSystem): shaped buffers keyed by [`TextKey`](../lune-ui-core/text.md#struct.TextKey), so the UI can be drawn
+The cosmic-text [`TextSystem`](../lune-ui-core/text.md#trait.TextSystem): shaped buffers keyed by [`TextKey`](../lune-ui-core/text.md#struct.TextKey), so the UI can be drawn
 immediate-mode. One cache serves any number of targets and scales.
 
-Source: `crates/lune-ui-wgpu/src/text_cache.rs:70`
+Source: `crates/lune-ui-wgpu/src/text_cache.rs:72`
 
 **Fields**
 
-- <a id="structfield.TextCache.fonts"></a>`pub fonts: glyphon::FontSystem`
+- <a id="structfield.TextCache.fonts"></a>`pub fonts: cosmic_text::FontSystem`
 
 **Methods and associated items**
 
@@ -47,15 +47,29 @@ Source: `crates/lune-ui-wgpu/src/text_cache.rs:70`
   that [`Font::Ui`](../lune-ui-core/text.md#variant.Font.Ui) and [`Font::Mono`](../lune-ui-core/text.md#variant.Font.Mono) resolve to. The caller supplies all of it; this
   crate embeds no fonts; with none, every text is an empty layout of zero size. The locale is `en-US`; see [`TextCache::with_locale`](text_cache.md#method.TextCache.with_locale).
 
-- <a id="method.TextCache.rasterize"></a>`pub fn rasterize(&mut self, key: TextKey, swash: &mut SwashCache) -> Option<TextRaster>`
+- <a id="method.TextCache.rasterize"></a>
+
+  ```rust
+  pub fn rasterize(
+      &mut self,
+      key: TextKey,
+      glyphs: &mut GlyphRasterizer,
+      rendering: TextRendering,
+  ) -> Option<TextRaster>
+  ```
 
   Draws the cached text `key` into straight-alpha RGBA pixels at the scale it was shaped at
-  (its own colours, on transparent), with [`RASTER_MARGIN`](text_cache.md#constant.RASTER_MARGIN) px around its box. `None` for a
+  (its own colours, on transparent), with [`RASTER_MARGIN`](text_cache.md#constant.RASTER_MARGIN) px around its box, rasterizing
+  glyphs as `rendering` says (its [`effective`](../lune-ui-core/text.md#method.TextRendering.effective) value). `None` for a
   key that is not cached, an empty layout (no fonts, no text) or a side above 8192 px.
+
+  With smoothing off the text is drawn by cosmic-text's `Buffer::draw`; otherwise each glyph
+  goes through `glyphs` with its own `GlyphParams`, so this path smooths like the glyph atlas
+  path does.
 
 - <a id="method.TextCache.split"></a>`pub fn split<'a>(&'a mut self) -> (&'a mut FontSystem, impl Fn(TextKey) -> Option<&'a Buffer> + 'a)`
 
-  The font system (for glyphon's `prepare`) alongside a lookup of shaped buffers.
+  The font system (for the glyph renderer's `prepare`) alongside a lookup of shaped buffers.
 
 - <a id="method.TextCache.with_locale"></a>`pub fn with_locale(font_data: &[&[u8]], ui_family: &str, mono_family: &str, locale: &str) -> Self`
 
@@ -82,7 +96,7 @@ pub struct TextRaster {
 A shaped text drawn into pixels by [`TextCache::rasterize`](text_cache.md#method.TextCache.rasterize): straight-alpha RGBA, row by row
 from the top left, with a margin of [`RASTER_MARGIN`](text_cache.md#constant.RASTER_MARGIN) px around the text's own box.
 
-Source: `crates/lune-ui-wgpu/src/text_cache.rs:20`
+Source: `crates/lune-ui-wgpu/src/text_cache.rs:22`
 
 **Fields**
 
@@ -112,5 +126,5 @@ pub const RASTER_MARGIN: u32 = 2;
 Transparent pixels around a rasterised text, so glyphs that overhang their advance box are
 not cut.
 
-Source: `crates/lune-ui-wgpu/src/text_cache.rs:28`
+Source: `crates/lune-ui-wgpu/src/text_cache.rs:30`
 

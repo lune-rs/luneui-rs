@@ -6,6 +6,10 @@ use std::hash::{Hash, Hasher};
 
 use crate::color::Rgba;
 
+mod rendering;
+
+pub use rendering::{GlyphParams, StemDarkening, TextRendering};
+
 /// Which family a run is shaped in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Font {

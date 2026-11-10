@@ -13,8 +13,10 @@
 //!   in about two seconds (see `smoke`). It needs a logged-in GUI session: exit 0 when it ran
 //!   and held, 1 when a check failed, 2 when there is no session to run in.
 //!
-//! Dump mode reads no clock and no environment: time comes from the scene tables and scripts,
-//! pixels from the offscreen target's readback (no screen or window capture).
+//! Dump mode reads no clock: time comes from the scene tables and scripts, pixels from the
+//! offscreen target's readback (no screen or window capture). It reads one environment variable,
+//! `LUNEUI_GALLERY_TEXT` (`on` or `off`): the text rendering every dumped scene is drawn with, in
+//! place of the scene's own (`off` is the look before font smoothing, what the pixel gate proves).
 
 mod bench;
 #[cfg(test)]
@@ -35,7 +37,7 @@ use lune_ui::dump;
 use lune_ui::frame::{FrameParams, FrameRenderer};
 use lune_ui::gpu::{self, Gpu};
 use lune_ui::scene::Scene;
-use lune_ui::text::TextCache;
+use lune_ui::text::{TextCache, TextRendering};
 use page::{FrameTweaks, PageKind, meets_expectation, register_images, release_images, run_scene};
 use pages::PAGES;
 use scenes::{H, W};
@@ -67,6 +69,8 @@ struct Renderer {
     text: TextCache,
     frame: FrameRenderer,
     fill: custom::Fill,
+    /// A text rendering that replaces every frame's own (dump mode, `LUNEUI_GALLERY_TEXT`).
+    text_rendering: Option<TextRendering>,
 }
 
 fn main() -> ExitCode {
@@ -85,16 +89,46 @@ fn main() -> ExitCode {
             }
             ExitCode::SUCCESS
         }
-        Command::Dump(dir) => match run_dump(&dir) {
-            Ok(()) => ExitCode::SUCCESS,
-            Err(e) => {
-                eprintln!("dump: {e}");
-                ExitCode::from(1)
+        Command::Dump(dir) => {
+            let var = std::env::var_os(TEXT_VAR);
+            let text = match text_override(var.as_deref()) {
+                Ok(text) => text,
+                Err(msg) => {
+                    eprintln!("{msg}");
+                    return ExitCode::from(2);
+                }
+            };
+            match run_dump(&dir, text) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(e) => {
+                    eprintln!("dump: {e}");
+                    ExitCode::from(1)
+                }
             }
-        },
+        }
         Command::Bench(opts) => bench::run(&opts),
         Command::SmokePlatform => smoke::run(),
         Command::Window => window::run(),
+    }
+}
+
+/// The environment variable that sets the text rendering of a dump.
+const TEXT_VAR: &str = "LUNEUI_GALLERY_TEXT";
+
+/// The text rendering `LUNEUI_GALLERY_TEXT` asks for: unset is `None` (each scene's own), `on` is
+/// the smooth look and `off` is the look without smoothing. Any other value, or one that is not
+/// Unicode, is an error naming the variable.
+fn text_override(value: Option<&std::ffi::OsStr>) -> Result<Option<TextRendering>, String> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    match value.to_str() {
+        Some("on") => Ok(Some(TextRendering::SMOOTH)),
+        Some("off") => Ok(Some(TextRendering::OFF)),
+        _ => Err(format!(
+            "{TEXT_VAR} must be `on` or `off` (got {})",
+            value.to_string_lossy()
+        )),
     }
 }
 
@@ -124,13 +158,16 @@ fn offscreen_renderer(mut gpu: Gpu) -> Renderer {
         text: text_cache(),
         frame,
         fill,
+        text_rendering: None,
     }
 }
 
 /// Dump mode: a headless device, `Bgra8Unorm` targets, every scene written to `dir`.
-fn run_dump(dir: &Path) -> Result<(), String> {
+/// `text` replaces every scene's own text rendering when given.
+fn run_dump(dir: &Path, text: Option<TextRendering>) -> Result<(), String> {
     let gpu = pollster::block_on(Gpu::new(gpu::instance(None), None))?;
     let mut r = offscreen_renderer(gpu);
+    r.text_rendering = text;
     dump_scenes(&mut r, dir)
 }
 
@@ -163,8 +200,11 @@ fn draw_with(
     r: &mut Renderer,
     scene: &Scene,
     target: &wgpu::TextureView,
-    params: FrameParams,
+    mut params: FrameParams,
 ) -> Result<(), String> {
+    if let Some(text) = r.text_rendering {
+        params.text = text;
+    }
     let mut customs: [&mut dyn lune_ui::custom::CustomDraw; 1] = [&mut r.fill];
     r.frame
         .draw_with(&mut r.gpu, &mut r.text, scene, target, params, &mut customs)
@@ -236,4 +276,36 @@ fn dump_one(
         .map_err(|e| format!("scene {name}: {e}"))?;
     eprintln!("dumped {name}.png");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::ffi::OsStr;
+
+    use super::*;
+
+    #[test]
+    fn the_text_variable_picks_the_dump_text_rendering() {
+        assert_eq!(text_override(None), Ok(None));
+        assert_eq!(
+            text_override(Some(OsStr::new("on"))),
+            Ok(Some(TextRendering::SMOOTH))
+        );
+        assert_eq!(
+            text_override(Some(OsStr::new("off"))),
+            Ok(Some(TextRendering::OFF))
+        );
+        for bad in ["", "ON", "Off", "true", "1", "bogus"] {
+            let err = text_override(Some(OsStr::new(bad))).expect_err(bad);
+            assert!(err.contains("LUNEUI_GALLERY_TEXT"), "{err}");
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_value_that_is_not_unicode_is_refused() {
+        use std::os::unix::ffi::OsStrExt;
+        let err = text_override(Some(OsStr::from_bytes(&[0x6f, 0xff]))).expect_err("not Unicode");
+        assert!(err.contains("LUNEUI_GALLERY_TEXT"), "{err}");
+    }
 }

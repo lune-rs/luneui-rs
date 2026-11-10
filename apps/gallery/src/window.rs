@@ -219,6 +219,7 @@ pub(crate) fn setup(
             text,
             frame,
             fill,
+            text_rendering: None,
         },
         translator,
         output: OutputState::new(),

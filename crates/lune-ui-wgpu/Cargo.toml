@@ -1,6 +1,6 @@
 [package]
 name = "lune-ui-wgpu"
-description = "wgpu renderer for the glass UI toolkit: one shared GPU, per-target frame renderers, window surfaces, glyphon text"
+description = "wgpu renderer for the glass UI toolkit: one shared GPU, per-target frame renderers, window surfaces, glyph rasterizing and rendering"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,7 +10,11 @@ license.workspace = true
 [dependencies]
 lune-ui-core = { path = "../lune-ui-core" }
 wgpu = "30"
-glyphon = "0.12"
+cosmic-text = "0.19"
+swash = "0.2"
+etagere = "0.3"
+lru = { version = "0.16", default-features = false }
+rustc-hash = "2"
 bytemuck = { version = "1", features = ["derive"] }
 png = "0.18"
 unicode-segmentation = "1"

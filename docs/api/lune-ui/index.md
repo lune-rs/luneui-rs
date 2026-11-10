@@ -8,7 +8,7 @@ App-agnostic glass UI toolkit: the facade. It re-exports the five crates under t
 toolkit has always had, so apps write `lune_ui::…` whichever crate holds the item:
 
 - `lune-ui-core`: the painter, display list, widgets, theme and seam types (no GPU or window);
-- `lune-ui-wgpu`: the shared GPU, frame renderers, window surfaces, dumps and glyphon text;
+- `lune-ui-wgpu`: the shared GPU, frame renderers, window surfaces, dumps, text shaping and glyph rendering;
 - `lune-ui-winit`: window attributes, input translation and output;
 - `lune-ui-platform`: the OS glass material, the tray item and the popover window.
 
@@ -21,7 +21,7 @@ Source: `crates/lune-ui/src/lib.rs:1`
 
 - [`access`](access.md) - Accessibility: the core's semantic tree and actions and, with the `accesskit` feature, the bridge to the OS accessibility API (`lune-ui-winit`).
 - [`input`](input.md) - Input: the core's plain-data `RawInput` and `FrameOutput`, and the winit translation and output.
-- [`text`](text.md) - Text: the core's specs and `TextSystem` seam, and the glyphon `TextCache` that implements it.
+- [`text`](text.md) - Text: the core's specs and `TextSystem` seam, the cosmic-text `TextCache` that implements it, and the `GlyphRasterizer` that rasterizes a glyph with the core's `GlyphParams`.
 - [`tray`](tray.md) - The tray: the core's icon raster, placement and click rules, and the OS item (`lune-ui-platform`).
 - [`window`](window.md) - Window helpers: the core's edge resize, double click and caption buttons, and the winit glass attributes and resize direction.
 

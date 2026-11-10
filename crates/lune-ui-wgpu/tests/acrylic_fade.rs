@@ -86,6 +86,7 @@ fn render_with(gpu: &mut Gpu, scene: &Scene, over: FrameParams) -> Vec<u8> {
         saturation: 1.0,
         noise_opacity: over.noise_opacity,
         blur: over.blur,
+        text: over.text,
     };
     renderer
         .draw(gpu, &mut text, scene, &view, params)

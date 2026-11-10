@@ -23,7 +23,7 @@ use lune_ui::scene::{BlurLimits, FrameParams, Scene};
 use lune_ui::shortcuts::Shortcuts;
 use lune_ui::strings::{DisplayFormat, StringTable};
 use lune_ui::testing::ScriptedInput;
-use lune_ui::text::TextSystem;
+use lune_ui::text::{TextRendering, TextSystem};
 use lune_ui::theme::Theme;
 use lune_ui::tray::TrayState;
 use lune_ui::ui::{FrameConfig, Ui, UiStore, WidgetId};
@@ -209,6 +209,8 @@ pub(crate) struct FrameTweaks {
     pub(crate) noise: f32,
     /// The blur kernel's cap and the divisor of its working picture.
     pub(crate) blur: BlurLimits,
+    /// How glyphs are rasterized: smoothing, hinting and stem darkening.
+    pub(crate) text: TextRendering,
 }
 
 impl FrameTweaks {
@@ -221,6 +223,7 @@ impl FrameTweaks {
             kernel_cap: BlurLimits::KERNEL_CAP,
             downsample: BlurLimits::DOWNSAMPLE,
         },
+        text: TextRendering::SMOOTH,
     };
 
     /// The renderer's frame parameters for a target of `size` physical pixels at scale `scale`.
@@ -232,6 +235,7 @@ impl FrameTweaks {
             saturation: self.saturation,
             noise_opacity: self.noise,
             blur: self.blur,
+            text: self.text,
         }
     }
 }

@@ -7,6 +7,7 @@
 //! below the popup.
 
 pub use lune_ui_core::scene::CustomItem;
+use lune_ui_core::text::TextRendering;
 
 /// What the current frame is drawn at; handed to [`CustomDraw`] on both calls.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -17,6 +18,11 @@ pub struct CustomFrame {
     pub scale: f32,
     /// Colour format of the pass the item renders into.
     pub format: wgpu::TextureFormat,
+    /// How glyphs are rasterized this frame: the frame's
+    /// [`TextRendering::effective`](lune_ui_core::text::TextRendering::effective) value. An app's own
+    /// glyph renderer rasterizes with it (see [`GlyphRasterizer`](crate::raster::GlyphRasterizer))
+    /// and keys its glyph cache by the glyph's `GlyphParams`.
+    pub text: TextRendering,
 }
 
 /// App-owned drawing. The app passes one implementation per slot to

@@ -1,16 +1,23 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-11 (tab strip reports `context` and owns no menu, version 0.3.0; on branch `orch/tab-context-menu`, not yet merged; tab-strip-plus-and-slide, library pass and dark-glass are on main, published at github.com/lune-rs/luneui-rs)
+Last updated: 2026-11-11 (font smoothing, version 0.4.0, on branch `orch/font-smoothing`, not yet merged; the tab strip's `context` (0.3.0, tagged at 2c0e25c), tab-strip-plus-and-slide, library pass and dark-glass are on main, published at github.com/lune-rs/luneui-rs)
 
 ## Now
 
 Program toolkit-v1 closed with M11 (merged at 10f503e); the gallery showcase task and the library pass followed. The toolkit is five crates (`lune-ui-core`, the adapters
-`lune-ui-wgpu`, `lune-ui-winit`, `lune-ui-platform`, and the facade `lune-ui`), workspace version 0.3.0 (D293; 0.2.0 was D238, kept while no consumer had adopted the toolkit). `apps/gallery` has 82 pages and 439 scene names (the first 14 are the legacy Painter-API scenes). The catalogue holds 97 entries: 91 `done`, 2 `in-progress`,
+`lune-ui-wgpu`, `lune-ui-winit`, `lune-ui-platform`, and the facade `lune-ui`), workspace version 0.4.0 (D297; 0.3.0 was D293, 0.2.0 D238, kept while no consumer had adopted the toolkit). `apps/gallery` has 82 pages and 439 scene names (the first 14 are the legacy Painter-API scenes). The catalogue holds 98 entries: 92 `done`, 2 `in-progress`,
 4 `external`. Milestone merges to main: M4 d9fe71f, M5 1aeaf1b, M6 a75a708, M7 662d310, M8 2474248, M9 8f499d0, M10 55cfaaf, M11 10f503e (M1 to M3: the extraction, the seams and the catalogue).
 `docs/architecture.md` has the module map, the pages and "API changes since M1"; `docs/consuming.md` how an app vendors the toolkit and, for the library pass, the migration map of its API changes.
 
-Tab context menu (task `luneui-rs/tab-context-menu`, D292, D293; on its branch): no widget builds a context menu (D292); `Ui::tab_strip` reports `TabStripResponse::context: Option<(TabKey, Rect)>` and the app opens its own `Ui::menu`. Removed: `menu_extra`, `TabEvent::CloseOthers|CloseAll|Rename|MenuExtra`, the four `luneui.tab-strip.menu.*` strings (a breaking change, hence 0.3.0; migration table in `docs/consuming.md`). The gallery's tab-strip page builds an icon menu from `context` (`icon::CLOSE_ALL` is new). The pixel gate is the orchestrator's final gate (no scene drew the strip's menu, so zero delta is expected). After merge: tag `v0.3.0` on the merge commit, push `main` and the tag, tell Luneterm the rev (the user's yes first, D4 of the task).
+Font smoothing (task `luneui-rs/font-smoothing`, D294 to D297; on its branch): the toolkit rasterizes glyphs itself and text is smoothed by default, like macOS: no hinting and stem darkening
+(Pathfinder's numbers), no blend gamma, the same on every OS. `FrameParams.text: TextRendering` is the per-frame setting (`SMOOTH` default, `OFF` is the 0.3.0 look), `CustomFrame.text` hands the effective value to an app's draws,
+and `lune_ui::text::GlyphRasterizer` is the one rasterizer an app's own glyph renderer shares (key its cache by `GlyphParams`, no `DISABLE_HINTING` of its own). glyphon's renderer is vendored into `lune-ui-wgpu` as the private
+`glyph` module and `glyphon` is out of the tree (D294); the glyph atlas and the rotated-text rasters are keyed by the setting, so a toggle never serves a stale glyph (D296). The gallery's showcase has a TEXT section
+in the global settings, and `gallery --dump` reads `LUNEUI_GALLERY_TEXT` (`on`, `off`). Breaking, hence 0.4.0; migration table in `docs/consuming.md`, "0.3.0 to 0.4.0" (D297). Entry: `text.rendering`.
+After merge: tag `v0.4.0` on the merge commit, push `main` and the tag, tell Luneterm the rev (the user's yes first, as for v0.3.0).
+
+Tab context menu (task `luneui-rs/tab-context-menu`, D292, D293; merged, tagged `v0.3.0` at 2c0e25c): no widget builds a context menu (D292); `Ui::tab_strip` reports `TabStripResponse::context: Option<(TabKey, Rect)>` and the app opens its own `Ui::menu`. The gallery's tab-strip page builds an icon menu from `context`. Migration table in `docs/consuming.md`, "0.2.0 to 0.3.0".
 
 Tab strip (task `luneui-rs/tab-strip-plus-and-slide`, D289 to D291; merged at 32d1904): a closable tab reserves its close column, so a hover or an activation moves no tab (D289, a Lunegit deviation); the new-tab button follows the last tab and is pinned at the right end only on overflow, and the viewport is fitted to the tabs, so the strip's empty space reaches the app under it (D290); the active tab's notch slides on a change of the active key (`tab_strip::SLIDE`, D291; scene `tab-strip-switch-mid`, 439 scene names). The pixel gate (`--base main`) moved exactly the `tab-strip-*` scenes (14 by the button's place, `tab-strip-content-swap` also by the slide) and left `tab-strip-overflow` identical; those 15 are the `--allow` list of D290. The feel of the slide is the user's to check with `cargo run -p gallery`.
 
@@ -30,7 +37,7 @@ on real machines (`owner: Luneterm M9 to M11 runs`); the second needs a pixel ga
 
 `cargo run -p gallery` opens the showcase: a 1600 x 900 glass window with a searchable sidebar (groups, pages, scenes), the chosen page live in the
 middle, and on the right that page's knobs and the global settings (theme, motion tier, speed, zoom, glass layers, noise strength, luminosity curve, blur and its limits, OS material, durations,
-the floating surfaces' tint, opacity and border). Seven labs (glass, blur, effects, motion, tokens, clipboard, JSON) cover what no component page shows. Keys: Cmd or Ctrl `]` and `[` walk the pages,
+the floating surfaces' tint, opacity and border, text smoothing). Seven labs (glass, blur, effects, motion, tokens, clipboard, JSON) cover what no component page shows. Keys: Cmd or Ctrl `]` and `[` walk the pages,
 Cmd or Ctrl `Q` quits. `--list`, `--dump <dir>` and `--bench` are unchanged; the shell's own scenes are the five `showcase-*`. `docs/components/infra/showcase.md`
 is the entry (what it shows, the four pages with no knob and why, what is unverified); decisions D246 to D254; the code is `apps/gallery/src/showcase/`.
 The showcase task changed nothing under `crates/` (D246); the library follow-ups it found were paid by the library pass.
@@ -46,8 +53,10 @@ proves clicks, the OS material swap and the feel of speed and zoom; the tests on
   the result is the orchestrator's final gate's (`scripts/pixel-gate.sh` header and regex now accept a scene that exists only at a fractional scale, as `ui-controls@1.5x`; step 26's own run was not finished when this was written).
 - Look values settled by the user after a live run (step 25, Q2): `menu_popup_border` #FFFFFF1F (R8), `menu_glass` alpha 157 (R9), the tab shine 1800 ms and a 48 px band (R3), `tree_guide` #FFFFFF14 (R15). Then, from the same run, D283: a tree guide drops from the centre of its parent's mark, and a leaf's stub reaches its label (`GuideStub::Label`, default; `Short` kept as an option).
   A pick changes one constant or token and re-runs the gate once with the same allow lists.
-- Release size (M11, not re-read): `cargo build --release -p gallery` at a9d1292, `wc -c target/release/gallery` (macOS, strip, fat LTO): 9,869,520 bytes, against 9,869,408 at
-  the M10 tip (+112) and 9,448,688 at the M9 merge. Also in `docs/consuming.md`. The library pass added no dependency.
+- Font smoothing, G0 (the vendored renderer, zero delta): `scripts/pixel-gate.sh --base 2c0e25c` at a8f75cf (step 1): 439 of 439 scenes identical. G1 at ed23193 (`LUNEUI_GALLERY_TEXT=off`, `--base 2c0e25c`): 434 of 439 scenes identical; the five `showcase-*` scenes are
+  allowed (D254) and also read 5 of 5 identical. G2 at ed23193 (the default smooth dump against G1's base, a record): 434 files, 0 identical, 434 differ, max delta 195 (every scene draws text).
+- Release size: `cargo build --release -p gallery`, `wc -c target/release/gallery` (macOS, strip, fat LTO): 10,118,576 bytes at 2c0e25c, 10,118,544 after step 1 (the vendored renderer), 10,118,544 after step 3
+  (the rasterizer; nothing called it yet), 10,267,264 at ed23193 (steps 4 to 6: the rasterizer in use). Before that: 9,869,520 at a9d1292 (M11), 9,869,408 at the M10 tip and 9,448,688 at the M9 merge. Also in `docs/consuming.md`.
 - Bench (M11, `cargo run --release -p gallery -- --bench`, per D85) at d14069f, one reading, 2080 x 1320, 5 runs, M1 Pro, no GUI session: 0 of 74 pages over budget at load
   2.0, self-test in range with a spread of +1.13/+2.81. Highest p99 5.99 ms and worst frame 13.03 ms, both `code-editor-view`; `flyout` p99 4.85. Nothing waits on a bench reading (D235);
   the first reading of stacked blur in the pages (about 0.25 ms a level at 3456 x 2234 in the plan's probe, D257) is the final gate's, not recorded here.
@@ -105,6 +114,8 @@ fit panel's clip, the nits F2 to F7 of M6 and M8, and the Library follow-ups the
   The panel rests on AppKit behaviour Apple does not document and is proved only on this macOS version (D223); run the smoke again after a macOS update.
 - The OS clipboard beyond the one guarded `real_round_trip` (macOS, plain text; `#[ignore]`, writes the user's clipboard, not re-run in M11); a real file dragged over a window.
 - A real GPU loss (a driver reset, an unplugged adapter): the tests stand in with `Device::destroy`.
+- Font smoothing (D296): the look at 1x on a real 100%-scaled Windows display (nothing ran on Windows; the user's), colour glyphs through the rasterizer (no colour font is bundled, so the pass-through
+  is untested on real data), and a hands-on toggle of the TEXT section in `cargo run -p gallery`. Unhinted text at 1x may read softer than ClearType; an app can pass `hinting: true` per window.
 - The showcase in a real window: clicks on the sidebar, the knobs and the settings, a live swap of the OS material, the feel of speed and zoom, Copy and Paste against the OS clipboard (`docs/components/infra/showcase.md`).
 - The library pass in a real window (the user's hands-on run of `cargo run -p gallery`): a dialog over a page, a list over the dialog, a tooltip and a toast; a click on the sidebar between dialog scenes (R7's path);
   an inactive window (R13); a tab in progress (R3, the feel of the shine); the glass sliders. OS glass and an inactive window are live-only.
@@ -112,10 +123,10 @@ fit panel's clip, the nits F2 to F7 of M6 and M8, and the Library follow-ups the
 
 ## Next
 
-1. Dark glass: the by-eye checks in Unverified here. After any public API or doc-comment change run `scripts/gen-api-docs.sh` (the gate's `--check` fails on a stale `docs/api/`).
+1. Font smoothing: the by-eye checks in Unverified here (the user's), and `v0.4.0` after the merge with the user's yes. Dark glass: the by-eye checks in Unverified here. After any public API or doc-comment change run `scripts/gen-api-docs.sh` (the gate's `--check` fails on a stale `docs/api/`).
 2. The rest of a hands-on run of `cargo run -p gallery` (see Unverified here); the look values are settled.
 3. Luneterm's M9 adopts the toolkit through `docs/consuming.md`: vendor `scripts/export-snapshot.sh`'s output, switch crate by crate (version 0.2.0 and later let the in-tree `lune-ui` and the snapshot stand
-   in one lock), use the migration maps (the Luneterm one, "API changes of the library pass" and "0.2.0 to 0.3.0"); its own OS runs close `platform.material` and `render.surface`. Luneterm itself is not changed by this repo.
+   in one lock), use the migration maps (the Luneterm one, "API changes of the library pass", "0.2.0 to 0.3.0" and "0.3.0 to 0.4.0"); its own OS runs close `platform.material` and `render.surface`. Luneterm itself is not changed by this repo.
 4. The Lunegit fixtures are licensed MIT OR Apache-2.0 (D284); the export still leaves them out.
 5. The user's calls, all reversible and taken at the recommended option: the final tray glyph (`platform.tray-icon`), column resize and reorder in the table (D163, Q15), and two taken calls to
    confirm: the Windows popover activates (D224, Q17), the tray icon is a CPU raster (D218, Q18).

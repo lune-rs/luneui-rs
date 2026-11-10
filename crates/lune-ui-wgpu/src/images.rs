@@ -9,7 +9,27 @@ use wgpu::util::DeviceExt;
 use lune_ui_core::image::{ImageData, ImageId, image_rect};
 use lune_ui_core::paint::Rect;
 use lune_ui_core::scene::{ImageItem, ImageSource};
-use lune_ui_core::text::TextKey;
+use lune_ui_core::text::{TextKey, TextRendering};
+
+/// A text setting as the bits that tell two settings apart: what a rasterised text is keyed by, so
+/// no raster is drawn under a setting other than the one it was made with.
+pub(crate) type RenderingBits = [u32; 7];
+
+/// The bits of `rendering`'s effective value (so `-0.0`, an invalid factor or a setting with
+/// smoothing off never count as another setting than the one they draw as).
+pub(crate) fn rendering_bits(rendering: TextRendering) -> RenderingBits {
+    let r = rendering.effective();
+    let d = r.stem_darkening;
+    [
+        u32::from(r.smoothing),
+        u32::from(r.hinting),
+        d.factors[0].to_bits(),
+        d.factors[1].to_bits(),
+        d.max_px[0].to_bits(),
+        d.max_px[1].to_bits(),
+        d.max_ppem.to_bits(),
+    ]
+}
 
 /// One image instance for the image shader: the picture's rect, the plain clip, the rounded clip
 /// rect, and `[rotation, alpha, rounded clip radius, 0]`. Physical pixels.
@@ -41,8 +61,9 @@ pub(crate) struct ImageResources {
     linear: wgpu::Sampler,
     /// Pictures the app registered.
     pub(crate) ids: HashMap<ImageId, GpuImage>,
-    /// Rasterised texts, dropped when the text leaves the cache.
-    pub(crate) texts: HashMap<TextKey, GpuImage>,
+    /// Rasterised texts by text and text setting, dropped when the text leaves the cache or its
+    /// setting is no longer drawn.
+    pub(crate) texts: HashMap<(TextKey, RenderingBits), GpuImage>,
 }
 
 impl ImageResources {
@@ -145,18 +166,22 @@ impl ImageResources {
         }
     }
 
-    /// The picture behind `source`, if it is registered or rasterised.
-    pub(crate) fn get(&self, source: ImageSource) -> Option<&GpuImage> {
+    /// The picture behind `source`, if it is registered or rasterised under the setting `bits`.
+    pub(crate) fn get(&self, source: ImageSource, bits: RenderingBits) -> Option<&GpuImage> {
         match source {
             ImageSource::Id(id) => self.ids.get(&id),
-            ImageSource::Text(key, _) => self.texts.get(&key),
+            ImageSource::Text(key, _) => self.texts.get(&(key, bits)),
         }
     }
 
     /// The instance record and bind group for drawing `item`, or `None` when its picture is not
     /// held or nothing of it would show.
-    pub(crate) fn instance(&self, item: &ImageItem) -> Option<(GpuImageInstance, wgpu::BindGroup)> {
-        let img = self.get(item.source)?;
+    pub(crate) fn instance(
+        &self,
+        item: &ImageItem,
+        bits: RenderingBits,
+    ) -> Option<(GpuImageInstance, wgpu::BindGroup)> {
+        let img = self.get(item.source, bits)?;
         let (tw, th) = (img.size.0 as f32, img.size.1 as f32);
         let rect = match item.source {
             ImageSource::Id(_) => image_rect(img.size, item.dst, item.fit, item.align)?,

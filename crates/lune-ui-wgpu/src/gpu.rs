@@ -5,15 +5,17 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use bytemuck::{Pod, Zeroable};
-use glyphon::{Cache, SwashCache, TextAtlas};
 use wgpu::util::DeviceExt;
 
 use crate::blur;
-use crate::images::{GpuImageInstance, ImageResources};
+use crate::glyph::{Cache, TextAtlas};
+use crate::images::{GpuImageInstance, ImageResources, RenderingBits, rendering_bits};
 use crate::platform;
+use crate::raster::GlyphRasterizer;
 use crate::text_cache::TextCache;
 use lune_ui_core::image::{ImageData, ImageError, ImageId, ImageStore};
 use lune_ui_core::scene::{ImageSource, Layer, Shape, StrokeVertex};
+use lune_ui_core::text::TextRendering;
 
 /// The uniform block of the shape and stroke pipelines: the target size in physical px, the scale
 /// and the opacity of the noise texture.
@@ -122,7 +124,10 @@ pub struct Gpu {
     pub(crate) noise_sampler: wgpu::Sampler,
     pub(crate) blur: blur::Shared,
     pub(crate) glyph_cache: Cache,
-    pub(crate) swash: SwashCache,
+    /// The one glyph rasterizer: the glyph atlases and the rotated-text rasters draw through it.
+    pub(crate) glyphs: GlyphRasterizer,
+    /// The text settings (as bits) the draws of this app frame used; cleared by `end_frame`.
+    text_bits_seen: Vec<RenderingBits>,
     /// Created on first use, looked up linearly (a handful of formats at most).
     pub(crate) formats: Vec<FormatState>,
     /// Set by the device's lost callback; read by [`Gpu::is_lost`].
@@ -314,7 +319,8 @@ impl Gpu {
             noise_sampler,
             blur,
             glyph_cache,
-            swash: SwashCache::new(),
+            glyphs: GlyphRasterizer::new(),
+            text_bits_seen: Vec::new(),
             formats: Vec::new(),
             lost,
         })
@@ -481,13 +487,7 @@ impl Gpu {
             cache: None,
             multiview_mask: None,
         });
-        let atlas = TextAtlas::with_color_mode(
-            device,
-            &self.queue,
-            &self.glyph_cache,
-            format,
-            glyphon::ColorMode::Web,
-        );
+        let atlas = TextAtlas::new(device, &self.queue, &self.glyph_cache, format);
         FormatState {
             format,
             acrylic_pipeline,
@@ -501,13 +501,28 @@ impl Gpu {
     }
 
     /// Per-app-frame housekeeping, once after every target of the frame drew: trims every glyph
-    /// atlas and ages the text cache.
+    /// atlas and ages the text cache. A rasterised text is kept while its shaped text is cached and,
+    /// when the frame drew, while its text setting was one the frame drew with, so a setting that
+    /// changes every frame (a slider drag) holds one raster per text, not one per value.
     pub fn end_frame(&mut self, text: &mut TextCache) {
         for f in &mut self.formats {
             f.atlas.trim();
         }
         text.end_frame();
-        self.images.texts.retain(|key, _| text.contains(*key));
+        let seen = std::mem::take(&mut self.text_bits_seen);
+        self.images.texts.retain(|(key, bits), _| {
+            text.contains(*key) && (seen.is_empty() || seen.contains(bits))
+        });
+    }
+
+    /// The largest side in px of any glyph atlas texture of any target format. A diagnostic for
+    /// tests: the atlas grows while a frame needs more glyphs than fit.
+    pub fn glyph_atlas_size(&self) -> u32 {
+        self.formats
+            .iter()
+            .map(|f| f.atlas.max_side())
+            .max()
+            .unwrap_or(0)
     }
 
     /// How many pictures the app has registered (rasterised texts are not counted).
@@ -520,18 +535,28 @@ impl Gpu {
         self.images.texts.len()
     }
 
-    /// Rasterises and uploads every text of `layers`' image items that has no raster yet.
-    pub(crate) fn ensure_text_images(&mut self, layers: &[&Layer], text: &mut TextCache) {
+    /// Rasterises and uploads, under `rendering`, every text of `layers`' image items that has no
+    /// raster for that setting yet.
+    pub(crate) fn ensure_text_images(
+        &mut self,
+        layers: &[&Layer],
+        text: &mut TextCache,
+        rendering: TextRendering,
+    ) {
         let limit = self.device.limits().max_texture_dimension_2d;
+        let bits = rendering_bits(rendering);
+        if !self.text_bits_seen.contains(&bits) {
+            self.text_bits_seen.push(bits);
+        }
         for layer in layers {
             for item in &layer.images {
                 let ImageSource::Text(key, _) = item.source else {
                     continue;
                 };
-                if self.images.texts.contains_key(&key) {
+                if self.images.texts.contains_key(&(key, bits)) {
                     continue;
                 }
-                let Some(raster) = text.rasterize(key, &mut self.swash) else {
+                let Some(raster) = text.rasterize(key, &mut self.glyphs, rendering) else {
                     continue;
                 };
                 if raster.width.max(raster.height) > limit {
@@ -544,7 +569,7 @@ impl Gpu {
                     raster.height,
                     &raster.rgba,
                 );
-                self.images.texts.insert(key, img);
+                self.images.texts.insert((key, bits), img);
             }
         }
     }
@@ -553,7 +578,8 @@ impl Gpu {
     /// fresh vertex buffers, created for this draw. The result's ranges index that list.
     ///
     /// [`Scene::in_order`]: lune_ui_core::scene::Scene::in_order
-    pub(crate) fn upload(&self, layers: &[&Layer]) -> Uploaded {
+    pub(crate) fn upload(&self, layers: &[&Layer], rendering: TextRendering) -> Uploaded {
+        let bits = rendering_bits(rendering);
         let mut shapes: Vec<GpuShape> = Vec::new();
         let mut strokes: Vec<GpuStrokeVertex> = Vec::new();
         let mut ranges = Vec::with_capacity(layers.len());
@@ -593,7 +619,7 @@ impl Gpu {
                 layer
                     .images
                     .iter()
-                    .filter_map(|item| self.images.instance(item))
+                    .filter_map(|item| self.images.instance(item, bits))
                     .map(|(inst, group)| {
                         instances.push(inst);
                         (instances.len() as u32 - 1, group)

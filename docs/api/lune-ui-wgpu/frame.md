@@ -29,7 +29,7 @@ pub struct FrameRenderer {
 
 Draws scenes into targets of one colour format. Use it only with the [`Gpu`](gpu.md#struct.Gpu) that made it.
 
-Source: `crates/lune-ui-wgpu/src/frame.rs:22`
+Source: `crates/lune-ui-wgpu/src/frame.rs:23`
 
 **Methods and associated items**
 

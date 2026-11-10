@@ -2,7 +2,7 @@
 //! the theme, and the seam types (text, input, backdrop material) that adapter crates implement.
 //! Styled after the house look (Fluent/Avalonia; see `docs/glass-styling.md`).
 //!
-//! This crate has no dependencies: no wgpu, winit or glyphon types appear in its signatures. The
+//! This crate has no dependencies: no wgpu, winit or cosmic-text types appear in its signatures. The
 //! renderer (`lune-ui-wgpu`), the window and input adapter (`lune-ui-winit`) and the OS material
 //! (`lune-ui-platform`) depend on it, and the `lune-ui` facade re-exports all of them.
 //!

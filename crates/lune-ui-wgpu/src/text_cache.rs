@@ -1,18 +1,20 @@
-//! The glyphon text system: a shaped-buffer cache behind [`TextSystem`].
+//! The cosmic-text system: a shaped-buffer cache behind [`TextSystem`].
 
 use std::borrow::Cow;
 use std::collections::HashMap;
 
-use glyphon::{
-    Attrs, Buffer, Color, Cursor, Family, FontSystem, Metrics, Shaping, Style as FontStyle,
-    SwashCache, Weight, Wrap,
+use cosmic_text::{
+    Attrs, Buffer, Color, Cursor, Family, FontSystem, Metrics, PhysicalGlyph, Renderer, Shaping,
+    Style as FontStyle, SwashContent, Weight, Wrap, render_decoration,
 };
 use unicode_segmentation::UnicodeSegmentation;
 
 use lune_ui_core::text::{
-    CaretPos, Font, LineSpan, Spec, Style, TextKey, TextSystem, Unit, clamp_to_boundary,
-    joined_text,
+    CaretPos, Font, LineSpan, Spec, Style, TextKey, TextRendering, TextSystem, Unit,
+    clamp_to_boundary, joined_text,
 };
+
+use crate::raster::GlyphRasterizer;
 
 /// A shaped text drawn into pixels by [`TextCache::rasterize`]: straight-alpha RGBA, row by row
 /// from the top left, with a margin of [`RASTER_MARGIN`] px around the text's own box.
@@ -64,7 +66,7 @@ struct Row {
     right: f32,
 }
 
-/// The glyphon [`TextSystem`]: shaped buffers keyed by [`TextKey`], so the UI can be drawn
+/// The cosmic-text [`TextSystem`]: shaped buffers keyed by [`TextKey`], so the UI can be drawn
 /// immediate-mode. One cache serves any number of targets and scales.
 #[derive(Debug)]
 pub struct TextCache {
@@ -92,7 +94,7 @@ impl TextCache {
         mono_family: &str,
         locale: &str,
     ) -> Self {
-        let mut db = glyphon::fontdb::Database::new();
+        let mut db = cosmic_text::fontdb::Database::new();
         for data in font_data {
             db.load_font_data(data.to_vec());
         }
@@ -106,7 +108,7 @@ impl TextCache {
         }
     }
 
-    /// The font system (for glyphon's `prepare`) alongside a lookup of shaped buffers.
+    /// The font system (for the glyph renderer's `prepare`) alongside a lookup of shaped buffers.
     pub fn split<'a>(
         &'a mut self,
     ) -> (
@@ -125,9 +127,19 @@ impl TextCache {
     }
 
     /// Draws the cached text `key` into straight-alpha RGBA pixels at the scale it was shaped at
-    /// (its own colours, on transparent), with [`RASTER_MARGIN`] px around its box. `None` for a
+    /// (its own colours, on transparent), with [`RASTER_MARGIN`] px around its box, rasterizing
+    /// glyphs as `rendering` says (its [`effective`](TextRendering::effective) value). `None` for a
     /// key that is not cached, an empty layout (no fonts, no text) or a side above 8192 px.
-    pub fn rasterize(&mut self, key: TextKey, swash: &mut SwashCache) -> Option<TextRaster> {
+    ///
+    /// With smoothing off the text is drawn by cosmic-text's `Buffer::draw`; otherwise each glyph
+    /// goes through `glyphs` with its own `GlyphParams`, so this path smooths like the glyph atlas
+    /// path does.
+    pub fn rasterize(
+        &mut self,
+        key: TextKey,
+        glyphs: &mut GlyphRasterizer,
+        rendering: TextRendering,
+    ) -> Option<TextRaster> {
         let entry = self.entries.get_mut(&key)?;
         let (mut w, mut h) = (0.0_f32, 0.0_f32);
         for run in entry.buffer.layout_runs() {
@@ -140,33 +152,68 @@ impl TextCache {
             return None;
         }
         let mut rgba = vec![0u8; 4 * width as usize * height as usize];
-        entry.buffer.draw(
-            &mut self.fonts,
-            swash,
-            Color::rgb(0xCC, 0xCC, 0xCC),
-            |x, y, rw, rh, color| {
-                let src = f32::from(color.a()) / 255.0;
-                if src <= 0.0 {
-                    return;
+        let mut blend = |x: i32, y: i32, rw: u32, rh: u32, color: Color| {
+            let src = f32::from(color.a()) / 255.0;
+            if src <= 0.0 {
+                return;
+            }
+            for py in y.max(-(m as i32))..(y + rh as i32).min(height as i32 - m as i32) {
+                for px in x.max(-(m as i32))..(x + rw as i32).min(width as i32 - m as i32) {
+                    let i =
+                        4 * ((py + m as i32) as usize * width as usize + (px + m as i32) as usize);
+                    let dst = f32::from(rgba[i + 3]) / 255.0;
+                    let out = src + dst * (1.0 - src);
+                    let mix = |s: u8, d: u8| {
+                        (f32::from(s) * src + f32::from(d) * dst * (1.0 - src)) / out
+                    };
+                    rgba[i] = mix(color.r(), rgba[i]).round() as u8;
+                    rgba[i + 1] = mix(color.g(), rgba[i + 1]).round() as u8;
+                    rgba[i + 2] = mix(color.b(), rgba[i + 2]).round() as u8;
+                    rgba[i + 3] = (out * 255.0).round() as u8;
                 }
-                for py in y.max(-(m as i32))..(y + rh as i32).min(height as i32 - m as i32) {
-                    for px in x.max(-(m as i32))..(x + rw as i32).min(width as i32 - m as i32) {
-                        let i = 4
-                            * ((py + m as i32) as usize * width as usize
-                                + (px + m as i32) as usize);
-                        let dst = f32::from(rgba[i + 3]) / 255.0;
-                        let out = src + dst * (1.0 - src);
-                        let mix = |s: u8, d: u8| {
-                            (f32::from(s) * src + f32::from(d) * dst * (1.0 - src)) / out
+            }
+        };
+        let default = Color::rgb(0xCC, 0xCC, 0xCC);
+        let rendering = rendering.effective();
+        if rendering == TextRendering::OFF {
+            entry
+                .buffer
+                .draw(&mut self.fonts, glyphs.swash(), default, blend);
+        } else {
+            entry.buffer.shape_until_scroll(&mut self.fonts, false);
+            for run in entry.buffer.layout_runs() {
+                for glyph in run.glyphs {
+                    let physical = glyph.physical((0., run.line_y), 1.0);
+                    let color = glyph.color_opt.unwrap_or(default);
+                    let params =
+                        rendering.glyph_params(f32::from_bits(physical.cache_key.font_size_bits));
+                    let Some(image) = glyphs.image(&mut self.fonts, physical.cache_key, params)
+                    else {
+                        continue;
+                    };
+                    // Texels as cosmic-text's `SwashCache::with_pixels` feeds them: a mask is
+                    // coverage with the colour's rgb, a colour glyph its own rgba.
+                    let channels = match image.content {
+                        SwashContent::Mask => 1,
+                        SwashContent::Color => 4,
+                        SwashContent::SubpixelMask => continue,
+                    };
+                    let width = image.placement.width as usize;
+                    let (left, top) = (image.placement.left, image.placement.top);
+                    for (i, texel) in image.data.chunks_exact(channels).enumerate() {
+                        let x = physical.x + left + (i % width) as i32;
+                        let y = physical.y - top + (i / width) as i32;
+                        let pixel = if channels == 1 {
+                            Color((u32::from(texel[0]) << 24) | (color.0 & 0xFF_FF_FF))
+                        } else {
+                            Color::rgba(texel[0], texel[1], texel[2], texel[3])
                         };
-                        rgba[i] = mix(color.r(), rgba[i]).round() as u8;
-                        rgba[i + 1] = mix(color.g(), rgba[i + 1]).round() as u8;
-                        rgba[i + 2] = mix(color.b(), rgba[i + 2]).round() as u8;
-                        rgba[i + 3] = (out * 255.0).round() as u8;
+                        blend(x, y, 1, 1, pixel);
                     }
                 }
-            },
-        );
+                render_decoration(&mut Rectangles(&mut blend), &run, default);
+            }
+        }
         Some(TextRaster {
             width,
             height,
@@ -181,6 +228,18 @@ impl TextCache {
             .retain(|_, e| frame.saturating_sub(e.last_used) < 180);
         self.frame += 1;
     }
+}
+
+/// A cosmic-text [`Renderer`] that keeps the rectangles (text decoration) and ignores glyphs: the
+/// glyphs of a rotated text are drawn by [`TextCache::rasterize`] itself.
+struct Rectangles<F>(F);
+
+impl<F: FnMut(i32, i32, u32, u32, Color)> Renderer for Rectangles<F> {
+    fn rectangle(&mut self, x: i32, y: i32, w: u32, h: u32, color: Color) {
+        (self.0)(x, y, w, h, color);
+    }
+
+    fn glyph(&mut self, _physical_glyph: PhysicalGlyph, _color: Color) {}
 }
 
 /// The runs as cosmic-text gets them: each line break of the joined text as one `\n`.
@@ -307,7 +366,7 @@ fn rows_of(buffer: &Buffer, joined: &str, height: f32) -> Vec<Row> {
 }
 
 /// The byte range of a layout run's glyphs in its buffer line (empty for an empty line).
-fn glyph_range(glyphs: &[glyphon::LayoutGlyph]) -> (usize, usize) {
+fn glyph_range(glyphs: &[cosmic_text::LayoutGlyph]) -> (usize, usize) {
     let start = glyphs.iter().map(|g| g.start).min().unwrap_or(0);
     let end = glyphs.iter().map(|g| g.end).max().unwrap_or(0);
     (start, end)
@@ -320,7 +379,7 @@ fn glyph_range(glyphs: &[glyphon::LayoutGlyph]) -> (usize, usize) {
 /// right half and back to the start in the second glyph's left half. `None` when `x` is in no such
 /// cluster. Only a glyph under `x` looks for its siblings, so a row of `n` glyphs costs `O(n)` a
 /// call, not `O(n^2)`; an `x` in a gap between two glyphs of one cluster is left to `Buffer::hit`.
-fn cluster_hit(run: &glyphon::LayoutRun, x: f32) -> Option<usize> {
+fn cluster_hit(run: &cosmic_text::LayoutRun, x: f32) -> Option<usize> {
     run.glyphs.iter().find_map(|g| {
         if x < g.x || x > g.x + g.w {
             return None;
