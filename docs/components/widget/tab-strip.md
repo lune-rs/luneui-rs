@@ -96,13 +96,13 @@ Never animated: the strip's layout (a tab or the new-tab button opening or closi
 ### Input and focus
 
 - Wheel and swipe: a strip whose tabs fit registers no scroll sense while it has nothing to scroll, so the delta reaches the scroll area around it; one that overflows keeps it (D176).
-- Pointer: press on a tab activates it and arms a reorder; click on the close button closes (a separate click target); click on the new-tab button adds a tab; right press on a tab opens its context menu; wheel and trackpad scroll the strip [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:303-311,338-348,365-368], [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:244-247]. Double-click is not bound in the file read.
+- Pointer: press on a tab activates it and arms a reorder; click on the close button closes (a separate click target); click on the new-tab button adds a tab; a right press on a tab (or its close button), or the show-menu action, is reported as `TabStripResponse::context` (the tab and its rect) and the strip opens no menu: the app opens its own with `Ui::menu` (D292, D293); wheel and trackpad scroll the strip [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:303-311,338-348,365-368], [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:244-247]. Double-click is not bound in the file read.
 - Reorder: through `infra.drag-and-drop` (threshold 4 horizontal, nearest-slot target, edge auto-scroll, Escape cancels) [infra.drag-and-drop].
 - Keys: Meta+T opens a new tab, which is the app's shortcut [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml:17-19], [D122]; Escape cancels a drag [L src/Lunegit.Desktop/Views/TerminalPanelView.axaml.cs:336-341]. No close or rename key [D122].
 - Gesture: from the press to the end of a gesture the strip draws and feeds the drag machine the press frame's widths [D123]. A tab added, closed or swapped ends the gesture with no reorder. A change of the active tab reveals it only after the gesture, since a reveal scrolls the slots under a held pointer. No tooltip runs during a gesture.
-- Menu: the rows of a tab with `closable` false leave out Close. The app's rows follow in `menu_extra`.
+- Context: `TabStripResponse::context: Option<(TabKey, Rect)>` for one frame, also for a tab with `closable` false; a disabled strip reports none. The rows, icons and actions are the app's; the gallery's tab-strip page is the example (D293).
 - Tab stops: the strip is one `tab-list` stop, roving: Left and Right wrap, Home and End go to the ends, Enter and Space activate, focus does not activate [D122]. The close buttons are no stops (a pointer target and a node); the new-tab button is the next stop.
-- Layer: `Page` (inside the card). Context menu and the tooltip are overlays above [core.ui].
+- Layer: `Page` (inside the card). The app's context menu and the tooltip are overlays above [core.ui].
 - Close policy is the app's: Lunegit confirms with a dialog (checkbox "Don't ask again") only when the session is alive and the prompt is not suppressed [L src/Lunegit.Desktop/ViewModels/TerminalPanelViewModel.cs:574-612]; rename opens a modal dialog with a text field [L src/Lunegit.Desktop/ViewModels/TerminalPanelViewModel.cs:656-659]. The strip emits `close_requested(tab)` and `rename_requested(tab)`; it never decides.
 - No focus scope of its own.
 
@@ -123,10 +123,6 @@ Never animated: the strip's layout (a tab or the new-tab button opening or closi
 
 - `luneui.tab-strip.new`: "New tab" (Lunegit: "New terminal tab", the word terminal dropped) [L src/Lunegit.Infrastructure/Localization/en.json:780].
 - `luneui.tab-strip.close`: "Close tab" [L src/Lunegit.Infrastructure/Localization/en.json:781].
-- `luneui.tab-strip.menu.close`: "Close" [L src/Lunegit.Infrastructure/Localization/en.json:821].
-- `luneui.tab-strip.menu.close-others`: "Close Others" [L src/Lunegit.Infrastructure/Localization/en.json:822].
-- `luneui.tab-strip.menu.close-all`: "Close All" [L src/Lunegit.Infrastructure/Localization/en.json:823].
-- `luneui.tab-strip.menu.rename`: "Rename…" [L src/Lunegit.Infrastructure/Localization/en.json:824].
 
 The confirm and rename dialog texts, "Duplicate Tab" and "Copy Working Directory" are app strings [L src/Lunegit.Infrastructure/Localization/en.json:782-785,825-832].
 
@@ -176,7 +172,7 @@ The confirm and rename dialog texts, "Duplicate Tab" and "Copy Working Directory
 ## Open questions
 
 - Still open, a `role-gap` limit (D122; D237): `role-gap: tab to panel association` (see Accessibility).
-- Limit (Q23): a disabled strip closes its open menu (`disabling_the_strip_closes_an_open_menu`), so no widget holds focus that frame and the menu's keys reach a `Global` binding. Kept as the recorded behaviour.
+- Q23 is gone with the strip's menu (D293): the app owns its menu and its keys.
 - Header tint: `Theme` has no token for the header's layer, so `TabStripOptions.header_tint` takes the colour from the app and `None` draws no tint; the gallery uses #00000024 ([D131]). It is a plain fill, drawn after the under shapes, so a hover fill sits under it, where Lunegit's sits over it.
 
 Closed by [D122]: the keyboard model, the disabled tab (none), all three busy treatments ship with Sweep as the default. `fg_muted` landed in M4 ([D58]).

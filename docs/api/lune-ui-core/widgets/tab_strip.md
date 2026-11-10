@@ -6,8 +6,9 @@
 
 Tabs with close, overflow, drag reorder, the outline and a busy cue (`widget.tab-strip`).
 
-The strip owns no list: it draws `tabs` and reports [`TabEvent`](tab_strip.md#enum.TabEvent)s; closing, renaming and the
-order are the app's. One frame computes the layout once, and everything reads it:
+The strip owns no list and no menu: it draws `tabs` and reports [`TabEvent`](tab_strip.md#enum.TabEvent)s; closing and the
+order are the app's, and a secondary click comes back as [`TabStripResponse::context`](tab_strip.md#structfield.TabStripResponse.context), where
+the app opens its own menu (D292). One frame computes the layout once, and everything reads it:
 
 - The widths come from one place: measured, or while a gesture lives the press frame's (D123),
   so an activation, a hover or a title change cannot move a slot under the pointer. The
@@ -48,7 +49,7 @@ Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:95`
 
 - <a id="structfield.Tab.closable"></a>`pub closable: bool`
 
-  Shows the close button and the menu's Close row.
+  Shows the close button.
 
 - <a id="structfield.Tab.progress"></a>`pub progress: Option<Tone>`
 
@@ -98,7 +99,6 @@ pub struct TabStripOptions<'a> {
     pub busy: Option<BusyCue>,
     pub busy_tone: Tone,
     pub card: Rect,
-    pub menu_extra: &'a [&'a str],
     pub name: &'a str,
     pub header_tint: Option<Rgba>,
 }
@@ -128,10 +128,6 @@ Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:119`
 
   The card the strip heads, in the strip's own space: the outline wraps it.
 
-- <a id="structfield.TabStripOptions.menu_extra"></a>`pub menu_extra: &'a [&'a str]`
-
-  The app's rows after the menu's own.
-
 - <a id="structfield.TabStripOptions.name"></a>`pub name: &'a str`
 
   The tab list's accessible name.
@@ -156,23 +152,28 @@ Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:119`
 ```rust
 pub struct TabStripResponse {
     pub events: Vec<TabEvent>,
+    pub context: Option<(TabKey, Rect)>,
 }
 ```
 
 What [`Ui::tab_strip`](../ui.md#method.Ui.tab_strip) returns.
 
-Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:159`
+Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:152`
 
 **Fields**
 
 - <a id="structfield.TabStripResponse.events"></a>`pub events: Vec<TabEvent>`
+
+- <a id="structfield.TabStripResponse.context"></a>`pub context: Option<(TabKey, Rect)>`
+
+  The tab a secondary click or a show-menu action landed on, and its rect: the app opens its
+  menu there.
 
 **Trait implementations**
 
 - `impl Clone for TabStripResponse`
 - `impl Debug for TabStripResponse`
 - `impl Default for TabStripResponse`
-- `impl Eq for TabStripResponse`
 - `impl PartialEq for TabStripResponse`
 - `impl StructuralPartialEq for TabStripResponse`
 
@@ -226,16 +227,12 @@ pub enum TabEvent {
     Close(TabKey),
     New,
     Reorder { from: usize, to: usize },
-    CloseOthers(TabKey),
-    CloseAll,
-    Rename(TabKey),
-    MenuExtra(TabKey, usize),
 }
 ```
 
 What the user asked for this frame.
 
-Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:140`
+Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:138`
 
 **Variants**
 
@@ -250,16 +247,6 @@ Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:140`
 - <a id="variant.TabEvent.Reorder"></a>`Reorder { from: usize, to: usize }`
 
   The tab at `from` moves to index `to` (remove, then insert).
-
-- <a id="variant.TabEvent.CloseOthers"></a>`CloseOthers(TabKey)`
-
-- <a id="variant.TabEvent.CloseAll"></a>`CloseAll`
-
-- <a id="variant.TabEvent.Rename"></a>`Rename(TabKey)`
-
-- <a id="variant.TabEvent.MenuExtra"></a>`MenuExtra(TabKey, usize)`
-
-  Row `.1` of [`TabStripOptions::menu_extra`](tab_strip.md#structfield.TabStripOptions.menu_extra) on the tab's menu.
 
 **Trait implementations**
 
@@ -281,7 +268,7 @@ pub fn busy_treatment(cue: BusyCue, tier: MotionTier) -> Option<BusyCue>
 
 The treatment that runs for `cue` under `tier`: Reduced forces the breath, Off is static.
 
-Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:164`
+Source: `crates/lune-ui-core/src/widgets/tab_strip.rs:160`
 
 ## Constants
 

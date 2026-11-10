@@ -1301,7 +1301,9 @@ Source: `crates/lune-ui-core/src/ui.rs:116`
   is under the strip. A closable tab reserves its close column, so a hover or an activation
   moves no tab; a change of `opts.active` slides the outline's notch to the new tab ([`SLIDE`](widgets/tab_strip.md#constant.SLIDE)).
   Call it every frame. Read `events` and apply them to the app's list; the strip never
-  changes it. See the module docs.
+  changes it. A secondary click (or the show-menu action) on a tab comes back as `context`,
+  the tab and its rect; the strip opens no menu, the app opens its own with [`Ui::menu`](ui.md#method.Ui.menu)
+  there. See the module docs.
 
 `impl Ui<'_>`
 

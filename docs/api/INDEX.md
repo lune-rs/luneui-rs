@@ -12,7 +12,7 @@ Each crate has a page per module (`<crate>/<module path>.md`; the root is `index
 
 ### `lune-ui-core` (`lune_ui_core`)
 
-92 modules, 1085 items. Left out and counted: 3252 blanket impls, 4686 items of the omitted impls, 1250 items of the trait impls shown as one line, 2178 synthetic impls.
+92 modules, 1086 items. Left out and counted: 3252 blanket impls, 4686 items of the omitted impls, 1250 items of the trait impls shown as one line, 2178 synthetic impls.
 
 | Module | Items |
 | --- | --- |
@@ -24,7 +24,7 @@ Each crate has a page per module (`<crate>/<module path>.md`; the root is `index
 | [`lune_ui_core::code_doc`](lune-ui-core/code_doc.md) | 1 |
 | [`lune_ui_core::color`](lune-ui-core/color.md) | 7 |
 | [`lune_ui_core::drag`](lune-ui-core/drag.md) | 23 |
-| [`lune_ui_core::icon`](lune-ui-core/icon.md) | 30 |
+| [`lune_ui_core::icon`](lune-ui-core/icon.md) | 31 |
 | [`lune_ui_core::image`](lune-ui-core/image.md) | 8 |
 | [`lune_ui_core::input`](lune-ui-core/input.md) | 19 |
 | [`lune_ui_core::json`](lune-ui-core/json.md) | 11 |
@@ -351,6 +351,7 @@ Every top-level item of the four owning crates, by name.
 - [`CLOSE`](lune-ui-core/icon.md#constant.CLOSE) - constant, `lune_ui_core::icon`
 - [`CLOSE`](lune-ui-core/widgets/dialog.md#constant.CLOSE) - constant, `lune_ui_core::widgets::dialog`
 - [`CLOSE`](lune-ui-core/widgets/menu.md#constant.CLOSE) - constant, `lune_ui_core::widgets::menu`
+- [`CLOSE_ALL`](lune-ui-core/icon.md#constant.CLOSE_ALL) - constant, `lune_ui_core::icon`
 - [`CLOSE_GLYPH`](lune-ui-core/widgets/tab_strip.md#constant.CLOSE_GLYPH) - constant, `lune_ui_core::widgets::tab_strip`
 - [`CLOSE_SIZE`](lune-ui-core/widgets/tab_strip.md#constant.CLOSE_SIZE) - constant, `lune_ui_core::widgets::tab_strip`
 - [`COALESCE_PAUSE`](lune-ui-core/text_edit.md#constant.COALESCE_PAUSE) - constant, `lune_ui_core::text_edit`

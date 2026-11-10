@@ -44,8 +44,8 @@ Depend on the facade `lune-ui`: it re-exports the four adapters under the paths 
 `popover`, `material`, `testing`, `lunegit_dark`, ...). The snapshot builds as a path dependency with
 `cargo check --offline` from a scratch consumer, and `cargo metadata --offline` passes inside it.
 
-**The version is 0.2.0 (D238).** Luneterm's own in-tree `crates/lune-ui` is 0.1.0; two packages named
-`lune-ui` at one version cannot stand in one lock. At 0.2.0 they can, so a port goes crate by crate
+**The version is 0.3.0 (D238, D293).** Luneterm's own in-tree `crates/lune-ui` is 0.1.0; two packages named
+`lune-ui` at one version cannot stand in one lock. At 0.2.0 and later they can, so a port goes crate by crate
 instead of in one commit. Keep the in-tree crate until the last importer has moved, then delete it.
 
 The snapshot carries no tests: run the toolkit's gate in the toolkit's repo.
@@ -132,6 +132,18 @@ Lines are the spike's, at 296cfdc.
 Not errors, but new since 296cfdc and worth a look when porting: `Theme` gained fields (a
 `Theme { .. }` literal outside the toolkit needs `glass`), `Event` gained the file-drop variants (the
 enums are `#[non_exhaustive]`: match with a wildcard), and `lune_ui::testing` holds the fakes.
+
+## 0.2.0 to 0.3.0: the tab strip's menu is the app's
+
+D292, D293. The tab strip no longer builds a context menu: it reports the right-click as `TabStripResponse::context` and the app opens its own with `Ui::menu`.
+
+| old | new | note |
+| --- | --- | --- |
+| `TabStripOptions { menu_extra, .. }` | drop the field | the strip has no menu rows of its own or an app's |
+| `TabEvent::CloseOthers(k)`, `CloseAll`, `Rename(k)`, `MenuExtra(k, i)` | gone: the app's own menu runs these | a `match` on `TabEvent` keeps `Activate`, `Close`, `New`, `Reorder` |
+| (the strip's menu opened by itself) | `let r = ui.tab_strip(..); if let Some((key, rect)) = r.context { menu = Some((key, ui.pointer_pos().filter(\|q\| rect.contains(*q)).unwrap_or((rect.x, rect.bottom())))) }`, then each frame while `menu` is `Some`: `ui.menu("tab-menu", &rows, at)`; run `picked` (an index into `rows`), and clear `menu` on a pick or `dismissed` | the gallery's `pages/tab_strip.rs` (`Demo::tab_menu`) is the worked example, with icons |
+| `TabStripResponse` derives `Eq` | derives `PartialEq` only | it holds a `Rect` |
+| the strings `luneui.tab-strip.menu.close`, `.close-others`, `.close-all`, `.rename` | gone | delete them from a language file: an unknown toolkit key is rejected at insert (`StringError::UnknownToolkitKey`) |
 
 ## API changes of the library pass
 

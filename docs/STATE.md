@@ -1,17 +1,18 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-09 (tab strip: reserved close column, `+` after the last tab, notch slide; on branch `orch/tab-strip-plus-and-slide`, not yet merged; library pass and dark-glass are on main, published at github.com/lune-rs/luneui-rs)
+Last updated: 2026-11-11 (tab strip reports `context` and owns no menu, version 0.3.0; on branch `orch/tab-context-menu`, not yet merged; tab-strip-plus-and-slide, library pass and dark-glass are on main, published at github.com/lune-rs/luneui-rs)
 
 ## Now
 
 Program toolkit-v1 closed with M11 (merged at 10f503e); the gallery showcase task and the library pass followed. The toolkit is five crates (`lune-ui-core`, the adapters
-`lune-ui-wgpu`, `lune-ui-winit`, `lune-ui-platform`, and the facade `lune-ui`), workspace version 0.2.0 (D238, still: no consumer had adopted it, so the library pass changed
-the API with no bump). `apps/gallery` has 82 pages and 439 scene names (the first 14 are the legacy Painter-API scenes). The catalogue holds 97 entries: 91 `done`, 2 `in-progress`,
+`lune-ui-wgpu`, `lune-ui-winit`, `lune-ui-platform`, and the facade `lune-ui`), workspace version 0.3.0 (D293; 0.2.0 was D238, kept while no consumer had adopted the toolkit). `apps/gallery` has 82 pages and 439 scene names (the first 14 are the legacy Painter-API scenes). The catalogue holds 97 entries: 91 `done`, 2 `in-progress`,
 4 `external`. Milestone merges to main: M4 d9fe71f, M5 1aeaf1b, M6 a75a708, M7 662d310, M8 2474248, M9 8f499d0, M10 55cfaaf, M11 10f503e (M1 to M3: the extraction, the seams and the catalogue).
 `docs/architecture.md` has the module map, the pages and "API changes since M1"; `docs/consuming.md` how an app vendors the toolkit and, for the library pass, the migration map of its API changes.
 
-Tab strip (task `luneui-rs/tab-strip-plus-and-slide`, D289 to D291; on its branch, merge and push wait for the user's yes): a closable tab reserves its close column, so a hover or an activation moves no tab (D289, a Lunegit deviation); the new-tab button follows the last tab and is pinned at the right end only on overflow, and the viewport is fitted to the tabs, so the strip's empty space reaches the app under it (D290); the active tab's notch slides on a change of the active key (`tab_strip::SLIDE`, D291; scene `tab-strip-switch-mid`, 439 scene names). The pixel gate (`--base main`) moved exactly the `tab-strip-*` scenes (14 by the button's place, `tab-strip-content-swap` also by the slide) and left `tab-strip-overflow` identical; those 15 are the `--allow` list of D290. The feel of the slide is the user's to check with `cargo run -p gallery`.
+Tab context menu (task `luneui-rs/tab-context-menu`, D292, D293; on its branch): no widget builds a context menu (D292); `Ui::tab_strip` reports `TabStripResponse::context: Option<(TabKey, Rect)>` and the app opens its own `Ui::menu`. Removed: `menu_extra`, `TabEvent::CloseOthers|CloseAll|Rename|MenuExtra`, the four `luneui.tab-strip.menu.*` strings (a breaking change, hence 0.3.0; migration table in `docs/consuming.md`). The gallery's tab-strip page builds an icon menu from `context` (`icon::CLOSE_ALL` is new). The pixel gate is the orchestrator's final gate (no scene drew the strip's menu, so zero delta is expected). After merge: tag `v0.3.0` on the merge commit, push `main` and the tag, tell Luneterm the rev (the user's yes first, D4 of the task).
+
+Tab strip (task `luneui-rs/tab-strip-plus-and-slide`, D289 to D291; merged at 32d1904): a closable tab reserves its close column, so a hover or an activation moves no tab (D289, a Lunegit deviation); the new-tab button follows the last tab and is pinned at the right end only on overflow, and the viewport is fitted to the tabs, so the strip's empty space reaches the app under it (D290); the active tab's notch slides on a change of the active key (`tab_strip::SLIDE`, D291; scene `tab-strip-switch-mid`, 439 scene names). The pixel gate (`--base main`) moved exactly the `tab-strip-*` scenes (14 by the button's place, `tab-strip-content-swap` also by the slide) and left `tab-strip-overflow` identical; those 15 are the `--allow` list of D290. The feel of the slide is the user's to check with `cargo run -p gallery`.
 
 Dark glass (task `luneui-rs/dark-glass`, D285 to D288; merged at 9f1421f): the OS glass is data (`Material::Custom(OsMaterial)`, `Material::os_material`); a theme file may carry an optional `glass` section (layers, curve, material); `theme::near_black` is the approved near-black look as one file, floating surfaces included (`MENU_GLASS`, D288). The gallery lists it in the materials and themes panes, and its tab header uses `near_black::HEADER_TINT` under that glass. Lunegit's preset is unchanged. The pixel gate was not run (no component's drawing changed, D254): the five `showcase-*` scenes move by design and are checked by eye. Unverified here: `UltraDark` under a Light system appearance on macOS, and every Windows result (the Windows code compiles; nothing ran there). Step 7 added `docs/api/` (D287): the whole public API as generated Markdown, a page per module, from rustdoc JSON by `tools/api-docs`; `scripts/gen-api-docs.sh --check` is in the gate, so it cannot go stale. Start at `docs/api/INDEX.md`.
 
@@ -69,7 +70,7 @@ fit panel's clip, the nits F2 to F7 of M6 and M8, and the Library follow-ups the
   What the OS draws for Windows acrylic and for vibrancy that follows the window when the window is inactive is unverified here, and the app draws no fallback now (D262).
 - Fonts: the gallery bundles no CJK face, so the IME scenes' "かな" draws as boxes (D90). No bold face is bundled, so bold draws exactly as medium (`text.shaping`). No italic face, so italic
   is the shaper's skew (D189).
-- Audit rulings (Q23, Q25): the tab strip closes its open menu when disabled, so that frame's menu keys reach a `Global` binding (`disabling_the_strip_closes_an_open_menu`).
+- Audit ruling Q25 stands; Q23 (the strip closing its own menu when disabled) is gone with the strip's menu (D293).
 - `menu_separator` is `#FFFFFF22`, not Lunegit's `#18FFFFFF` (D244). `menu_popup_border` is `#FFFFFF1F`, a deliberate deviation from Lunegit's `PopupMenuOuterBorder` (D260).
 - API gaps, marked in the entries: the table has no column resize or reorder (D163, Q15, deferred); `StrokeStyle` has no cap mode, so the lane graph's lines end butt (D172); the access tree has no
   keyboard-move action for the board (D55, D169); the callout has no title line or inline figure and the empty state's actions have no glyph (D136); the sidebar footer is one line in one family;
@@ -113,8 +114,8 @@ fit panel's clip, the nits F2 to F7 of M6 and M8, and the Library follow-ups the
 
 1. Dark glass: the by-eye checks in Unverified here. After any public API or doc-comment change run `scripts/gen-api-docs.sh` (the gate's `--check` fails on a stale `docs/api/`).
 2. The rest of a hands-on run of `cargo run -p gallery` (see Unverified here); the look values are settled.
-3. Luneterm's M9 adopts the toolkit through `docs/consuming.md`: vendor `scripts/export-snapshot.sh`'s output, switch crate by crate (version 0.2.0 lets the in-tree `lune-ui` and the snapshot stand
-   in one lock), use the migration maps (the Luneterm one and "API changes of the library pass"); its own OS runs close `platform.material` and `render.surface`. Luneterm itself is not changed by this repo.
+3. Luneterm's M9 adopts the toolkit through `docs/consuming.md`: vendor `scripts/export-snapshot.sh`'s output, switch crate by crate (version 0.2.0 and later let the in-tree `lune-ui` and the snapshot stand
+   in one lock), use the migration maps (the Luneterm one, "API changes of the library pass" and "0.2.0 to 0.3.0"); its own OS runs close `platform.material` and `render.surface`. Luneterm itself is not changed by this repo.
 4. The Lunegit fixtures are licensed MIT OR Apache-2.0 (D284); the export still leaves them out.
 5. The user's calls, all reversible and taken at the recommended option: the final tray glyph (`platform.tray-icon`), column resize and reorder in the table (D163, Q15), and two taken calls to
    confirm: the Windows popover activates (D224, Q17), the tray icon is a CPU raster (D218, Q18).
