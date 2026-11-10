@@ -1,7 +1,8 @@
 //! Tabs with close, overflow, drag reorder, the outline and a busy cue (`widget.tab-strip`).
 //!
-//! The strip owns no list: it draws `tabs` and reports [`TabEvent`]s; closing, renaming and the
-//! order are the app's. One frame computes the layout once, and everything reads it:
+//! The strip owns no list and no menu: it draws `tabs` and reports [`TabEvent`]s; closing and the
+//! order are the app's, and a secondary click comes back as [`TabStripResponse::context`], where
+//! the app opens its own menu (D292). One frame computes the layout once, and everything reads it:
 //!
 //! - The widths come from one place: measured, or while a gesture lives the press frame's (D123),
 //!   so an activation, a hover or a title change cannot move a slot under the pointer. The
@@ -33,7 +34,6 @@ use crate::motion::{Easing, Kind, Motion, MotionTier, Reduce, Time, Token};
 use crate::paint::{Painter, Rect, StrokeStyle, Xform};
 use crate::text::{Spec, Style};
 use crate::ui::{Response, RoveAxis, Sense, Ui, WidgetId};
-use crate::widgets::menu::MenuRow;
 
 /// The strip's height and the outline's seam.
 pub const HEIGHT: f32 = 32.0;
@@ -95,7 +95,7 @@ pub struct TabKey(pub u64);
 pub struct Tab<'a> {
     pub key: TabKey,
     pub title: &'a str,
-    /// Shows the close button and the menu's Close row.
+    /// Shows the close button.
     pub closable: bool,
     /// The title shines while the work runs: a band of light passes through it, in the tone's
     /// light (`Neutral` is `fg_bright`). The tab is no wider for it.
@@ -126,8 +126,6 @@ pub struct TabStripOptions<'a> {
     pub busy_tone: Tone,
     /// The card the strip heads, in the strip's own space: the outline wraps it.
     pub card: Rect,
-    /// The app's rows after the menu's own.
-    pub menu_extra: &'a [&'a str],
     /// The tab list's accessible name.
     pub name: &'a str,
     /// The header's tint, punched out by the outline so the active tab reads as cut out of the
@@ -147,17 +145,15 @@ pub enum TabEvent {
         from: usize,
         to: usize,
     },
-    CloseOthers(TabKey),
-    CloseAll,
-    Rename(TabKey),
-    /// Row `.1` of [`TabStripOptions::menu_extra`] on the tab's menu.
-    MenuExtra(TabKey, usize),
 }
 
 /// What [`Ui::tab_strip`] returns.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct TabStripResponse {
     pub events: Vec<TabEvent>,
+    /// The tab a secondary click or a show-menu action landed on, and its rect: the app opens its
+    /// menu there.
+    pub context: Option<(TabKey, Rect)>,
 }
 
 /// The treatment that runs for `cue` under `tier`: Reduced forces the breath, Off is static.
@@ -309,8 +305,6 @@ struct StripState {
     pressed: Option<TabKey>,
     /// The tab dragged or settling, which paints last.
     lifted: Option<TabKey>,
-    /// The tab the menu is for, and where it opened (window space).
-    menu: Option<(TabKey, (f32, f32))>,
     /// The `active` already revealed.
     revealed: Option<TabKey>,
     /// The active tab last drawn and its drawn span (left and width in content space, the drag
@@ -349,7 +343,9 @@ impl Ui<'_> {
     /// is under the strip. A closable tab reserves its close column, so a hover or an activation
     /// moves no tab; a change of `opts.active` slides the outline's notch to the new tab ([`SLIDE`]).
     /// Call it every frame. Read `events` and apply them to the app's list; the strip never
-    /// changes it. See the module docs.
+    /// changes it. A secondary click (or the show-menu action) on a tab comes back as `context`,
+    /// the tab and its rect; the strip opens no menu, the app opens its own with [`Ui::menu`]
+    /// there. See the module docs.
     pub fn tab_strip(
         &mut self,
         key: impl Hash,
@@ -360,17 +356,18 @@ impl Ui<'_> {
         let id = self.id(&key);
         let mut st = mem::take(self.transient::<StripState>(id));
         let mut events = Vec::new();
+        let mut context = None;
         let mut node = Node::new(id, Role::TabList, opts.name, rect);
         if !self.is_enabled() {
             node.states.insert(State::Disabled);
         }
         self.scope(&key, |ui| {
             ui.node_container(node, |ui| {
-                ui.strip_frame(rect, tabs, opts, &mut st, &mut events);
+                ui.strip_frame(rect, tabs, opts, &mut st, &mut events, &mut context);
             });
         });
         *self.transient::<StripState>(id) = st;
-        TabStripResponse { events }
+        TabStripResponse { events, context }
     }
 
     fn strip_frame(
@@ -380,6 +377,7 @@ impl Ui<'_> {
         opts: &TabStripOptions<'_>,
         st: &mut StripState,
         events: &mut Vec<TabEvent>,
+        context: &mut Option<(TabKey, Rect)>,
     ) {
         let keys: Vec<TabKey> = tabs.iter().map(|t| t.key).collect();
         // A tab added, closed or moved under a gesture ends it. The machine sees only a count, and
@@ -391,7 +389,6 @@ impl Ui<'_> {
         let known = |k: &TabKey| keys.contains(k);
         st.pressed = st.pressed.filter(known);
         st.lifted = st.lifted.filter(known);
-        st.menu = st.menu.filter(|(k, _)| known(k));
 
         let active = opts.active.and_then(|a| keys.iter().position(|k| *k == a));
         let hover = self.painter().hover;
@@ -440,9 +437,6 @@ impl Ui<'_> {
         }
 
         let enabled = self.is_enabled();
-        if !enabled {
-            st.menu = None;
-        }
         let roving: Vec<(WidgetId, bool)> = items.iter().map(|i| (i.id, enabled)).collect();
         let stop = self.rove_stop(&roving, active);
         self.rove_keys(&roving, RoveAxis::Horizontal, true);
@@ -468,7 +462,7 @@ impl Ui<'_> {
             stop,
         };
         let response = self.scroll_area("tabs", viewport, &area, |ui, view| {
-            let laid = ui.strip_content(&frame, view, st, events);
+            let laid = ui.strip_content(&frame, view, st, events, context);
             (laid, Extent::default())
         });
         let laid = response.value;
@@ -501,7 +495,6 @@ impl Ui<'_> {
                 self.tooltip(resp, tab.title);
             }
         }
-        self.strip_menu(tabs, opts, st, events);
     }
 
     /// The active tab's span to draw (content space): the live one, or while a switch slides the
@@ -559,6 +552,7 @@ impl Ui<'_> {
         view: &ScrollView,
         st: &mut StripState,
         events: &mut Vec<TabEvent>,
+        context: &mut Option<(TabKey, Rect)>,
     ) -> Laid {
         let viewport = view.viewport;
         let slot = |x: f64, i: usize| {
@@ -641,11 +635,7 @@ impl Ui<'_> {
                 events.push(TabEvent::Close(tab.key));
             }
             if resp.secondary_clicked || close_resp.is_some_and(|c| c.secondary_clicked) {
-                let at = self
-                    .pointer_pos()
-                    .filter(|q| resp.rect.contains(*q))
-                    .unwrap_or((resp.rect.x, resp.rect.bottom()));
-                st.menu = Some((tab.key, at));
+                *context = Some((tab.key, resp.rect));
             }
             responses.push(resp);
             close_responses.push(close);
@@ -863,55 +853,6 @@ impl Ui<'_> {
             let center = [card.x + card.w / 2.0, card.y + card.h / 2.0];
             let color = cue_color(p, opts.busy_tone);
             paint_busy(p, &pts, center, treatment, color, now);
-        }
-    }
-
-    /// The open menu: runs it and turns a picked row into its event.
-    fn strip_menu(
-        &mut self,
-        tabs: &[Tab<'_>],
-        opts: &TabStripOptions<'_>,
-        st: &mut StripState,
-        events: &mut Vec<TabEvent>,
-    ) {
-        let Some((key, at)) = st.menu else {
-            return;
-        };
-        let closable = tabs.iter().any(|t| t.key == key && t.closable);
-        let close = closable.then_some(TabEvent::Close(key));
-        let own = close.into_iter().chain([
-            TabEvent::CloseOthers(key),
-            TabEvent::CloseAll,
-            TabEvent::Rename(key),
-        ]);
-        let extra = (0..opts.menu_extra.len()).map(|i| TabEvent::MenuExtra(key, i));
-        let picks: Vec<TabEvent> = own.chain(extra).collect();
-        let labels: Vec<&str> = picks
-            .iter()
-            .filter_map(|e| match e {
-                TabEvent::Close(_) => Some(self.tr("luneui.tab-strip.menu.close")),
-                TabEvent::CloseOthers(_) => Some(self.tr("luneui.tab-strip.menu.close-others")),
-                TabEvent::CloseAll => Some(self.tr("luneui.tab-strip.menu.close-all")),
-                TabEvent::Rename(_) => Some(self.tr("luneui.tab-strip.menu.rename")),
-                TabEvent::MenuExtra(_, i) => opts.menu_extra.get(*i).copied(),
-                _ => None,
-            })
-            .collect();
-        let rows: Vec<MenuRow<'_>> = labels
-            .iter()
-            .map(|text| MenuRow::Item {
-                glyph: None,
-                text,
-                shortcut: "",
-            })
-            .collect();
-        let response = self.menu("menu", &rows, at);
-        if let Some(picked) = response.picked.and_then(|i| picks.get(i)) {
-            events.push(*picked);
-            st.menu = None;
-        }
-        if response.dismissed {
-            st.menu = None;
         }
     }
 }

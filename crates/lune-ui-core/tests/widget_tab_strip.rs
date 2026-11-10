@@ -1,6 +1,6 @@
 //! The tab strip (`widget.tab-strip` acceptance): press routing, the gesture and its frozen widths
 //! (D123), identity, overflow, keys (D122), the outline and its notch, the busy cue per tier, the
-//! menu, the nodes and the probes at scale 2.
+//! context report, the nodes and the probes at scale 2.
 
 use std::time::Duration;
 
@@ -22,7 +22,7 @@ use lune_ui_core::widgets::progress::breath_opacity;
 use lune_ui_core::widgets::shine;
 use lune_ui_core::widgets::tab_strip::{
     BRUSH, BusyCue, CONTENT_SWAP, FOCUS, GAP, HOVER, MAX_WIDTH, MIN_WIDTH, SLIDE as NOTCH_SLIDE,
-    Tab, TabEvent, TabKey, TabStripOptions,
+    Tab, TabEvent, TabKey, TabStripOptions, TabStripResponse,
 };
 use lune_ui_core::widgets::tone::Tone;
 
@@ -47,7 +47,6 @@ struct App {
     panel_focused: bool,
     busy: Option<BusyCue>,
     tone: Tone,
-    extra: Vec<&'static str>,
     apply: bool,
     /// Translates the whole strip, card and all.
     parent: (f32, f32),
@@ -68,7 +67,6 @@ impl App {
             panel_focused: true,
             busy: None,
             tone: Tone::Neutral,
-            extra: Vec::new(),
             apply: true,
             parent: (0.0, 0.0),
             tint: false,
@@ -103,9 +101,14 @@ struct Run {
     scene: Scene,
     out: FrameOutput,
     events: Vec<TabEvent>,
+    context: Option<(TabKey, Rect)>,
 }
 
 fn draw(ui: &mut Ui<'_>, app: &App) -> Vec<TabEvent> {
+    draw_response(ui, app).events
+}
+
+fn draw_response(ui: &mut Ui<'_>, app: &App) -> TabStripResponse {
     let tabs: Vec<Tab<'_>> = app
         .tabs
         .iter()
@@ -116,14 +119,12 @@ fn draw(ui: &mut Ui<'_>, app: &App) -> Vec<TabEvent> {
             progress: t.3,
         })
         .collect();
-    let extra: Vec<&str> = app.extra.clone();
     let opts = TabStripOptions {
         active: app.active.map(TabKey),
         panel_focused: app.panel_focused,
         busy: app.busy,
         busy_tone: app.tone,
         card: CARD,
-        menu_extra: &extra,
         name: "Sessions",
         header_tint: app.tint.then_some([0, 0, 0, 0x40]),
     };
@@ -131,20 +132,23 @@ fn draw(ui: &mut Ui<'_>, app: &App) -> Vec<TabEvent> {
     if translated {
         ui.painter().push_translate(app.parent.0, app.parent.1);
     }
-    let events = ui
-        .with_enabled(app.enabled, |ui| ui.tab_strip("s", STRIP, &tabs, &opts))
-        .events;
+    let response = ui.with_enabled(app.enabled, |ui| ui.tab_strip("s", STRIP, &tabs, &opts));
     if translated {
         ui.painter().pop_translate();
     }
-    events
+    response
 }
 
 fn run(h: &mut UiHarness, app: &mut App) -> Run {
-    let mut events = Vec::new();
-    let (scene, out) = h.frame(|ui| events = draw(ui, app));
-    app.take(&events);
-    Run { scene, out, events }
+    let mut response = TabStripResponse::default();
+    let (scene, out) = h.frame(|ui| response = draw_response(ui, app));
+    app.take(&response.events);
+    Run {
+        scene,
+        out,
+        events: response.events,
+        context: response.context,
+    }
 }
 
 fn bench(app: &mut App) -> UiHarness {
@@ -1775,119 +1779,89 @@ fn the_title_starts_where_a_still_one_starts() {
     );
 }
 
-// The menu.
+// The context report: the strip opens no menu, it names the tab and its rect.
 
-fn open_menu(h: &mut UiHarness, app: &mut App, tab: &str) -> Vec<Node> {
+/// A secondary click on the middle of tab `tab`; the frame it lands in.
+fn secondary_click(h: &mut UiHarness, app: &mut App, tab: &str) -> Run {
     let tree = run(h, app).out.tree;
     let at = mid(&tree, tab);
     h.input.pointer_to(at.0, at.1);
     run(h, app);
     h.input.click(PointerButton::Secondary);
-    let r = run(h, app);
+    run(h, app)
+}
+
+fn no_menu(r: &Run) {
+    assert!(nodes(&r.out.tree, Role::Menu).is_empty(), "no menu node");
+    assert!(
+        nodes(&r.out.tree, Role::MenuItem).is_empty(),
+        "no menu item"
+    );
+}
+
+#[test]
+fn a_secondary_click_reports_the_tab_and_its_rect_and_opens_no_menu() {
+    let mut app = App::of(3, Some(0));
+    let mut h = bench(&mut app);
+    let r = secondary_click(&mut h, &mut app, "t2");
     assert_eq!(
         activations(&r.events),
         0,
         "a secondary click does not activate"
     );
-    let r = run(h, app);
-    nodes(&r.out.tree, Role::MenuItem)
-        .into_iter()
-        .cloned()
-        .collect()
+    let tree = run(&mut h, &mut app).out.tree;
+    let want = tab_node(&tree, "t2").bounds;
+    assert_eq!(r.context, Some((TabKey(2), want)));
+    no_menu(&r);
+    no_menu(&run(&mut h, &mut app));
 }
 
 #[test]
-fn a_secondary_click_opens_the_menu_with_the_apps_rows_after_the_strips() {
-    let mut app = App::of(3, Some(0));
-    app.extra = vec!["Duplicate Tab"];
+fn the_close_buttons_secondary_click_reports_its_tab() {
+    let mut app = App::of(3, Some(1));
     let mut h = bench(&mut app);
-    let rows = open_menu(&mut h, &mut app, "t2");
-    let names: Vec<&str> = rows.iter().map(|n| n.name.as_str()).collect();
-    assert_eq!(
-        names,
-        [
-            "Close",
-            "Close Others",
-            "Close All",
-            "Rename\u{2026}",
-            "Duplicate Tab"
-        ]
+    let tree = run(&mut h, &mut app).out.tree;
+    let t = tab_node(&tree, "t1").bounds;
+    // The active tab shows its close button.
+    let close = nodes(&tree, Role::Button)
+        .into_iter()
+        .find(|b| b.name == "Close tab")
+        .expect("the active tab's close button")
+        .bounds;
+    h.input
+        .pointer_to(close.x + close.w / 2.0, close.y + close.h / 2.0);
+    run(&mut h, &mut app);
+    h.input.click(PointerButton::Secondary);
+    let r = run(&mut h, &mut app);
+    assert_eq!(r.context, Some((TabKey(1), t)));
+    assert!(
+        !r.events.iter().any(|e| matches!(e, TabEvent::Close(_))),
+        "a secondary click does not close"
     );
 }
 
 #[test]
-fn each_row_reports_its_event_for_the_tab_the_menu_is_for() {
-    let want = [
-        TabEvent::Close(TabKey(2)),
-        TabEvent::CloseOthers(TabKey(2)),
-        TabEvent::CloseAll,
-        TabEvent::Rename(TabKey(2)),
-        TabEvent::MenuExtra(TabKey(2), 0),
-    ];
-    for (i, event) in want.into_iter().enumerate() {
-        let mut app = App::of(3, Some(0));
-        app.extra = vec!["Duplicate Tab"];
-        let mut h = bench(&mut app);
-        let rows = open_menu(&mut h, &mut app, "t2");
-        let b = rows[i].bounds;
-        h.at_ms(1000);
-        h.input.pointer_to(b.x + 5.0, b.y + 5.0);
-        run(&mut h, &mut app);
-        h.input.click(PRIMARY);
-        assert_eq!(run(&mut h, &mut app).events, vec![event], "row {i}");
-        h.at_ms(3000);
-        let r = run(&mut h, &mut app);
-        assert!(nodes(&r.out.tree, Role::MenuItem).is_empty(), "closes");
-    }
-}
-
-#[test]
-fn a_tab_that_is_not_closable_has_no_close_row() {
+fn a_tab_that_is_not_closable_is_still_reported() {
     let mut app = App::of(3, Some(0));
     app.tabs[2].2 = false;
     let mut h = bench(&mut app);
-    let rows = open_menu(&mut h, &mut app, "t2");
-    assert_eq!(rows[0].name, "Close Others");
+    let r = secondary_click(&mut h, &mut app, "t2");
+    assert_eq!(r.context.map(|c| c.0), Some(TabKey(2)));
 }
 
 #[test]
-fn removing_the_tab_closes_its_menu_and_escape_dismisses_it() {
+fn no_secondary_click_reports_no_context() {
     let mut app = App::of(3, Some(0));
     let mut h = bench(&mut app);
-    assert_eq!(open_menu(&mut h, &mut app, "t2").len(), 4);
-    app.tabs.remove(2);
-    h.at_ms(1000);
-    let r = run(&mut h, &mut app);
-    assert!(nodes(&r.out.tree, Role::MenuItem).is_empty());
-
-    let mut app = App::of(3, Some(0));
-    let mut h = bench(&mut app);
-    open_menu(&mut h, &mut app, "t2");
-    key(&mut h, NamedKey::Escape);
-    run(&mut h, &mut app);
-    h.at_ms(1000);
-    let r = run(&mut h, &mut app);
-    assert!(nodes(&r.out.tree, Role::MenuItem).is_empty());
-}
-
-#[test]
-fn a_reorder_leaves_the_menu_on_its_tab() {
-    let mut app = App::of(3, Some(0));
-    app.extra = vec!["Extra"];
-    let mut h = bench(&mut app);
-    let rows = open_menu(&mut h, &mut app, "t2");
-    let t = app.tabs.remove(2);
-    app.tabs.insert(0, t);
-    run(&mut h, &mut app);
-    let b = rows[3].bounds;
-    h.at_ms(1000);
-    h.input.pointer_to(b.x + 5.0, b.y + 5.0);
-    run(&mut h, &mut app);
+    let tree = run(&mut h, &mut app).out.tree;
+    let at = mid(&tree, "t2");
+    h.input.pointer_to(at.0, at.1);
+    assert_eq!(run(&mut h, &mut app).context, None);
     h.input.click(PRIMARY);
-    assert_eq!(
-        run(&mut h, &mut app).events,
-        vec![TabEvent::Rename(TabKey(2))]
-    );
+    let r = run(&mut h, &mut app);
+    assert_eq!(activations(&r.events), 1);
+    assert_eq!(r.context, None);
+    assert_eq!(run(&mut h, &mut app).context, None, "one frame only");
 }
 
 #[test]
@@ -2027,7 +2001,7 @@ fn an_access_default_activates_and_a_close_default_closes() {
 }
 
 #[test]
-fn an_access_show_menu_opens_the_menu_under_the_tab() {
+fn an_access_show_menu_reports_the_tab_and_opens_no_menu() {
     let mut app = App::of(3, Some(0));
     let mut h = bench(&mut app);
     let tree = run(&mut h, &mut app).out.tree;
@@ -2035,10 +2009,8 @@ fn an_access_show_menu_opens_the_menu_under_the_tab() {
     act(&mut h, tab.id, Action::ShowMenu);
     let r = run(&mut h, &mut app);
     assert_eq!(activations(&r.events), 0);
-    let menu = nodes(&r.out.tree, Role::Menu);
-    assert_eq!(menu.len(), 1);
-    assert_eq!(menu[0].bounds.x, tab.bounds.x);
-    assert_eq!(menu[0].bounds.y, tab.bounds.bottom());
+    assert_eq!(r.context, Some((TabKey(1), tab.bounds)));
+    no_menu(&r);
 }
 
 // Probes at scale 2.
@@ -2187,22 +2159,6 @@ fn a_disabled_strip_nodes_are_disabled_and_offer_no_focus_or_action() {
 }
 
 #[test]
-fn disabling_the_strip_closes_an_open_menu() {
-    let mut app = App::of(3, Some(0));
-    let mut h = bench(&mut app);
-    assert_eq!(open_menu(&mut h, &mut app, "t2").len(), 4);
-    app.enabled = false;
-    h.at_ms(1000);
-    let r = run(&mut h, &mut app);
-    assert!(nodes(&r.out.tree, Role::MenuItem).is_empty());
-    // It stays closed once enabled again: the strip dropped it, it did not hide it.
-    app.enabled = true;
-    h.at_ms(2000);
-    let r = run(&mut h, &mut app);
-    assert!(nodes(&r.out.tree, Role::MenuItem).is_empty());
-}
-
-#[test]
 fn a_disabled_strip_pointer_input_reports_nothing() {
     let mut app = App::of(3, Some(0));
     app.enabled = false;
@@ -2214,9 +2170,10 @@ fn a_disabled_strip_pointer_input_reports_nothing() {
     h.input.click(PRIMARY);
     assert!(run(&mut h, &mut app).events.is_empty());
     h.input.click(PointerButton::Secondary);
-    run(&mut h, &mut app);
     let r = run(&mut h, &mut app);
-    assert!(nodes(&r.out.tree, Role::MenuItem).is_empty());
+    assert_eq!(r.context, None);
+    no_menu(&r);
+    no_menu(&run(&mut h, &mut app));
 }
 
 /// A press on a tab activates it; the strip is disabled while the button is held; the release after
