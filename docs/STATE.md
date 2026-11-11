@@ -1,7 +1,7 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-11 (font smoothing, version 0.4.0, on branch `orch/font-smoothing`, not yet merged; the tab strip's `context` (0.3.0, tagged at 2c0e25c), tab-strip-plus-and-slide, library pass and dark-glass are on main, published at github.com/lune-rs/luneui-rs)
+Last updated: 2026-11-11 (font smoothing, version 0.4.0, merged at cebd7d7 and tagged `v0.4.0`; the tab strip's `context` (0.3.0, tagged at 2c0e25c), tab-strip-plus-and-slide, library pass and dark-glass are on main, published at github.com/lune-rs/luneui-rs)
 
 ## Now
 
@@ -10,12 +10,12 @@ Program toolkit-v1 closed with M11 (merged at 10f503e); the gallery showcase tas
 4 `external`. Milestone merges to main: M4 d9fe71f, M5 1aeaf1b, M6 a75a708, M7 662d310, M8 2474248, M9 8f499d0, M10 55cfaaf, M11 10f503e (M1 to M3: the extraction, the seams and the catalogue).
 `docs/architecture.md` has the module map, the pages and "API changes since M1"; `docs/consuming.md` how an app vendors the toolkit and, for the library pass, the migration map of its API changes.
 
-Font smoothing (task `luneui-rs/font-smoothing`, D294 to D297; on its branch): the toolkit rasterizes glyphs itself and text is smoothed by default, like macOS: no hinting and stem darkening
+Font smoothing (task `luneui-rs/font-smoothing`, D294 to D297; merged at cebd7d7, tagged `v0.4.0`): the toolkit rasterizes glyphs itself and text is smoothed by default, like macOS: no hinting and stem darkening
 (Pathfinder's numbers), no blend gamma, the same on every OS. `FrameParams.text: TextRendering` is the per-frame setting (`SMOOTH` default, `OFF` is the 0.3.0 look), `CustomFrame.text` hands the effective value to an app's draws,
 and `lune_ui::text::GlyphRasterizer` is the one rasterizer an app's own glyph renderer shares (key its cache by `GlyphParams`, no `DISABLE_HINTING` of its own). glyphon's renderer is vendored into `lune-ui-wgpu` as the private
 `glyph` module and `glyphon` is out of the tree (D294); the glyph atlas and the rotated-text rasters are keyed by the setting, so a toggle never serves a stale glyph (D296). The gallery's showcase has a TEXT section
 in the global settings, and `gallery --dump` reads `LUNEUI_GALLERY_TEXT` (`on`, `off`). Breaking, hence 0.4.0; migration table in `docs/consuming.md`, "0.3.0 to 0.4.0" (D297). Entry: `text.rendering`.
-After merge: tag `v0.4.0` on the merge commit, push `main` and the tag, tell Luneterm the rev (the user's yes first, as for v0.3.0).
+Next: tell Luneterm the rev (`v0.4.0`, cebd7d7) so it can bump its pin.
 
 Tab context menu (task `luneui-rs/tab-context-menu`, D292, D293; merged, tagged `v0.3.0` at 2c0e25c): no widget builds a context menu (D292); `Ui::tab_strip` reports `TabStripResponse::context: Option<(TabKey, Rect)>` and the app opens its own `Ui::menu`. The gallery's tab-strip page builds an icon menu from `context`. Migration table in `docs/consuming.md`, "0.2.0 to 0.3.0".
 
