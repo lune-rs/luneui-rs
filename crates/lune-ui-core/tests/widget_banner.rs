@@ -2,11 +2,13 @@
 //! wrapped height and spinner, the empty column's layout, the actions' result, press and hover
 //! motion per tier, pixel probes at scale 2, and the semantic nodes.
 
+use std::time::Duration;
+
 use lune_ui_core::access::{Action, Live, Role, SemanticTree, State};
 use lune_ui_core::color::premul;
 use lune_ui_core::image::{Fit, ImageAlign, ImageId};
 use lune_ui_core::input::{PointerButton, Repaint};
-use lune_ui_core::motion::MotionTier;
+use lune_ui_core::motion::{Cadence, MotionTier};
 use lune_ui_core::paint::Rect;
 use lune_ui_core::scene::{ImageSource, Scene};
 use lune_ui_core::testing::{FakeText, UiHarness};
@@ -89,13 +91,27 @@ fn a_one_line_banner_is_the_icon_and_padding_high_and_a_long_one_wraps() {
     assert_eq!(text.y, 20.0 + BANNER_PAD_Y + BANNER_BORDER);
 }
 
+/// The repaint a frame with only a busy loop in flight reports at `ms`: the next tick of the
+/// default busy cadence (D298).
+fn busy_tick(ms: u64) -> Repaint {
+    Repaint::At(
+        Cadence::BUSY
+            .next_tick(Duration::from_millis(ms))
+            .expect("a finite tick"),
+    )
+}
+
 #[test]
 fn the_banner_spins_while_busy_and_holds_still_when_not() {
     let mut h = UiHarness::new(WIN);
     banner_frame(&mut h, "Indexing", true);
     h.at_ms(300);
     let (scene, _, _, repaint) = banner_frame(&mut h, "Indexing", true);
-    assert_eq!(repaint, Repaint::Now, "a running spinner is moving");
+    assert_eq!(
+        repaint,
+        busy_tick(300),
+        "a running spinner asks at the busy cadence"
+    );
     let turned = &scene.layers[0].images;
     assert_eq!(turned.len(), 1, "the glyph is a rotated text image");
     assert!(turned[0].rotation > 0.0);

@@ -322,7 +322,13 @@ impl App {
         let config = FrameConfig {
             theme: state.theme().unwrap_or(THEME),
             tier: state.tier().unwrap_or(MotionTier::Full),
-            busy_cadence: Cadence::BUSY,
+            // Ticks are app time: under slow motion a 30 a second grid would draw a few frames a
+            // real second, so any other speed keeps every frame (D8).
+            busy_cadence: if speed == 1.0 {
+                Cadence::BUSY
+            } else {
+                Cadence::EveryFrame
+            },
             strings: &self.strings,
             arg_format: &DisplayFormat,
             keymap: keymap(),

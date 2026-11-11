@@ -743,7 +743,7 @@ impl Ui<'_> {
         let (tier, now) = (self.tier(), self.time());
         // The shine moves under Full and breathes under Reduced; under Off it is a fixed mix.
         if tab.progress.is_some() && tier != MotionTier::Off {
-            self.mark_moving();
+            self.request_busy_frame(rect);
         }
         let close_state = look.close.map_or(ButtonState::default(), |c| ButtonState {
             hovered: c.hovered,
@@ -837,7 +837,7 @@ impl Ui<'_> {
         let (tier, now) = (self.tier(), self.time());
         let treatment = opts.busy.and_then(|cue| busy_treatment(cue, tier));
         if treatment.is_some() {
-            self.mark_moving();
+            self.request_busy_frame(opts.card);
         }
         let at = |q: &[f32; 2]| [q[0] + card.x, q[1] + card.y];
         let p = self.painter();

@@ -186,7 +186,7 @@ const SCENES: &[UiScene] = &[
         state: indeterminate,
         script: &[],
         capture_ms: 600,
-        expect: Expect::Moving,
+        expect: Expect::Waiting,
     },
     // The Reduced fill breathes over 1800 ms: fully up at 900 ms.
     UiScene {
@@ -196,6 +196,6 @@ const SCENES: &[UiScene] = &[
         state: indeterminate,
         script: &[],
         capture_ms: 900,
-        expect: Expect::Moving,
+        expect: Expect::Waiting,
     },
 ];

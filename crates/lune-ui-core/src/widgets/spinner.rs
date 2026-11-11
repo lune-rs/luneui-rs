@@ -1,7 +1,8 @@
 //! A turning busy indicator (`widget.spinner`): the sync glyph rotating about its centre, one
 //! revolution per 1200 ms while busy (D117). Under Reduced and Off it is a static glyph at angle
 //! 0 and reports `Idle`: a transform is not allowed there, and a spinner has no colour change to
-//! keep.
+//! keep. While it turns it asks for its next frame at the frame's busy cadence
+//! (`FrameConfig::busy_cadence`, D298), not at once.
 //!
 //! The angle is held per instance as the angle it stopped at plus the time elapsed since it
 //! started being busy, so elapsed time alone sets it (a late frame does not slow it), a stop
@@ -82,7 +83,7 @@ pub fn paint<H: Copy + PartialEq>(
 
 impl Ui<'_> {
     /// A spinner under `key`, the glyph centred on `center`. Turns while `opts.busy` under Full
-    /// (asking for the next frame); a static glyph at angle 0 under Reduced and Off. The node is
+    /// (asking for its next frame at the frame's busy cadence, D298); a static glyph at angle 0 under Reduced and Off. The node is
     /// `Progress` named `opts.name`, `Busy` while busy, with no value.
     pub fn spinner(&mut self, key: impl Hash, center: (f32, f32), opts: &SpinnerOptions<'_>) {
         let id = self.id(key);
@@ -104,16 +105,12 @@ impl Ui<'_> {
         };
         let color = opts.color.unwrap_or(self.theme().fg_secondary);
         paint(self.painter(), center, opts.size, color, degrees);
-        if turning {
-            self.mark_moving();
-        }
         let half = opts.size / 2.0;
-        let mut node = Node::new(
-            id,
-            Role::Progress,
-            opts.name,
-            Rect::new(center.0 - half, center.1 - half, opts.size, opts.size),
-        );
+        let bounds = Rect::new(center.0 - half, center.1 - half, opts.size, opts.size);
+        if turning {
+            self.request_busy_frame(bounds);
+        }
+        let mut node = Node::new(id, Role::Progress, opts.name, bounds);
         if opts.busy {
             node.states.insert(State::Busy);
         }

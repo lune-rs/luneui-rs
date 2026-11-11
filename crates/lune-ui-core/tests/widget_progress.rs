@@ -7,7 +7,7 @@ use std::time::Duration;
 use lune_ui_core::access::{Role, SemanticTree, Value};
 use lune_ui_core::color::premul;
 use lune_ui_core::input::Repaint;
-use lune_ui_core::motion::MotionTier;
+use lune_ui_core::motion::{Cadence, MotionTier};
 use lune_ui_core::paint::{Painter, Rect};
 use lune_ui_core::scene::{Scene, Shape};
 use lune_ui_core::testing::{FakeText, UiHarness};
@@ -241,17 +241,27 @@ fn the_segment_is_30_percent_of_the_track_travelling_left_to_right_clipped_by_it
     assert!(s.round_radius > 0.0);
 }
 
+/// The repaint a frame with only a busy loop in flight reports at `ms`: the next tick of the
+/// default busy cadence (D298).
+fn busy_tick(ms: u64) -> Repaint {
+    Repaint::At(
+        Cadence::BUSY
+            .next_tick(Duration::from_millis(ms))
+            .expect("a finite tick"),
+    )
+}
+
 #[test]
 fn full_and_reduced_keep_asking_for_frames_and_off_is_idle() {
     for t in [0, 600, 1799, 2400, 7777] {
         assert_eq!(
             run(MotionTier::Full, t, &indet()).3,
-            Repaint::Now,
+            busy_tick(t),
             "Full {t}"
         );
         assert_eq!(
             run(MotionTier::Reduced, t, &indet()).3,
-            Repaint::Now,
+            busy_tick(t),
             "Reduced {t}"
         );
         assert_eq!(

@@ -426,7 +426,7 @@ const SCENES: &[UiScene] = &[
         state: progress,
         script: &[],
         capture_ms: 300,
-        expect: Expect::Moving,
+        expect: Expect::Waiting,
     },
     // Phase 1/2: the band's centre is on each title's centre.
     UiScene {
@@ -436,7 +436,7 @@ const SCENES: &[UiScene] = &[
         state: progress,
         script: &[],
         capture_ms: 900,
-        expect: Expect::Moving,
+        expect: Expect::Waiting,
     },
     // Phase 0.25 of the 2400 ms loop.
     UiScene {
@@ -446,7 +446,7 @@ const SCENES: &[UiScene] = &[
         state: busy_sweep,
         script: &[],
         capture_ms: 600,
-        expect: Expect::Moving,
+        expect: Expect::Waiting,
     },
     UiScene {
         id: "tab-strip-busy-comet",
@@ -455,7 +455,7 @@ const SCENES: &[UiScene] = &[
         state: busy_comet,
         script: &[],
         capture_ms: 600,
-        expect: Expect::Moving,
+        expect: Expect::Waiting,
     },
     // The brightest point of the 1800 ms breath.
     UiScene {
@@ -465,7 +465,7 @@ const SCENES: &[UiScene] = &[
         state: busy_breath,
         script: &[],
         capture_ms: 900,
-        expect: Expect::Moving,
+        expect: Expect::Waiting,
     },
     UiScene {
         id: "tab-strip-overflow",

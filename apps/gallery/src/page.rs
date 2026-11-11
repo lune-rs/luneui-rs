@@ -284,8 +284,8 @@ pub(crate) enum Expect {
     Settled,
     /// `Repaint::Now` at the capture frame (a transition is in flight).
     Moving,
-    /// `Repaint::At(_)` at the capture frame: nothing moves yet, a frame is due later (a pending
-    /// tooltip).
+    /// `Repaint::At(_)` at the capture frame: a frame is due later: a pending tooltip, or a busy
+    /// loop's next tick (D298).
     Waiting,
 }
 

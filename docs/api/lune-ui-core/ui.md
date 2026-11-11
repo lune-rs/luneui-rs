@@ -1167,7 +1167,7 @@ Source: `crates/lune-ui-core/src/ui.rs:121`
 - <a id="method.Ui.spinner"></a>`pub fn spinner(&mut self, key: impl Hash, center: (f32, f32), opts: &SpinnerOptions<'_>)`
 
   A spinner under `key`, the glyph centred on `center`. Turns while `opts.busy` under Full
-  (asking for the next frame); a static glyph at angle 0 under Reduced and Off. The node is
+  (asking for its next frame at the frame's busy cadence, D298); a static glyph at angle 0 under Reduced and Off. The node is
   `Progress` named `opts.name`, `Busy` while busy, with no value.
 
 `impl Ui<'_>`

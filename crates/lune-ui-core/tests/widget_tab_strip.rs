@@ -10,7 +10,7 @@ use lune_ui_core::color::premul;
 use lune_ui_core::drag::{SETTLE, SLIDE};
 
 use lune_ui_core::input::{FrameOutput, Key, NamedKey, PointerButton, Repaint};
-use lune_ui_core::motion::{MotionTier, Token, conformance};
+use lune_ui_core::motion::{Cadence, MotionTier, Token, conformance};
 use lune_ui_core::paint::{Rect, polyline_length};
 use lune_ui_core::scene::{Scene, StrokeVertex};
 use lune_ui_core::shortcuts::{Binding, Chord, Scope};
@@ -1415,6 +1415,16 @@ fn the_header_tint_leaves_the_active_tab_out() {
 
 // The busy cue.
 
+/// The repaint a frame with only a busy loop in flight reports at `ms`: the next tick of the
+/// default busy cadence (D298).
+fn busy_tick(ms: u64) -> Repaint {
+    Repaint::At(
+        Cadence::BUSY
+            .next_tick(Duration::from_millis(ms))
+            .expect("a finite tick"),
+    )
+}
+
 fn busy_run(cue: BusyCue, tier: MotionTier, ms: u64) -> (Scene, FrameOutput, usize) {
     let mut app = App::of(3, Some(1));
     app.busy = Some(cue);
@@ -1431,7 +1441,7 @@ fn busy_run(cue: BusyCue, tier: MotionTier, ms: u64) -> (Scene, FrameOutput, usi
 fn the_sweep_is_two_passes_and_its_phase_is_time_over_2400_ms() {
     for (ms, phase) in [(0, 0.0), (600, 0.25), (1800, 0.75), (3000, 0.25)] {
         let (scene, out, n) = busy_run(BusyCue::Sweep, MotionTier::Full, ms);
-        assert_eq!(out.repaint, Repaint::Now);
+        assert_eq!(out.repaint, busy_tick(ms));
         let s = &scene.layers[0].geometry.strokes;
         assert_eq!(s.len(), 3 * 6 * n, "the line and two passes");
         let (bloom, line) = (s[6 * n], s[12 * n]);
@@ -1481,7 +1491,7 @@ fn reduced_forces_the_breath_and_off_is_static_and_idle() {
         let s = &scene.layers[0].geometry.strokes;
         assert_eq!(s.len(), 2 * 6 * n, "{cue:?}");
         assert_eq!(s[6 * n].style[0], 0.0, "{cue:?} is solid");
-        assert_eq!(out.repaint, Repaint::Now);
+        assert_eq!(out.repaint, busy_tick(900));
         let (scene, out, n) = busy_run(cue, MotionTier::Off, 900);
         assert_eq!(scene.layers[0].geometry.strokes.len(), 6 * n);
         assert_eq!(out.repaint, Repaint::Idle);
@@ -1494,7 +1504,7 @@ fn no_cue_is_idle_and_a_finished_cue_stops() {
     let mut h = bench(&mut app);
     assert_eq!(run(&mut h, &mut app).out.repaint, Repaint::Idle);
     app.busy = Some(BusyCue::Sweep);
-    assert_eq!(run(&mut h, &mut app).out.repaint, Repaint::Now);
+    assert_eq!(run(&mut h, &mut app).out.repaint, busy_tick(0));
     app.busy = None;
     assert_eq!(run(&mut h, &mut app).out.repaint, Repaint::Idle);
 }
@@ -1729,7 +1739,7 @@ fn reduced_breathes_in_one_piece_and_off_is_static_and_idle() {
     };
     assert_eq!(title_texts(&a.scene)[0].key.0, want(0));
     assert_eq!(title_texts(&b.scene)[0].key.0, want(900));
-    assert_eq!(a.out.repaint, Repaint::Now);
+    assert_eq!(a.out.repaint, busy_tick(0));
     // Off: the same at any time, and nothing to repaint.
     let (a, b) = (at(MotionTier::Off, 0), at(MotionTier::Off, 900));
     assert_eq!(title_texts(&a.scene).len(), 1);
@@ -1742,7 +1752,7 @@ fn reduced_breathes_in_one_piece_and_off_is_static_and_idle() {
 fn only_a_shining_tab_asks_for_frames() {
     assert_eq!(
         shining(MotionTier::Full, Tone::Neutral, 300).out.repaint,
-        Repaint::Now
+        busy_tick(300)
     );
     let mut app = App::of(2, Some(0));
     let mut h = UiHarness::new(WIN);
@@ -2201,4 +2211,157 @@ fn a_press_held_across_a_disabled_frame_then_released_activates_once() {
         "the release is the end of the press, not a click: {:?}",
         r.events
     );
+}
+
+// Busy loops ask at the busy cadence (D298).
+
+/// Drives the strip as an app that draws when asked: `At(x)` draws next at `x`, `Now` a 60 Hz
+/// frame later, `Idle` stops. Returns every frame drawn with `from <= t < to` as `(t, repaint)`,
+/// after one warm-up frame at `from - 500 ms` that is not counted.
+fn drive(h: &mut UiHarness, app: &mut App, from: u64, to: u64) -> Vec<(Duration, Repaint)> {
+    h.at_ms(from - 500);
+    run(h, app);
+    let (from, to) = (Duration::from_millis(from), Duration::from_millis(to));
+    let mut t = from;
+    let mut frames = Vec::new();
+    while t < to {
+        h.input.set_time(t);
+        let repaint = run(h, app).out.repaint;
+        frames.push((t, repaint));
+        match repaint {
+            Repaint::Idle => break,
+            Repaint::Now => t += Duration::from_nanos(16_666_667),
+            Repaint::At(x) => t = x,
+        }
+    }
+    frames
+}
+
+fn shining_app() -> App {
+    let mut app = App::of(3, Some(0));
+    app.tabs[1].3 = Some(Tone::Neutral);
+    app
+}
+
+#[test]
+fn a_shining_tab_draws_30_frames_a_second_at_the_default_cadence() {
+    for tier in [MotionTier::Full, MotionTier::Reduced] {
+        let mut h = UiHarness::new(WIN);
+        h.tier = tier;
+        let frames = drive(&mut h, &mut shining_app(), 1000, 2000);
+        assert_eq!(frames.len(), 30, "{tier:?}");
+        for (t, repaint) in &frames {
+            let tick = Cadence::BUSY.next_tick(*t).expect("a finite tick");
+            assert_eq!(*repaint, Repaint::At(tick), "{tier:?} at {t:?}");
+        }
+    }
+}
+
+#[test]
+fn every_frame_keeps_the_display_rate_and_off_draws_once() {
+    let mut h = UiHarness::new(WIN);
+    h.busy_cadence = Cadence::EveryFrame;
+    let frames = drive(&mut h, &mut shining_app(), 1000, 2000);
+    assert_eq!(frames.len(), 60);
+    assert!(frames.iter().all(|(_, r)| *r == Repaint::Now));
+
+    let mut h = UiHarness::new(WIN);
+    h.tier = MotionTier::Off;
+    let frames = drive(&mut h, &mut shining_app(), 1000, 2000);
+    assert_eq!(frames.len(), 1);
+    assert_eq!(frames[0].1, Repaint::Idle);
+}
+
+#[test]
+fn the_shine_on_an_inactive_tab_asks_as_on_the_active_one() {
+    for shining in [0, 1] {
+        let mut app = App::of(3, Some(0));
+        app.tabs[shining].3 = Some(Tone::Neutral);
+        let mut h = UiHarness::new(WIN);
+        let frames = drive(&mut h, &mut app, 1000, 1200);
+        assert!(frames.len() >= 5, "tab {shining}: {frames:?}");
+        for (t, repaint) in &frames {
+            let tick = Cadence::BUSY.next_tick(*t).expect("a finite tick");
+            assert_eq!(*repaint, Repaint::At(tick), "tab {shining} at {t:?}");
+        }
+    }
+}
+
+#[test]
+fn a_shine_scrolled_out_of_the_strip_asks_nothing() {
+    let mut app = App::of(40, Some(0));
+    app.tabs[39].3 = Some(Tone::Neutral);
+    let mut h = UiHarness::new(WIN);
+    h.at_ms(0);
+    let r = run(&mut h, &mut app);
+    assert!(
+        tab_node(&r.out.tree, "t39").bounds.x >= VIEW_RIGHT,
+        "instrument: tab 39 lies right of the viewport"
+    );
+    // The strip settles (at most one catch-up frame), then nothing is asked.
+    let mut ms = 0;
+    for _ in 0..2 {
+        tick(&mut h, &mut ms);
+        run(&mut h, &mut app);
+    }
+    for i in 0..6 {
+        tick(&mut h, &mut ms);
+        let r = run(&mut h, &mut app);
+        assert_eq!(r.out.repaint, Repaint::Idle, "frame {i}");
+    }
+    // The same progress on the tab in view asks at the cadence.
+    let mut app = App::of(40, Some(0));
+    app.tabs[0].3 = Some(Tone::Neutral);
+    let mut h = UiHarness::new(WIN);
+    h.at_ms(1000);
+    let r = run(&mut h, &mut app);
+    let tick = Cadence::BUSY
+        .next_tick(Duration::from_millis(1000))
+        .expect("a finite tick");
+    assert_eq!(r.out.repaint, Repaint::At(tick));
+}
+
+#[test]
+fn a_hover_fade_in_flight_is_never_held_to_the_cadence() {
+    let mut app = shining_app();
+    let mut h = UiHarness::new(WIN);
+    h.at_ms(1000);
+    let tree = run(&mut h, &mut app).out.tree;
+    let at = mid(&tree, "t0");
+    h.at_ms(1100);
+    run(&mut h, &mut app);
+    h.input.pointer_to(at.0, at.1);
+    let mut ms = 1100;
+    let mut seen_now = false;
+    let mut settled = false;
+    // HOVER is 120 ms; the fade starts on the frame the pointer lands.
+    for _ in 0..30 {
+        ms += 16;
+        h.at_ms(ms);
+        let repaint = run(&mut h, &mut app).out.repaint;
+        let tick = Cadence::BUSY
+            .next_tick(Duration::from_millis(ms))
+            .expect("a finite tick");
+        if repaint == Repaint::Now {
+            assert!(!settled, "no Now after the fade settled, at {ms}");
+            seen_now = true;
+        } else {
+            assert_eq!(repaint, Repaint::At(tick), "{ms}");
+            settled = true;
+        }
+    }
+    assert!(seen_now, "the fade asked for frames at once");
+    assert!(settled, "then only the busy loop asks, at its tick");
+}
+
+#[test]
+fn the_busy_cue_asks_at_the_cadence_under_full_and_reduced_and_not_under_off() {
+    for cue in [BusyCue::Sweep, BusyCue::Comet, BusyCue::Breath] {
+        for tier in [MotionTier::Full, MotionTier::Reduced] {
+            let (_, out, _) = busy_run(cue, tier, 900);
+            assert_eq!(out.repaint, busy_tick(900), "{cue:?} {tier:?}");
+        }
+        let (_, out, _) = busy_run(cue, MotionTier::Off, 900);
+        assert_eq!(out.repaint, Repaint::Idle, "{cue:?} Off");
+    }
 }

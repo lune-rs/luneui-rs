@@ -9,7 +9,9 @@ tone (neutral is `accent`; square at its leading edge, clipped by the track), an
 head (name left, value right, 13 on a 20 px line, 4 px below). Determinate never animates (a progress value updates continuously, no tween).
 Indeterminate (D118) is a 3 px track: a segment 30% of the track travelling left to right,
 linear, period 2400 ms, clipped by the track. Under Reduced the full-width fill breathes
-between 0.38 and 1.0 over 1800 ms (opacity only); under Off it holds at 0.38.
+between 0.38 and 1.0 over 1800 ms (opacity only); under Off it holds at 0.38. An indeterminate
+track under Full or Reduced asks for its next frame at the frame's busy cadence
+(`FrameConfig::busy_cadence`, D298), not at once.
 
 Source: `crates/lune-ui-core/src/widgets/progress.rs:1`
 
@@ -29,7 +31,7 @@ pub struct ProgressOptions<'a> {
 
 What a progress bar shows.
 
-Source: `crates/lune-ui-core/src/widgets/progress.rs:43`
+Source: `crates/lune-ui-core/src/widgets/progress.rs:45`
 
 **Fields**
 
@@ -72,7 +74,7 @@ pub enum Indeterminate {
 
 How an indeterminate bar is drawn at one instant.
 
-Source: `crates/lune-ui-core/src/widgets/progress.rs:67`
+Source: `crates/lune-ui-core/src/widgets/progress.rs:69`
 
 **Variants**
 
@@ -103,7 +105,7 @@ pub fn breath_opacity(t: Time) -> f32
 
 The Reduced fill's opacity at `t`: 0.38 to 1.0 and back over 1800 ms, sine in and out.
 
-Source: `crates/lune-ui-core/src/widgets/progress.rs:98`
+Source: `crates/lune-ui-core/src/widgets/progress.rs:100`
 
 <a id="fn.clamp"></a>
 ### Function `clamp`
@@ -114,7 +116,7 @@ pub fn clamp(fraction: f32) -> f32
 
 `fraction` as a clamped 0 to 1 value; NaN is 0.
 
-Source: `crates/lune-ui-core/src/widgets/progress.rs:83`
+Source: `crates/lune-ui-core/src/widgets/progress.rs:85`
 
 <a id="fn.fill_color"></a>
 ### Function `fill_color`
@@ -125,7 +127,7 @@ pub fn fill_color(theme: &Theme, tone: Tone) -> Rgba
 
 The fill colour of `tone`: neutral is `accent`.
 
-Source: `crates/lune-ui-core/src/widgets/progress.rs:75`
+Source: `crates/lune-ui-core/src/widgets/progress.rs:77`
 
 <a id="fn.indeterminate_at"></a>
 ### Function `indeterminate_at`
@@ -136,7 +138,7 @@ pub fn indeterminate_at(tier: MotionTier, t: Time) -> Indeterminate
 
 What an indeterminate bar draws under `tier` at `t`.
 
-Source: `crates/lune-ui-core/src/widgets/progress.rs:106`
+Source: `crates/lune-ui-core/src/widgets/progress.rs:108`
 
 <a id="fn.paint"></a>
 ### Function `paint`
@@ -149,7 +151,7 @@ Draws a determinate bar in `track` at `fraction` (clamped): the track, then the 
 left, whose width is the fraction of the track's. No fill op at 0. The ends are semicircles of
 the track's own height (4 px gives `RADIUS`). Public for the stat meter.
 
-Source: `crates/lune-ui-core/src/widgets/progress.rs:117`
+Source: `crates/lune-ui-core/src/widgets/progress.rs:119`
 
 <a id="fn.paint_indeterminate"></a>
 ### Function `paint_indeterminate`
@@ -166,7 +168,7 @@ pub fn paint_indeterminate<H: Copy + PartialEq>(
 Draws an indeterminate bar in `track`: the track, then the segment clipped by it, or the
 faded full fill.
 
-Source: `crates/lune-ui-core/src/widgets/progress.rs:133`
+Source: `crates/lune-ui-core/src/widgets/progress.rs:135`
 
 <a id="fn.travel_phase"></a>
 ### Function `travel_phase`
@@ -177,7 +179,7 @@ pub fn travel_phase(t: Time) -> f32
 
 The segment's position at `t`, closed in time: `frac(t / 2400 ms)`.
 
-Source: `crates/lune-ui-core/src/widgets/progress.rs:92`
+Source: `crates/lune-ui-core/src/widgets/progress.rs:94`
 
 ## Constants
 
@@ -190,7 +192,7 @@ pub const BREATH_LOW: f32 = 0.38;
 
 The lowest opacity of the breath, and the static opacity under Off.
 
-Source: `crates/lune-ui-core/src/widgets/progress.rs:39`
+Source: `crates/lune-ui-core/src/widgets/progress.rs:41`
 
 <a id="constant.BREATH_PERIOD"></a>
 ### Constant `BREATH_PERIOD`
@@ -201,7 +203,7 @@ pub const BREATH_PERIOD: std::time::Duration;
 
 One breath of the Reduced fill.
 
-Source: `crates/lune-ui-core/src/widgets/progress.rs:37`
+Source: `crates/lune-ui-core/src/widgets/progress.rs:39`
 
 <a id="constant.HEAD_GAP"></a>
 ### Constant `HEAD_GAP`
@@ -212,7 +214,7 @@ pub const HEAD_GAP: f32 = 4.0;
 
 The gap below the head.
 
-Source: `crates/lune-ui-core/src/widgets/progress.rs:31`
+Source: `crates/lune-ui-core/src/widgets/progress.rs:33`
 
 <a id="constant.HEAD_LINE"></a>
 ### Constant `HEAD_LINE`
@@ -223,7 +225,7 @@ pub const HEAD_LINE: f32 = 20.0;
 
 The head's line height.
 
-Source: `crates/lune-ui-core/src/widgets/progress.rs:29`
+Source: `crates/lune-ui-core/src/widgets/progress.rs:31`
 
 <a id="constant.HEIGHT"></a>
 ### Constant `HEIGHT`
@@ -234,7 +236,7 @@ pub const HEIGHT: f32 = 4.0;
 
 The determinate track's height.
 
-Source: `crates/lune-ui-core/src/widgets/progress.rs:21`
+Source: `crates/lune-ui-core/src/widgets/progress.rs:23`
 
 <a id="constant.HEIGHT_INDETERMINATE"></a>
 ### Constant `HEIGHT_INDETERMINATE`
@@ -245,7 +247,7 @@ pub const HEIGHT_INDETERMINATE: f32 = 3.0;
 
 The indeterminate track's height (thinner than a measured bar).
 
-Source: `crates/lune-ui-core/src/widgets/progress.rs:23`
+Source: `crates/lune-ui-core/src/widgets/progress.rs:25`
 
 <a id="constant.PERIOD"></a>
 ### Constant `PERIOD`
@@ -256,7 +258,7 @@ pub const PERIOD: std::time::Duration;
 
 One trip of the segment: the accepted busy-loop period, outside the motion scale.
 
-Source: `crates/lune-ui-core/src/widgets/progress.rs:35`
+Source: `crates/lune-ui-core/src/widgets/progress.rs:37`
 
 <a id="constant.RADIUS"></a>
 ### Constant `RADIUS`
@@ -267,7 +269,7 @@ pub const RADIUS: f32 = 2f32;
 
 The track's corner radius: half the height, a semicircular end (D135).
 
-Source: `crates/lune-ui-core/src/widgets/progress.rs:25`
+Source: `crates/lune-ui-core/src/widgets/progress.rs:27`
 
 <a id="constant.RADIUS_INDETERMINATE"></a>
 ### Constant `RADIUS_INDETERMINATE`
@@ -278,7 +280,7 @@ pub const RADIUS_INDETERMINATE: f32 = 1.5f32;
 
 The indeterminate track's corner radius, half its own height.
 
-Source: `crates/lune-ui-core/src/widgets/progress.rs:27`
+Source: `crates/lune-ui-core/src/widgets/progress.rs:29`
 
 <a id="constant.SEGMENT"></a>
 ### Constant `SEGMENT`
@@ -289,5 +291,5 @@ pub const SEGMENT: f32 = 0.3;
 
 The travelling segment's share of the track.
 
-Source: `crates/lune-ui-core/src/widgets/progress.rs:33`
+Source: `crates/lune-ui-core/src/widgets/progress.rs:35`
 

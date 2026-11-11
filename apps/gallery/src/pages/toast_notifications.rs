@@ -405,7 +405,7 @@ const SCENES: &[UiScene] = &[
         loading,
         &[],
         800,
-        Expect::Moving,
+        Expect::Waiting,
     ),
     scene(
         "toast-notifications-prompt",
