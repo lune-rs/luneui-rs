@@ -11,7 +11,10 @@
 //! - `--bench [--runs N] [--frames N] [--size WxH]`: times frames offscreen (see `bench`);
 //! - `--smoke-platform`: puts an item in the tray, opens and closes its surface and tears down,
 //!   in about two seconds (see `smoke`). It needs a logged-in GUI session: exit 0 when it ran
-//!   and held, 1 when a check failed, 2 when there is no session to run in.
+//!   and held, 1 when a check failed, 2 when there is no session to run in;
+//! - `--pace-probe`: times the frame pacing on the real renderer in four phases (see `pace`). It
+//!   needs a logged-in GUI session; a window opens for about 15 s, leave it visible and untouched;
+//!   exit 0 held, 1 did not hold, 2 could not measure.
 //!
 //! Dump mode reads no clock: time comes from the scene tables and scripts, pixels from the
 //! offscreen target's readback (no screen or window capture). It reads one environment variable,
@@ -22,6 +25,7 @@ mod bench;
 #[cfg(test)]
 mod catalogue;
 mod custom;
+mod pace;
 mod page;
 mod pages;
 mod popover;
@@ -42,7 +46,7 @@ use page::{FrameTweaks, PageKind, meets_expectation, register_images, release_im
 use pages::PAGES;
 use scenes::{H, W};
 
-const USAGE: &str = "usage: gallery [--dump <dir> | --list | --bench [--runs N] [--frames N] [--size WxH] | --smoke-platform]\n  --smoke-platform needs a logged-in GUI session (it puts an item in the tray for about 2 s); exit 2 without one";
+const USAGE: &str = "usage: gallery [--dump <dir> | --list | --bench [--runs N] [--frames N] [--size WxH] | --smoke-platform | --pace-probe]\n  --smoke-platform needs a logged-in GUI session (it puts an item in the tray for about 2 s); exit 2 without one\n  --pace-probe needs a logged-in GUI session; a window opens for about 15 s, leave it visible and untouched; exit 0 held, 1 did not hold, 2 could not measure";
 
 enum Command {
     Window,
@@ -50,6 +54,7 @@ enum Command {
     List,
     Bench(bench::Options),
     SmokePlatform,
+    PaceProbe,
 }
 
 fn parse(args: &[String]) -> Result<Command, String> {
@@ -57,6 +62,7 @@ fn parse(args: &[String]) -> Result<Command, String> {
         [] => Ok(Command::Window),
         [a] if a == "--list" => Ok(Command::List),
         [a] if a == "--smoke-platform" => Ok(Command::SmokePlatform),
+        [a] if a == "--pace-probe" => Ok(Command::PaceProbe),
         [a, dir] if a == "--dump" => Ok(Command::Dump(PathBuf::from(dir))),
         [a, rest @ ..] if a == "--bench" => bench::Options::parse(rest).map(Command::Bench),
         _ => Err(USAGE.to_owned()),
@@ -108,6 +114,7 @@ fn main() -> ExitCode {
         }
         Command::Bench(opts) => bench::run(&opts),
         Command::SmokePlatform => smoke::run(),
+        Command::PaceProbe => pace::run(),
         Command::Window => window::run(),
     }
 }
