@@ -23,6 +23,60 @@ pub fn outline(width: f32, height: f32, seam: f32, tab: Option<TabSpan>) -> Vec<
     build_loop(width, height, seam, tab, STROKE / 2.0)
 }
 
+/// The closed loop `pts` moved `d` outward (away from the area it encloses, either winding) along
+/// each point's mitered normal, as the stroke tessellation joins its segments: at `d` of half a
+/// stroke's width it is that stroke's outer edge. Consecutive points closer than 1e-3 count as one.
+pub(crate) fn outset(pts: &[[f32; 2]], d: f32) -> Vec<[f32; 2]> {
+    let mut p: Vec<[f32; 2]> = Vec::with_capacity(pts.len());
+    for &q in pts {
+        if p.last()
+            .is_none_or(|l: &[f32; 2]| (l[0] - q[0]).abs() + (l[1] - q[1]).abs() > 1e-3)
+        {
+            p.push(q);
+        }
+    }
+    while p.len() > 2 && {
+        let (a, b) = (p[0], p[p.len() - 1]);
+        (a[0] - b[0]).abs() + (a[1] - b[1]).abs() <= 1e-3
+    } {
+        p.pop();
+    }
+    let n = p.len();
+    if n < 3 {
+        return p;
+    }
+    let area2: f32 = (0..n)
+        .map(|k| {
+            let (a, b) = (p[k], p[(k + 1) % n]);
+            a[0] * b[1] - b[0] * a[1]
+        })
+        .sum();
+    let sign = if area2 >= 0.0 { 1.0 } else { -1.0 };
+    // The outward unit normal of the edge k -> k + 1.
+    let edge: Vec<[f32; 2]> = (0..n)
+        .map(|k| {
+            let (a, b) = (p[k], p[(k + 1) % n]);
+            let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+            let len = (dx * dx + dy * dy).sqrt().max(1e-6);
+            [sign * dy / len, -sign * dx / len]
+        })
+        .collect();
+    (0..n)
+        .map(|k| {
+            let (e0, e1) = (edge[(k + n - 1) % n], edge[k]);
+            let m = [e0[0] + e1[0], e0[1] + e1[1]];
+            let len = (m[0] * m[0] + m[1] * m[1]).sqrt();
+            let (v, miter) = if len <= 1e-6 {
+                (e1, 1.0)
+            } else {
+                let v = [m[0] / len, m[1] / len];
+                (v, 1.0 / (v[0] * e1[0] + v[1] * e1[1]).max(0.3))
+            };
+            [p[k][0] + v[0] * d * miter, p[k][1] + v[1] * d * miter]
+        })
+        .collect()
+}
+
 struct Path {
     pts: Vec<[f32; 2]>,
 }
@@ -218,6 +272,28 @@ mod tests {
         );
         closed_and_inside(&pts, 400.0, 300.0);
         assert!(pts.iter().any(|p| p[0] < 1.0 && p[1] < 10.0));
+    }
+
+    #[test]
+    fn outset_moves_a_square_out_either_winding() {
+        let cw = [
+            [0.0, 0.0],
+            [10.0, 0.0],
+            [10.0, 10.0],
+            [0.0, 10.0],
+            [0.0, 0.0],
+        ];
+        let want = [[-1.0, -1.0], [11.0, -1.0], [11.0, 11.0], [-1.0, 11.0]];
+        let near = |a: [f32; 2], b: [f32; 2]| (a[0] - b[0]).abs() + (a[1] - b[1]).abs() < 1e-4;
+        let got = outset(&cw, 1.0);
+        assert_eq!(got.len(), 4, "{got:?}");
+        assert!(got.iter().zip(want).all(|(&g, w)| near(g, w)), "{got:?}");
+        let ccw: Vec<[f32; 2]> = cw.iter().rev().copied().collect();
+        let got = outset(&ccw, 1.0);
+        assert!(
+            want.iter().all(|&w| got.iter().any(|&g| near(g, w))),
+            "{got:?}"
+        );
     }
 
     #[test]
