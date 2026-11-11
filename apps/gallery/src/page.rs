@@ -17,7 +17,7 @@ use lune_ui::input::{
 };
 use lune_ui::lunegit_dark::THEME;
 use lune_ui::material::Material;
-use lune_ui::motion::MotionTier;
+use lune_ui::motion::{Cadence, MotionTier};
 use lune_ui::paint::Rect;
 use lune_ui::scene::{BlurLimits, FrameParams, Scene};
 use lune_ui::shortcuts::Shortcuts;
@@ -284,8 +284,8 @@ pub(crate) enum Expect {
     Settled,
     /// `Repaint::Now` at the capture frame (a transition is in flight).
     Moving,
-    /// `Repaint::At(_)` at the capture frame: nothing moves yet, a frame is due later (a pending
-    /// tooltip).
+    /// `Repaint::At(_)` at the capture frame: a frame is due later: a pending tooltip, or a busy
+    /// loop's next tick (D298).
     Waiting,
 }
 
@@ -667,6 +667,7 @@ impl Player {
         let config = FrameConfig {
             theme: self.restyle.map_or(theme, |f| f(theme)),
             tier: self.state.tier().unwrap_or(self.tier),
+            busy_cadence: Cadence::BUSY,
             strings: &self.strings,
             arg_format: &DisplayFormat,
             // Scripted scenes run the same on every host.

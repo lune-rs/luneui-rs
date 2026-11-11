@@ -255,6 +255,7 @@ mod tests {
         let config = lune_ui::ui::FrameConfig {
             theme: lune_ui::lunegit_dark::THEME,
             tier: lune_ui::motion::MotionTier::Full,
+            busy_cadence: lune_ui::motion::Cadence::BUSY,
             strings: &strings,
             arg_format: &lune_ui::strings::DisplayFormat,
             keymap: lune_ui::input::Keymap::MAC,

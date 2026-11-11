@@ -8,7 +8,7 @@
 use std::time::Duration;
 
 use lune_ui_core::input::Keymap;
-use lune_ui_core::motion::{Kind, Motion, MotionTier};
+use lune_ui_core::motion::{Cadence, Kind, Motion, MotionTier};
 use lune_ui_core::paint::{LayerId, Rect};
 use lune_ui_core::scene::Scene;
 use lune_ui_core::shortcuts::Shortcuts;
@@ -123,6 +123,7 @@ impl Window {
         let config = FrameConfig {
             theme: DARK,
             tier: MotionTier::Full,
+            busy_cadence: Cadence::BUSY,
             strings: &self.strings,
             arg_format: &DisplayFormat,
             keymap: Keymap::MAC,

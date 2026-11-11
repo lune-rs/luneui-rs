@@ -1,11 +1,14 @@
 //! The spinner (`widget.spinner` acceptance, D117): 360 degrees per 1200 ms from elapsed time
 //! alone, wrap at 360, a stop holds the angle and a restart continues from it, a static glyph at
-//! angle 0 under Reduced and Off, `Repaint::Now` only while spinning, a transient phase.
+//! angle 0 under Reduced and Off, a frame at the busy cadence's next tick only while spinning, a
+//! transient phase.
+
+use std::time::Duration;
 
 use lune_ui_core::access::{Role, State};
 use lune_ui_core::icon;
 use lune_ui_core::input::Repaint;
-use lune_ui_core::motion::MotionTier;
+use lune_ui_core::motion::{Cadence, MotionTier};
 use lune_ui_core::paint::{Painter, Rect};
 use lune_ui_core::scene::{ImageItem, ImageSource, Scene};
 use lune_ui_core::testing::{FakeText, UiHarness};
@@ -46,6 +49,16 @@ fn at(h: &mut UiHarness, ms: u64, busy: bool) -> (f32, Repaint) {
     (degrees(&scene), out.repaint)
 }
 
+/// The repaint a frame with only a busy loop in flight reports at `ms`: the next tick of the
+/// default busy cadence (D298).
+fn busy_tick(ms: u64) -> Repaint {
+    Repaint::At(
+        Cadence::BUSY
+            .next_tick(Duration::from_millis(ms))
+            .expect("a finite tick"),
+    )
+}
+
 fn circular(a: f32, b: f32) -> f32 {
     let d = (a - b).rem_euclid(360.0);
     d.min(360.0 - d)
@@ -62,7 +75,7 @@ fn the_angle_is_360_degrees_per_1200_ms_on_a_60_hz_grid_and_wraps() {
         let want = (ms % 1200) as f32 * 0.3;
         assert!(circular(a, want) <= 6.0, "{ms} ms: {a} vs {want}");
         assert!((0.0..360.0).contains(&a), "{a}");
-        assert_eq!(repaint, Repaint::Now);
+        assert_eq!(repaint, busy_tick(ms));
         if a < last {
             wrapped = true;
             assert!(last > 340.0 && a < 20.0, "wraps at 360: {last} -> {a}");
@@ -80,7 +93,7 @@ fn it_starts_on_the_first_frame_so_300_ms_is_a_quarter_turn() {
     assert_eq!(at(&mut h, 0, true).0, 0.0);
     let (a, repaint) = at(&mut h, 300, true);
     assert!(circular(a, 90.0) < 0.01, "{a}");
-    assert_eq!(repaint, Repaint::Now);
+    assert_eq!(repaint, busy_tick(300));
 }
 
 #[test]
@@ -110,7 +123,7 @@ fn a_stop_holds_the_angle_and_a_restart_continues_from_it() {
     // Restarted at 100 s: the first frame is the held angle, then it turns on from there.
     let (a, repaint) = at(&mut h, 100_000, true);
     assert!(circular(a, 120.0) < 0.01, "{a}");
-    assert_eq!(repaint, Repaint::Now);
+    assert_eq!(repaint, busy_tick(100_000));
     let (a, _) = at(&mut h, 100_300, true);
     assert!(circular(a, 210.0) < 0.01, "{a}");
 }

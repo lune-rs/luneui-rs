@@ -183,12 +183,12 @@ struct RunStats {
 }
 
 /// Nearest-rank percentile of `v` (sorted ascending, non-empty).
-fn percentile(v: &[f64], p: f64) -> f64 {
+pub(crate) fn percentile(v: &[f64], p: f64) -> f64 {
     let rank = (p * v.len() as f64).ceil() as usize;
     v[rank.clamp(1, v.len()) - 1]
 }
 
-fn sorted(mut v: Vec<f64>) -> Vec<f64> {
+pub(crate) fn sorted(mut v: Vec<f64>) -> Vec<f64> {
     v.sort_by(f64::total_cmp);
     v
 }
@@ -250,7 +250,7 @@ impl Outcome {
 }
 
 /// The 1-minute load average, when the platform reports one (app code may read it).
-fn load1() -> String {
+pub(crate) fn load1() -> String {
     if let Ok(s) = std::fs::read_to_string("/proc/loadavg")
         && let Some(v) = s.split_whitespace().next()
     {

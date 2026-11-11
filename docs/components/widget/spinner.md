@@ -43,7 +43,7 @@ Conflict: `.claude/docs/animation-rules.md:150` bars animations longer than 500 
 
 | state | look | cite |
 |---|---|---|
-| spinning (busy) | glyph rotates, 1.2 s per revolution | [L src/Lunegit.Desktop/Controls/SpinBehavior.cs:17,38-53] |
+| spinning (busy) | glyph rotates, 1.2 s per revolution; its frames tick at the busy cadence (`Repaint::At`, 30 a second by default, not every frame: D298, which amends D117) | [L src/Lunegit.Desktop/Controls/SpinBehavior.cs:17,38-53] |
 | stopped (not busy, or detached) | glyph static at its last angle | [L src/Lunegit.Desktop/Controls/SpinBehavior.cs:56-60] |
 | Reduced tier | static glyph | [L src/Lunegit.Desktop/Themes/AnimationsReduced.axaml:10-16] |
 | Off tier | static glyph | [motion] |

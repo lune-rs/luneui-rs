@@ -7,7 +7,8 @@
 A turning busy indicator (`widget.spinner`): the sync glyph rotating about its centre, one
 revolution per 1200 ms while busy (D117). Under Reduced and Off it is a static glyph at angle
 0 and reports `Idle`: a transform is not allowed there, and a spinner has no colour change to
-keep.
+keep. While it turns it asks for its next frame at the frame's busy cadence
+(`FrameConfig::busy_cadence`, D298), not at once.
 
 The angle is held per instance as the angle it stopped at plus the time elapsed since it
 started being busy, so elapsed time alone sets it (a late frame does not slow it), a stop
@@ -32,7 +33,7 @@ pub struct SpinnerOptions<'a> {
 
 What a spinner shows.
 
-Source: `crates/lune-ui-core/src/widgets/spinner.rs:24`
+Source: `crates/lune-ui-core/src/widgets/spinner.rs:25`
 
 **Fields**
 
@@ -78,7 +79,7 @@ pub fn paint<H: Copy + PartialEq>(
 
 Draws the glyph centred on `center`, turned by `degrees` clockwise.
 
-Source: `crates/lune-ui-core/src/widgets/spinner.rs:69`
+Source: `crates/lune-ui-core/src/widgets/spinner.rs:70`
 
 ## Constants
 
@@ -91,5 +92,5 @@ pub const SIZE: f32 = 14.0;
 
 The glyph size when the caller names none.
 
-Source: `crates/lune-ui-core/src/widgets/spinner.rs:20`
+Source: `crates/lune-ui-core/src/widgets/spinner.rs:21`
 

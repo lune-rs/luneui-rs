@@ -37,7 +37,7 @@ use crate::input::{
     ClipboardRequest, CursorIcon, Event, FocusEvent, FrameOutput, Key, Keymap, Modifiers, NamedKey,
     RawInput, Repaint, ScrollDelta,
 };
-use crate::motion::{MotionTier, Time};
+use crate::motion::{Cadence, MotionTier, Time};
 use crate::paint::{Painter, Rect, SUPPRESSED};
 use crate::scene::{LayerId, Scene};
 use crate::shortcuts::{CommandId, Scope, Shortcuts};
@@ -58,6 +58,10 @@ pub(crate) const DISABLED_ALPHA: f32 = 0.4;
 pub struct FrameConfig<'a> {
     pub theme: Theme,
     pub tier: MotionTier,
+    /// How often a busy loop (a shine, a spinner, an indeterminate bar) asks for its next frame
+    /// when nothing else is in flight. Transitions, overlays, drags, scrolling and input catch-up
+    /// frames are never held to it (D298).
+    pub busy_cadence: Cadence,
     pub strings: &'a StringTable,
     pub arg_format: &'a dyn ArgFormat,
     /// The platform's keyboard conventions (the app reads the OS, not the toolkit).
@@ -71,6 +75,7 @@ impl std::fmt::Debug for FrameConfig<'_> {
         f.debug_struct("FrameConfig")
             .field("theme", &self.theme)
             .field("tier", &self.tier)
+            .field("busy_cadence", &self.busy_cadence)
             .field("strings", &self.strings)
             .field("keymap", &self.keymap)
             .field("shortcuts", &self.shortcuts)
@@ -128,6 +133,8 @@ pub struct Ui<'a> {
     /// Ranges of painter hit indices registered while disabled.
     disabled: Vec<Range<usize>>,
     in_flight: bool,
+    /// A busy loop drew this frame inside the clip: the frame is due at the cadence's next tick.
+    busy_frame: bool,
     repaint_at: Option<Time>,
     clipboard_write: Option<String>,
     clipboard_read: bool,
@@ -540,6 +547,7 @@ impl<'a> Ui<'a> {
             registered: Vec::new(),
             disabled: Vec::new(),
             in_flight: false,
+            busy_frame: false,
             repaint_at: None,
             clipboard_write: None,
             clipboard_read: false,
@@ -577,6 +585,7 @@ impl<'a> Ui<'a> {
             registered,
             disabled,
             in_flight,
+            busy_frame,
             repaint_at,
             clipboard_write,
             clipboard_read,
@@ -739,12 +748,16 @@ impl<'a> Ui<'a> {
         store.last_tier = Some(config.tier);
         store.last_theme = Some(config.theme);
 
+        let due = repaint_at.filter(|t| *t > now);
         let repaint = if in_flight || moving || catch_up {
             Repaint::Now
-        } else if let Some(t) = repaint_at.filter(|t| *t > now) {
-            Repaint::At(t)
+        } else if busy_frame {
+            match config.busy_cadence.next_tick(now) {
+                None => Repaint::Now,
+                Some(tick) => Repaint::At(due.map_or(tick, |t| t.min(tick))),
+            }
         } else {
-            Repaint::Idle
+            due.map_or(Repaint::Idle, Repaint::At)
         };
         let mut clipboard = Vec::new();
         if let Some(text) = clipboard_write {
@@ -1124,6 +1137,21 @@ impl<'a> Ui<'a> {
     /// Marks something as moving: the frame reports `Repaint::Now`.
     pub(crate) fn mark_moving(&mut self) {
         self.in_flight = true;
+    }
+
+    /// A busy loop (a shine, a spinner, an indeterminate bar) drew `rect` this frame and needs
+    /// another one: the frame reports the next tick of [`FrameConfig::busy_cadence`] instead of
+    /// `Repaint::Now`, unless something else keeps it in flight. `rect` is in the space draws are
+    /// made in now; a rect wholly outside the current rect clip draws nothing visible and asks
+    /// for nothing (D298).
+    pub fn request_busy_frame(&mut self, rect: Rect) {
+        if let Some(clip) = self.painter.clip_rect() {
+            let seen = rect.intersect(&clip);
+            if !(seen.w > 0.0 && seen.h > 0.0) {
+                return;
+            }
+        }
+        self.busy_frame = true;
     }
 
     /// Edits the node `id` emitted this frame, if any (the latest one with that id).

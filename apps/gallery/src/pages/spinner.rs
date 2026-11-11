@@ -101,7 +101,7 @@ const SCENES: &[UiScene] = &[
         state: busy,
         script: &[],
         capture_ms: 300,
-        expect: Expect::Moving,
+        expect: Expect::Waiting,
     },
     UiScene {
         id: "spinner-spinning",
@@ -110,7 +110,7 @@ const SCENES: &[UiScene] = &[
         state: busy,
         script: &[],
         capture_ms: 300,
-        expect: Expect::Moving,
+        expect: Expect::Waiting,
     },
     UiScene {
         id: "spinner-stopped",
@@ -141,7 +141,7 @@ const SCENES: &[UiScene] = &[
             events: &[Ev::PointerOver(SWITCH), Ev::Click],
         }],
         capture_ms: 250,
-        expect: Expect::Moving,
+        expect: Expect::Waiting,
     },
 ];
 

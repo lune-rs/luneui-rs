@@ -97,7 +97,7 @@ the frame's `RawInput`, a `FrameConfig` (theme, motion tier, string table, `ArgF
 `TextSystem`. `Ui::finish` returns the `Scene` and a `FrameOutput` whose `repaint` says when to draw
 again (`Idle`, `Now`, or `At(time)`), with the cursor, the input-method area, clipboard requests, semantic
 tree, focused widget and the shortcut commands that fired. `FrameConfig` also carries the `Keymap` and the
-`Shortcuts` table (D92, D93).
+`Shortcuts` table (D92, D93). A busy loop (a tab's shine, a spinner, an indeterminate bar) asks with `Ui::request_busy_frame` and reports `At` on the grid of `FrameConfig::busy_cadence` when nothing else is in flight, never `Now` (D298).
 
 - Ids: `WidgetId` from app keys under scopes (`ui.id`, `ui.scope`); the same key path is the same id
   from frame to frame.
@@ -319,6 +319,7 @@ duration under the frame's tier (`Full` runs it, `Reduced` maps the token or fad
 transform, `Off` snaps, D69). `Token::Zero` is a row that never runs, in any tier. A retarget while
 in flight keeps position and velocity (D68). `conformance` samples a motion at 60 Hz and checks
 monotone steps, the exact end and that it finishes within its duration plus one frame.
+A busy loop's frames tick at `motion::Cadence` (30 a second by default, D298); a transition is never held to it. `Repaint::paced` puts a run of `Now` frames on the grid of a display's rate (D299).
 
 ### `lune-ui-wgpu` (`crates/lune-ui-wgpu/src/`)
 
@@ -328,7 +329,7 @@ monotone steps, the exact end and that it finishes within its duration plus one 
 | `frame` (`frame.rs`) | One target's renderer: the scene, blur, target pass sequence over a core `Scene`, walking `Scene::in_order`; the frame's stops are where a layer has requests | `FrameRenderer`, `FrameParams` |
 | `images` (`images.rs`, `image.wgsl`) | The image pipeline and the picture store: premultiply on upload, nearest at an integer ratio without rotation, else linear; rotated text is a raster of the shaped text drawn through it (D105, D106) | `Gpu::register`, `Gpu::release` (the `ImageStore` impl) |
 | `blur` (`blur.rs`, `blur.wgsl`) | Backdrop blur: a stop per layer with requests, a blur per distinct sigma at each, and a replace by an erase then an add (D257, D258); the kernel cap and the working size come from `FrameParams.blur` (D264) | `Blur` |
-| `surface` (`surface.rs`) | A window's swapchain; no winit dependency | `WindowSurface`, `Acquired` |
+| `surface` (`surface.rs`) | A window's swapchain; no winit dependency; present mode and frame latency are options (D299) | `WindowSurface`, `Acquired`, `SurfaceOptions` |
 | `dump` (`dump.rs`) | Offscreen targets and GPU readback to PNG; no screen capture | `target`, `read_rgba`, `write_png` |
 | `custom` (`custom.rs`) | App-owned GPU drawing inside a painted layer (the hook for app-specific drawing, D8) | `CustomDraw`, `CustomFrame`, `CustomItem` |
 | `text_cache` (`text_cache.rs`) | cosmic-text shaping behind the core's `TextSystem`, including the caret, hit, line and segment queries, which read one row list per shaped text (`unicode-segmentation`, D86; D112) | `TextCache` |
@@ -573,7 +574,13 @@ From M1 to M3:
 - new: `RawInput`, `FrameOutput`, `Translator`, `OutputState`, `Backdrop::apply`, `WindowBackdrop`,
   the `testing` module.
 
-Since 0.3.0 (font smoothing, D294 to D297; the workspace version is 0.4.0; `docs/consuming.md`, "0.3.0 to 0.4.0", is the migration map):
+Since 0.4.0 (frame pacing, D298 to D300; the workspace version is 0.5.0; `docs/consuming.md`, "0.4.0 to 0.5.0", is the migration map):
+
+- `lune_ui_core::motion::Cadence` (`Cadence::BUSY`, 30 a second; `Cadence::hz`; `Cadence::next_tick`, the grid of whole multiples of 1 s / n of app time); `FrameConfig` gains `busy_cadence` (a literal outside the toolkit stops compiling); `Ui::request_busy_frame(rect)` is a busy loop's request; `Repaint::paced(now, rate)` moves a `Now` to the next tick; `testing::UiHarness` gains `busy_cadence`. Busy loops (the tab shine, the busy cue, the spinner, the indeterminate bar) report `At` where they reported `Now` (D298);
+- `lune-ui-wgpu`: `SurfaceOptions { present_mode, frame_latency }` (default `Fifo`, 2), `WindowSurface::with_options`, `options`, `set_options`; `new` is unchanged. An unlisted present mode falls back to `Fifo`. `acquire` drops a suboptimal texture before it reconfigures, and no configure runs while a texture from `acquire` is alive (D299);
+- the gallery: `gallery --pace-probe` times the frame pacing on the real renderer in four phases; its reading is in `render.surface` (D299).
+
+Since 0.3.0 (font smoothing, D294 to D297; the workspace version was 0.4.0; `docs/consuming.md`, "0.3.0 to 0.4.0", is the migration map):
 
 - `FrameParams` gains `text: lune_ui_core::text::TextRendering` (default `TextRendering::SMOOTH`: no hinting and stem darkening, the look is new) and `CustomFrame` gains
   `text`, the effective setting; `TextRendering::OFF` draws the 0.3.0 look. New in the core: `TextRendering`, `StemDarkening`, `GlyphParams` (pure values, D296);

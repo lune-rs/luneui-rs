@@ -3,7 +3,9 @@
 //! head (name left, value right, 13 on a 20 px line, 4 px below). Determinate never animates (a progress value updates continuously, no tween).
 //! Indeterminate (D118) is a 3 px track: a segment 30% of the track travelling left to right,
 //! linear, period 2400 ms, clipped by the track. Under Reduced the full-width fill breathes
-//! between 0.38 and 1.0 over 1800 ms (opacity only); under Off it holds at 0.38.
+//! between 0.38 and 1.0 over 1800 ms (opacity only); under Off it holds at 0.38. An indeterminate
+//! track under Full or Reduced asks for its next frame at the frame's busy cadence
+//! (`FrameConfig::busy_cadence`, D298), not at once.
 
 use std::hash::Hash;
 use std::time::Duration;
@@ -228,7 +230,7 @@ impl Ui<'_> {
                     indeterminate_at(tier, now),
                 );
                 if tier != MotionTier::Off {
-                    self.mark_moving();
+                    self.request_busy_frame(track);
                 }
             }
         }

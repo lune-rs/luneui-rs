@@ -6,7 +6,7 @@
 
 use lune_ui_core::access::{AccessAction, Action, Node, Role, State, Value};
 use lune_ui_core::input::{FrameOutput, Key, Modifiers, NamedKey, PointerButton, Repaint};
-use lune_ui_core::motion::{Easing, Kind, MOTION, Motion, MotionTier, Reduce, Token};
+use lune_ui_core::motion::{Cadence, Easing, Kind, MOTION, Motion, MotionTier, Reduce, Token};
 use lune_ui_core::paint::{LayerId, Rect};
 use lune_ui_core::scene::Scene;
 use lune_ui_core::testing::UiHarness;
@@ -4186,6 +4186,7 @@ mod m10 {
         let config = FrameConfig {
             theme: h.theme,
             tier: h.tier,
+            busy_cadence: Cadence::BUSY,
             strings: &h.strings,
             arg_format: &DisplayFormat,
             keymap: h.keymap,

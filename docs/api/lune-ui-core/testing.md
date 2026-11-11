@@ -431,6 +431,7 @@ pub struct UiHarness {
     pub input: ScriptedInput,
     pub theme: Theme,
     pub tier: MotionTier,
+    pub busy_cadence: Cadence,
     pub keymap: Keymap,
     pub shortcuts: Shortcuts,
 }
@@ -454,6 +455,10 @@ Source: `crates/lune-ui-core/src/testing/ui.rs:81`
 - <a id="structfield.UiHarness.theme"></a>`pub theme: Theme`
 
 - <a id="structfield.UiHarness.tier"></a>`pub tier: MotionTier`
+
+- <a id="structfield.UiHarness.busy_cadence"></a>`pub busy_cadence: Cadence`
+
+  How often a busy loop asks for its next frame; [`Cadence::BUSY`](motion.md#associatedconstant.Cadence.BUSY) by default.
 
 - <a id="structfield.UiHarness.keymap"></a>`pub keymap: Keymap`
 

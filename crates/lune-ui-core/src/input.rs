@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use crate::access::{AccessAction, SemanticTree};
-use crate::motion::Time;
+use crate::motion::{Cadence, Time};
 use crate::paint::Rect;
 use crate::shortcuts::CommandId;
 use crate::ui::WidgetId;
@@ -275,6 +275,22 @@ pub enum Repaint {
     Now,
     /// Draw again at this app time (an animation's next frame).
     At(Time),
+}
+
+impl Repaint {
+    /// Puts a `Now` on the grid of `rate`: it becomes the first tick after `now`, or stays `Now`
+    /// under [`Cadence::EveryFrame`]. `Idle` and `At(_)` are returned unchanged.
+    ///
+    /// An app that would wait in the surface's acquire between frames uses this to draw a run of
+    /// `Now` frames at the display's rate instead. A grid at or above the display's real rate
+    /// under a queueing present mode (`Fifo`) can fill the swapchain queue and wait in acquire
+    /// again (D299).
+    pub fn paced(self, now: Time, rate: Cadence) -> Repaint {
+        match self {
+            Repaint::Now => rate.next_tick(now).map_or(Repaint::Now, Repaint::At),
+            other => other,
+        }
+    }
 }
 
 /// What the toolkit asks of the window after a frame.

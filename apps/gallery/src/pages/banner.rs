@@ -182,7 +182,7 @@ const SCENES: &[UiScene] = &[
         state: banner_only,
         script: &[],
         capture_ms: 300,
-        expect: Expect::Moving,
+        expect: Expect::Waiting,
     },
     UiScene {
         id: "banner-empty-state",

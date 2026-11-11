@@ -7,11 +7,55 @@
 A window's swapchain: the surface, its configuration, and acquire / present. Windowing-free:
 the app creates the `wgpu::Surface` from any window handle (`Instance::create_surface`), asks
 for a redraw when [`acquire`](surface.md#method.WindowSurface.acquire) says so, and tells its window a frame is
-about to be presented before [`present`](surface.md#method.WindowSurface.present).
+about to be presented before [`present`](surface.md#method.WindowSurface.present). [`SurfaceOptions`](surface.md#struct.SurfaceOptions) sets the
+present mode and the frame latency ([`WindowSurface::with_options`](surface.md#method.WindowSurface.with_options),
+[`WindowSurface::set_options`](surface.md#method.WindowSurface.set_options)); the defaults are 0.4.0's.
 
 Source: `crates/lune-ui-wgpu/src/surface.rs:1`
 
 ## Structs
+
+<a id="struct.SurfaceOptions"></a>
+### Struct `SurfaceOptions`
+
+```rust
+pub struct SurfaceOptions {
+    pub present_mode: wgpu::PresentMode,
+    pub frame_latency: u32,
+}
+```
+
+How a [`WindowSurface`](surface.md#struct.WindowSurface) presents (D299). The default is `Fifo` with a latency of 2.
+
+`Fifo` waits for the display, and [`WindowSurface::acquire`](surface.md#method.WindowSurface.acquire) blocks while every drawable is
+queued, so a run of frames asked for at once waits there for up to a refresh interval each.
+An app that draws only when a frame is due can pick a mode that does not wait.
+`AutoNoVsync` becomes the first of `Immediate`, `Mailbox` and `Fifo` that the surface lists
+(wgpu's order), and a mode that does not wait for the display can tear.
+
+Source: `crates/lune-ui-wgpu/src/surface.rs:30`
+
+**Fields**
+
+- <a id="structfield.SurfaceOptions.present_mode"></a>`pub present_mode: wgpu::PresentMode`
+
+  The present mode. A mode the surface does not list falls back to `Fifo`; `AutoVsync` and
+  `AutoNoVsync` are resolved by wgpu.
+
+- <a id="structfield.SurfaceOptions.frame_latency"></a>`pub frame_latency: u32`
+
+  wgpu's `desired_maximum_frame_latency`: how many frames may be queued ahead of the
+  display. wgpu clamps it to the backend's range (Metal: 1 to 2).
+
+**Trait implementations**
+
+- `impl Clone for SurfaceOptions`
+- `impl Copy for SurfaceOptions`
+- `impl Debug for SurfaceOptions`
+- `impl Default for SurfaceOptions`
+- `impl Eq for SurfaceOptions`
+- `impl PartialEq for SurfaceOptions`
+- `impl StructuralPartialEq for SurfaceOptions`
 
 <a id="struct.WindowSurface"></a>
 ### Struct `WindowSurface`
@@ -24,7 +68,7 @@ pub struct WindowSurface {
 
 One window's surface, configured for a [`Gpu`](gpu.md#struct.Gpu).
 
-Source: `crates/lune-ui-wgpu/src/surface.rs:21`
+Source: `crates/lune-ui-wgpu/src/surface.rs:63`
 
 **Methods and associated items**
 
@@ -35,6 +79,9 @@ Source: `crates/lune-ui-wgpu/src/surface.rs:21`
   The next surface texture. An outdated, suboptimal or lost surface is reconfigured (a
   suboptimal texture is dropped, not drawn) and [`Acquired::Redraw`](surface.md#variant.Acquired.Redraw) returned; a hidden or
   minimised window, or a timeout, gives [`Acquired::Skip`](surface.md#variant.Acquired.Skip).
+
+  Under `Fifo` a frame started before the display can take one waits here for up to a
+  refresh interval (see [`SurfaceOptions`](surface.md#struct.SurfaceOptions)).
 
 - <a id="method.WindowSurface.alpha_mode"></a>`pub fn alpha_mode(&self) -> wgpu::CompositeAlphaMode`
 
@@ -47,8 +94,14 @@ Source: `crates/lune-ui-wgpu/src/surface.rs:21`
 
 - <a id="method.WindowSurface.new"></a>`pub fn new(gpu: &Gpu, surface: wgpu::Surface<'static>, size: (u32, u32)) -> Result<Self, String>`
 
-  Configures `surface` at `size` physical pixels. The format prefers `Bgra8Unorm`, then
-  `Rgba8Unorm`; the alpha mode prefers premultiplied, then post-multiplied.
+  Configures `surface` at `size` physical pixels with [`SurfaceOptions::default`]. The
+  format prefers `Bgra8Unorm`, then `Rgba8Unorm`; the alpha mode prefers premultiplied, then
+  post-multiplied.
+
+- <a id="method.WindowSurface.options"></a>`pub fn options(&self) -> SurfaceOptions`
+
+  What the surface is configured with: the present mode actually in use (after the fallback
+  to `Fifo`) and the frame latency requested.
 
 - <a id="method.WindowSurface.present"></a>`pub fn present(&self, gpu: &Gpu, frame: wgpu::SurfaceTexture)`
 
@@ -58,11 +111,35 @@ Source: `crates/lune-ui-wgpu/src/surface.rs:21`
 - <a id="method.WindowSurface.resize"></a>`pub fn resize(&mut self, gpu: &Gpu, width: u32, height: u32)`
 
   Reconfigures the surface to `width` by `height` physical px, each at least 1. Call it when
-  the window resizes; [`Self::acquire`](surface.md#method.WindowSurface.acquire) does it itself for an outdated surface.
+  the window resizes, between frames and never while a texture from [`Self::acquire`](surface.md#method.WindowSurface.acquire) is
+  alive (present or drop it first: wgpu refuses to configure a surface with an outstanding
+  texture and its default error handler panics); [`Self::acquire`](surface.md#method.WindowSurface.acquire) does it itself for an
+  outdated surface.
+
+- <a id="method.WindowSurface.set_options"></a>`pub fn set_options(&mut self, gpu: &Gpu, options: SurfaceOptions)`
+
+  Reconfigures the surface with `options` at the current size and format. Call it between
+  frames, never while a texture from [`Self::acquire`](surface.md#method.WindowSurface.acquire) is alive (present or drop it first):
+  wgpu refuses to configure a surface with an outstanding texture and its default error
+  handler panics.
 
 - <a id="method.WindowSurface.size"></a>`pub fn size(&self) -> (u32, u32)`
 
   The configured size in physical pixels.
+
+- <a id="method.WindowSurface.with_options"></a>
+
+  ```rust
+  pub fn with_options(
+      gpu: &Gpu,
+      surface: wgpu::Surface<'static>,
+      size: (u32, u32),
+      options: SurfaceOptions,
+  ) -> Result<Self, String>
+  ```
+
+  [`Self::new`](surface.md#method.WindowSurface.new) with the present mode and frame latency of `options`; a mode the surface
+  does not list becomes `Fifo` ([`Self::options`](surface.md#method.WindowSurface.options) reports what was configured).
 
 **Trait implementations**
 
@@ -83,7 +160,7 @@ pub enum Acquired {
 
 What [`WindowSurface::acquire`](surface.md#method.WindowSurface.acquire) got.
 
-Source: `crates/lune-ui-wgpu/src/surface.rs:10`
+Source: `crates/lune-ui-wgpu/src/surface.rs:12`
 
 **Variants**
 

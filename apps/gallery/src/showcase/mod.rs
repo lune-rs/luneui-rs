@@ -654,7 +654,7 @@ mod tests {
     use super::*;
     use lune_ui::access::State;
     use lune_ui::input::{FrameOutput, Translator};
-    use lune_ui::motion::MotionTier;
+    use lune_ui::motion::{Cadence, MotionTier};
     use lune_ui::shortcuts::Shortcuts;
     use lune_ui::strings::DisplayFormat;
     use lune_ui::testing::FakeText;
@@ -836,6 +836,7 @@ mod tests {
             let config = FrameConfig {
                 theme: self.shell.theme().unwrap_or(lune_ui::lunegit_dark::THEME),
                 tier: MotionTier::Full,
+                busy_cadence: Cadence::BUSY,
                 strings: &strings,
                 arg_format: &DisplayFormat,
                 keymap: lune_ui::input::Keymap::MAC,

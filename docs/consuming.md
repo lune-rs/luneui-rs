@@ -62,6 +62,8 @@ environment. The app:
   loaded with `Theme::from_json`), the string table and the shortcut table, every frame;
 - turns `FrameOutput` into window and OS actions (`WindowCommand`, cursor icon, clipboard, repaint
   request, accessibility tree); the toolkit calls none of them;
+- honours `Repaint::At` deadlines (`control_flow` gives `WaitUntil`; redraw on `StartCause::ResumeTimeReached`) and picks `FrameConfig::busy_cadence` (D298);
+- for a window whose main thread must not wait in acquire: maps `Repaint` through `paced` and sets `SurfaceOptions { present_mode: AutoNoVsync, .. }`, measured on macOS/Metal only (D299; see "0.4.0 to 0.5.0: frame pacing");
 - keeps `Gpu::end_frame(&mut text)` once per frame after every target drew;
 - rebuilds `Gpu`, `TextCache`, every `FrameRenderer`, every `WindowSurface` and every registered image
   when `Gpu::is_lost()` says the device is gone (it reports, it does not recover; D241);
@@ -162,6 +164,19 @@ D294 to D297. Glyphs are rasterized by the toolkit now, with a setting the app p
 | (no glyph atlas diagnostic) | `Gpu::glyph_atlas_size` | new, for tests: the largest side in px of any glyph atlas texture (it grows when a frame needs more glyphs than fit) |
 | `glyphon` in the lock | gone: `cosmic-text`, `etagere`, `lru`, `rustc-hash`, `swash` are direct dependencies of `lune-ui-wgpu` at the versions already locked | no package is added to the lock; a snapshot consumer's lock follows the same list |
 | the pixel gate against a 0.3.0 base | `LUNEUI_GALLERY_TEXT=off scripts/pixel-gate.sh --base <rev>` | the gallery's dumps read the variable (`on`, `off`) |
+
+## 0.4.0 to 0.5.0: frame pacing
+
+D298 to D300. Busy loops (a tab's shine, the busy cue, a spinner, an indeterminate bar) tick at `busy_cadence` instead of every frame, and a window surface can be set so the main thread does not wait in acquire when no frame is due. Breaking, hence 0.5.0.
+
+| old | new | note |
+| --- | --- | --- |
+| `FrameConfig { .. }` literal | add `busy_cadence: Cadence::BUSY` (`lune_ui::motion::Cadence`) | new: how often a busy loop asks for its next frame (D298); `Cadence::EveryFrame` is 0.4.0's behaviour; `FrameConfig` has no `Default` |
+| a busy loop that asks `Now` every frame (a tab shines, a spinner turns) | `Repaint::At(next tick)`: redraw when the `At` deadline comes | the app's loop must wake at `At` (`control_flow` gives `WaitUntil`; redraw on `StartCause::ResumeTimeReached`); a transition, input or a catch-up frame still gives `Now`; a busy loop wholly outside its clip asks nothing (D298) |
+| an app-side cap on input-free frames (a flag that holds `Now` to 30 Hz) | remove it | the toolkit holds busy loops, never transitions or input |
+| an app's own decorative loop (`mark_moving` every frame) | `Ui::request_busy_frame(rect)` | the rect is in the space draws are made in; a rect wholly outside the current clip asks nothing (D298) |
+| `WindowSurface::new(gpu, surface, size)` | unchanged, or `WindowSurface::with_options(gpu, surface, size, SurfaceOptions { .. })`; then `set_options`, `options` | `SurfaceOptions { present_mode, frame_latency }`, default `Fifo`, 2 (0.4.0's); a mode the surface does not list falls back to `Fifo` (D299) |
+| a run of `Now` frames that blocks in acquire (about 16.5 ms a frame at 60 Hz under `Fifo`, the planner's probe) | `control_flow(out.repaint.paced(now, Cadence::hz(display_hz)), origin)` with `SurfaceOptions { present_mode: PresentMode::AutoNoVsync, .. }` | measured on macOS/Metal only (Apple M1 Pro, one 60 Hz display): a paced run did not wait in acquire (`gallery --pace-probe`, the reading in `render.surface`). On DX12, Vulkan and GL `AutoNoVsync` can resolve to `Mailbox` or `Immediate`: unmeasured. Tearing is unchecked on every platform, so the app picks the mode. Under `Fifo`, keep the grid below the display's real rate. Call `set_options` and `resize` between frames, never while a texture from `acquire` is alive (D299) |
 
 ## API changes of the library pass
 

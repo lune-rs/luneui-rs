@@ -1,12 +1,14 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-11 (font smoothing, version 0.4.0, merged at cebd7d7 and tagged `v0.4.0`; the tab strip's `context` (0.3.0, tagged at 2c0e25c), tab-strip-plus-and-slide, library pass and dark-glass are on main, published at github.com/lune-rs/luneui-rs)
+Last updated: 2026-11-11 (frame pacing, version 0.5.0 (D300), on `orch/frame-pacing`, not yet merged; font smoothing, version 0.4.0, merged at cebd7d7 and tagged `v0.4.0`; the tab strip's `context` (0.3.0, tagged at 2c0e25c), tab-strip-plus-and-slide, library pass and dark-glass are on main, published at github.com/lune-rs/luneui-rs)
 
 ## Now
 
+Frame pacing (task `luneui-rs/frame-pacing`, D298 to D300; version 0.5.0, breaking; on `orch/frame-pacing`, not yet merged): a busy loop (a tab's progress shine, the busy cue, a spinner, an indeterminate bar) reports `At` on the grid of `FrameConfig::busy_cadence` instead of `Now` every frame; `Cadence::BUSY` is 30 a second by default (D1; the feel is the user's by-eye check). A transition, input or a catch-up frame still gives `Now`, and a loop wholly outside its clip asks nothing. The window surface takes `SurfaceOptions` (present mode, frame latency; default `Fifo`, 2, as 0.4.0), and `Repaint::paced` puts a run of `Now` frames on a display-rate grid: on macOS/Metal with `AutoNoVsync`, the main thread did not wait in `acquire` (`gallery --pace-probe`, exit 0; the reading is under Readings). `acquire` drops a suboptimal texture before it reconfigures (D11; fixed by reading, never run). Migration table: `docs/consuming.md`, "0.4.0 to 0.5.0". Entry: `render.surface` (still `in-progress`, as before).
+
 Program toolkit-v1 closed with M11 (merged at 10f503e); the gallery showcase task and the library pass followed. The toolkit is five crates (`lune-ui-core`, the adapters
-`lune-ui-wgpu`, `lune-ui-winit`, `lune-ui-platform`, and the facade `lune-ui`), workspace version 0.4.0 (D297; 0.3.0 was D293, 0.2.0 D238, kept while no consumer had adopted the toolkit). `apps/gallery` has 82 pages and 439 scene names (the first 14 are the legacy Painter-API scenes). The catalogue holds 98 entries: 92 `done`, 2 `in-progress`,
+`lune-ui-wgpu`, `lune-ui-winit`, `lune-ui-platform`, and the facade `lune-ui`), workspace version 0.5.0 (D300; 0.4.0 was D297, 0.3.0 was D293, 0.2.0 D238, kept while no consumer had adopted the toolkit). `apps/gallery` has 82 pages and 439 scene names (the first 14 are the legacy Painter-API scenes). The catalogue holds 98 entries: 92 `done`, 2 `in-progress`,
 4 `external`. Milestone merges to main: M4 d9fe71f, M5 1aeaf1b, M6 a75a708, M7 662d310, M8 2474248, M9 8f499d0, M10 55cfaaf, M11 10f503e (M1 to M3: the extraction, the seams and the catalogue).
 `docs/architecture.md` has the module map, the pages and "API changes since M1"; `docs/consuming.md` how an app vendors the toolkit and, for the library pass, the migration map of its API changes.
 
@@ -55,6 +57,14 @@ proves clicks, the OS material swap and the feel of speed and zoom; the tests on
   A pick changes one constant or token and re-runs the gate once with the same allow lists.
 - Font smoothing, G0 (the vendored renderer, zero delta): `scripts/pixel-gate.sh --base 2c0e25c` at a8f75cf (step 1): 439 of 439 scenes identical. G1 at ed23193 (`LUNEUI_GALLERY_TEXT=off`, `--base 2c0e25c`): 434 of 439 scenes identical; the five `showcase-*` scenes are
   allowed (D254) and also read 5 of 5 identical. G2 at ed23193 (the default smooth dump against G1's base, a record): 434 files, 0 identical, 434 differ, max delta 195 (every scene draws text).
+- Frame pacing, `cargo run --release -p gallery -- --pace-probe` at 9250138 (macOS/Metal, Apple M1 Pro, one 60 Hz display, the window left untouched): exit 0 on the first run, no re-run. Verbatim:
+  `reading: pace-probe 9250138 60 Hz load1=5.20 exit 0`;
+  `pace-probe: phase 1 0.4.0: scheduled 60.0/s (180 frames), os 0, acquire p50 16.21 p95 16.38 p99 16.87 max 16.88 ms, busy 1000 ms/s, interval p50 16.68 p95 16.86 ms, skip 0 redraw 0`;
+  `pace-probe: phase 2 cadence: scheduled 30.0/s (90 frames), os 0, acquire p50 0.04 p95 0.06 p99 0.07 max 0.07 ms, busy 14 ms/s, interval p50 33.35 p95 34.70 ms, skip 0 redraw 0`;
+  `pace-probe: phase 3 paced-fifo: scheduled 60.0/s (180 frames), os 0, acquire p50 0.03 p95 0.05 p99 0.07 max 0.08 ms, busy 24 ms/s, interval p50 16.67 p95 18.48 ms, skip 0 redraw 0`;
+  `pace-probe: phase 4 paced-novsync: scheduled 60.0/s (180 frames), os 0, acquire p50 0.03 p95 0.04 p99 0.05 max 0.06 ms, busy 28 ms/s, interval p50 16.67 p95 18.28 ms, skip 0 redraw 0`;
+  `pace-probe: verdict: held: phase 2 30.0/s with acquire p95 within 2 ms; phase 4 60.0/s of a 60 Hz display with acquire p95 within 2 ms; display 60 Hz; load1=5.20`.
+  Phase 4's `AutoNoVsync` resolved to `Immediate` on Metal (the planner's listing; the probe does not print it). The planner's probes at 0b46176 (load 6 to 8) are the figures in D298 and D299.
 - Release size: `cargo build --release -p gallery`, `wc -c target/release/gallery` (macOS, strip, fat LTO): 10,118,576 bytes at 2c0e25c, 10,118,544 after step 1 (the vendored renderer), 10,118,544 after step 3
   (the rasterizer; nothing called it yet), 10,267,264 at ed23193 (steps 4 to 6: the rasterizer in use). Before that: 9,869,520 at a9d1292 (M11), 9,869,408 at the M10 tip and 9,448,688 at the M9 merge. Also in `docs/consuming.md`.
 - Bench (M11, `cargo run --release -p gallery -- --bench`, per D85) at d14069f, one reading, 2080 x 1320, 5 runs, M1 Pro, no GUI session: 0 of 74 pages over budget at load
@@ -119,11 +129,12 @@ fit panel's clip, the nits F2 to F7 of M6 and M8, and the Library follow-ups the
 - The showcase in a real window: clicks on the sidebar, the knobs and the settings, a live swap of the OS material, the feel of speed and zoom, Copy and Paste against the OS clipboard (`docs/components/infra/showcase.md`).
 - The library pass in a real window (the user's hands-on run of `cargo run -p gallery`): a dialog over a page, a list over the dialog, a tooltip and a toast; a click on the sidebar between dialog scenes (R7's path);
   an inactive window (R13); a tab in progress (R3, the feel of the shine); the glass sliders. OS glass and an inactive window are live-only.
+- Frame pacing (D298 to D300): the user's by-eye check of the 30 a second loops (the shine, the busy cue, the spinner, the indeterminate bar; D1, one constant `Cadence::BUSY`); `paced` and `AutoNoVsync` on DX12, Vulkan and GL (unmeasured); tearing under `AutoNoVsync` on any platform (unchecked); `acquire`'s suboptimal path (D11: fixed by reading, never run; Metal never reports suboptimal, Vulkan does).
 - Dark glass (D285, D286): the near-black look on a real macOS window in Light appearance (the fix if it fails is `appearance` in `near_black::MATERIAL`, one constant); the Windows acrylic tint and dark flag on builds 22523 and later; the tab header under the near-black glass (`near_black::HEADER_TINT`, a proposal for the user's eye).
 
 ## Next
 
-1. Font smoothing: the by-eye checks in Unverified here (the user's), and `v0.4.0` after the merge with the user's yes. Dark glass: the by-eye checks in Unverified here. After any public API or doc-comment change run `scripts/gen-api-docs.sh` (the gate's `--check` fails on a stale `docs/api/`).
+1. Frame pacing: after the merge, tell Luneterm the rev so it drops its `IDLE_ANIMATION_HZ` stopgap and maps `Repaint` through `paced` (D298, D299); the by-eye check in Unverified here (the user's). Font smoothing: the by-eye checks in Unverified here (the user's), and `v0.4.0` after the merge with the user's yes. Dark glass: the by-eye checks in Unverified here. After any public API or doc-comment change run `scripts/gen-api-docs.sh` (the gate's `--check` fails on a stale `docs/api/`).
 2. The rest of a hands-on run of `cargo run -p gallery` (see Unverified here); the look values are settled.
 3. Luneterm's M9 adopts the toolkit through `docs/consuming.md`: vendor `scripts/export-snapshot.sh`'s output, switch crate by crate (version 0.2.0 and later let the in-tree `lune-ui` and the snapshot stand
    in one lock), use the migration maps (the Luneterm one, "API changes of the library pass", "0.2.0 to 0.3.0" and "0.3.0 to 0.4.0"); its own OS runs close `platform.material` and `render.surface`. Luneterm itself is not changed by this repo.

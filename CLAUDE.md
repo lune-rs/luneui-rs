@@ -36,6 +36,7 @@ for the extraction; Luneterm's `docs/architecture.md` sections "lune-ui modules"
   since 0.4.0 (D296): `gallery --dump` reads `LUNEUI_GALLERY_TEXT` (`on`, `off`; anything else exits 2), and a gate
   against a base from before it runs as `LUNEUI_GALLERY_TEXT=off scripts/pixel-gate.sh --base <rev>` (smoothing off draws that look).
 - Platform smoke (needs a logged-in macOS or Windows GUI session; puts a tray item up for about 2 s; not in the gate; exit 0 held, 1 failed, 2 no session): `cargo run -p gallery -- --smoke-platform`
+- Frame pacing probe (needs a logged-in macOS GUI session; a window opens for about 15 s, leave it visible and untouched; not in the gate; exit 0 held, 1 did not hold, 2 could not measure): `cargo run --release -p gallery -- --pace-probe`
 - Dump the scenes by hand: `cargo run -p gallery -- --dump <dir>` (`-- --list` prints the scene names)
 - M1-only proof against Luneterm's 18-scene spike gate: `scripts/pixel-gate-luneterm.sh` (its full run
   cannot build against the M2 API and exits 2; `--parity-only` checked that `Cargo.lock` holds no

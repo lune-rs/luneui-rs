@@ -237,7 +237,7 @@ D41, in three parts [D41]:
    verdict (D85). There is no
    memory target in v1.
 3. **Idle when settled.** A settled page reports `Repaint::Idle`: zero idle frames. A running
-   transition reports `Now` (or `At(t)`) until it settles [core.ui].
+   transition reports `Now` (or `At(t)`) until it settles [core.ui]. A busy loop (a shine, a spinner, an indeterminate bar) reports `At(next tick)` at the frame's cadence, never `Now` (D298).
 
 ## Moved menu mapping
 

@@ -211,6 +211,7 @@ and 4 `external`. Ids no entry cites are met by a script, a rule or a manifest, 
   time on Windows and Linux is unverified here, and CI stays out (D15, kept: the repo has no remote).
 - R-nfr-8 [new] Testability: each seam (text shaping, GPU, glass, windowing) gets a contract test
   and a fake (headless target, null material) once the extraction plan introduces it.
+- R-nfr-9 [new] Frame pacing: busy loops (a tab's shine, the busy cue, a spinner, an indeterminate bar) tick at a cadence the app sets and never hold a transition; a window surface can be set so the main thread does not wait in acquire when no frame is due. Resolved by D298, D299 and `render.surface`; the non-blocking option is measured on macOS/Metal only.
 
 ## Extraction
 
