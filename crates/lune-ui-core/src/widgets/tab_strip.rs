@@ -244,8 +244,26 @@ fn quarter(c: [f32; 2], radius: f32, a0: f32, a1: f32) -> impl Iterator<Item = [
     })
 }
 
+/// The edge the header tint stops at, for the loop `pts` of a `w` wide card at `scale` physical px
+/// per logical px: the stroke's outer edge, plus a third of a physical pixel, where a fill's
+/// one-pixel fringe (full at its edge, none two thirds of a pixel out) crosses half coverage at the
+/// stroke's own half-coverage line. So the tint and the stroke share no coverage: a tint under the
+/// stroke lightened (or darkened) it, only on the arcs, a seam at each tab corner. Held inside the
+/// card. A `scale` that is not finite and positive counts as 1.
+fn tint_edge(pts: &[[f32; 2]], w: f32, scale: f32) -> Vec<[f32; 2]> {
+    let scale = if scale.is_finite() && scale > 0.0 {
+        scale
+    } else {
+        1.0
+    };
+    chrome::outset(pts, chrome::STROKE / 2.0 + 1.0 / (3.0 * scale))
+        .into_iter()
+        .map(|q| [q[0].clamp(0.0, w), q[1].max(0.0)])
+        .collect()
+}
+
 /// The header of a `w` wide card minus the loop `pts` (card-local, the shape [`chrome::outline`]
-/// makes for a seam at [`HEIGHT`]) as simple polygons: the band above the loop, in two where the
+/// makes for a seam at [`HEIGHT`], moved out to [`tint_edge`]) as simple polygons: the band above the loop, in two where the
 /// active tab reaches the card's top. A flush tab leaves nothing on its side.
 fn header_tint(pts: &[[f32; 2]], w: f32) -> Vec<Vec<[f32; 2]>> {
     use std::f32::consts::{FRAC_PI_2, PI};
@@ -842,7 +860,7 @@ impl Ui<'_> {
         let at = |q: &[f32; 2]| [q[0] + card.x, q[1] + card.y];
         let p = self.painter();
         if let Some(tint) = opts.header_tint {
-            for poly in header_tint(&local, card.w) {
+            for poly in header_tint(&tint_edge(&local, card.w, p.s), card.w) {
                 let pts: Vec<[f32; 2]> = poly.iter().map(at).collect();
                 p.fill_path(&pts, tint);
             }
@@ -925,4 +943,63 @@ fn committed_slots(widths: &[f64], from: usize, to: usize) -> Vec<f64> {
         at += widths[i] + f64::from(GAP);
     }
     xs
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The distance from `q` to the closed polyline `pts`.
+    fn to_loop(q: [f32; 2], pts: &[[f32; 2]]) -> f32 {
+        let n = pts.len();
+        (0..n)
+            .map(|k| {
+                let (a, b) = (pts[k], pts[(k + 1) % n]);
+                let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+                let len2 = dx * dx + dy * dy;
+                let t = if len2 > 0.0 {
+                    (((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / len2).clamp(0.0, 1.0)
+                } else {
+                    0.0
+                };
+                ((q[0] - a[0] - t * dx).powi(2) + (q[1] - a[1] - t * dy).powi(2)).sqrt()
+            })
+            .fold(f32::INFINITY, f32::min)
+    }
+
+    #[test]
+    fn the_header_tint_stops_at_the_stroke_s_outer_edge() {
+        let (w, h) = (720.0, 300.0);
+        let spans = [
+            Some(TabSpan {
+                left: 113.0,
+                right: 221.0,
+            }),
+            Some(TabSpan {
+                left: 0.0,
+                right: 108.0,
+            }),
+            Some(TabSpan {
+                left: 612.0,
+                right: 720.0,
+            }),
+            None,
+        ];
+        for span in spans {
+            let pts = chrome::outline(w, h, HEIGHT, span);
+            for scale in [1.0, 1.5, 2.0] {
+                let want = chrome::STROKE / 2.0 + 1.0 / (3.0 * scale) - 1e-3;
+                let polys = header_tint(&tint_edge(&pts, w, scale), w);
+                assert!(!polys.is_empty(), "{span:?} at {scale}");
+                for q in polys.iter().flatten() {
+                    // A point held on the card's edge has no stroke outside it to clear.
+                    if q[0] <= 0.0 || q[0] >= w || q[1] <= 0.0 {
+                        continue;
+                    }
+                    let d = to_loop(*q, &pts);
+                    assert!(d >= want, "{span:?} at {scale}: {q:?} is {d} from the loop");
+                }
+            }
+        }
+    }
 }

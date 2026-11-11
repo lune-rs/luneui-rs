@@ -173,7 +173,7 @@ The confirm and rename dialog texts, "Duplicate Tab" and "Copy Working Directory
 
 - Still open, a `role-gap` limit (D122; D237): `role-gap: tab to panel association` (see Accessibility).
 - Q23 is gone with the strip's menu (D293): the app owns its menu and its keys.
-- Header tint: `Theme` has no token for the header's layer, so `TabStripOptions.header_tint` takes the colour from the app and `None` draws no tint; the gallery uses #00000024 ([D131]). It is a plain fill, drawn after the under shapes, so a hover fill sits under it, where Lunegit's sits over it.
+- Header tint: `Theme` has no token for the header's layer, so `TabStripOptions.header_tint` takes the colour from the app and `None` draws no tint; the gallery uses #00000024 ([D131]). It is a plain fill, drawn after the under shapes, so a hover fill sits under it, where Lunegit's sits over it. Its edge is the stroke's outer edge plus a third of a physical pixel, not the loop's centre line, so the tint never lies under the outline (D301).
 
 Closed by [D122]: the keyboard model, the disabled tab (none), all three busy treatments ship with Sweep as the default. `fg_muted` landed in M4 ([D58]).
 
