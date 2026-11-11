@@ -127,6 +127,7 @@ Toolchain pin `1.92.0` (rustfmt, clippy), edition 2024, `rust-version = 1.85`, r
 
 - Worktree per orchestrated task; commit per change.
 - Remote `origin`: github.com/lune-rs/luneui-rs (public, D284). Push only when the user asks; never force-push.
+- Every release (a workspace version bump that lands on `main`) gets an annotated tag `v<version>` on its merge commit, message `v<version>: <theme> (<D-rows>)` (as `v0.4.0`, `v0.5.0`); push the tag with the release.
 
 ## Read on demand
 
