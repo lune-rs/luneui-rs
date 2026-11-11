@@ -580,6 +580,29 @@ impl ApplicationHandler<AppEvent> for Probe {
         }
     }
 
+    /// Enforces `DEADLINE` between events too: a frame whose repaint maps to no redraw (`Idle`,
+    /// or an `At` far ahead) leaves the loop waiting with nothing to run `render`'s own check, so
+    /// the wake is capped at the deadline and the first wake past it fails the run (exit 2).
+    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        if self.shown.is_none() {
+            return;
+        }
+        let deadline = self.origin + DEADLINE;
+        if Instant::now() > deadline {
+            self.fail(
+                "not finished in time (no frame was due: is the window hidden?)".into(),
+                event_loop,
+            );
+            return;
+        }
+        let flow = match event_loop.control_flow() {
+            ControlFlow::WaitUntil(t) if t <= deadline => ControlFlow::WaitUntil(t),
+            ControlFlow::Poll => ControlFlow::Poll,
+            _ => ControlFlow::WaitUntil(deadline + Duration::from_millis(1)),
+        };
+        event_loop.set_control_flow(flow);
+    }
+
     /// An accessibility wake or a tray click asks nothing of the probe.
     fn user_event(&mut self, _event_loop: &ActiveEventLoop, _event: AppEvent) {}
 

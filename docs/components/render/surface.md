@@ -18,6 +18,7 @@ The present mode and the frame latency are `SurfaceOptions` (`with_options`, `op
 ## Needs
 
 - Several windows on one GPU, and headless targets (C2; R-nfr-8).
+- A window surface set so the main thread does not wait in acquire when no frame is due (R-nfr-9).
 
 ## Existing code
 
