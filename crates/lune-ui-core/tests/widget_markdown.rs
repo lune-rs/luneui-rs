@@ -11,7 +11,7 @@ use lune_ui_core::input::{
     ClipboardRequest, CursorIcon, FrameOutput, Key, Keymap, Modifiers, NamedKey, PointerButton,
     Repaint,
 };
-use lune_ui_core::motion::MotionTier;
+use lune_ui_core::motion::{Cadence, MotionTier};
 use lune_ui_core::paint::Rect;
 use lune_ui_core::scene::{Scene, Shape};
 use lune_ui_core::shortcuts::Shortcuts;
@@ -1140,6 +1140,7 @@ impl Bench {
         let config = FrameConfig {
             theme: DARK,
             tier: MotionTier::Full,
+            busy_cadence: Cadence::BUSY,
             strings: &self.strings,
             arg_format: &DisplayFormat,
             keymap: Keymap::MAC,

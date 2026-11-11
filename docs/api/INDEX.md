@@ -12,7 +12,7 @@ Each crate has a page per module (`<crate>/<module path>.md`; the root is `index
 
 ### `lune-ui-core` (`lune_ui_core`)
 
-92 modules, 1089 items. Left out and counted: 3279 blanket impls, 4725 items of the omitted impls, 1262 items of the trait impls shown as one line, 2196 synthetic impls.
+92 modules, 1090 items. Left out and counted: 3288 blanket impls, 1 intra-doc links left unlinked (private or unresolvable target), 4738 items of the omitted impls, 1267 items of the trait impls shown as one line, 2202 synthetic impls.
 
 | Module | Items |
 | --- | --- |
@@ -29,7 +29,7 @@ Each crate has a page per module (`<crate>/<module path>.md`; the root is `index
 | [`lune_ui_core::input`](lune-ui-core/input.md) | 19 |
 | [`lune_ui_core::json`](lune-ui-core/json.md) | 11 |
 | [`lune_ui_core::layout`](lune-ui-core/layout.md) | 11 |
-| [`lune_ui_core::motion`](lune-ui-core/motion.md) | 26 |
+| [`lune_ui_core::motion`](lune-ui-core/motion.md) | 27 |
 | [`lune_ui_core::paint`](lune-ui-core/paint.md) | 6 |
 | [`lune_ui_core::scene`](lune-ui-core/scene.md) | 18 |
 | [`lune_ui_core::shortcuts`](lune-ui-core/shortcuts.md) | 6 |
@@ -283,6 +283,7 @@ Every top-level item of the four owning crates, by name.
 - [`ButtonLook`](lune-ui-core/widgets/button.md#struct.ButtonLook) - struct, `lune_ui_core::widgets::button`
 - [`ButtonOptions`](lune-ui-core/widgets/button.md#struct.ButtonOptions) - struct, `lune_ui_core::widgets::button`
 - [`ButtonState`](lune-ui-core/widgets/button.md#struct.ButtonState) - struct, `lune_ui_core::widgets::button`
+- [`Cadence`](lune-ui-core/motion.md#enum.Cadence) - enum, `lune_ui_core::motion`
 - [`CALENDAR`](lune-ui-core/icon.md#constant.CALENDAR) - constant, `lune_ui_core::icon`
 - [`CalloutOptions`](lune-ui-core/widgets/callout.md#struct.CalloutOptions) - struct, `lune_ui_core::widgets::callout`
 - [`CalloutResponse`](lune-ui-core/widgets/callout.md#struct.CalloutResponse) - struct, `lune_ui_core::widgets::callout`

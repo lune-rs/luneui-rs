@@ -29,6 +29,7 @@ Source: `crates/lune-ui-core/src/ui.rs:1`
 pub struct FrameConfig<'a> {
     pub theme: Theme,
     pub tier: MotionTier,
+    pub busy_cadence: Cadence,
     pub strings: &'a StringTable,
     pub arg_format: &'a dyn ArgFormat,
     pub keymap: Keymap,
@@ -45,6 +46,12 @@ Source: `crates/lune-ui-core/src/ui.rs:58`
 - <a id="structfield.FrameConfig.theme"></a>`pub theme: Theme`
 
 - <a id="structfield.FrameConfig.tier"></a>`pub tier: MotionTier`
+
+- <a id="structfield.FrameConfig.busy_cadence"></a>`pub busy_cadence: Cadence`
+
+  How often a busy loop (a shine, a spinner, an indeterminate bar) asks for its next frame
+  when nothing else is in flight. Transitions, overlays, drags, scrolling and input catch-up
+  frames are never held to it (D298).
 
 - <a id="structfield.FrameConfig.strings"></a>`pub strings: &'a StringTable`
 
@@ -374,7 +381,7 @@ pub struct Ui<'a> {
 
 One window's frame. Built by [`Ui::begin`](ui.md#method.Ui.begin), consumed by [`Ui::finish`](ui.md#method.Ui.finish).
 
-Source: `crates/lune-ui-core/src/ui.rs:116`
+Source: `crates/lune-ui-core/src/ui.rs:121`
 
 **Methods and associated items**
 
@@ -1615,6 +1622,14 @@ Source: `crates/lune-ui-core/src/ui.rs:116`
 - <a id="method.Ui.pointer_pos"></a>`pub fn pointer_pos(&self) -> Option<(f32, f32)>`
 
   The pointer's position in logical pixels, or `None` when it is outside the window.
+
+- <a id="method.Ui.request_busy_frame"></a>`pub fn request_busy_frame(&mut self, rect: Rect)`
+
+  A busy loop (a shine, a spinner, an indeterminate bar) drew `rect` this frame and needs
+  another one: the frame reports the next tick of [`FrameConfig::busy_cadence`](ui.md#structfield.FrameConfig.busy_cadence) instead of
+  `Repaint::Now`, unless something else keeps it in flight. `rect` is in the space draws are
+  made in now; a rect wholly outside the current rect clip draws nothing visible and asks
+  for nothing (D298).
 
 - <a id="method.Ui.request_repaint_at"></a>`pub fn request_repaint_at(&mut self, t: Time)`
 

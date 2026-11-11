@@ -320,6 +320,7 @@ impl PopoverHost {
         let config = FrameConfig {
             theme: THEME,
             tier: lune_ui::motion::MotionTier::Full,
+            busy_cadence: lune_ui::motion::Cadence::BUSY,
             strings: &self.strings,
             arg_format: &DisplayFormat,
             keymap: keymap(),

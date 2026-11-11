@@ -7,8 +7,10 @@
 //! - [`Transition`]: a retargetable run that keeps its velocity when interrupted (D11).
 //! - [`Token`], [`Kind`], [`Motion`], [`MotionTier`], [`MotionTokens`], [`MOTION`]: the
 //!   vocabulary and the tier rules (D12).
+//! - [`Cadence`]: how often a busy loop asks for its next frame (D298).
 //! - [`conformance`], [`conformance_of`]: the 60 Hz harness (D41).
 
+mod cadence;
 mod conformance;
 mod easing;
 mod tokens;
@@ -17,6 +19,7 @@ mod tween;
 
 use std::time::Duration;
 
+pub use cadence::Cadence;
 pub use conformance::{
     Conformance, ConformanceError, FRAME, STEP_BOUND, STEP_BOUND_BACK_OUT, conformance,
     conformance_of,

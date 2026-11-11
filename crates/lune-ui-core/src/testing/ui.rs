@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use crate::access::{Actions, Role, SemanticTree, State};
 use crate::input::{FrameOutput, Keymap};
-use crate::motion::MotionTier;
+use crate::motion::{Cadence, MotionTier};
 use crate::paint::Rect;
 use crate::scene::{LAYER_COUNT, LayerId, Scene};
 use crate::shortcuts::Shortcuts;
@@ -85,6 +85,8 @@ pub struct UiHarness {
     pub input: ScriptedInput,
     pub theme: Theme,
     pub tier: MotionTier,
+    /// How often a busy loop asks for its next frame; [`Cadence::BUSY`] by default.
+    pub busy_cadence: Cadence,
     /// The keyboard conventions the frames run with; macOS by default.
     pub keymap: Keymap,
     /// The shortcut table the frames run with; empty by default.
@@ -104,6 +106,7 @@ impl UiHarness {
             input,
             theme: DARK,
             tier: MotionTier::Full,
+            busy_cadence: Cadence::BUSY,
             keymap: Keymap::MAC,
             shortcuts: Shortcuts::default(),
         }
@@ -121,6 +124,7 @@ impl UiHarness {
         let config = FrameConfig {
             theme: self.theme,
             tier: self.tier,
+            busy_cadence: self.busy_cadence,
             strings: &self.strings,
             arg_format: &DisplayFormat,
             keymap: self.keymap,

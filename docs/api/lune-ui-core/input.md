@@ -34,7 +34,7 @@ pub struct FrameOutput {
 
 What the toolkit asks of the window after a frame.
 
-Source: `crates/lune-ui-core/src/input.rs:282`
+Source: `crates/lune-ui-core/src/input.rs:298`
 
 **Fields**
 
@@ -298,7 +298,7 @@ pub enum CursorIcon {
 
 Cursor icons: the CSS cursor names.
 
-Source: `crates/lune-ui-core/src/input.rs:321`
+Source: `crates/lune-ui-core/src/input.rs:337`
 
 **Variants**
 
@@ -818,6 +818,20 @@ Source: `crates/lune-ui-core/src/input.rs:268`
 
   Draw again at this app time (an animation's next frame).
 
+**Methods and associated items**
+
+`impl Repaint`
+
+- <a id="method.Repaint.paced"></a>`pub fn paced(self, now: Time, rate: Cadence) -> Repaint`
+
+  Puts a `Now` on the grid of `rate`: it becomes the first tick after `now`, or stays `Now`
+  under [`Cadence::EveryFrame`](motion.md#variant.Cadence.EveryFrame). `Idle` and `At(_)` are returned unchanged.
+
+  An app that would wait in the surface's acquire between frames uses this to draw a run of
+  `Now` frames at the display's rate instead. A grid at or above the display's real rate
+  under a queueing present mode (`Fifo`) can fill the swapchain queue and wait in acquire
+  again (D299).
+
 **Trait implementations**
 
 - `impl Clone for Repaint`
@@ -877,7 +891,7 @@ pub enum WindowCommand {
 
 A window operation the app performs.
 
-Source: `crates/lune-ui-core/src/input.rs:305`
+Source: `crates/lune-ui-core/src/input.rs:321`
 
 **Variants**
 
@@ -984,5 +998,5 @@ pub fn printable(text: &str) -> Option<String>
 The text a key press types: `text` without control characters, or `None` when nothing is left.
 Adapters and fakes use this one rule to decide whether a press emits [`Event::Text`](input.md#variant.Event.Text).
 
-Source: `crates/lune-ui-core/src/input.rs:405`
+Source: `crates/lune-ui-core/src/input.rs:421`
 

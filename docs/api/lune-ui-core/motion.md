@@ -13,6 +13,7 @@ clock, so a frame is reproducible.
 - [`Transition`](motion.md#struct.Transition): a retargetable run that keeps its velocity when interrupted (D11).
 - [`Token`](motion.md#enum.Token), [`Kind`](motion.md#enum.Kind), [`Motion`](motion.md#struct.Motion), [`MotionTier`](motion.md#enum.MotionTier), [`MotionTokens`](motion.md#struct.MotionTokens), [`MOTION`](motion.md#constant.MOTION): the
   vocabulary and the tier rules (D12).
+- [`Cadence`](motion.md#enum.Cadence): how often a busy loop asks for its next frame (D298).
 - [`conformance`](motion.md#fn.conformance), [`conformance_of`](motion.md#fn.conformance_of): the 60 Hz harness (D41).
 
 Source: `crates/lune-ui-core/src/motion.rs:1`
@@ -445,6 +446,63 @@ Source: `crates/lune-ui-core/src/motion/tween.rs:76`
 
 ## Enums
 
+<a id="enum.Cadence"></a>
+### Enum `Cadence`
+
+```rust
+pub enum Cadence {
+    EveryFrame,
+    Hz(std::num::NonZeroU16),
+}
+```
+
+A rate at which something that moves without end (a shine, a spinner, an indeterminate bar)
+asks for its next frame. Transitions, input and catch-up frames are never held to it.
+
+Source: `crates/lune-ui-core/src/motion/cadence.rs:14`
+
+**Variants**
+
+- <a id="variant.Cadence.EveryFrame"></a>`EveryFrame`
+
+  Every frame: the loop asks for the next one at once, so the display's rate sets the pace
+  (0.4.0's behaviour).
+
+- <a id="variant.Cadence.Hz"></a>`Hz(std::num::NonZeroU16)`
+
+  This many ticks a second, at whole multiples of 1 s / n of app time.
+
+**Methods and associated items**
+
+`impl Cadence`
+
+- <a id="associatedconstant.Cadence.BUSY"></a>`const BUSY: Cadence = _;`
+
+  The default for busy loops: 30 a second.
+
+- <a id="method.Cadence.hz"></a>`pub const fn hz(n: u16) -> Cadence`
+
+  `n` ticks a second; 0 is [`Cadence::EveryFrame`](motion.md#variant.Cadence.EveryFrame).
+
+- <a id="method.Cadence.next_tick"></a>`pub fn next_tick(self, now: Time) -> Option<Time>`
+
+  The first tick strictly after `now`: the smallest `ceil(k * 10^9 / n)` ns for an integer
+  `k >= 1` that is greater than `now`. The tick is computed from its index, never by adding
+  a period, so a rate that is not a whole number of nanoseconds does not drift. `None` under
+  [`Cadence::EveryFrame`](motion.md#variant.Cadence.EveryFrame) and when the tick lies past [`Duration::MAX`]; the caller then
+  asks for the frame at once.
+
+**Trait implementations**
+
+- `impl Clone for Cadence`
+- `impl Copy for Cadence`
+- `impl Debug for Cadence`
+- `impl Default for Cadence`
+- `impl Eq for Cadence`
+- `impl Hash for Cadence`
+- `impl PartialEq for Cadence`
+- `impl StructuralPartialEq for Cadence`
+
 <a id="enum.ConformanceError"></a>
 ### Enum `ConformanceError`
 
@@ -831,7 +889,7 @@ pub type Time = std::time::Duration;
 Time since the app's origin, as the app supplies it in `RawInput`. The toolkit never reads a
 clock itself.
 
-Source: `crates/lune-ui-core/src/motion.rs:33`
+Source: `crates/lune-ui-core/src/motion.rs:36`
 
 ## Functions
 
@@ -897,7 +955,7 @@ Spinner angle in degrees at `t`: `360 · frac(t / 1200 ms)`, from the app's time
 accumulate per frame. This is the raw phase, whatever the tier: the spinner widget decides by
 tier (a turning glyph under Full, a static one at angle 0 under Reduced and Off, D117).
 
-Source: `crates/lune-ui-core/src/motion.rs:41`
+Source: `crates/lune-ui-core/src/motion.rs:44`
 
 ## Constants
 
@@ -934,7 +992,7 @@ pub const SPIN_PERIOD: std::time::Duration;
 
 One spinner revolution.
 
-Source: `crates/lune-ui-core/src/motion.rs:36`
+Source: `crates/lune-ui-core/src/motion.rs:39`
 
 <a id="constant.STEP_BOUND"></a>
 ### Constant `STEP_BOUND`

@@ -19,7 +19,7 @@ use lune_ui_core::access::{
     Value,
 };
 use lune_ui_core::input::{FrameOutput, Keymap};
-use lune_ui_core::motion::MotionTier;
+use lune_ui_core::motion::{Cadence, MotionTier};
 use lune_ui_core::paint::Rect;
 use lune_ui_core::shortcuts::Shortcuts;
 use lune_ui_core::strings::{DisplayFormat, StringTable};
@@ -1050,6 +1050,7 @@ mod frames {
         let config = FrameConfig {
             theme: DARK,
             tier: MotionTier::Full,
+            busy_cadence: Cadence::BUSY,
             strings: &strings,
             arg_format: &DisplayFormat,
             keymap: Keymap::MAC,

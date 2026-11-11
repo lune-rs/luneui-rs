@@ -23,7 +23,7 @@ use lune_ui::gpu::{self, Gpu};
 use lune_ui::input::{ClipboardRequest, OutputState, Repaint, Translator, control_flow, keymap};
 use lune_ui::lunegit_dark::THEME;
 use lune_ui::material::{self, Material};
-use lune_ui::motion::MotionTier;
+use lune_ui::motion::{Cadence, MotionTier};
 use lune_ui::shortcuts::Shortcuts;
 use lune_ui::strings::{DisplayFormat, StringTable};
 use lune_ui::surface::{Acquired, WindowSurface};
@@ -322,6 +322,7 @@ impl App {
         let config = FrameConfig {
             theme: state.theme().unwrap_or(THEME),
             tier: state.tier().unwrap_or(MotionTier::Full),
+            busy_cadence: Cadence::BUSY,
             strings: &self.strings,
             arg_format: &DisplayFormat,
             keymap: keymap(),
