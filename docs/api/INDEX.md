@@ -111,7 +111,7 @@ Each crate has a page per module (`<crate>/<module path>.md`; the root is `index
 
 ### `lune-ui-wgpu` (`lune_ui_wgpu`)
 
-9 modules, 16 items. Left out and counted: 151 blanket impls, 1 intra-doc links left unlinked (private or unresolvable target), 106 items of the omitted impls, 23 items of the trait impls shown as one line, 60 synthetic impls.
+9 modules, 17 items. Left out and counted: 169 blanket impls, 2 intra-doc links left unlinked (private or unresolvable target), 121 items of the omitted impls, 27 items of the trait impls shown as one line, 66 synthetic impls.
 
 | Module | Items |
 | --- | --- |
@@ -122,7 +122,7 @@ Each crate has a page per module (`<crate>/<module path>.md`; the root is `index
 | [`lune_ui_wgpu::frame`](lune-ui-wgpu/frame.md) | 1 |
 | [`lune_ui_wgpu::gpu`](lune-ui-wgpu/gpu.md) | 3 |
 | [`lune_ui_wgpu::raster`](lune-ui-wgpu/raster.md) | 1 |
-| [`lune_ui_wgpu::surface`](lune-ui-wgpu/surface.md) | 2 |
+| [`lune_ui_wgpu::surface`](lune-ui-wgpu/surface.md) | 3 |
 | [`lune_ui_wgpu::text_cache`](lune-ui-wgpu/text_cache.md) | 3 |
 
 ### `lune-ui-winit` (`lune_ui_winit`)
@@ -1163,6 +1163,7 @@ Every top-level item of the four owning crates, by name.
 - [`SUBTITLE_LINE`](lune-ui-core/widgets/page.md#constant.SUBTITLE_LINE) - constant, `lune_ui_core::widgets::page`
 - [`SUCCESS_TIMEOUT`](lune-ui-core/widgets/toast.md#constant.SUCCESS_TIMEOUT) - constant, `lune_ui_core::widgets::toast`
 - [`Surface`](lune-ui-core/widgets/popover.md#enum.Surface) - enum, `lune_ui_core::widgets::popover`
+- [`SurfaceOptions`](lune-ui-wgpu/surface.md#struct.SurfaceOptions) - struct, `lune_ui_wgpu::surface`
 - [`SWAP_DY`](lune-ui-core/widgets/page.md#constant.SWAP_DY) - constant, `lune_ui_core::widgets::page`
 - [`SWAP_OPACITY`](lune-ui-core/widgets/page.md#constant.SWAP_OPACITY) - constant, `lune_ui_core::widgets::page`
 - [`SWAP_SLIDE`](lune-ui-core/widgets/page.md#constant.SWAP_SLIDE) - constant, `lune_ui_core::widgets::page`
