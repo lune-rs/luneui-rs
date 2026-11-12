@@ -11,7 +11,10 @@
 # The JSON needs the nightly flag `--output-format json`; the toolchain is pinned stable, so this
 # sets RUSTC_BOOTSTRAP=1 for the rustdoc runs only (D287). A toolchain bump that moves the JSON
 # format makes the tool exit 2 until the `rustdoc-types` pin in tools/api-docs/Cargo.toml moves.
-# bash 3.2 / BSD safe.
+# The pages are generated for one fixed target, aarch64-apple-darwin, on every host (D303):
+# rustdoc's blanket-impl counts follow the dependency tree of the target the docs are built for, so
+# a host build would give each OS its own numbers. `rust-toolchain.toml` lists the target, so rustup
+# installs its std on any host. bash 3.2 / BSD safe.
 set -euo pipefail
 export LC_ALL=C
 
@@ -19,6 +22,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # API_DIR lets tests run against a temp copy; default is the real reference.
 API="${API_DIR:-$ROOT/docs/api}"
 TARGET="$ROOT/target/api-docs"
+DOC_TARGET=aarch64-apple-darwin
 PACKAGES="lune-ui-core lune-ui-wgpu lune-ui-winit lune-ui-platform lune-ui"
 
 mode=write
@@ -36,6 +40,14 @@ TMP="$(mktemp -d "${TMPDIR:-/tmp}/gen-api-docs.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
 cd "$ROOT"
 
+# The target's std must be installed; say so before cargo fails with a long error.
+if command -v rustup > /dev/null 2>&1; then
+  if ! rustup target list --installed 2> /dev/null | grep -qx "$DOC_TARGET"; then
+    echo "gen-api-docs: the $DOC_TARGET target is not installed; run: rustup target add $DOC_TARGET" >&2
+    exit 2
+  fi
+fi
+
 # run <log name> <command...>: runs quietly, shows the log only on failure. The rustdoc flags of
 # the caller's environment are dropped so the output does not depend on them.
 run() {
@@ -49,15 +61,15 @@ run() {
 
 for p in $PACKAGES; do
   run "rustdoc-$p" env RUSTC_BOOTSTRAP=1 CARGO_TARGET_DIR="$TARGET" \
-    cargo rustdoc -p "$p" --lib --all-features -- -Z unstable-options --output-format json
+    cargo rustdoc -p "$p" --lib --all-features --target "$DOC_TARGET" -- -Z unstable-options --output-format json
 done
 pargs=""
 for p in $PACKAGES; do pargs="$pargs -p $p"; done
 # shellcheck disable=SC2086
-run "doc" env CARGO_TARGET_DIR="$TARGET" cargo doc --no-deps --all-features $pargs
+run "doc" env CARGO_TARGET_DIR="$TARGET" cargo doc --no-deps --all-features --target "$DOC_TARGET" $pargs
 
 rc=0
-cargo run -q -p api-docs -- --json-dir "$TARGET/doc" --html-dir "$TARGET/doc" --out "$TMP/api" || rc=$?
+cargo run -q -p api-docs -- --json-dir "$TARGET/$DOC_TARGET/doc" --html-dir "$TARGET/$DOC_TARGET/doc" --out "$TMP/api" || rc=$?
 if [ "$rc" -ne 0 ]; then
   echo "gen-api-docs: the generator failed (exit $rc)" >&2
   exit 2
