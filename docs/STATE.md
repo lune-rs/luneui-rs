@@ -1,9 +1,11 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-11 (tab header tint fix, version 0.5.1 (D301, D302), tagged `v0.5.1`; frame pacing, version 0.5.0, merged at b767f51 and tagged `v0.5.0`; font smoothing, version 0.4.0, tagged `v0.4.0`; the tab strip's `context` (0.3.0, tagged at 2c0e25c), tab-strip-plus-and-slide, library pass and dark-glass are on main, published at github.com/lune-rs/luneui-rs)
+Last updated: 2026-11-13 (the gate passes on Windows (D303); tab header tint fix, version 0.5.1 (D301, D302), tagged `v0.5.1`; frame pacing, version 0.5.0, merged at b767f51 and tagged `v0.5.0`; font smoothing, version 0.4.0, tagged `v0.4.0`; the tab strip's `context` (0.3.0, tagged at 2c0e25c), tab-strip-plus-and-slide, library pass and dark-glass are on main, published at github.com/lune-rs/luneui-rs)
 
 ## Now
+
+The gate passes on Windows (Git Bash, MSVC host; task `luneui-rs/windows-gate-portability`, D303; no library change, no version bump): `scripts/check-boundaries.sh` and the gallery catalogue read `\` paths as `/`, the API pages are generated for `aarch64-apple-darwin` on every host (the target is in `rust-toolchain.toml`), and `.gitattributes` holds LF. Not run on macOS or Linux here: run the gate once on macOS after the merge.
 
 Tab header tint (D301, D302; version 0.5.1, a look fix, no API change): the tab strip's header tint stops at the outline stroke's outer edge, so it no longer lies under the stroke on the tab's arcs (a light wash brightened each tab corner, a dark one dimmed the arcs). The pixel gate moved only the `tab-strip-*` scenes with a tint. Next: Luneterm moves its pin from `v0.5.0` to `v0.5.1`.
 
