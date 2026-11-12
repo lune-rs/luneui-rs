@@ -182,7 +182,14 @@ pub(crate) fn load(root: &Path) -> Vec<Entry> {
         files.sort();
         for f in files {
             let text = std::fs::read_to_string(&f).expect("entry");
-            let name = f.strip_prefix(root).unwrap_or(&f).display().to_string();
+            // `/` separators on every host: the rules match names by `/` suffix.
+            let name = f
+                .strip_prefix(root)
+                .unwrap_or(&f)
+                .components()
+                .map(|c| c.as_os_str().to_string_lossy())
+                .collect::<Vec<_>>()
+                .join("/");
             out.push(Entry::parse(&name, &text).unwrap_or_else(|e| panic!("{e}")));
         }
     }
