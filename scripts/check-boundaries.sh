@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Library boundary rules for the crates under crates/ (ported from Luneterm's
-# scripts/check-lib-boundaries.sh). Runs the same on macOS (bash 3.2, BSD grep/awk) and Linux (GNU
-# grep/awk). Prints each offending line with its rule number. Exit 1 on any offender, 0 when clean,
+# scripts/check-lib-boundaries.sh). Runs the same on macOS (bash 3.2, BSD grep/awk), Linux (GNU
+# grep/awk) and Windows (Git Bash; backslash paths from cargo are read as `/`). Prints each
+# offending line with its rule number. Exit 1 on any offender, 0 when clean,
 # 2 when a scanned path is missing or a tool (grep, awk, find, cargo) is missing or fails: a bad path
 # never passes. A workspace cargo refuses to load is a rule 9 offender (its edges cannot be read).
 #
@@ -253,7 +254,7 @@ function parse_value(path,   c, k, i) {
 # keep: stores the fields the rules read; everything else is parsed and dropped.
 function keep(path, v, t,   a, c, p, j) {
   c = split(path, a, "/")
-  if (c == 2 && a[2] == "workspace_root") { wsroot = v; return }
+  if (c == 2 && a[2] == "workspace_root") { wsroot = v; gsub(/\\/, "/", wsroot); return }
   if (c < 4 || a[2] != "packages" || a[3] !~ /^[0-9]+$/) return
   p = a[3] + 0
   if (p + 1 > np) np = p + 1
@@ -274,6 +275,7 @@ function keep(path, v, t,   a, c, p, j) {
   }
 }
 function rel(f) {
+  gsub(/\\/, "/", f)
   if (index(f, wsroot "/") == 1) return substr(f, length(wsroot) + 2)
   return f
 }
@@ -331,7 +333,7 @@ else
       exit 2
       ;;
   esac
-  bad_man="$(printf '%s\n' "$errtext" | grep -o -m 1 'crates/[A-Za-z0-9_.-]*/Cargo.toml' || true)"
+  bad_man="$(printf '%s\n' "$errtext" | tr '\\' '/' | grep -o -m 1 'crates/[A-Za-z0-9_.-]*/Cargo.toml' || true)"
   echo "rule 9: ${bad_man:-Cargo.toml}: cargo cannot load the workspace, dependencies unchecked: ${err:-cargo metadata failed}"
   if [ "$bad_man" = crates/lune-ui-core/Cargo.toml ]; then
     echo "rule 7: $bad_man: cargo cannot load it, so it is not shown to declare no dependency"
