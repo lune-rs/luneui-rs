@@ -92,7 +92,7 @@ on macOS, read with `wc -c`) is **10,118,544 bytes** after the font-smoothing wo
 unchanged by the rasterizer, since nothing in the gallery called it yet; the later steps added no dependency and were not re-read). It was 9,869,520 bytes at a9d1292, the M11 close, 9,448,688 at the M9 merge (8f499d0)
 and 9,869,408 at the M10 tip; the M10 growth is the AccessKit bridge, the tray stack and `arboard` (DECISIONS D216, D213).
 The figure covers the gallery with every feature on, including `accesskit`; an app that leaves the feature off is smaller.
-`docs/STATE.md` keeps the latest reading.
+`docs/STATE.md` keeps the latest reading. On Windows (MSVC, the same profile; `target/release/gallery.exe`, `stat -c %s`) the gallery was **13,112,320 bytes** before the docked-windows work and after its platform step (D314: `windows-sys` is already in the lock, and the linker drops what nothing calls), and **13,222,912 bytes** once the gallery's `docked-panels` page and `PanelsHost` call the new functions (D317; the growth is mostly the page and the host, not the toolkit).
 
 ## Migration map: Luneterm 296cfdc `lune-ui` to the snapshot
 
@@ -177,6 +177,36 @@ D298 to D300. Busy loops (a tab's shine, the busy cue, a spinner, an indetermina
 | an app's own decorative loop (`mark_moving` every frame) | `Ui::request_busy_frame(rect)` | the rect is in the space draws are made in; a rect wholly outside the current clip asks nothing (D298) |
 | `WindowSurface::new(gpu, surface, size)` | unchanged, or `WindowSurface::with_options(gpu, surface, size, SurfaceOptions { .. })`; then `set_options`, `options` | `SurfaceOptions { present_mode, frame_latency }`, default `Fifo`, 2 (0.4.0's); a mode the surface does not list falls back to `Fifo` (D299) |
 | a run of `Now` frames that blocks in acquire (about 16.5 ms a frame at 60 Hz under `Fifo`, the planner's probe) | `control_flow(out.repaint.paced(now, Cadence::hz(display_hz)), origin)` with `SurfaceOptions { present_mode: PresentMode::AutoNoVsync, .. }` | measured on macOS/Metal only (Apple M1 Pro, one 60 Hz display): a paced run did not wait in acquire (`gallery --pace-probe`, the reading in `render.surface`). On DX12, Vulkan and GL `AutoNoVsync` can resolve to `Mailbox` or `Immediate`: unmeasured. Tearing is unchecked on every platform, so the app picks the mode. Under `Fifo`, keep the grid below the display's real rate. Call `set_options` and `resize` between frames, never while a texture from `acquire` is alive (D299) |
+
+## 0.5.1 to 0.6.0: images and docked windows
+
+D304 to D319. A picture can be drawn by part and sampled per draw and rewritten in place, and the toolkit gains the pieces of an app with several borderless, shaped, docked windows: desktop units and monitors, snapping and docked sets, window shapes, window groups, a menu in its own window, and two window commands. Breaking, hence 0.6.0. `RawInput` and `FrameOutput` do not change. The gate's pixel check stays at zero delta: a whole-picture draw has 0.5.1's arithmetic.
+
+**Breaks.**
+
+| old | new | note |
+| --- | --- | --- |
+| an `ImageItem { .. }` literal, or a pattern on it with every field | draw through `Painter` (`image`, `image_with`, `image_part`); add `..` to a pattern; read `part` and `sampling` | `ImageItem` is `#[non_exhaustive]` and gains `part: Option<ImagePart>` and `sampling: Sampling` (D304 to D306) |
+| a custom `ImageStore` | implement `update(&mut self, id, at: (u32, u32), data: &ImageData) -> Result<(), ImageError>` | required, no default (D307). Checks in this order: `data.length_ok()` else `BadLength`; an unregistered id else `UnknownId`; a rect past the picture's edge else `OutOfBounds`; a 0-width or 0-height `data` is `Ok` and writes nothing. A refusal changes nothing. Run `image_store_contract` on the store |
+| an exhaustive `match` on `ImageError` | add a `_` arm | `ImageError` is `#[non_exhaustive]` and gains the unit variants `UnknownId` and `OutOfBounds` |
+| a custom renderer that draws `ImageItem` | honour `part` and `sampling` | `part` is a rect of the picture's own pixels: sample inside it, clamped half a texel inward so linear filtering never reads a neighbour, and place the part's size in `dst` with `fit` and `align`; a part past the picture is dropped. `Sampling::Auto` is D106's rule measured on the drawn part (nearest for an unrotated, whole-ratio draw), `Nearest` and `Linear` force it. `part: None` is the 0.5.1 draw |
+| a match on `WindowCommand` with no wildcard | add a `_` arm | it was already `#[non_exhaustive]`; it gains `SetSize` and `SetAlwaysOnTop` (D312) |
+
+**Additions** (nothing to change unless you want them).
+
+| item | what it is |
+| --- | --- |
+| `Painter::image_with(dst, id, &ImageDraw)`, `Painter::image_part(dst, id, part, alpha)`; `ImagePart`, `Sampling`, `ImageDraw` (`lune_ui::image`) | draw a part of a picture, a sprite from a sheet, nearest or linear by the draw (D304, D305) |
+| `ImageStore::update` | write a rect of a registered picture in place: one premultiplied `write_texture` on the `Gpu`, bind groups untouched (D307) |
+| `lune_ui::desktop` (core `desktop` and platform `desktop`) | `DesktopPoint`, `DesktopRect`, `Monitor`, `to_units`, `monitor_at`, `place_popup`, `WindowShape`, `ShapeError`; the OS reads `monitors`, `pointer`, `window_frame`, `set_window_origin`, `move_windows`, `window_at`, `units_per_logical`; `set_window_shape`, `ShapeMode`, `ShapeFollower`, `Follow`. Desktop units are the OS's own global space (D309, D313, D315) |
+| `lune_ui::dock` | `touching`, `docked_sets`, `docked_with`, `snap`, `DockDrag`: pure docking maths (D310) |
+| `lune_ui::group` | `WindowGroup`, `owned_by`: windows the OS treats as one (D316) |
+| `WindowCommand::SetSize { width, height }`, `WindowCommand::SetAlwaysOnTop(bool)`; `lune_ui::window::panel_attributes` | resize a window's content in the frame's logical px; keep a window on top; a borderless, transparent, shadowless panel window (D312). A window of a group routes `Minimize` and `SetAlwaysOnTop` through the group |
+| `desktop::pointer()` and `desktop::window_at()` | live OS state read in the adapter (an exception to "the library reads no environment", like `frontmost_app`); the core is pure and the app passes the values in (D313) |
+
+**Dependencies.** `lune-ui-platform` gains `windows-sys` 0.61 on Windows (features `Win32_Foundation`, `Win32_Graphics_Gdi`, `Win32_UI_WindowsAndMessaging`; already in the lock through window-vibrancy, tray-icon and arboard, so a consumer's lock gains the edge and no package) and, on macOS, the `objc2-app-kit` features `NSScreen`, `NSEvent` and `NSGraphics` (D314). A snapshot consumer's lock follows the same list. Release size: see "Release size".
+
+**Using it.** `apps/gallery/src/panels.rs` and the `docked-panels` page are the worked example: three panels in a group, a shape each, a drag by `DockDrag` over `window_frame`s with `move_windows`, a menu window placed by `place_popup`. The live check is `cargo run -p gallery -- --smoke-panels` (by hand, in a logged-in GUI session; it ran on Windows, and every macOS half is compile-only).
 
 ## API changes of the library pass
 

@@ -1,9 +1,11 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-13 (the gate passes on Windows (D303); tab header tint fix, version 0.5.1 (D301, D302), tagged `v0.5.1`; frame pacing, version 0.5.0, merged at b767f51 and tagged `v0.5.0`; font smoothing, version 0.4.0, tagged `v0.4.0`; the tab strip's `context` (0.3.0, tagged at 2c0e25c), tab-strip-plus-and-slide, library pass and dark-glass are on main, published at github.com/lune-rs/luneui-rs)
+Last updated: 2026-11-13 (docked windows and image parts, version 0.6.0 (D304 to D319), merge and the tag `v0.6.0` are the orchestrator's; the gate passes on Windows (D303); tab header tint fix, version 0.5.1 (D301, D302), tagged `v0.5.1`; frame pacing, version 0.5.0, merged at b767f51 and tagged `v0.5.0`; font smoothing, version 0.4.0, tagged `v0.4.0`; the tab strip's `context` (0.3.0, tagged at 2c0e25c), tab-strip-plus-and-slide, library pass and dark-glass are on main, published at github.com/lune-rs/luneui-rs)
 
 ## Now
+
+Docked windows and image parts (task `luneui-rs/multi-window-groups`, D304 to D319; version 0.6.0, breaking): the generic pieces of an app with several borderless, shaped, docked windows. Images: `Painter::image_with` and `image_part` draw a part of a picture, nearest or linear per draw (`ImagePart`, `Sampling`, `ImageDraw`), and `ImageStore::update` writes a rect of a registered picture in place (one `write_texture`); `ImageItem` and `ImageError` are `#[non_exhaustive]` and `update` is required. Desktop: `lune_ui::desktop` (core units, monitors, popup placement, window shapes; the OS reads of the monitors and work areas, the pointer, window frames, one batch move, the window at a point), `lune_ui::dock` (touching, docked sets, snapping, `DockDrag`) and `lune_ui::group` (`WindowGroup`: owned windows on Windows, child windows for docked members on macOS; `owned_by`), `WindowCommand::SetSize` and `SetAlwaysOnTop`, `panel_attributes`. A window shape is a window region on Windows and a pointer follower on macOS. `lune-ui-platform` gains `windows-sys` (already in the lock). The gallery's `docked-panels` page (the "Show the panels" switch) opens three docked panel windows and a menu window (`apps/gallery/src/panels.rs`, D317); `gallery --smoke-panels` checks them on a real desktop (D318). The pixel gate (`--base fceff45`) read 439 of 439 identical (the three new `docked-panels` scenes and the three image scenes are new), so no `--allow`. Migration table: `docs/consuming.md`, "0.5.1 to 0.6.0". Entries: `platform.desktop`, `platform.window-docking`, `platform.window-group`, `platform.window-shape`, `overlay.menu-window` (all `done`; `unverified here` names macOS, mixed-scale monitors and the feel of a real drag). Every macOS half is compile-only (`scripts/check-targets.sh` runs clippy for `aarch64-apple-darwin`, D308).
 
 The gate passes on Windows (Git Bash, MSVC host; task `luneui-rs/windows-gate-portability`, D303; no library change, no version bump): `scripts/check-boundaries.sh` and the gallery catalogue read `\` paths as `/`, the API pages are generated for `aarch64-apple-darwin` on every host (the target is in `rust-toolchain.toml`), and `.gitattributes` holds LF. Not run on macOS or Linux here: run the gate once on macOS after the merge.
 
@@ -12,7 +14,7 @@ Tab header tint (D301, D302; version 0.5.1, a look fix, no API change): the tab 
 Frame pacing (task `luneui-rs/frame-pacing`, D298 to D300; version 0.5.0, breaking; merged at b767f51, tagged `v0.5.0`): a busy loop (a tab's progress shine, the busy cue, a spinner, an indeterminate bar) reports `At` on the grid of `FrameConfig::busy_cadence` instead of `Now` every frame; `Cadence::BUSY` is 30 a second by default (D1; the feel is the user's by-eye check). A transition, input or a catch-up frame still gives `Now`, and a loop wholly outside its clip asks nothing. The window surface takes `SurfaceOptions` (present mode, frame latency; default `Fifo`, 2, as 0.4.0), and `Repaint::paced` puts a run of `Now` frames on a display-rate grid: on macOS/Metal with `AutoNoVsync`, the main thread did not wait in `acquire` (`gallery --pace-probe`, exit 0; the reading is under Readings). `acquire` drops a suboptimal texture before it reconfigures (D11; fixed by reading, never run). Migration table: `docs/consuming.md`, "0.4.0 to 0.5.0". Entry: `render.surface` (still `in-progress`, as before).
 
 Program toolkit-v1 closed with M11 (merged at 10f503e); the gallery showcase task and the library pass followed. The toolkit is five crates (`lune-ui-core`, the adapters
-`lune-ui-wgpu`, `lune-ui-winit`, `lune-ui-platform`, and the facade `lune-ui`), workspace version 0.5.1 (D302; 0.5.0 was D300, 0.4.0 was D297, 0.3.0 was D293, 0.2.0 D238, kept while no consumer had adopted the toolkit). `apps/gallery` has 82 pages and 439 scene names (the first 14 are the legacy Painter-API scenes). The catalogue holds 98 entries: 92 `done`, 2 `in-progress`,
+`lune-ui-wgpu`, `lune-ui-winit`, `lune-ui-platform`, and the facade `lune-ui`), workspace version 0.6.0 (D319; 0.5.1 was D302, 0.5.0 was D300, 0.4.0 was D297, 0.3.0 was D293, 0.2.0 D238, kept while no consumer had adopted the toolkit). `apps/gallery` has 83 pages and 445 scene names (the first 14 are the legacy Painter-API scenes). The catalogue holds 103 entries: 97 `done`, 2 `in-progress`,
 4 `external`. Milestone merges to main: M4 d9fe71f, M5 1aeaf1b, M6 a75a708, M7 662d310, M8 2474248, M9 8f499d0, M10 55cfaaf, M11 10f503e (M1 to M3: the extraction, the seams and the catalogue).
 `docs/architecture.md` has the module map, the pages and "API changes since M1"; `docs/consuming.md` how an app vendors the toolkit and, for the library pass, the migration map of its API changes.
 
@@ -69,6 +71,25 @@ proves clicks, the OS material swap and the feel of speed and zoom; the tests on
   `pace-probe: phase 4 paced-novsync: scheduled 60.0/s (180 frames), os 0, acquire p50 0.03 p95 0.04 p99 0.05 max 0.06 ms, busy 28 ms/s, interval p50 16.67 p95 18.28 ms, skip 0 redraw 0`;
   `pace-probe: verdict: held: phase 2 30.0/s with acquire p95 within 2 ms; phase 4 60.0/s of a 60 Hz display with acquire p95 within 2 ms; display 60 Hz; load1=5.20`.
   Phase 4's `AutoNoVsync` resolved to `Immediate` on Metal (the planner's listing; the probe does not print it). The planner's probes at 0b46176 (load 6 to 8) are the figures in D298 and D299.
+- Docked panels smoke (`cargo run -p gallery -- --smoke-panels` at 4791db2, Windows 11, a logged-in unlocked desktop, debug build): exit 0. Verbatim:
+  `smoke-panels: 1 panels shown and docked: ok`
+  `smoke-panels: 2 monitor and pointer: ok`
+  `smoke-panels: 3 group drag: ok`
+  `smoke-panels: 4 snap to the work area: ok`
+  `smoke-panels: 5 detach: ok`
+  `smoke-panels: 5 window_at in the gap: ok`
+  `smoke-panels: 6 shape: ok`
+  `smoke-panels: 7 re-dock: ok`
+  `smoke-panels: 8 shade: height and notch: ok`
+  `smoke-panels: 8 unshade: height and notch: ok`
+  `smoke-panels: 9 minimise and restore: ok`
+  `smoke-panels: 10 always on top: applied (no getter)`
+  `smoke-panels: 11 menu placed: ok`
+  `smoke-panels: 11 menu hides after a dismissal: ok`
+  `smoke-panels: 12 meter: ok`
+  `smoke-panels: ok`
+  Not run on macOS or Linux.
+- Release size, Windows (`cargo build --release -p gallery`, `stat -c %s target/release/gallery.exe`): 13,112,320 bytes before the docked-windows work and after its platform step (D314), 13,222,912 bytes with the gallery's `docked-panels` page and host. Also in `docs/consuming.md`.
 - Release size: `cargo build --release -p gallery`, `wc -c target/release/gallery` (macOS, strip, fat LTO): 10,118,576 bytes at 2c0e25c, 10,118,544 after step 1 (the vendored renderer), 10,118,544 after step 3
   (the rasterizer; nothing called it yet), 10,267,264 at ed23193 (steps 4 to 6: the rasterizer in use). Before that: 9,869,520 at a9d1292 (M11), 9,869,408 at the M10 tip and 9,448,688 at the M9 merge. Also in `docs/consuming.md`.
 - Bench (M11, `cargo run --release -p gallery -- --bench`, per D85) at d14069f, one reading, 2080 x 1320, 5 runs, M1 Pro, no GUI session: 0 of 74 pages over budget at load
@@ -135,17 +156,19 @@ fit panel's clip, the nits F2 to F7 of M6 and M8, and the Library follow-ups the
   an inactive window (R13); a tab in progress (R3, the feel of the shine); the glass sliders. OS glass and an inactive window are live-only.
 - Frame pacing (D298 to D300): the user's by-eye check of the 30 a second loops (the shine, the busy cue, the spinner, the indeterminate bar; D1, one constant `Cadence::BUSY`); `paced` and `AutoNoVsync` on DX12, Vulkan and GL (unmeasured); tearing under `AutoNoVsync` on any platform (unchecked); `acquire`'s suboptimal path (D11: fixed by reading, never run; Metal never reports suboptimal, Vulkan does).
 - Dark glass (D285, D286): the near-black look on a real macOS window in Light appearance (the fix if it fails is `appearance` in `near_black::MATERIAL`, one constant); the Windows acrylic tint and dark flag on builds 22523 and later; the tab header under the near-black glass (`near_black::HEADER_TINT`, a proposal for the user's eye).
+- Docked windows (D309 to D318): every macOS half has only been compiled (clippy for `aarch64-apple-darwin`, D308): the desktop reads (`NSScreen`, `NSEvent.mouseLocation`, the flip against the primary display, `windowNumberAtPoint`), the window shape as a pointer follower (`set_cursor_hittest` toggled from a polled pointer; whether a non-opaque Metal window passes clicks through transparent pixels by itself), child windows keeping docked members together above the leader, `orderWindow:relativeTo:` raising detached members, a miniaturised leader hiding its children, and the menu window. The Linux fallback files (`platform/**/other.rs`) have not been compiled on this host (no Docker). On Windows the smoke ran once on one monitor at one scale: mixed-scale monitors, a taskbar on a side, a display left of or above the primary one (negative units) and the feel of a real drag (lag, snap under a hand) are unchecked; double size at an odd scale factor may leave a 1 px gap in a docked stack (rounding of the doubled height); a real click's `Focused(false)` for the menu window is not exercised by the smoke (it checks only that the menu is still open 500 ms after it opens). Shading the first panel moves no member, so a shaded panel leaves a gap until it is unshaded.
 
 ## Next
 
-1. Frame pacing: after the merge, tell Luneterm the rev so it drops its `IDLE_ANIMATION_HZ` stopgap and maps `Repaint` through `paced` (D298, D299); the by-eye check in Unverified here (the user's). Font smoothing: the by-eye checks in Unverified here (the user's), and `v0.4.0` after the merge with the user's yes. Dark glass: the by-eye checks in Unverified here. After any public API or doc-comment change run `scripts/gen-api-docs.sh` (the gate's `--check` fails on a stale `docs/api/`).
-2. The rest of a hands-on run of `cargo run -p gallery` (see Unverified here); the look values are settled.
-3. Luneterm's M9 adopts the toolkit through `docs/consuming.md`: vendor `scripts/export-snapshot.sh`'s output, switch crate by crate (version 0.2.0 and later let the in-tree `lune-ui` and the snapshot stand
-   in one lock), use the migration maps (the Luneterm one, "API changes of the library pass", "0.2.0 to 0.3.0" and "0.3.0 to 0.4.0"); its own OS runs close `platform.material` and `render.surface`. Luneterm itself is not changed by this repo.
-4. The Lunegit fixtures are licensed MIT OR Apache-2.0 (D284); the export still leaves them out.
-5. The user's calls, all reversible and taken at the recommended option: the final tray glyph (`platform.tray-icon`), column resize and reorder in the table (D163, Q15), and two taken calls to
+1. Docked windows (0.6.0): run `cargo run -p gallery -- --smoke-panels` on a Mac (nothing of the macOS half has run), and the user's hands-on run of `cargo run -p gallery`, `docked-panels` page, "Show the panels": drag feel, snap, the menu, shade, double size. Luneterm and any vendored copy migrate through `docs/consuming.md`, "0.5.1 to 0.6.0". The tag `v0.6.0` is put on the merge commit by the orchestrator and not pushed.
+2. Frame pacing: after the merge, tell Luneterm the rev so it drops its `IDLE_ANIMATION_HZ` stopgap and maps `Repaint` through `paced` (D298, D299); the by-eye check in Unverified here (the user's). Font smoothing: the by-eye checks in Unverified here (the user's), and `v0.4.0` after the merge with the user's yes. Dark glass: the by-eye checks in Unverified here. After any public API or doc-comment change run `scripts/gen-api-docs.sh` (the gate's `--check` fails on a stale `docs/api/`).
+3. The rest of a hands-on run of `cargo run -p gallery` (see Unverified here); the look values are settled.
+4. Luneterm's M9 adopts the toolkit through `docs/consuming.md`: vendor `scripts/export-snapshot.sh`'s output, switch crate by crate (version 0.2.0 and later let the in-tree `lune-ui` and the snapshot stand
+   in one lock), use the migration maps (the Luneterm one, "API changes of the library pass", "0.2.0 to 0.3.0", "0.3.0 to 0.4.0" and "0.5.1 to 0.6.0"); its own OS runs close `platform.material` and `render.surface`. Luneterm itself is not changed by this repo.
+5. The Lunegit fixtures are licensed MIT OR Apache-2.0 (D284); the export still leaves them out.
+6. The user's calls, all reversible and taken at the recommended option: the final tray glyph (`platform.tray-icon`), column resize and reorder in the table (D163, Q15), and two taken calls to
    confirm: the Windows popover activates (D224, Q17), the tray icon is a CPU raster (D218, Q18).
-6. CI stays out (D15) until the user asks; the remote is `origin`, github.com/lune-rs/luneui-rs (public).
+7. CI stays out (D15) until the user asks; the remote is `origin`, github.com/lune-rs/luneui-rs (public).
 
 ## Blockers / open questions
 

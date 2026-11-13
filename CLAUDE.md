@@ -26,7 +26,7 @@ for the extraction; Luneterm's `docs/architecture.md` sections "lune-ui modules"
 - Gate (before every commit; must be green): `cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && cargo clippy -p lune-ui-winit --all-targets -- -D warnings && cargo test -p lune-ui-winit && scripts/check-boundaries.sh && scripts/gen-component-index.sh --check && scripts/gen-api-docs.sh --check`
 - Showcase (the gallery's window; Cmd or Ctrl `]` and `[` walk the pages, Cmd or Ctrl `Q` quits; its global settings include text smoothing, hinting and stem darkening): `cargo run -p gallery`
 - Pixel gate (a change to a component's drawing; gallery-only work is checked by eye, D254): `scripts/pixel-gate.sh [--base <rev>] [--allow <id>…] [--removed <id>…]` dumps
-  every scene `gallery --list` prints (438 at the library pass's close; the first 14 are the legacy Painter-API scenes) for `<rev>`
+  every scene `gallery --list` prints (445 at 0.6.0's close; the first 14 are the legacy Painter-API scenes) for `<rev>`
   (default `HEAD`) and for the working tree and compares them
   (`dump-compare`); zero delta unless the look change is intended: name its scenes with `--allow <id>`
   and give the reason in a DECISIONS.md row in the same commit. A scene whose subject is gone is named with `--removed <id>` (D260): it must be in
