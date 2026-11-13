@@ -81,6 +81,19 @@ impl ImageStore for FakeImages {
             self.freed += 1;
         }
     }
+
+    fn update(&mut self, id: ImageId, at: (u32, u32), data: &ImageData) -> Result<(), ImageError> {
+        if !data.length_ok() {
+            return Err(ImageError::BadLength);
+        }
+        let (w, h) = self.sizes.get(&id).copied().ok_or(ImageError::UnknownId)?;
+        if u64::from(at.0) + u64::from(data.width) > u64::from(w)
+            || u64::from(at.1) + u64::from(data.height) > u64::from(h)
+        {
+            return Err(ImageError::OutOfBounds);
+        }
+        Ok(())
+    }
 }
 
 fn solid(width: u32, height: u32) -> ImageData {
@@ -101,7 +114,13 @@ fn solid(width: u32, height: u32) -> ImageData {
 /// - P3: registering an id again replaces the picture and frees the old one (`live` unchanged);
 /// - P4: releasing frees the id (`live` drops), and releasing an unknown id does nothing;
 /// - P5: an id registers again after its release;
-/// - P6: a side above `limit` is refused with `TooLarge { limit }` and changes nothing.
+/// - P6: a side above `limit` is refused with `TooLarge { limit }` and changes nothing;
+/// - P7: updating a registered picture succeeds and `live` is unchanged;
+/// - P8: updating an unregistered id is refused with `UnknownId`;
+/// - P9: a rect one past the right edge, and one past the bottom edge, is refused with
+///   `OutOfBounds`;
+/// - P10: short data is refused with `BadLength`, also for an unknown id (length is checked first);
+/// - P11: an update with no pixels succeeds for a registered picture.
 pub fn image_store_contract<S: ImageStore>(
     store: &mut S,
     live: impl Fn(&S) -> usize,
@@ -165,6 +184,55 @@ pub fn image_store_contract<S: ImageStore>(
         }
         check("P6", store, 0)?;
     }
+
+    store
+        .register(a, solid(4, 3))
+        .map_err(|e| format!("P7: registering was refused: {e}"))?;
+    store
+        .update(a, (1, 1), &solid(2, 2))
+        .map_err(|e| format!("P7: updating a registered picture was refused: {e}"))?;
+    check("P7", store, 1)?;
+
+    if store.update(z, (0, 0), &solid(1, 1)) != Err(ImageError::UnknownId) {
+        return Err("P8: an update of an unregistered id was not refused with UnknownId".into());
+    }
+    check("P8", store, 1)?;
+
+    if store.update(a, (3, 0), &solid(2, 1)) != Err(ImageError::OutOfBounds) {
+        return Err("P9: a rect past the right edge was not refused with OutOfBounds".into());
+    }
+    if store.update(a, (0, 2), &solid(1, 2)) != Err(ImageError::OutOfBounds) {
+        return Err("P9: a rect past the bottom edge was not refused with OutOfBounds".into());
+    }
+    if store.update(a, (u32::MAX, 0), &solid(2, 1)) != Err(ImageError::OutOfBounds) {
+        return Err("P9: an origin that overflows u32 was not refused with OutOfBounds".into());
+    }
+    check("P9", store, 1)?;
+
+    let short = ImageData {
+        width: 2,
+        height: 2,
+        rgba: vec![0; 15],
+    };
+    if store.update(z, (0, 0), &short) != Err(ImageError::BadLength) {
+        return Err("P10: short data for an unknown id was not refused with BadLength".into());
+    }
+    if store.update(a, (0, 0), &short) != Err(ImageError::BadLength) {
+        return Err("P10: short data for a registered id was not refused with BadLength".into());
+    }
+    check("P10", store, 1)?;
+
+    let empty = ImageData {
+        width: 0,
+        height: 0,
+        rgba: Vec::new(),
+    };
+    store
+        .update(a, (0, 0), &empty)
+        .map_err(|e| format!("P11: an update with no pixels was refused: {e}"))?;
+    check("P11", store, 1)?;
+    store.release(a);
+    check("P11 (release)", store, 0)?;
     Ok(())
 }
 
@@ -206,6 +274,14 @@ mod tests {
             }
             fn release(&mut self, _: ImageId) {
                 self.0 = self.0.saturating_sub(1);
+            }
+            fn update(
+                &mut self,
+                _: ImageId,
+                _: (u32, u32),
+                _: &ImageData,
+            ) -> Result<(), ImageError> {
+                Ok(())
             }
         }
         let mut s = Lax::default();

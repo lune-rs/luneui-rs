@@ -638,3 +638,96 @@ fn a_part_past_the_picture_draws_nothing() {
     };
     assert!(img.iter().any(|&b| b != 0));
 }
+
+// ── in-place updates ────────────────────────────────────────────────────────────────────────
+
+/// Draws picture 1 whole into 8 by 8 logical at (5, 5) = device (10, 10, 16, 16): 4 device px per
+/// texel of a 4 by 4 picture.
+fn draw_4x4(gpu: &mut Gpu, text: &mut TextCache) -> Vec<u8> {
+    let scene = paint(text, |p| {
+        p.image(
+            Rect::new(5.0, 5.0, 8.0, 8.0),
+            ImageId(1),
+            Fit::Contain,
+            CENTER,
+            1.0,
+        );
+    });
+    render(gpu, text, &scene)
+}
+
+#[test]
+fn an_update_rewrites_only_its_rect() {
+    let Some(mut gpu) = headless_gpu() else {
+        return;
+    };
+    let mut text = text_cache();
+    gpu.register(ImageId(1), solid(4, 4, [255, 0, 0, 255]))
+        .expect("registers");
+    let before = draw_4x4(&mut gpu, &mut text);
+    assert_eq!(px(&before, 15, 15), [255, 0, 0, 255], "instrument check");
+    gpu.update(ImageId(1), (1, 1), &solid(2, 2, [0, 255, 0, 255]))
+        .expect("updates");
+    let img = draw_4x4(&mut gpu, &mut text);
+    for y in 14..22 {
+        for x in 14..22 {
+            assert_eq!(px(&img, x, y), [0, 255, 0, 255], "({x}, {y})");
+        }
+    }
+    for (x, y) in [
+        (10, 10),
+        (13, 13),
+        (22, 22),
+        (25, 25),
+        (10, 25),
+        (25, 10),
+        (13, 18),
+    ] {
+        assert_eq!(px(&img, x, y), [255, 0, 0, 255], "({x}, {y})");
+    }
+    assert_eq!(gpu.image_count(), 1);
+}
+
+#[test]
+fn an_update_premultiplies() {
+    let Some(mut gpu) = headless_gpu() else {
+        return;
+    };
+    let mut text = text_cache();
+    gpu.register(ImageId(1), solid(4, 4, [255, 0, 0, 255]))
+        .expect("registers");
+    gpu.update(ImageId(1), (0, 0), &solid(4, 4, [0, 0, 255, 128]))
+        .expect("updates");
+    let img = draw_4x4(&mut gpu, &mut text);
+    let c = px(&img, 15, 15);
+    let near = |a: u8, b: u8| a.abs_diff(b) <= 2;
+    assert!(
+        near(c[0], 0) && near(c[1], 0) && near(c[2], 128) && near(c[3], 128),
+        "{c:?}"
+    );
+}
+
+#[test]
+fn a_refused_update_leaves_the_picture() {
+    let Some(mut gpu) = headless_gpu() else {
+        return;
+    };
+    let mut text = text_cache();
+    gpu.register(ImageId(1), solid(4, 4, [255, 0, 0, 255]))
+        .expect("registers");
+    assert_eq!(
+        gpu.update(ImageId(1), (3, 3), &solid(2, 2, [0, 255, 0, 255])),
+        Err(lune_ui_core::image::ImageError::OutOfBounds)
+    );
+    assert_eq!(
+        gpu.update(ImageId(9), (0, 0), &solid(1, 1, [0, 255, 0, 255])),
+        Err(lune_ui_core::image::ImageError::UnknownId)
+    );
+    let img = draw_4x4(&mut gpu, &mut text);
+    for y in 10..26 {
+        for x in 10..26 {
+            assert_eq!(px(&img, x, y), [255, 0, 0, 255], "({x}, {y})");
+        }
+    }
+    assert_eq!(gpu.image_count(), 1);
+}

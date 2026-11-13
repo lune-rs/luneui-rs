@@ -12,7 +12,7 @@ Each crate has a page per module (`<crate>/<module path>.md`; the root is `index
 
 ### `lune-ui-core` (`lune_ui_core`)
 
-92 modules, 1093 items. Left out and counted: 3315 blanket impls, 1 intra-doc links left unlinked (private or unresolvable target), 4777 items of the omitted impls, 1280 items of the trait impls shown as one line, 2220 synthetic impls.
+92 modules, 1093 items. Left out and counted: 3315 blanket impls, 1 intra-doc links left unlinked (private or unresolvable target), 4777 items of the omitted impls, 1281 items of the trait impls shown as one line, 2220 synthetic impls.
 
 | Module | Items |
 | --- | --- |
@@ -111,7 +111,7 @@ Each crate has a page per module (`<crate>/<module path>.md`; the root is `index
 
 ### `lune-ui-wgpu` (`lune_ui_wgpu`)
 
-9 modules, 17 items. Left out and counted: 169 blanket impls, 2 intra-doc links left unlinked (private or unresolvable target), 121 items of the omitted impls, 27 items of the trait impls shown as one line, 66 synthetic impls.
+9 modules, 17 items. Left out and counted: 169 blanket impls, 2 intra-doc links left unlinked (private or unresolvable target), 121 items of the omitted impls, 28 items of the trait impls shown as one line, 66 synthetic impls.
 
 | Module | Items |
 | --- | --- |

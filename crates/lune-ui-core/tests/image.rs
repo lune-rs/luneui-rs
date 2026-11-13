@@ -487,3 +487,37 @@ fn image_draw_default_is_the_whole_picture_contained_centred() {
     assert_eq!(d.sampling, Sampling::Auto);
     assert_eq!(Sampling::default(), Sampling::Auto);
 }
+
+#[test]
+fn the_fake_update_checks_length_then_id_then_bounds() {
+    let px = |w: u32, h: u32| ImageData {
+        width: w,
+        height: h,
+        rgba: vec![0; 4 * (w * h) as usize],
+    };
+    let mut s = FakeImages::new();
+    s.register(ImageId(1), px(4, 3)).expect("registers");
+    let short = ImageData {
+        width: 2,
+        height: 2,
+        rgba: vec![0; 15],
+    };
+    assert_eq!(
+        s.update(ImageId(2), (0, 0), &short),
+        Err(ImageError::BadLength)
+    );
+    assert_eq!(
+        s.update(ImageId(2), (0, 0), &px(1, 1)),
+        Err(ImageError::UnknownId)
+    );
+    assert_eq!(
+        s.update(ImageId(1), (3, 0), &px(2, 1)),
+        Err(ImageError::OutOfBounds)
+    );
+    // An empty write at the bottom right corner fits and does nothing.
+    assert_eq!(s.update(ImageId(1), (4, 3), &px(0, 0)), Ok(()));
+    assert_eq!(s.update(ImageId(1), (2, 1), &px(2, 2)), Ok(()));
+    assert_eq!((s.len(), s.size(ImageId(1))), (1, Some((4, 3))));
+    assert!(!ImageError::UnknownId.to_string().is_empty());
+    assert!(!ImageError::OutOfBounds.to_string().is_empty());
+}

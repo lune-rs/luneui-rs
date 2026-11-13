@@ -24,13 +24,19 @@ impl ImageData {
     }
 }
 
-/// Why a store refused a picture. A refusal changes nothing: a replaced id keeps its old picture.
+/// Why a store refused a picture or an update. A refusal changes nothing: a replaced id keeps its
+/// old picture.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ImageError {
     /// `rgba` is not `4 * width * height` bytes.
     BadLength,
     /// A side is above what the store can hold; `limit` is the most it takes.
     TooLarge { limit: u32 },
+    /// An update named an id that is not registered.
+    UnknownId,
+    /// An update's rect does not lie inside the registered picture.
+    OutOfBounds,
 }
 
 impl std::fmt::Display for ImageError {
@@ -38,6 +44,8 @@ impl std::fmt::Display for ImageError {
         match self {
             Self::BadLength => f.write_str("image data is not 4 * width * height bytes"),
             Self::TooLarge { limit } => write!(f, "image side above the limit of {limit} px"),
+            Self::UnknownId => f.write_str("no picture is registered under this id"),
+            Self::OutOfBounds => f.write_str("the update's rect is not inside the picture"),
         }
     }
 }
@@ -54,6 +62,21 @@ pub trait ImageStore {
     /// [`ImageError::BadLength`] when `data.rgba` is not `4 * width * height` bytes;
     /// [`ImageError::TooLarge`] when a side is above the store's limit.
     fn register(&mut self, id: ImageId, data: ImageData) -> Result<(), ImageError>;
+
+    /// Replaces the pixels of the rect of the picture registered as `id` whose top-left corner is
+    /// `at` (picture pixels) and whose size is `data`'s, in place: the picture's size, its id and
+    /// the store's live count do not change, and the pixels outside the rect stay. `data` is
+    /// straight alpha like [`ImageData`]. A `data` with no pixels does nothing. A refusal changes
+    /// nothing.
+    ///
+    /// The next frame drawn after the call shows the new pixels; update a picture before drawing
+    /// any window of the frame.
+    ///
+    /// # Errors
+    /// Checked in this order: [`ImageError::BadLength`] when `data.rgba` is not
+    /// `4 * width * height` bytes; [`ImageError::UnknownId`] when `id` is not registered;
+    /// [`ImageError::OutOfBounds`] when the rect reaches past the picture's right or bottom edge.
+    fn update(&mut self, id: ImageId, at: (u32, u32), data: &ImageData) -> Result<(), ImageError>;
 
     /// Frees `id`; does nothing for an id that is not registered. The id may be registered again.
     fn release(&mut self, id: ImageId);

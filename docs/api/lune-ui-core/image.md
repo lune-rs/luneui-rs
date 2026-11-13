@@ -24,7 +24,7 @@ pub struct ImageAlign {
 
 Where the fitted picture sits in the destination rect.
 
-Source: `crates/lune-ui-core/src/image.rs:79`
+Source: `crates/lune-ui-core/src/image.rs:102`
 
 **Fields**
 
@@ -110,7 +110,7 @@ pub struct ImageDraw {
 Everything about one picture draw except where and which picture. `Default` draws the whole
 picture contained, centred, opaque, unturned, with [`Sampling::Auto`](image.md#variant.Sampling.Auto).
 
-Source: `crates/lune-ui-core/src/image.rs:125`
+Source: `crates/lune-ui-core/src/image.rs:148`
 
 **Fields**
 
@@ -190,7 +190,7 @@ A rect of a picture's own pixels, top-left origin: a sprite cut from a sheet. A 
 area (`w` or `h` 0) draws nothing; a part past the picture's edge is dropped by the renderer,
 which knows the picture's size.
 
-Source: `crates/lune-ui-core/src/image.rs:101`
+Source: `crates/lune-ui-core/src/image.rs:124`
 
 **Fields**
 
@@ -227,7 +227,7 @@ pub enum Anchor {
 
 A position along one axis.
 
-Source: `crates/lune-ui-core/src/image.rs:71`
+Source: `crates/lune-ui-core/src/image.rs:94`
 
 **Variants**
 
@@ -257,7 +257,7 @@ pub enum Fit {
 
 How a picture is fitted into its destination rect.
 
-Source: `crates/lune-ui-core/src/image.rs:64`
+Source: `crates/lune-ui-core/src/image.rs:87`
 
 **Variants**
 
@@ -278,15 +278,19 @@ Source: `crates/lune-ui-core/src/image.rs:64`
 ### Enum `ImageError`
 
 ```rust
+#[non_exhaustive]
 pub enum ImageError {
     BadLength,
     TooLarge { limit: u32 },
+    UnknownId,
+    OutOfBounds,
 }
 ```
 
-Why a store refused a picture. A refusal changes nothing: a replaced id keeps its old picture.
+Why a store refused a picture or an update. A refusal changes nothing: a replaced id keeps its
+old picture.
 
-Source: `crates/lune-ui-core/src/image.rs:29`
+Source: `crates/lune-ui-core/src/image.rs:31`
 
 **Variants**
 
@@ -297,6 +301,14 @@ Source: `crates/lune-ui-core/src/image.rs:29`
 - <a id="variant.ImageError.TooLarge"></a>`TooLarge { limit: u32 }`
 
   A side is above what the store can hold; `limit` is the most it takes.
+
+- <a id="variant.ImageError.UnknownId"></a>`UnknownId`
+
+  An update named an id that is not registered.
+
+- <a id="variant.ImageError.OutOfBounds"></a>`OutOfBounds`
+
+  An update's rect does not lie inside the registered picture.
 
 **Trait implementations**
 
@@ -322,7 +334,7 @@ pub enum Sampling {
 
 How a draw samples its picture.
 
-Source: `crates/lune-ui-core/src/image.rs:110`
+Source: `crates/lune-ui-core/src/image.rs:133`
 
 **Variants**
 
@@ -363,7 +375,7 @@ pub trait ImageStore { .. }
 Where registered pictures live. The renderer implements it; the painter only names ids, so an
 id that is unknown or released draws nothing.
 
-Source: `crates/lune-ui-core/src/image.rs:49`
+Source: `crates/lune-ui-core/src/image.rs:57`
 
 **Required items**
 
@@ -380,6 +392,22 @@ Source: `crates/lune-ui-core/src/image.rs:49`
 
   Frees `id`; does nothing for an id that is not registered. The id may be registered again.
 
+- <a id="tymethod.ImageStore.update"></a>`fn update(&mut self, id: ImageId, at: (u32, u32), data: &ImageData) -> Result<(), ImageError>`
+
+  Replaces the pixels of the rect of the picture registered as `id` whose top-left corner is
+  `at` (picture pixels) and whose size is `data`'s, in place: the picture's size, its id and
+  the store's live count do not change, and the pixels outside the rect stay. `data` is
+  straight alpha like [`ImageData`](image.md#struct.ImageData). A `data` with no pixels does nothing. A refusal changes
+  nothing.
+
+  The next frame drawn after the call shows the new pixels; update a picture before drawing
+  any window of the frame.
+
+  ###### Errors
+  Checked in this order: [`ImageError::BadLength`](image.md#variant.ImageError.BadLength) when `data.rgba` is not
+  `4 * width * height` bytes; [`ImageError::UnknownId`](image.md#variant.ImageError.UnknownId) when `id` is not registered;
+  [`ImageError::OutOfBounds`](image.md#variant.ImageError.OutOfBounds) when the rect reaches past the picture's right or bottom edge.
+
 ## Functions
 
 <a id="fn.image_rect"></a>
@@ -392,5 +420,5 @@ pub fn image_rect(size: (u32, u32), dst: Rect, fit: Fit, align: ImageAlign) -> O
 The rect a picture of `size` (width, height in pixels) occupies when fitted into `dst`, or
 `None` when the picture or `dst` has no area or a number is not finite.
 
-Source: `crates/lune-ui-core/src/image.rs:155`
+Source: `crates/lune-ui-core/src/image.rs:178`
 

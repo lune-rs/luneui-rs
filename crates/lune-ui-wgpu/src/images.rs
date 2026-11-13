@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use bytemuck::{Pod, Zeroable};
 use wgpu::util::DeviceExt;
 
-use lune_ui_core::image::{ImageData, ImageId, Sampling, image_rect};
+use lune_ui_core::image::{ImageData, ImageError, ImageId, Sampling, image_rect};
 use lune_ui_core::paint::Rect;
 use lune_ui_core::scene::{ImageItem, ImageSource};
 use lune_ui_core::text::{TextKey, TextRendering};
@@ -53,7 +53,7 @@ pub(crate) struct GpuImage {
     pub(crate) size: (u32, u32),
     nearest: wgpu::BindGroup,
     linear: wgpu::BindGroup,
-    _texture: wgpu::Texture,
+    texture: wgpu::Texture,
 }
 
 /// Everything the image pipeline shares: layout, samplers and the registered pictures.
@@ -118,13 +118,7 @@ impl ImageResources {
         height: u32,
         rgba: &[u8],
     ) -> GpuImage {
-        let mut px = rgba.to_vec();
-        for p in px.chunks_exact_mut(4) {
-            let a = u32::from(p[3]);
-            for c in &mut p[..3] {
-                *c = ((u32::from(*c) * a + 127) / 255) as u8;
-            }
-        }
+        let px = premultiplied(rgba);
         let texture = device.create_texture_with_data(
             queue,
             &wgpu::TextureDescriptor {
@@ -138,7 +132,7 @@ impl ImageResources {
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
                 format: wgpu::TextureFormat::Rgba8Unorm,
-                usage: wgpu::TextureUsages::TEXTURE_BINDING,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
                 view_formats: &[],
             },
             wgpu::util::TextureDataOrder::LayerMajor,
@@ -165,8 +159,56 @@ impl ImageResources {
             size: (width, height),
             nearest: group(&self.nearest),
             linear: group(&self.linear),
-            _texture: texture,
+            texture,
         }
+    }
+
+    /// Writes the straight-alpha `data` (premultiplied as `upload` does) into the picture `id`
+    /// with its top-left corner at `at`, in place: the texture and its bind groups stay. The
+    /// caller has checked the length and that the rect lies inside the picture.
+    pub(crate) fn write(
+        &self,
+        queue: &wgpu::Queue,
+        id: ImageId,
+        at: (u32, u32),
+        data: &ImageData,
+    ) -> Result<(), ImageError> {
+        if !data.length_ok() {
+            return Err(ImageError::BadLength);
+        }
+        let img = self.ids.get(&id).ok_or(ImageError::UnknownId)?;
+        if u64::from(at.0) + u64::from(data.width) > u64::from(img.size.0)
+            || u64::from(at.1) + u64::from(data.height) > u64::from(img.size.1)
+        {
+            return Err(ImageError::OutOfBounds);
+        }
+        if data.width == 0 || data.height == 0 {
+            return Ok(());
+        }
+        queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &img.texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d {
+                    x: at.0,
+                    y: at.1,
+                    z: 0,
+                },
+                aspect: wgpu::TextureAspect::All,
+            },
+            &premultiplied(&data.rgba),
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(4 * data.width),
+                rows_per_image: None,
+            },
+            wgpu::Extent3d {
+                width: data.width,
+                height: data.height,
+                depth_or_array_layers: 1,
+            },
+        );
+        Ok(())
     }
 
     /// The picture behind `source`, if it is registered or rasterised under the setting `bits`.
@@ -241,9 +283,20 @@ impl ImageResources {
     }
 }
 
+/// `rgba` (straight alpha) with each colour channel scaled by its alpha, rounded.
+fn premultiplied(rgba: &[u8]) -> Vec<u8> {
+    let mut px = rgba.to_vec();
+    for p in px.chunks_exact_mut(4) {
+        let a = u32::from(p[3]);
+        for c in &mut p[..3] {
+            *c = ((u32::from(*c) * a + 127) / 255) as u8;
+        }
+    }
+    px
+}
+
 /// Checks `data` against `limit` and the length rule, as the store contract asks.
-pub(crate) fn check(data: &ImageData, limit: u32) -> Result<(), lune_ui_core::image::ImageError> {
-    use lune_ui_core::image::ImageError;
+pub(crate) fn check(data: &ImageData, limit: u32) -> Result<(), ImageError> {
     if !data.length_ok() {
         return Err(ImageError::BadLength);
     }

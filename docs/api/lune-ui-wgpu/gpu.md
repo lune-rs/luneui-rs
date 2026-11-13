@@ -157,5 +157,5 @@ The wgpu instance. `display` is the windowing system's display handle (an event 
 display handle, say); `None` for a headless instance. On Windows this is DX12 presented
 through a DirectComposition visual, the wgpu path that supports a transparent window.
 
-Source: `crates/lune-ui-wgpu/src/gpu.rs:206`
+Source: `crates/lune-ui-wgpu/src/gpu.rs:213`
 
