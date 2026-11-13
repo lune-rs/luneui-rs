@@ -23,9 +23,11 @@ pub use lune_ui_wgpu::{blur, custom, dump, frame, gpu, surface};
 
 pub use lune_ui_platform::{material, popover};
 
-/// The desktop: the core's units, monitors, popup placement and window shapes.
+/// The desktop: the core's units, monitors, popup placement and window shapes, and the OS
+/// functions that read the monitors and the pointer and move windows (`lune-ui-platform`).
 pub mod desktop {
     pub use lune_ui_core::desktop::*;
+    pub use lune_ui_platform::desktop::*;
 }
 
 /// The tray: the core's icon raster, placement and click rules, and the OS item

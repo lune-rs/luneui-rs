@@ -141,24 +141,25 @@ Each crate has a page per module (`<crate>/<module path>.md`; the root is `index
 
 ### `lune-ui-platform` (`lune_ui_platform`)
 
-4 modules, 12 items. Left out and counted: 100 blanket impls, 94 items of the omitted impls, 23 items of the trait impls shown as one line, 48 synthetic impls.
+5 modules, 19 items. Left out and counted: 100 blanket impls, 94 items of the omitted impls, 23 items of the trait impls shown as one line, 48 synthetic impls.
 
 | Module | Items |
 | --- | --- |
 | [`lune_ui_platform`](lune-ui-platform/index.md) | 0 |
+| [`lune_ui_platform::desktop`](lune-ui-platform/desktop.md) | 7 |
 | [`lune_ui_platform::material`](lune-ui-platform/material.md) | 3 |
 | [`lune_ui_platform::popover`](lune-ui-platform/popover.md) | 2 |
 | [`lune_ui_platform::tray`](lune-ui-platform/tray.md) | 7 |
 
 ### `lune-ui` (`lune_ui`)
 
-7 modules, 136 re-exports shown as links.
+7 modules, 143 re-exports shown as links.
 
 | Module | Re-exports |
 | --- | --- |
 | [`lune_ui`](lune-ui/index.md) | 36 |
 | [`lune_ui::access`](lune-ui/access.md) | 19 |
-| [`lune_ui::desktop`](lune-ui/desktop.md) | 8 |
+| [`lune_ui::desktop`](lune-ui/desktop.md) | 15 |
 | [`lune_ui::input`](lune-ui/input.md) | 27 |
 | [`lune_ui::text`](lune-ui/text.md) | 16 |
 | [`lune_ui::tray`](lune-ui/tray.md) | 18 |
@@ -842,12 +843,14 @@ Every top-level item of the four owning crates, by name.
 - [`Mods`](lune-ui-core/shortcuts.md#struct.Mods) - struct, `lune_ui_core::shortcuts`
 - [`Monitor`](lune-ui-core/desktop.md#struct.Monitor) - struct, `lune_ui_core::desktop`
 - [`monitor_at`](lune-ui-core/desktop.md#fn.monitor_at) - function, `lune_ui_core::desktop`
+- [`monitors`](lune-ui-platform/desktop.md#fn.monitors) - function, `lune_ui_platform::desktop`
 - [`MOTION`](lune-ui-core/motion.md#constant.MOTION) - constant, `lune_ui_core::motion`
 - [`Motion`](lune-ui-core/motion.md#struct.Motion) - struct, `lune_ui_core::motion`
 - [`Motion`](lune-ui-core/text_edit.md#enum.Motion) - enum, `lune_ui_core::text_edit`
 - [`MotionTier`](lune-ui-core/motion.md#enum.MotionTier) - enum, `lune_ui_core::motion`
 - [`MotionTokens`](lune-ui-core/motion.md#struct.MotionTokens) - struct, `lune_ui_core::motion`
 - [`MOVE`](lune-ui-core/widgets/toggle.md#constant.MOVE) - constant, `lune_ui_core::widgets::toggle`
+- [`move_windows`](lune-ui-platform/desktop.md#fn.move_windows) - function, `lune_ui_platform::desktop`
 - [`NAME_GAP`](lune-ui-core/widgets/verdict_row.md#constant.NAME_GAP) - constant, `lune_ui_core::widgets::verdict_row`
 - [`NAME_LINE`](lune-ui-core/widgets/list_row.md#constant.NAME_LINE) - constant, `lune_ui_core::widgets::list_row`
 - [`NAME_W`](lune-ui-core/widgets/verdict_row.md#constant.NAME_W) - constant, `lune_ui_core::widgets::verdict_row`
@@ -964,6 +967,7 @@ Every top-level item of the four owning crates, by name.
 - [`PlainHighlighter`](lune-ui-core/widgets/text_lines.md#struct.PlainHighlighter) - struct, `lune_ui_core::widgets::text_lines`
 - [`PLOT`](lune-ui-core/widgets/bar_chart.md#constant.PLOT) - constant, `lune_ui_core::widgets::bar_chart`
 - [`plus_rect`](lune-ui-core/widgets/stepper.md#fn.plus_rect) - function, `lune_ui_core::widgets::stepper`
+- [`pointer`](lune-ui-platform/desktop.md#fn.pointer) - function, `lune_ui_platform::desktop`
 - [`PointerButton`](lune-ui-core/input.md#enum.PointerButton) - enum, `lune_ui_core::input`
 - [`polyline_length`](lune-ui-core/paint.md#fn.polyline_length) - function, `lune_ui_core::paint`
 - [`popover_attributes`](lune-ui-winit/window.md#fn.popover_attributes) - function, `lune_ui_winit::window`
@@ -1086,6 +1090,7 @@ Every top-level item of the four owning crates, by name.
 - [`Sense`](lune-ui-core/ui.md#struct.Sense) - struct, `lune_ui_core::ui`
 - [`SEPARATOR`](lune-ui-core/widgets/diff_view.md#constant.SEPARATOR) - constant, `lune_ui_core::widgets::diff_view`
 - [`set_event_handler`](lune-ui-platform/tray.md#fn.set_event_handler) - function, `lune_ui_platform::tray`
+- [`set_window_origin`](lune-ui-platform/desktop.md#fn.set_window_origin) - function, `lune_ui_platform::desktop`
 - [`SettingRow`](lune-ui-core/widgets/row.md#struct.SettingRow) - struct, `lune_ui_core::widgets::row`
 - [`SettingsPage`](lune-ui-core/widgets/settings_page.md#struct.SettingsPage) - struct, `lune_ui_core::widgets::settings_page`
 - [`SettingsResponse`](lune-ui-core/widgets/settings_page.md#struct.SettingsResponse) - struct, `lune_ui_core::widgets::settings_page`
@@ -1287,6 +1292,7 @@ Every top-level item of the four owning crates, by name.
 - [`UNAVAILABLE_LINE`](lune-ui-core/widgets/panel.md#constant.UNAVAILABLE_LINE) - constant, `lune_ui_core::widgets::panel`
 - [`UNDO_DEPTH`](lune-ui-core/text_edit.md#constant.UNDO_DEPTH) - constant, `lune_ui_core::text_edit`
 - [`Unit`](lune-ui-core/text.md#enum.Unit) - enum, `lune_ui_core::text`
+- [`units_per_logical`](lune-ui-platform/desktop.md#fn.units_per_logical) - function, `lune_ui_platform::desktop`
 - [`VALUE`](lune-ui-core/widgets/bar_chart.md#constant.VALUE) - constant, `lune_ui_core::widgets::bar_chart`
 - [`VALUE`](lune-ui-core/widgets/pie_chart.md#constant.VALUE) - constant, `lune_ui_core::widgets::pie_chart`
 - [`VALUE`](lune-ui-core/widgets/slider.md#constant.VALUE) - constant, `lune_ui_core::widgets::slider`
@@ -1309,7 +1315,9 @@ Every top-level item of the four owning crates, by name.
 - [`WIDTH_EXPANDED`](lune-ui-core/widgets/toast.md#constant.WIDTH_EXPANDED) - constant, `lune_ui_core::widgets::toast`
 - [`WINDOW`](lune-ui-core/theme/lunegit_dark.md#constant.WINDOW) - constant, `lune_ui_core::theme::lunegit_dark`
 - [`WINDOW`](lune-ui-core/theme/near_black.md#constant.WINDOW) - constant, `lune_ui_core::theme::near_black`
+- [`window_at`](lune-ui-platform/desktop.md#fn.window_at) - function, `lune_ui_platform::desktop`
 - [`WINDOW_BLACK_MAX`](lune-ui-core/theme/near_black.md#constant.WINDOW_BLACK_MAX) - constant, `lune_ui_core::theme::near_black`
+- [`window_frame`](lune-ui-platform/desktop.md#fn.window_frame) - function, `lune_ui_platform::desktop`
 - [`WindowBackdrop`](lune-ui-platform/material.md#struct.WindowBackdrop) - struct, `lune_ui_platform::material`
 - [`WindowCommand`](lune-ui-core/input.md#enum.WindowCommand) - enum, `lune_ui_core::input`
 - [`WindowShape`](lune-ui-core/desktop.md#struct.WindowShape) - struct, `lune_ui_core::desktop`

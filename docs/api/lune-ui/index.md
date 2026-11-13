@@ -20,7 +20,7 @@ Source: `crates/lune-ui/src/lib.rs:1`
 ## Modules
 
 - [`access`](access.md) - Accessibility: the core's semantic tree and actions and, with the `accesskit` feature, the bridge to the OS accessibility API (`lune-ui-winit`).
-- [`desktop`](desktop.md) - The desktop: the core's units, monitors, popup placement and window shapes.
+- [`desktop`](desktop.md) - The desktop: the core's units, monitors, popup placement and window shapes, and the OS functions that read the monitors and the pointer and move windows (`lune-ui-platform`).
 - [`input`](input.md) - Input: the core's plain-data `RawInput` and `FrameOutput`, and the winit translation and output.
 - [`text`](text.md) - Text: the core's specs and `TextSystem` seam, the cosmic-text `TextCache` that implements it, and the `GlyphRasterizer` that rasterizes a glyph with the core's `GlyphParams`.
 - [`tray`](tray.md) - The tray: the core's icon raster, placement and click rules, and the OS item (`lune-ui-platform`).

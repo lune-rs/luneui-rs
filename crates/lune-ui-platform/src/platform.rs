@@ -1,6 +1,7 @@
 //! The OS code of the tray item and the popover window, one file per platform. macOS and Windows
 //! share the `tray-icon` wrapper in `platform/item.rs`.
 
+pub(crate) mod desktop;
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 mod item;
 #[cfg(target_os = "macos")]

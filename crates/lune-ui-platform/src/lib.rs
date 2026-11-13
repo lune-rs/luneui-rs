@@ -6,6 +6,7 @@
 // The platform modules name the core's backdrop types as `crate::backdrop::…`.
 use lune_ui_core::backdrop;
 
+pub mod desktop;
 pub mod material;
 mod platform;
 pub mod popover;

@@ -4,9 +4,10 @@
 
 [API reference](../INDEX.md) / parent [`lune_ui`](index.md)
 
-The desktop: the core's units, monitors, popup placement and window shapes.
+The desktop: the core's units, monitors, popup placement and window shapes, and the OS
+functions that read the monitors and the pointer and move windows (`lune-ui-platform`).
 
-Source: `crates/lune-ui/src/lib.rs:27`
+Source: `crates/lune-ui/src/lib.rs:28`
 
 ## Re-exports
 
@@ -18,6 +19,13 @@ Source: `crates/lune-ui/src/lib.rs:27`
 | `ShapeError` | Enum | [`lune_ui_core::desktop::ShapeError`](../lune-ui-core/desktop.md#enum.ShapeError) |
 | `WindowShape` | Struct | [`lune_ui_core::desktop::WindowShape`](../lune-ui-core/desktop.md#struct.WindowShape) |
 | `monitor_at` | Function | [`lune_ui_core::desktop::monitor_at`](../lune-ui-core/desktop.md#fn.monitor_at) |
+| `monitors` | Function | [`lune_ui_platform::desktop::monitors`](../lune-ui-platform/desktop.md#fn.monitors) |
+| `move_windows` | Function | [`lune_ui_platform::desktop::move_windows`](../lune-ui-platform/desktop.md#fn.move_windows) |
 | `place_popup` | Function | [`lune_ui_core::desktop::place_popup`](../lune-ui-core/desktop.md#fn.place_popup) |
+| `pointer` | Function | [`lune_ui_platform::desktop::pointer`](../lune-ui-platform/desktop.md#fn.pointer) |
+| `set_window_origin` | Function | [`lune_ui_platform::desktop::set_window_origin`](../lune-ui-platform/desktop.md#fn.set_window_origin) |
 | `to_units` | Function | [`lune_ui_core::desktop::to_units`](../lune-ui-core/desktop.md#fn.to_units) |
+| `units_per_logical` | Function | [`lune_ui_platform::desktop::units_per_logical`](../lune-ui-platform/desktop.md#fn.units_per_logical) |
+| `window_at` | Function | [`lune_ui_platform::desktop::window_at`](../lune-ui-platform/desktop.md#fn.window_at) |
+| `window_frame` | Function | [`lune_ui_platform::desktop::window_frame`](../lune-ui-platform/desktop.md#fn.window_frame) |
 

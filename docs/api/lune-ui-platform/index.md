@@ -13,6 +13,7 @@ Source: `crates/lune-ui-platform/src/lib.rs:1`
 
 ## Modules
 
+- [`desktop`](desktop.md) - The desktop as the OS reports it, in the core's desktop units ([`lune_ui_core::desktop`](../lune-ui-core/desktop.md)): the monitors and their work areas, the pointer, a window's frame, moving windows,...
 - [`material`](material.md) - OS backdrop material behind a transparent window.
 - [`popover`](popover.md) - The window a tray surface draws in: borderless, above everything, shown and hidden by the app.
 - [`tray`](tray.md) - The tray item: the notification-area icon on Windows, the menu-bar status item on macOS.

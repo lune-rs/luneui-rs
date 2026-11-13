@@ -7,7 +7,7 @@
 Window helpers: the core's edge resize, double click and caption buttons, and the winit glass
 attributes and resize direction.
 
-Source: `crates/lune-ui/src/lib.rs:56`
+Source: `crates/lune-ui/src/lib.rs:58`
 
 ## Re-exports
 
