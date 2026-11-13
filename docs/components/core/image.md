@@ -6,7 +6,7 @@ status: done
 consumers: lunegit, wane
 source: crates/lune-ui-core/src/image.rs
 owner: —
-summary: Image primitive: app-decoded RGBA drawn into a rect with a fit mode, alpha and optional corner radius; explicit resource lifetime
+summary: Image primitive: app-decoded RGBA drawn into a rect with a fit mode, alpha, optional corner radius, a part of the picture (sprite sheets) and per-draw sampling; explicit resource lifetime and in-place rect updates
 ---
 
 ## What it is
@@ -41,14 +41,17 @@ No conflicts among sources.
 ### Anatomy
 
 - Input: decoded RGBA8, straight alpha, width and height in pixels, owned by the app until registered; the toolkit never decodes. Lunegit's viewer accepts png, jpg, jpeg, gif, webp, bmp and ico, all decoded by Avalonia's `Bitmap` [L src/Lunegit.Desktop/ViewModels/Explorer/FileViewerViewModel.cs:89-90,532-533]; the app's decoder is the app's choice.
-- Draw call: `image(dst_rect, id, fit, align, alpha)` recorded as plain data in the layer (`ImageItem { id, dst, fit, align, alpha, clip }`) beside the shapes, drawn by the adapter in layer order [R crates/lune-ui-core/src/paint.rs:215-260], [C2].
+- Draw call: `image(dst_rect, id, fit, align, alpha)`, or `image_with(dst_rect, id, &ImageDraw)` for the other fields, recorded as plain data in the layer (`ImageItem { source, dst, fit, align, alpha, rotation, clip, round_clip, part, sampling }`) beside the shapes, drawn by the adapter in layer order [R crates/lune-ui-core/src/paint.rs:902], [R crates/lune-ui-core/src/scene.rs:159], [C2].
+- Part (D304): `ImageDraw { part: Some(ImagePart { x, y, w, h }) }` draws a rect of the picture's own pixels, a sprite cut from a sheet; `fit` and `align` place the part's size in `dst`. A part with no area draws nothing (the core drops it); a part past the picture's edge draws nothing (the renderer drops it). The sample is clamped half a texel inside the part, so linear filtering never reads a neighbour [R crates/lune-ui-core/src/image.rs:124]. `None` is the whole picture, with the arithmetic of 0.5.1.
+- Sampling (D305): `Sampling::Auto` is the default: whole texels when the drawn part is scaled up by an integer factor or drawn at its own size, linear filtering otherwise (D106), measured on the drawn part. `Nearest` and `Linear` force one of them [R crates/lune-ui-core/src/image.rs:133].
+- In-place update (D307): `ImageStore::update(id, at, &ImageData)` rewrites a rect of a registered picture with one texture write; the picture's size, its id and the live count stay. The checks run in order: length (`BadLength`), id (`UnknownId`), bounds (`OutOfBounds`); an empty write does nothing; a refusal changes nothing. The next frame drawn after the call shows the new pixels [R crates/lune-ui-core/src/image.rs:79].
 - Fit modes found in Lunegit's use: `Uniform` only: the picture scales, up or down, keeping its aspect ratio, to the largest size that fits the destination rect [L src/Lunegit.Desktop/Views/FileViewerView.axaml:352-356], [L src/Lunegit.Desktop/Views/MarkdownPreviewView.axaml:168], [L src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:17-20]. The primitive names it `Contain`. No fill, cover, stretch or none mode is used, so none is specified.
 - Alignment inside the rect: centred in the viewer (`HorizontalAlignment` and `VerticalAlignment` centre), left in Markdown blocks, centred for the logo [L src/Lunegit.Desktop/Views/FileViewerView.axaml:354-355], [L src/Lunegit.Desktop/Views/MarkdownPreviewView.axaml:168].
 - Destination size is the caller's: Markdown caps the width at 640 px, the logo is 100 by 100 (`EmptyStateLogoSize`), the viewer fills its region [L src/Lunegit.Desktop/Views/MarkdownPreviewView.axaml:168], [L src/Lunegit.Desktop/App.axaml:213], [L src/Lunegit.Desktop/Views/EmptyRepositoryView.axaml:17-20].
 - Alpha: a constant multiplier for disabled or faded images (the painter already has an alpha in `Xform`) [R crates/lune-ui-core/src/paint.rs:160-175]. No tint, no rounded clip and no border in Lunegit's uses; a rounded clip (`clip-rounded`) is not required by this entry.
 - Resource lifetime: the app registers pixels under an id and releases it explicitly; the adapter holds the GPU texture until then. Lunegit disposes the previous bitmap whenever it is replaced, because an undisposed native backing store leaks on every reload [L src/Lunegit.Desktop/ViewModels/Explorer/FileViewerViewModel.cs:616-624], [L src/Lunegit.Desktop/Views/MarkdownPreviewView.axaml.cs:463-483]. An unknown or released id draws nothing and is not an error.
 - Size limits: Lunegit caps an image file at 20,000,000 bytes [L src/Lunegit.Desktop/ViewModels/Explorer/FileViewerViewModel.cs:83-84], but a small file can decode to a huge bitmap. The adapter refuses an image whose width or height exceeds the device's maximum texture size (it reports the device limit) and the app downsizes; the primitive never panics on a refusal [derived: the GPU limit; Lunegit has no pixel cap, grep found none].
-- Sampling: bilinear when the destination differs from the source size [derived: Avalonia's default, not stated by Lunegit; Open questions]. At an integer scale of 1 the image is drawn pixel for pixel.
+- Sampling: Lunegit leaves Avalonia's default, bilinear when the destination differs from the source size [derived: not stated by Lunegit; Open questions]. The toolkit's own choice is the `Sampling` of each draw (see above). At an integer scale of 1 the image is drawn pixel for pixel.
 - No SVG: Lunegit renders Mermaid and maths to SVG through its host; the toolkit takes RGBA, so such a host rasterizes first [L src/Lunegit.Desktop/Markdown/IMarkdownPreviewHost.cs:37-49], [D13].
 - Not drawn here: loading placeholders (text in `text.markdown-preview`), the "binary file" and "not found" states of the viewer (the app's) [L src/Lunegit.Desktop/Views/FileViewerView.axaml:358-390].
 
@@ -92,6 +95,9 @@ None: no text of its own.
 - `image-scale-1`: the pattern at scale 1, pixel for pixel, settled.
 - `image-missing-id`: an unregistered id, nothing drawn, settled.
 - `image-too-large`: an image beyond the device limit refused, nothing drawn, settled.
+- `image-part-sprite`: the four 16 by 16 sprites of a 32 by 32 sheet drawn side by side at 2 logical px per texel, settled.
+- `image-part-nearest`: one 16 by 16 sprite drawn twice at 2.5 logical px per texel, Auto (linear) on the left and Nearest on the right, settled.
+- `image-sampling`: a 16 by 16 checker drawn three times at a ratio of 3 device px per texel (scale 2), Auto, Nearest and Linear, settled.
 
 ### Painter primitives
 
@@ -110,9 +116,9 @@ None: no text of its own.
 
 ### Build
 
-- Milestone: M5. Built in M5 (steps 5 and 6; the page is `image`, 7 scenes). M11 audited it against D47 (the `Done` line). Unverified here: the Windows and Linux run time (the lint for both is `scripts/check-targets.sh`).
+- Milestone: M5. Built in M5 (steps 5 and 6; the page is `image`, 7 scenes). M11 audited it against D47 (the `Done` line). 0.6.0 adds parts, sampling and `update` (D304-D307, steps 1-3) and three scenes, so the page has 10. Unverified here: the Linux run time (the lint for it is `scripts/check-targets.sh`).
 - Depends on: core.painter, core.scene, render.gpu, render.frame, render.surface
-- Done (D47, M11): tests `crates/lune-ui-core/tests/image.rs::contain_known_answers, crates/lune-ui-core/tests/image.rs::an_image_is_recorded_with_layer_clip_and_scale, crates/lune-ui-core/tests/image.rs::the_fake_meets_the_contract_with_and_without_a_limit, crates/lune-ui-core/tests/image.rs::a_length_that_overflows_is_refused, crates/lune-ui-wgpu/tests/images.rs::the_gpu_store_meets_the_contract, crates/lune-ui-wgpu/tests/images.rs::four_exact_quadrants_at_an_integer_ratio, crates/lune-ui-wgpu/tests/images.rs::contain_fits_a_wide_picture_centred, crates/lune-ui-wgpu/tests/images.rs::alpha_blends_over_a_fill, crates/lune-ui-wgpu/tests/images.rs::unknown_released_and_refused_ids_draw_nothing, crates/lune-ui-wgpu/tests/images.rs::replacing_an_id_draws_the_new_picture, crates/lune-ui-wgpu/tests/images.rs::an_oversize_or_short_picture_is_refused_before_the_gpu`; page `image`; unverified here: Windows and Linux run time.
+- Done (D47, M11): tests `crates/lune-ui-core/tests/image.rs::contain_known_answers, crates/lune-ui-core/tests/image.rs::an_image_is_recorded_with_layer_clip_and_scale, crates/lune-ui-core/tests/image.rs::the_fake_meets_the_contract_with_and_without_a_limit, crates/lune-ui-core/tests/image.rs::a_length_that_overflows_is_refused, crates/lune-ui-core/tests/image.rs::an_image_part_is_recorded_with_its_part_and_sampling, crates/lune-ui-core/tests/image.rs::a_part_with_no_area_draws_nothing, crates/lune-ui-core/tests/image.rs::the_old_image_calls_record_no_part_and_auto_sampling, crates/lune-ui-core/tests/image.rs::image_draw_default_is_the_whole_picture_contained_centred, crates/lune-ui-core/tests/image.rs::the_fake_update_checks_length_then_id_then_bounds, crates/lune-ui-wgpu/tests/images.rs::the_gpu_store_meets_the_contract, crates/lune-ui-wgpu/tests/images.rs::four_exact_quadrants_at_an_integer_ratio, crates/lune-ui-wgpu/tests/images.rs::contain_fits_a_wide_picture_centred, crates/lune-ui-wgpu/tests/images.rs::alpha_blends_over_a_fill, crates/lune-ui-wgpu/tests/images.rs::unknown_released_and_refused_ids_draw_nothing, crates/lune-ui-wgpu/tests/images.rs::replacing_an_id_draws_the_new_picture, crates/lune-ui-wgpu/tests/images.rs::an_oversize_or_short_picture_is_refused_before_the_gpu, crates/lune-ui-wgpu/tests/images.rs::a_part_draws_only_its_texels, crates/lune-ui-wgpu/tests/images.rs::a_part_at_a_fractional_ratio_does_not_bleed, crates/lune-ui-wgpu/tests/images.rs::nearest_holds_at_a_fractional_ratio, crates/lune-ui-wgpu/tests/images.rs::linear_blends_at_an_integer_ratio, crates/lune-ui-wgpu/tests/images.rs::a_part_past_the_picture_draws_nothing, crates/lune-ui-wgpu/tests/images.rs::an_update_rewrites_only_its_rect, crates/lune-ui-wgpu/tests/images.rs::an_update_premultiplies, crates/lune-ui-wgpu/tests/images.rs::a_refused_update_leaves_the_picture`; page `image`; unverified here: Linux run time.
 
 ## Open questions
 

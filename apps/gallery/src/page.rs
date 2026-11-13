@@ -264,8 +264,8 @@ pub(crate) fn release_images(store: &mut impl ImageStore, ids: &[ImageId]) {
     }
 }
 
-/// Every picture the states of `page` draw: its scenes' and its window state's. Empty for a
-/// legacy page.
+/// Every picture the states of `page` draw: its scenes' and its window state's, each id once (the
+/// first copy: states that draw the same picture build it again). Empty for a legacy page.
 pub(crate) fn page_images(page: &Page) -> Vec<(ImageId, ImageData)> {
     let PageKind::Ui(ui) = page.kind else {
         return Vec::new();
@@ -274,6 +274,8 @@ pub(crate) fn page_images(page: &Page) -> Vec<(ImageId, ImageData)> {
     for scene in ui.scenes {
         out.extend((scene.state)().images());
     }
+    let mut seen = std::collections::BTreeSet::new();
+    out.retain(|(id, _)| seen.insert(*id));
     out
 }
 

@@ -2,7 +2,7 @@
 //! generated here from arithmetic (no bundled file, so no licence row). A scene's state returns the
 //! pictures it draws; the runner registers them for the scene and releases them after.
 
-use lune_ui::image::{Fit, ImageAlign, ImageData, ImageId};
+use lune_ui::image::{Fit, ImageAlign, ImageData, ImageDraw, ImageId, ImagePart, Sampling};
 use lune_ui::lunegit_dark::THEME;
 use lune_ui::motion::MotionTier;
 use lune_ui::paint::Rect;
@@ -27,6 +27,10 @@ pub(crate) static PAGE: Page = Page {
 const WIDE: ImageId = ImageId(101);
 /// 100 by 200 test pattern.
 const TALL: ImageId = ImageId(102);
+/// The 32 by 32 sprite sheet of [`sprite_sheet`], drawn by part.
+const SPRITES: ImageId = ImageId(103);
+/// The 16 by 16 checker of [`checker`], drawn at each sampling mode.
+const CHECKER: ImageId = ImageId(104);
 /// Never registered: the `image-missing-id` scene draws it.
 const MISSING: ImageId = ImageId(199);
 /// Never registered by this page: the device refuses an image this wide, so registering it would
@@ -53,6 +57,60 @@ fn pattern(width: u32, height: u32) -> ImageData {
     }
 }
 
+/// A 32 by 32 sheet of four 16 by 16 sprites, top left first: each has its own base colour, and
+/// every other pixel is darker, so a draw that samples nearest or linear reads differently.
+fn sprite_sheet() -> ImageData {
+    const BASE: [[u32; 3]; 4] = [[220, 70, 70], [70, 190, 90], [70, 110, 230], [230, 180, 60]];
+    let mut rgba = Vec::with_capacity(4 * 32 * 32);
+    for y in 0..32u32 {
+        for x in 0..32u32 {
+            let base = BASE[((y / 16) * 2 + x / 16) as usize];
+            let dark = (x + y) % 2 == 1;
+            for c in base {
+                let v = if dark { c * 3 / 5 } else { c };
+                rgba.push(v as u8);
+            }
+            rgba.push(255);
+        }
+    }
+    ImageData {
+        width: 32,
+        height: 32,
+        rgba,
+    }
+}
+
+/// The sprite at `i` (0 to 3) in [`sprite_sheet`]: a 16 by 16 part, top left first.
+fn sprite(i: u32) -> ImagePart {
+    ImagePart {
+        x: (i % 2) * 16,
+        y: (i / 2) * 16,
+        w: 16,
+        h: 16,
+    }
+}
+
+/// A 16 by 16 checker of two strong colours, one pixel a cell: linear filtering blurs it and
+/// nearest keeps it crisp.
+fn checker() -> ImageData {
+    let mut rgba = Vec::with_capacity(4 * 16 * 16);
+    for y in 0..16u32 {
+        for x in 0..16u32 {
+            let px: [u8; 3] = if (x + y) % 2 == 0 {
+                [230, 60, 60]
+            } else {
+                [40, 60, 230]
+            };
+            rgba.extend_from_slice(&[px[0], px[1], px[2], 255]);
+        }
+    }
+    ImageData {
+        width: 16,
+        height: 16,
+        rgba,
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 enum Shot {
     Wide,
@@ -62,8 +120,12 @@ enum Shot {
     Scale1,
     Missing,
     TooLarge,
+    PartSprite,
+    PartNearest,
+    Modes,
 }
 
+/// The sheet's grid. The part and sampling shots are not in it, so the sheet keeps its seven.
 const SHOTS: [Shot; 7] = [
     Shot::Wide,
     Shot::Tall,
@@ -83,6 +145,9 @@ fn name(which: Shot) -> &'static str {
         Shot::Scale1 => "scale 1",
         Shot::Missing => "missing id",
         Shot::TooLarge => "too large",
+        Shot::PartSprite => "part sprite",
+        Shot::PartNearest => "part nearest",
+        Shot::Modes => "sampling",
     }
 }
 
@@ -93,6 +158,8 @@ fn pictures(which: Shot) -> Vec<(ImageId, ImageData)> {
             vec![(WIDE, pattern(200, 100))]
         }
         Shot::Tall => vec![(TALL, pattern(100, 200))],
+        Shot::PartSprite | Shot::PartNearest => vec![(SPRITES, sprite_sheet())],
+        Shot::Modes => vec![(CHECKER, checker())],
         Shot::Missing | Shot::TooLarge => Vec::new(),
     }
 }
@@ -101,6 +168,13 @@ fn pictures(which: Shot) -> Vec<(ImageId, ImageData)> {
 fn picture(ui: &mut Ui<'_>, id: ImageId, dst: Rect, align: ImageAlign, alpha: f32) {
     let p = ui.painter();
     p.image(dst, id, Fit::Contain, align, alpha);
+    p.ring(dst, 0.0, 1.0, THEME.border, false);
+}
+
+/// Draws `id` as `draw` says into `dst` and outlines `dst`, like [`picture`].
+fn drawn(ui: &mut Ui<'_>, id: ImageId, dst: Rect, draw: &ImageDraw) {
+    let p = ui.painter();
+    p.image_with(dst, id, draw);
     p.ring(dst, 0.0, 1.0, THEME.border, false);
 }
 
@@ -156,6 +230,53 @@ fn shot(ui: &mut Ui<'_>, which: Shot, area: Rect) {
             ImageAlign::CENTER,
             1.0,
         ),
+        Shot::PartSprite => {
+            // Four sprites, 2 logical px per texel: a whole ratio, so Auto samples nearest.
+            for i in 0..4 {
+                let dst = Rect::new(area.x + i as f32 * 40.0, top, 32.0, 32.0);
+                let draw = ImageDraw {
+                    part: Some(sprite(i)),
+                    ..ImageDraw::default()
+                };
+                drawn(ui, SPRITES, dst, &draw);
+            }
+        }
+        Shot::PartNearest => {
+            // Same part, same 2.5 logical px per texel: a fractional ratio, so Auto is linear.
+            let part = Some(sprite(0));
+            let auto = Rect::new(area.x, top, 40.0, 40.0);
+            let nearest = Rect::new(area.x + 60.0, top, 40.0, 40.0);
+            let draw = ImageDraw {
+                part,
+                ..ImageDraw::default()
+            };
+            drawn(ui, SPRITES, auto, &draw);
+            let draw = ImageDraw {
+                part,
+                sampling: Sampling::Nearest,
+                ..ImageDraw::default()
+            };
+            drawn(ui, SPRITES, nearest, &draw);
+            caption(ui, "auto", auto.x, top + 44.0);
+            caption(ui, "nearest", nearest.x, top + 44.0);
+        }
+        Shot::Modes => {
+            // Three draws at a ratio of 3 device px per texel (1.5 logical px at scale 2).
+            let modes = [
+                (Sampling::Auto, "auto"),
+                (Sampling::Nearest, "nearest"),
+                (Sampling::Linear, "linear"),
+            ];
+            for (i, (sampling, label)) in modes.into_iter().enumerate() {
+                let x = area.x + i as f32 * 56.0;
+                let draw = ImageDraw {
+                    sampling,
+                    ..ImageDraw::default()
+                };
+                drawn(ui, CHECKER, Rect::new(x, top, 24.0, 24.0), &draw);
+                caption(ui, label, x, top + 28.0);
+            }
+        }
     }
 }
 
@@ -249,6 +370,18 @@ fn too_large() -> Box<dyn PageState> {
     Box::new(Show(Shot::TooLarge))
 }
 
+fn part_sprite() -> Box<dyn PageState> {
+    Box::new(Show(Shot::PartSprite))
+}
+
+fn part_nearest() -> Box<dyn PageState> {
+    Box::new(Show(Shot::PartNearest))
+}
+
+fn modes() -> Box<dyn PageState> {
+    Box::new(Show(Shot::Modes))
+}
+
 const SCENES: &[UiScene] = &[
     UiScene {
         id: "image-contain-wide",
@@ -309,6 +442,33 @@ const SCENES: &[UiScene] = &[
         scale: 2.0,
         tier: MotionTier::Full,
         state: too_large,
+        script: &[],
+        capture_ms: 0,
+        expect: Expect::Settled,
+    },
+    UiScene {
+        id: "image-part-sprite",
+        scale: 2.0,
+        tier: MotionTier::Full,
+        state: part_sprite,
+        script: &[],
+        capture_ms: 0,
+        expect: Expect::Settled,
+    },
+    UiScene {
+        id: "image-part-nearest",
+        scale: 1.5,
+        tier: MotionTier::Full,
+        state: part_nearest,
+        script: &[],
+        capture_ms: 0,
+        expect: Expect::Settled,
+    },
+    UiScene {
+        id: "image-sampling",
+        scale: 2.0,
+        tier: MotionTier::Full,
+        state: modes,
         script: &[],
         capture_ms: 0,
         expect: Expect::Settled,

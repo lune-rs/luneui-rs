@@ -25,7 +25,7 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | [core.color](core/color.md) | Colour helpers | done | luneterm | Straight-alpha RGBA values with premultiply, blend-over and alpha helpers |
 | [core.focus](core/focus.md) | Keyboard focus | done | any | Tab order by call order within focus scopes, focus-visible, scope push, trap and restore, roving focus in composites |
 | [core.icon](core/icon.md) | Codicon glyph constants | done | luneterm, wane | Codicon glyph constants and a glyph helper; the app supplies the icon font |
-| [core.image](core/image.md) | Image drawing | done | lunegit, wane | Image primitive: app-decoded RGBA drawn into a rect with a fit mode, alpha and optional corner radius; explicit resource lifetime |
+| [core.image](core/image.md) | Image drawing | done | lunegit, wane | Image primitive: app-decoded RGBA drawn into a rect with a fit mode, alpha, optional corner radius, a part of the picture (sprite sheets) and per-draw sampling; explicit resource lifetime and in-place rect updates |
 | [core.input](core/input.md) | Input model | done | any | Plain-data RawInput in, FrameOutput out; the windowing adapter translates both |
 | [core.painter](core/painter.md) | Immediate-mode painter | done | luneterm | Painter: ordered layers, fills, rings, strokes, acrylic, text, clip, transform and hit regions, building a plain-data Scene; holds the aggregate table of new primitives |
 | [core.scene](core/scene.md) | Display list | done | any | Plain-data Scene the painter builds and a renderer consumes; the draw-order contract |
