@@ -7,7 +7,7 @@
 Text: the core's specs and `TextSystem` seam, the cosmic-text `TextCache` that implements it, and
 the `GlyphRasterizer` that rasterizes a glyph with the core's `GlyphParams`.
 
-Source: `crates/lune-ui/src/lib.rs:43`
+Source: `crates/lune-ui/src/lib.rs:48`
 
 ## Re-exports
 

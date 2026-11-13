@@ -30,6 +30,8 @@
 //! - `backdrop` (the material seam: `GlassLayer`, `LuminosityCurve`, `BackdropKind`, `Material` and the `Backdrop`
 //!   capability);
 //! - `window` (edge resize, double click, caption buttons);
+//! - `desktop` (desktop units, monitors, popup placement and window shapes) and `dock` (docking,
+//!   snapping and the group drag, in those units);
 //! - `tray` (the tray icon rasterised on the CPU, where its flyout and menu go, the click rules);
 //! - `testing` (fakes of the seams for tests: the display-list recorder, a fake text system
 //!   and its contract suite, a scripted input source, a null material and its contract suite).
@@ -45,6 +47,8 @@ pub mod backdrop;
 pub mod chrome;
 pub mod code_doc;
 pub mod color;
+pub mod desktop;
+pub mod dock;
 pub mod drag;
 pub mod icon;
 pub mod image;

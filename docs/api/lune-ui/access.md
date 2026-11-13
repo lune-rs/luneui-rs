@@ -7,7 +7,7 @@
 Accessibility: the core's semantic tree and actions and, with the `accesskit` feature, the
 bridge to the OS accessibility API (`lune-ui-winit`).
 
-Source: `crates/lune-ui/src/lib.rs:35`
+Source: `crates/lune-ui/src/lib.rs:40`
 
 ## Re-exports
 

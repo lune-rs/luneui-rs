@@ -20,6 +20,7 @@ Source: `crates/lune-ui/src/lib.rs:1`
 ## Modules
 
 - [`access`](access.md) - Accessibility: the core's semantic tree and actions and, with the `accesskit` feature, the bridge to the OS accessibility API (`lune-ui-winit`).
+- [`desktop`](desktop.md) - The desktop: the core's units, monitors, popup placement and window shapes.
 - [`input`](input.md) - Input: the core's plain-data `RawInput` and `FrameOutput`, and the winit translation and output.
 - [`text`](text.md) - Text: the core's specs and `TextSystem` seam, the cosmic-text `TextCache` that implements it, and the `GlyphRasterizer` that rasterizes a glyph with the core's `GlyphParams`.
 - [`tray`](tray.md) - The tray: the core's icon raster, placement and click rules, and the OS item (`lune-ui-platform`).
@@ -41,6 +42,7 @@ Source: `crates/lune-ui/src/lib.rs:1`
 | `code_doc` | Module | [`lune_ui_core::code_doc`](../lune-ui-core/code_doc.md) |
 | `color` | Module | [`lune_ui_core::color`](../lune-ui-core/color.md) |
 | `custom` | Module | [`lune_ui_wgpu::custom`](../lune-ui-wgpu/custom.md) |
+| `dock` | Module | [`lune_ui_core::dock`](../lune-ui-core/dock.md) |
 | `drag` | Module | [`lune_ui_core::drag`](../lune-ui-core/drag.md) |
 | `dump` | Module | [`lune_ui_wgpu::dump`](../lune-ui-wgpu/dump.md) |
 | `frame` | Module | [`lune_ui_wgpu::frame`](../lune-ui-wgpu/frame.md) |

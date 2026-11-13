@@ -6,7 +6,7 @@
 
 Input: the core's plain-data `RawInput` and `FrameOutput`, and the winit translation and output.
 
-Source: `crates/lune-ui/src/lib.rs:57`
+Source: `crates/lune-ui/src/lib.rs:62`
 
 ## Re-exports
 

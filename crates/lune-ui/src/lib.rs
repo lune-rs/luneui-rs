@@ -13,8 +13,8 @@
 
 pub use lune_ui_core::{Backdrop, BackdropKind, GlassLayer, LuminosityCurve};
 pub use lune_ui_core::{
-    acrylic, backdrop, chrome, code_doc, color, drag, icon, image, json, layout, motion, paint,
-    scene, shortcuts, strings, testing, text_edit, theme, ui, widgets,
+    acrylic, backdrop, chrome, code_doc, color, dock, drag, icon, image, json, layout, motion,
+    paint, scene, shortcuts, strings, testing, text_edit, theme, ui, widgets,
 };
 pub use theme::lunegit_dark;
 pub use theme::near_black;
@@ -22,6 +22,11 @@ pub use theme::near_black;
 pub use lune_ui_wgpu::{blur, custom, dump, frame, gpu, surface};
 
 pub use lune_ui_platform::{material, popover};
+
+/// The desktop: the core's units, monitors, popup placement and window shapes.
+pub mod desktop {
+    pub use lune_ui_core::desktop::*;
+}
 
 /// The tray: the core's icon raster, placement and click rules, and the OS item
 /// (`lune-ui-platform`).
