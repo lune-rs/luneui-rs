@@ -71,7 +71,7 @@ pub struct BackdropRequest {
 
 A blurred-backdrop region to draw, in physical pixels.
 
-Source: `crates/lune-ui-core/src/scene.rs:208`
+Source: `crates/lune-ui-core/src/scene.rs:214`
 
 **Fields**
 
@@ -111,7 +111,7 @@ pub struct BlurLimits {
 The limits of the backdrop blur: how coarse its working picture is and how wide its kernel may
 grow.
 
-Source: `crates/lune-ui-core/src/scene.rs:336`
+Source: `crates/lune-ui-core/src/scene.rs:342`
 
 **Fields**
 
@@ -207,7 +207,7 @@ pub struct FrameParams {
 
 What one frame is drawn at, and how its glass backdrop is blurred.
 
-Source: `crates/lune-ui-core/src/scene.rs:285`
+Source: `crates/lune-ui-core/src/scene.rs:291`
 
 **Fields**
 
@@ -264,6 +264,7 @@ Source: `crates/lune-ui-core/src/scene.rs:285`
 ### Struct `ImageItem`
 
 ```rust
+#[non_exhaustive]
 pub struct ImageItem {
     pub source: ImageSource,
     pub dst: Rect,
@@ -273,12 +274,14 @@ pub struct ImageItem {
     pub rotation: f32,
     pub clip: [f32; 4],
     pub round_clip: RoundClip,
+    pub part: Option<ImagePart>,
+    pub sampling: Sampling,
 }
 ```
 
 One recorded image draw. All rects are physical pixels.
 
-Source: `crates/lune-ui-core/src/scene.rs:158`
+Source: `crates/lune-ui-core/src/scene.rs:159`
 
 **Fields**
 
@@ -307,6 +310,15 @@ Source: `crates/lune-ui-core/src/scene.rs:158`
 
 - <a id="structfield.ImageItem.round_clip"></a>`pub round_clip: RoundClip`
 
+- <a id="structfield.ImageItem.part"></a>`pub part: Option<ImagePart>`
+
+  The part of the picture to draw, in the picture's own pixels; `None` is the whole picture.
+  With a part, `fit` and `align` place the part's size in `dst`. Text rasters carry `None`.
+
+- <a id="structfield.ImageItem.sampling"></a>`pub sampling: Sampling`
+
+  How the renderer samples the picture; text rasters carry [`Sampling::Auto`](image.md#variant.Sampling.Auto).
+
 **Trait implementations**
 
 - `impl Clone for ImageItem`
@@ -332,7 +344,7 @@ One layer's items, grouped by kind, each kind in record order. They draw as: acr
 shapes, path fills, customs, images, text, then the over shapes and strokes (the geometry that
 draws above the text).
 
-Source: `crates/lune-ui-core/src/scene.rs:178`
+Source: `crates/lune-ui-core/src/scene.rs:184`
 
 **Fields**
 
@@ -415,7 +427,7 @@ pub struct OverlayLayer {
 
 What one overlay drew: a draw layer of its own, after the fixed layer it sits on.
 
-Source: `crates/lune-ui-core/src/scene.rs:220`
+Source: `crates/lune-ui-core/src/scene.rs:226`
 
 **Fields**
 
@@ -477,7 +489,7 @@ pub struct Scene {
 
 One painted frame: every layer. [`Self::in_order`](scene.md#method.Scene.in_order) is the draw order.
 
-Source: `crates/lune-ui-core/src/scene.rs:230`
+Source: `crates/lune-ui-core/src/scene.rs:236`
 
 **Fields**
 

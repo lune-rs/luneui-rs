@@ -38,6 +38,21 @@ pub fn popover_attributes(size: (f64, f64)) -> WindowAttributes {
     platform::popover(attrs)
 }
 
+/// Window attributes for a panel: a borderless, transparent window of a fixed size (logical
+/// pixels) with no shadow and no rounded corners, so the app's own drawing and window shape are
+/// all that shows. The level is left at its default; a group of panels is raised and kept on top
+/// through the platform crate's window group.
+pub fn panel_attributes(title: &str, size: (f64, f64), visible: bool) -> WindowAttributes {
+    let attrs = Window::default_attributes()
+        .with_title(title)
+        .with_inner_size(LogicalSize::new(size.0, size.1))
+        .with_visible(visible)
+        .with_decorations(false)
+        .with_transparent(true)
+        .with_resizable(false);
+    platform::panel(attrs)
+}
+
 /// The winit resize direction of `edge`.
 pub fn resize_direction(edge: ResizeEdge) -> ResizeDirection {
     match edge {
@@ -56,6 +71,22 @@ pub fn resize_direction(edge: ResizeEdge) -> ResizeDirection {
 mod tests {
     use super::*;
     use winit::dpi::Size;
+
+    #[test]
+    fn panel_attributes_are_a_borderless_transparent_fixed_window() {
+        let attrs = panel_attributes("Panel", (275.0, 116.0), true);
+        assert_eq!(attrs.title, "Panel");
+        assert!(attrs.visible);
+        assert!(!attrs.decorations);
+        assert!(attrs.transparent);
+        assert!(!attrs.resizable);
+        assert_eq!(attrs.window_level, WindowLevel::Normal);
+        assert_eq!(
+            attrs.inner_size,
+            Some(Size::Logical(LogicalSize::new(275.0, 116.0)))
+        );
+        assert!(!panel_attributes("Panel", (275.0, 116.0), false).visible);
+    }
 
     #[test]
     fn popover_attributes_are_a_hidden_borderless_fixed_window_on_top() {

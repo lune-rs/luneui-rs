@@ -169,6 +169,13 @@ impl ImageStore for Gpu {
     fn release(&mut self, id: ImageId) {
         self.images.ids.remove(&id);
     }
+
+    /// Writes the rect with one premultiplied `write_texture` into the picture's own texture, so
+    /// its bind groups stay. A picture registered with no pixels is not held (see `register`),
+    /// so updating its id is refused with `UnknownId`.
+    fn update(&mut self, id: ImageId, at: (u32, u32), data: &ImageData) -> Result<(), ImageError> {
+        self.images.write(&self.queue, id, at, data)
+    }
 }
 
 type Range = std::ops::Range<u32>;
@@ -453,7 +460,7 @@ impl Gpu {
             Some(premultiplied_over),
         );
         let image_attrs = wgpu::vertex_attr_array![
-            0 => Float32x4, 1 => Float32x4, 2 => Float32x4, 3 => Float32x4
+            0 => Float32x4, 1 => Float32x4, 2 => Float32x4, 3 => Float32x4, 4 => Float32x4
         ];
         let image_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("images"),

@@ -357,7 +357,7 @@ crate_deps() {
     lune-ui-core) echo "" ;;
     lune-ui-wgpu) echo "lune-ui-core wgpu cosmic-text swash etagere lru rustc-hash bytemuck png unicode-segmentation" ;;
     lune-ui-winit) echo "lune-ui-core winit arboard" ;;
-    lune-ui-platform) echo "lune-ui-core winit window-vibrancy objc2 objc2-app-kit raw-window-handle tray-icon" ;;
+    lune-ui-platform) echo "lune-ui-core winit window-vibrancy objc2 objc2-app-kit raw-window-handle tray-icon windows-sys" ;;
     lune-ui) echo "lune-ui-core lune-ui-wgpu lune-ui-winit lune-ui-platform" ;;
     *) return 1 ;;
   esac

@@ -238,7 +238,7 @@ pub struct RecordingRenderer {
 
 Consumes scenes like a renderer does, in the draw order the [`scene`](scene.md) module
 documents, and records one [`DrawCall`](testing.md#enum.DrawCall) per draw: one per acrylic, under and over shape, one
-per non-empty stroke or path-fill run, one per text item, one per custom item, and the backdrop step when
+per non-empty stroke or path-fill run, one per image item, one per text item, one per custom item, and the backdrop step when
 the scene requests one.
 
 Source: `crates/lune-ui-core/src/testing/recording.rs:82`
@@ -671,9 +671,15 @@ store has a small enough one to probe (pass `None` to skip P6).
 - P3: registering an id again replaces the picture and frees the old one (`live` unchanged);
 - P4: releasing frees the id (`live` drops), and releasing an unknown id does nothing;
 - P5: an id registers again after its release;
-- P6: a side above `limit` is refused with `TooLarge { limit }` and changes nothing.
+- P6: a side above `limit` is refused with `TooLarge { limit }` and changes nothing;
+- P7: updating a registered picture succeeds and `live` is unchanged;
+- P8: updating an unregistered id is refused with `UnknownId`;
+- P9: a rect one past the right edge, and one past the bottom edge, is refused with
+  `OutOfBounds`;
+- P10: short data is refused with `BadLength`, also for an unknown id (length is checked first);
+- P11: an update with no pixels succeeds for a registered picture.
 
-Source: `crates/lune-ui-core/src/testing/images.rs:105`
+Source: `crates/lune-ui-core/src/testing/images.rs:124`
 
 <a id="fn.scripted_input_contract"></a>
 ### Function `scripted_input_contract`

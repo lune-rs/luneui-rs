@@ -7,7 +7,7 @@
 The tray: the core's icon raster, placement and click rules, and the OS item
 (`lune-ui-platform`).
 
-Source: `crates/lune-ui/src/lib.rs:28`
+Source: `crates/lune-ui/src/lib.rs:35`
 
 ## Re-exports
 

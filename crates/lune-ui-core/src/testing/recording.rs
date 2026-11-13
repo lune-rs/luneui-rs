@@ -76,7 +76,7 @@ pub struct RecordedFrame {
 
 /// Consumes scenes like a renderer does, in the draw order the [`scene`](crate::scene) module
 /// documents, and records one [`DrawCall`] per draw: one per acrylic, under and over shape, one
-/// per non-empty stroke or path-fill run, one per text item, one per custom item, and the backdrop step when
+/// per non-empty stroke or path-fill run, one per image item, one per text item, one per custom item, and the backdrop step when
 /// the scene requests one.
 #[derive(Debug, Default)]
 pub struct RecordingRenderer {

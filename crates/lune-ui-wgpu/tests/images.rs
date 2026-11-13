@@ -4,7 +4,9 @@
 //! GPU test: with no adapter it prints `skipped: no GPU adapter` and passes, unless
 //! `LUNEUI_REQUIRE_GPU=1`, which makes a missing adapter a failure.
 
-use lune_ui_core::image::{Fit, ImageAlign, ImageData, ImageId, ImageStore};
+use lune_ui_core::image::{
+    Fit, ImageAlign, ImageData, ImageDraw, ImageId, ImagePart, ImageStore, Sampling,
+};
 use lune_ui_core::paint::{Painter, Rect};
 use lune_ui_core::scene::Scene;
 use lune_ui_core::testing::image_store_contract;
@@ -471,4 +473,261 @@ fn a_text_raster_lives_while_its_text_is_cached_and_a_fade_does_not_redo_it() {
         gpu.end_frame(&mut text);
     }
     assert_eq!(gpu.text_image_count(), 0);
+}
+
+// ── parts and sampling ──────────────────────────────────────────────────────────────────────
+
+/// A 4 by 2 picture: the left 2 by 2 red, the right 2 by 2 green, all opaque.
+fn red_green() -> ImageData {
+    let mut rgba = Vec::new();
+    for _ in 0..2 {
+        for x in 0..4 {
+            rgba.extend_from_slice(if x < 2 {
+                &[255, 0, 0, 255]
+            } else {
+                &[0, 255, 0, 255]
+            });
+        }
+    }
+    ImageData {
+        width: 4,
+        height: 2,
+        rgba,
+    }
+}
+
+/// A 2 by 1 picture: opaque black, opaque white.
+fn black_white() -> ImageData {
+    ImageData {
+        width: 2,
+        height: 1,
+        rgba: vec![0, 0, 0, 255, 255, 255, 255, 255],
+    }
+}
+
+/// Draws `draw` of picture 1 into the logical `dst` and returns the device pixels.
+fn draw_one(data: ImageData, dst: Rect, draw: ImageDraw) -> Option<Vec<u8>> {
+    let mut gpu = headless_gpu()?;
+    let mut text = text_cache();
+    gpu.register(ImageId(1), data).expect("registers");
+    let scene = paint(&mut text, |p| p.image_with(dst, ImageId(1), &draw));
+    Some(render(&mut gpu, &mut text, &scene))
+}
+
+fn part(x: u32, y: u32, w: u32, h: u32) -> Option<ImagePart> {
+    Some(ImagePart { x, y, w, h })
+}
+
+#[test]
+fn a_part_draws_only_its_texels() {
+    // Part (2, 0, 2, 2) into 4 by 4 logical at (5, 5) = device (10, 10, 8, 8): 4 device px per
+    // texel.
+    let draw = ImageDraw {
+        part: part(2, 0, 2, 2),
+        ..ImageDraw::default()
+    };
+    let Some(img) = draw_one(red_green(), Rect::new(5.0, 5.0, 4.0, 4.0), draw) else {
+        return;
+    };
+    // Instrument check: outside the drawn rect is empty.
+    assert_eq!(px(&img, 5, 5), [0, 0, 0, 0]);
+    assert_eq!(px(&img, 19, 19), [0, 0, 0, 0]);
+    for y in 10..18 {
+        for x in 10..18 {
+            let c = px(&img, x, y);
+            assert!(c[0] <= 2, "({x}, {y}) red {c:?}");
+            assert!(c[1] >= 254 && c[2] <= 2 && c[3] >= 254, "({x}, {y}) {c:?}");
+        }
+    }
+}
+
+#[test]
+fn a_part_at_a_fractional_ratio_does_not_bleed() {
+    // Part (0, 0, 2, 2) (red) into 1.5 by 1.5 logical at (5, 5) = device (10, 10, 3, 3): 1.5
+    // device px per texel, so a linear sample at the part's edge would reach the green texel.
+    let draw = ImageDraw {
+        part: part(0, 0, 2, 2),
+        sampling: Sampling::Linear,
+        ..ImageDraw::default()
+    };
+    let Some(img) = draw_one(red_green(), Rect::new(5.0, 5.0, 1.5, 1.5), draw) else {
+        return;
+    };
+    assert_eq!(px(&img, 9, 10), [0, 0, 0, 0]);
+    for y in 10..13 {
+        for x in 10..13 {
+            let c = px(&img, x, y);
+            assert!(c[1] <= 2, "({x}, {y}) green {c:?}");
+            assert!(c[0] >= 254, "({x}, {y}) {c:?}");
+        }
+    }
+}
+
+/// Whether any pixel of `rows` by `cols` (device) has a channel strictly between 20 and 235.
+fn any_grey(img: &[u8], cols: std::ops::Range<usize>, rows: std::ops::Range<usize>) -> bool {
+    rows.into_iter().any(|y| {
+        cols.clone()
+            .any(|x| px(img, x, y)[..3].iter().any(|&c| c > 20 && c < 235))
+    })
+}
+
+#[test]
+fn nearest_holds_at_a_fractional_ratio() {
+    // A 2 by 1 picture into 1.5 by 0.75 logical at (5, 5) = device (10, 10, 3, 1.5): 1.5 device px
+    // per texel. Row 10 and columns 10 to 12 are fully covered.
+    let dst = Rect::new(5.0, 5.0, 1.5, 0.75);
+    let nearest = ImageDraw {
+        sampling: Sampling::Nearest,
+        ..ImageDraw::default()
+    };
+    let Some(img) = draw_one(black_white(), dst, nearest) else {
+        return;
+    };
+    for x in 10..13 {
+        let c = px(&img, x, 10);
+        let black = c[..3].iter().all(|&v| v <= 1);
+        let white = c[..3].iter().all(|&v| v >= 254);
+        assert!(black || white, "({x}, 10) {c:?}");
+    }
+    // Both texels show: the left pixel black, the right white.
+    assert!(px(&img, 10, 10)[0] <= 1 && px(&img, 12, 10)[0] >= 254);
+    let Some(auto) = draw_one(black_white(), dst, ImageDraw::default()) else {
+        return;
+    };
+    assert!(any_grey(&auto, 10..13, 10..11), "Auto blends here");
+}
+
+#[test]
+fn linear_blends_at_an_integer_ratio() {
+    // The 2 by 1 picture into 4 by 2 logical at (5, 5) = device (10, 10, 8, 4): 4 device px per
+    // texel, an integer ratio, so Auto is nearest.
+    let dst = Rect::new(5.0, 5.0, 4.0, 2.0);
+    let linear = ImageDraw {
+        sampling: Sampling::Linear,
+        ..ImageDraw::default()
+    };
+    let Some(img) = draw_one(black_white(), dst, linear) else {
+        return;
+    };
+    assert!(any_grey(&img, 10..18, 10..14), "Linear blends");
+    let Some(auto) = draw_one(black_white(), dst, ImageDraw::default()) else {
+        return;
+    };
+    assert!(!any_grey(&auto, 10..18, 10..14), "Auto stays crisp");
+    assert_eq!(px(&auto, 10, 10), [0, 0, 0, 255]);
+    assert_eq!(px(&auto, 17, 13), [255; 4]);
+}
+
+#[test]
+fn a_part_past_the_picture_draws_nothing() {
+    let draw = ImageDraw {
+        part: part(3, 0, 2, 2),
+        ..ImageDraw::default()
+    };
+    let Some(img) = draw_one(red_green(), Rect::new(5.0, 5.0, 4.0, 4.0), draw) else {
+        return;
+    };
+    assert!(img.iter().all(|&b| b == 0), "the target stays transparent");
+    // The same part inside the picture does draw: the check above is not vacuous.
+    let inside = ImageDraw {
+        part: part(2, 0, 2, 2),
+        ..ImageDraw::default()
+    };
+    let Some(img) = draw_one(red_green(), Rect::new(5.0, 5.0, 4.0, 4.0), inside) else {
+        return;
+    };
+    assert!(img.iter().any(|&b| b != 0));
+}
+
+// ── in-place updates ────────────────────────────────────────────────────────────────────────
+
+/// Draws picture 1 whole into 8 by 8 logical at (5, 5) = device (10, 10, 16, 16): 4 device px per
+/// texel of a 4 by 4 picture.
+fn draw_4x4(gpu: &mut Gpu, text: &mut TextCache) -> Vec<u8> {
+    let scene = paint(text, |p| {
+        p.image(
+            Rect::new(5.0, 5.0, 8.0, 8.0),
+            ImageId(1),
+            Fit::Contain,
+            CENTER,
+            1.0,
+        );
+    });
+    render(gpu, text, &scene)
+}
+
+#[test]
+fn an_update_rewrites_only_its_rect() {
+    let Some(mut gpu) = headless_gpu() else {
+        return;
+    };
+    let mut text = text_cache();
+    gpu.register(ImageId(1), solid(4, 4, [255, 0, 0, 255]))
+        .expect("registers");
+    let before = draw_4x4(&mut gpu, &mut text);
+    assert_eq!(px(&before, 15, 15), [255, 0, 0, 255], "instrument check");
+    gpu.update(ImageId(1), (1, 1), &solid(2, 2, [0, 255, 0, 255]))
+        .expect("updates");
+    let img = draw_4x4(&mut gpu, &mut text);
+    for y in 14..22 {
+        for x in 14..22 {
+            assert_eq!(px(&img, x, y), [0, 255, 0, 255], "({x}, {y})");
+        }
+    }
+    for (x, y) in [
+        (10, 10),
+        (13, 13),
+        (22, 22),
+        (25, 25),
+        (10, 25),
+        (25, 10),
+        (13, 18),
+    ] {
+        assert_eq!(px(&img, x, y), [255, 0, 0, 255], "({x}, {y})");
+    }
+    assert_eq!(gpu.image_count(), 1);
+}
+
+#[test]
+fn an_update_premultiplies() {
+    let Some(mut gpu) = headless_gpu() else {
+        return;
+    };
+    let mut text = text_cache();
+    gpu.register(ImageId(1), solid(4, 4, [255, 0, 0, 255]))
+        .expect("registers");
+    gpu.update(ImageId(1), (0, 0), &solid(4, 4, [0, 0, 255, 128]))
+        .expect("updates");
+    let img = draw_4x4(&mut gpu, &mut text);
+    let c = px(&img, 15, 15);
+    let near = |a: u8, b: u8| a.abs_diff(b) <= 2;
+    assert!(
+        near(c[0], 0) && near(c[1], 0) && near(c[2], 128) && near(c[3], 128),
+        "{c:?}"
+    );
+}
+
+#[test]
+fn a_refused_update_leaves_the_picture() {
+    let Some(mut gpu) = headless_gpu() else {
+        return;
+    };
+    let mut text = text_cache();
+    gpu.register(ImageId(1), solid(4, 4, [255, 0, 0, 255]))
+        .expect("registers");
+    assert_eq!(
+        gpu.update(ImageId(1), (3, 3), &solid(2, 2, [0, 255, 0, 255])),
+        Err(lune_ui_core::image::ImageError::OutOfBounds)
+    );
+    assert_eq!(
+        gpu.update(ImageId(9), (0, 0), &solid(1, 1, [0, 255, 0, 255])),
+        Err(lune_ui_core::image::ImageError::UnknownId)
+    );
+    let img = draw_4x4(&mut gpu, &mut text);
+    for y in 10..26 {
+        for x in 10..26 {
+            assert_eq!(px(&img, x, y), [255, 0, 0, 255], "({x}, {y})");
+        }
+    }
+    assert_eq!(gpu.image_count(), 1);
 }

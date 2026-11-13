@@ -32,6 +32,7 @@ use lune_ui::ui::{FrameConfig, Ui, UiStore};
 use lune_ui::window::glass_attributes;
 
 use crate::page::{FrameTweaks, Page, PageKind, PageState, Stage, register_images};
+use crate::panels::PanelsHost;
 use crate::popover::{AppEvent, TrayHost, event_loop, route_tray_events};
 use crate::showcase;
 use crate::{Renderer, custom, draw_with, text_cache};
@@ -124,9 +125,13 @@ struct App {
     tray: Option<TrayHost>,
     /// The state the page's tray control said last: the surface follows it.
     tray_state: TrayState,
-    /// The control flow the main window's last frame asked for, and the tray surface's.
+    /// The live docked panels, while the `docked-panels` page's switch is on.
+    panels: Option<PanelsHost>,
+    /// The control flow the main window's last frame asked for, the tray surface's and the
+    /// panels'.
     main_flow: ControlFlow,
     pop_flow: ControlFlow,
+    panels_flow: ControlFlow,
     /// The app's time origin: the real time the clock runs from.
     start: Instant,
     /// The page's clock: real time scaled by the page's speed.
@@ -160,8 +165,10 @@ pub(crate) fn run() -> ExitCode {
         clipboard: Clipboard::new(),
         tray: None,
         tray_state: TrayState::Serving,
+        panels: None,
         main_flow: ControlFlow::Wait,
         pop_flow: ControlFlow::Wait,
+        panels_flow: ControlFlow::Wait,
         start: Instant::now(),
         clock: Clock::default(),
         material: Material::Vibrancy,
@@ -251,10 +258,44 @@ fn sync_tray(tray: &mut Option<TrayHost>, wanted: bool, state: TrayState, scale:
     }
 }
 
+/// Puts the live panels up while the hosted page's switch is on and takes them down otherwise.
+/// Panels that cannot be made are reported once and the page's switch goes off, so they are not
+/// tried again every frame. Returns whether the panels' flow must be reset.
+fn sync_panels(
+    panels: &mut Option<PanelsHost>,
+    state: &mut dyn PageState,
+    event_loop: &ActiveEventLoop,
+    r: &mut Renderer,
+    anchor: &Window,
+    start: Instant,
+) -> bool {
+    match (state.panels(), panels.is_some()) {
+        (true, false) => {
+            match PanelsHost::new(event_loop, r, anchor, start) {
+                Ok(host) => *panels = Some(host),
+                Err(e) => {
+                    eprintln!("panels: {e}");
+                    state.panels_closed();
+                }
+            }
+            true
+        }
+        (false, true) => {
+            *panels = None;
+            true
+        }
+        _ => false,
+    }
+}
+
 impl App {
-    /// Hands the event loop the earlier of what the main window and the tray surface ask for.
+    /// Hands the event loop the earliest of what the main window, the tray surface and the live
+    /// panels ask for.
     fn set_flow(&self, event_loop: &ActiveEventLoop) {
-        event_loop.set_control_flow(merge_flow(self.main_flow, self.pop_flow));
+        event_loop.set_control_flow(merge_flow(
+            merge_flow(self.main_flow, self.pop_flow),
+            self.panels_flow,
+        ));
     }
 
     /// Draws the current page into the window and sets the loop's control flow from the frame's
@@ -359,6 +400,19 @@ impl App {
             host.sync(event_loop, ts);
             poll_tray = host.wants_poll();
         }
+        if sync_panels(
+            &mut self.panels,
+            &mut **state,
+            event_loop,
+            r,
+            window,
+            self.start,
+        ) {
+            self.panels_flow = match &self.panels {
+                Some(host) => host.flow(),
+                None => ControlFlow::Wait,
+            };
+        }
         // Writes go to the OS; a read is answered with the next frame's input, which needs a frame.
         self.clipboard.service(&out, translator);
         if out
@@ -438,7 +492,7 @@ impl ApplicationHandler<AppEvent> for App {
         }
     }
 
-    fn new_events(&mut self, _event_loop: &ActiveEventLoop, cause: StartCause) {
+    fn new_events(&mut self, event_loop: &ActiveEventLoop, cause: StartCause) {
         // A `Repaint::At` request: its time has come.
         if matches!(cause, StartCause::ResumeTimeReached { .. }) {
             if let Some(shown) = &self.shown {
@@ -447,12 +501,18 @@ impl ApplicationHandler<AppEvent> for App {
             if let Some(p) = self.tray.as_ref().and_then(TrayHost::popover) {
                 p.window().request_redraw();
             }
+            if let Some(host) = &mut self.panels {
+                host.tick();
+                self.panels_flow = host.flow();
+                self.set_flow(event_loop);
+            }
         }
     }
 
     /// The event loop is done: the tray item and its window go before it returns, the window
     /// through the guard that restores it.
     fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
+        self.panels = None;
         self.tray = None;
     }
 
@@ -465,7 +525,16 @@ impl ApplicationHandler<AppEvent> for App {
             self.tray_window_event(event_loop, &event);
             return;
         }
+        if self.panels.as_ref().is_some_and(|p| p.owns(id)) {
+            self.panels_window_event(event_loop, id, &event);
+            return;
+        }
+        // A window the host already dropped (a later `Destroyed` or `Focused(false)`) is not the
+        // showcase window: its events never reach the main window's input or frame.
         let Some(shown) = &mut self.shown else { return };
+        if shown.window.id() != id {
+            return;
+        }
         shown.bridge.window_event(&shown.window, &event);
         let action = match &event {
             WindowEvent::KeyboardInput { event: key, .. } if key.state == ElementState::Pressed => {
@@ -518,6 +587,44 @@ impl ApplicationHandler<AppEvent> for App {
 }
 
 impl App {
+    /// An event of a panel's window or the menu's: a frame, or input for it. A close takes the
+    /// panels down and turns the page's switch off.
+    fn panels_window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        id: WindowId,
+        event: &WindowEvent,
+    ) {
+        let now = self.start.elapsed();
+        let (Some(host), Some(shown)) = (&mut self.panels, &mut self.shown) else {
+            return;
+        };
+        let outcome = if matches!(event, WindowEvent::RedrawRequested) {
+            match host.render(event_loop, &mut shown.r, id, now) {
+                Ok(outcome) => outcome,
+                Err(e) => {
+                    eprintln!("panels: {e}");
+                    self.exit_code = 1;
+                    event_loop.exit();
+                    return;
+                }
+            }
+        } else {
+            host.window_event(id, event)
+        };
+        if outcome.close {
+            self.panels = None;
+            self.panels_flow = ControlFlow::Wait;
+            if let Some(state) = &mut self.state {
+                state.panels_closed();
+            }
+            shown.window.request_redraw();
+        } else {
+            self.panels_flow = host.flow();
+        }
+        self.set_flow(event_loop);
+    }
+
     /// An event of the tray surface's window: a frame, or input for it.
     fn tray_window_event(&mut self, event_loop: &ActiveEventLoop, event: &WindowEvent) {
         let now = self.start.elapsed();
@@ -552,7 +659,7 @@ impl App {
 }
 
 /// The earlier of two control flows: polling beats a deadline, a deadline beats waiting.
-fn merge_flow(a: ControlFlow, b: ControlFlow) -> ControlFlow {
+pub(crate) fn merge_flow(a: ControlFlow, b: ControlFlow) -> ControlFlow {
     match (a, b) {
         (ControlFlow::Poll, _) | (_, ControlFlow::Poll) => ControlFlow::Poll,
         (ControlFlow::WaitUntil(x), ControlFlow::WaitUntil(y)) => ControlFlow::WaitUntil(x.min(y)),

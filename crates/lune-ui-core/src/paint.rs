@@ -2,7 +2,7 @@
 //! text placements and hit regions. Clicks resolve against the previous frame's hit regions.
 
 use crate::color::{Rgba, premul};
-use crate::image::{Fit, ImageAlign, ImageId};
+use crate::image::{Fit, ImageAlign, ImageDraw, ImageId, ImagePart};
 use crate::scene::{
     Acrylic, BackdropRequest, CustomItem, ImageItem, ImageSource, Layer, LayerGeometry,
     OverlayLayer, RoundClip, Scene, Shape, StrokeVertex, TextItem,
@@ -171,7 +171,7 @@ enum Op {
     FillPath(Vec<[f32; 2]>, Rgba),
     FillJoined(Vec<Vec<[f32; 2]>>, Vec<[f32; 2]>, Rgba),
     Sector([f32; 2], f32, f32, f32, Rgba),
-    Image(Rect, ImageId, Fit, ImageAlign, f32, f32),
+    Image(Rect, ImageId, ImageDraw),
     TextRotated(Spec, (f32, f32), f32),
     Custom(usize, Rect),
 }
@@ -389,9 +389,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
                 Op::Sector(center, radius, start, sweep, c) => {
                     self.sector(*center, *radius, *start, *sweep, *c);
                 }
-                Op::Image(dst, id, fit, align, alpha, rotation) => {
-                    self.image_rotated(*dst, *id, *fit, *align, *alpha, *rotation);
-                }
+                Op::Image(dst, id, draw) => self.image_with(*dst, *id, draw),
                 Op::TextRotated(spec, center, radians) => {
                     self.text_rotated(spec, *center, *radians);
                 }
@@ -887,8 +885,38 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         alpha: f32,
         radians: f32,
     ) {
-        self.rec(|| Op::Image(dst, id, fit, align, alpha, radians));
-        self.push_image(ImageSource::Id(id), dst, fit, align, alpha, radians);
+        let draw = ImageDraw {
+            fit,
+            align,
+            alpha,
+            rotation: radians,
+            ..ImageDraw::default()
+        };
+        self.image_with(dst, id, &draw);
+    }
+
+    /// Draws the picture registered as `id` the way `draw` says: a part of it (`draw.part`),
+    /// fitted and aligned, at an opacity and a turn, sampled as `draw.sampling`. Draws nothing
+    /// for any case [`Self::image`] draws nothing for, nor for a part with no area (`w` or `h`
+    /// 0). A part past the picture's edge is dropped by the renderer, not here.
+    pub fn image_with(&mut self, dst: Rect, id: ImageId, draw: &ImageDraw) {
+        self.rec(|| Op::Image(dst, id, *draw));
+        if draw.part.is_some_and(|p| p.w == 0 || p.h == 0) {
+            return;
+        }
+        self.push_image(ImageSource::Id(id), dst, draw);
+    }
+
+    /// Draws `part` of the picture registered as `id` into `dst` at opacity `alpha`, contained
+    /// and centred, sampled by [`Sampling::Auto`](crate::image::Sampling::Auto): [`Self::image_with`] with every other field at
+    /// its default.
+    pub fn image_part(&mut self, dst: Rect, id: ImageId, part: ImagePart, alpha: f32) {
+        let draw = ImageDraw {
+            part: Some(part),
+            alpha,
+            ..ImageDraw::default()
+        };
+        self.image_with(dst, id, &draw);
     }
 
     /// Draws `spec`, centred on `center`, turned by `radians` (clockwise on screen) about that
@@ -903,19 +931,15 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         let (w, h) = (size.0 * k * self.s, size.1 * k * self.s);
         let dst = Rect::new(cx * self.s - w / 2.0, cy * self.s - h / 2.0, w, h);
         let src = ImageSource::Text(key, k);
-        self.push_image_phys(src, dst, Fit::Contain, ImageAlign::CENTER, 1.0, radians);
+        let draw = ImageDraw {
+            rotation: radians,
+            ..ImageDraw::default()
+        };
+        self.push_image_phys(src, dst, &draw);
         size
     }
 
-    fn push_image(
-        &mut self,
-        source: ImageSource,
-        dst: Rect,
-        fit: Fit,
-        align: ImageAlign,
-        alpha: f32,
-        radians: f32,
-    ) {
+    fn push_image(&mut self, source: ImageSource, dst: Rect, draw: &ImageDraw) {
         if ![dst.x, dst.y, dst.w, dst.h].iter().all(|v| v.is_finite()) {
             return;
         }
@@ -926,24 +950,16 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
             dst.w * self.s,
             dst.h * self.s,
         );
-        self.push_image_phys(source, dst, fit, align, alpha, radians);
+        self.push_image_phys(source, dst, draw);
     }
 
     /// Records an image whose `dst` is already in physical px.
-    fn push_image_phys(
-        &mut self,
-        source: ImageSource,
-        dst: Rect,
-        fit: Fit,
-        align: ImageAlign,
-        alpha: f32,
-        radians: f32,
-    ) {
-        let alpha = alpha.clamp(0.0, 1.0) * self.alpha_k();
+    fn push_image_phys(&mut self, source: ImageSource, dst: Rect, draw: &ImageDraw) {
+        let alpha = draw.alpha.clamp(0.0, 1.0) * self.alpha_k();
         let ok = [dst.x, dst.y, dst.w, dst.h].iter().all(|v| v.is_finite())
             && dst.w > 0.0
             && dst.h > 0.0
-            && radians.is_finite()
+            && draw.rotation.is_finite()
             && alpha.is_finite()
             && alpha > 0.0;
         if !ok {
@@ -953,12 +969,14 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
         let item = ImageItem {
             source,
             dst,
-            fit,
-            align,
+            fit: draw.fit,
+            align: draw.align,
             alpha,
-            rotation: radians,
+            rotation: draw.rotation,
             clip: self.clip_phys(),
             round_clip: RoundClip { rect, radius },
+            part: draw.part,
+            sampling: draw.sampling,
         };
         self.target().images.push(item);
     }

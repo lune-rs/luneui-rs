@@ -24,13 +24,19 @@ impl ImageData {
     }
 }
 
-/// Why a store refused a picture. A refusal changes nothing: a replaced id keeps its old picture.
+/// Why a store refused a picture or an update. A refusal changes nothing: a replaced id keeps its
+/// old picture.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ImageError {
     /// `rgba` is not `4 * width * height` bytes.
     BadLength,
     /// A side is above what the store can hold; `limit` is the most it takes.
     TooLarge { limit: u32 },
+    /// An update named an id that is not registered.
+    UnknownId,
+    /// An update's rect does not lie inside the registered picture.
+    OutOfBounds,
 }
 
 impl std::fmt::Display for ImageError {
@@ -38,6 +44,8 @@ impl std::fmt::Display for ImageError {
         match self {
             Self::BadLength => f.write_str("image data is not 4 * width * height bytes"),
             Self::TooLarge { limit } => write!(f, "image side above the limit of {limit} px"),
+            Self::UnknownId => f.write_str("no picture is registered under this id"),
+            Self::OutOfBounds => f.write_str("the update's rect is not inside the picture"),
         }
     }
 }
@@ -54,6 +62,21 @@ pub trait ImageStore {
     /// [`ImageError::BadLength`] when `data.rgba` is not `4 * width * height` bytes;
     /// [`ImageError::TooLarge`] when a side is above the store's limit.
     fn register(&mut self, id: ImageId, data: ImageData) -> Result<(), ImageError>;
+
+    /// Replaces the pixels of the rect of the picture registered as `id` whose top-left corner is
+    /// `at` (picture pixels) and whose size is `data`'s, in place: the picture's size, its id and
+    /// the store's live count do not change, and the pixels outside the rect stay. `data` is
+    /// straight alpha like [`ImageData`]. A `data` with no pixels does nothing. A refusal changes
+    /// nothing.
+    ///
+    /// The next frame drawn after the call shows the new pixels; update a picture before drawing
+    /// any window of the frame.
+    ///
+    /// # Errors
+    /// Checked in this order: [`ImageError::BadLength`] when `data.rgba` is not
+    /// `4 * width * height` bytes; [`ImageError::UnknownId`] when `id` is not registered;
+    /// [`ImageError::OutOfBounds`] when the rect reaches past the picture's right or bottom edge.
+    fn update(&mut self, id: ImageId, at: (u32, u32), data: &ImageData) -> Result<(), ImageError>;
 
     /// Frees `id`; does nothing for an id that is not registered. The id may be registered again.
     fn release(&mut self, id: ImageId);
@@ -92,6 +115,62 @@ impl ImageAlign {
         x: Anchor::Start,
         y: Anchor::Center,
     };
+}
+
+/// A rect of a picture's own pixels, top-left origin: a sprite cut from a sheet. A part with no
+/// area (`w` or `h` 0) draws nothing; a part past the picture's edge is dropped by the renderer,
+/// which knows the picture's size.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ImagePart {
+    pub x: u32,
+    pub y: u32,
+    pub w: u32,
+    pub h: u32,
+}
+
+/// How a draw samples its picture.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum Sampling {
+    /// The renderer's own rule: whole texels (nearest) when the drawn part is scaled up by an
+    /// integer factor or drawn at its own size, linear filtering otherwise (D106), measured on
+    /// the drawn part, not on the whole picture.
+    #[default]
+    Auto,
+    /// Always the nearest texel: crisp pixel art at any scale.
+    Nearest,
+    /// Always linear filtering: smooth at any scale.
+    Linear,
+}
+
+/// Everything about one picture draw except where and which picture. `Default` draws the whole
+/// picture contained, centred, opaque, unturned, with [`Sampling::Auto`].
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ImageDraw {
+    /// The part of the picture to draw; `None` is the whole picture.
+    pub part: Option<ImagePart>,
+    /// How the picture (or the part) is fitted into the destination rect.
+    pub fit: Fit,
+    /// Where the fitted picture sits in the destination rect.
+    pub align: ImageAlign,
+    /// Opacity multiplier, 0 to 1.
+    pub alpha: f32,
+    /// Radians, clockwise on screen, about the centre of the fitted picture.
+    pub rotation: f32,
+    /// How the picture is sampled.
+    pub sampling: Sampling,
+}
+
+impl Default for ImageDraw {
+    fn default() -> Self {
+        Self {
+            part: None,
+            fit: Fit::Contain,
+            align: ImageAlign::CENTER,
+            alpha: 1.0,
+            rotation: 0.0,
+            sampling: Sampling::Auto,
+        }
+    }
 }
 
 /// The rect a picture of `size` (width, height in pixels) occupies when fitted into `dst`, or

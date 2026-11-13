@@ -131,7 +131,7 @@ fn set_live_class(ns: &NSWindow, class: &AnyClass) {
     unsafe { AnyObject::set_class(object, class) };
 }
 
-fn ns_window(window: &Window) -> Option<Retained<NSWindow>> {
+pub(crate) fn ns_window(window: &Window) -> Option<Retained<NSWindow>> {
     let RawWindowHandle::AppKit(handle) = window.window_handle().ok()?.as_raw() else {
         return None;
     };

@@ -13,6 +13,10 @@ pub(crate) fn popover(attrs: WindowAttributes) -> WindowAttributes {
     attrs.with_has_shadow(true).with_accepts_first_mouse(true)
 }
 
+pub(crate) fn panel(attrs: WindowAttributes) -> WindowAttributes {
+    attrs.with_has_shadow(false).with_accepts_first_mouse(true)
+}
+
 /// The keyboard conventions of this platform.
 pub(crate) fn keymap() -> Keymap {
     Keymap::MAC

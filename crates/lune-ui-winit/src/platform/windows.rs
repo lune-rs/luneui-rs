@@ -22,6 +22,15 @@ pub(crate) fn popover(attrs: WindowAttributes) -> WindowAttributes {
         .with_no_redirection_bitmap(true)
 }
 
+pub(crate) fn panel(attrs: WindowAttributes) -> WindowAttributes {
+    // No redirection bitmap, for the same reason as `glass`. No shadow and no rounded corners: the
+    // window's outer size is its inner size, and the app draws the edge.
+    attrs
+        .with_no_redirection_bitmap(true)
+        .with_undecorated_shadow(false)
+        .with_corner_preference(CornerPreference::DoNotRound)
+}
+
 /// The keyboard conventions of this platform.
 pub(crate) fn keymap() -> Keymap {
     Keymap::PC

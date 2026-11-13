@@ -36,6 +36,8 @@ Modules:
 - `backdrop` (the material seam: `GlassLayer`, `LuminosityCurve`, `BackdropKind`, `Material` and the `Backdrop`
   capability);
 - `window` (edge resize, double click, caption buttons);
+- `desktop` (desktop units, monitors, popup placement and window shapes) and `dock` (docking,
+  snapping and the group drag, in those units);
 - `tray` (the tray icon rasterised on the CPU, where its flyout and menu go, the click rules);
 - `testing` (fakes of the seams for tests: the display-list recorder, a fake text system
   and its contract suite, a scripted input source, a null material and its contract suite).
@@ -53,6 +55,8 @@ Source: `crates/lune-ui-core/src/lib.rs:1`
 - [`chrome`](chrome.md) - Tab chrome loop: one closed outline that wraps the active tab and the card body.
 - [`code_doc`](code_doc.md) - The document of the code editor: one `String` and a line index (D179).
 - [`color`](color.md) - Colour type and helpers shared by the toolkit and its apps.
+- [`desktop`](desktop.md) - The desktop in one coordinate space: points and rects in desktop units, monitors, popup placement in that space, and window shapes.
+- [`dock`](dock.md) - Docking maths for windows in desktop units: which rects touch, the sets they form, how a moving set snaps to screen areas and to other windows, and the drag that keeps a set together.
 - [`drag`](drag.md) - In-window drag and drop (`infra.drag-and-drop`): pointer tracking only, never the OS drag API.
 - [`icon`](icon.md) - Codicons, as mapped into the Nerd Font (the house look uses the Codicons icon pack).
 - [`image`](image.md) - Images: the plain data an app registers once under an [`ImageId`](image.md#struct.ImageId), the [`ImageStore`](image.md#trait.ImageStore) seam a renderer implements to hold the pixels, and the pure fi...

@@ -598,6 +598,14 @@ impl PageState for Showcase {
         self.child.tray_state()
     }
 
+    fn panels(&self) -> bool {
+        self.child.panels()
+    }
+
+    fn panels_closed(&mut self) {
+        self.child.panels_closed();
+    }
+
     /// Adds the replayed script's events that are due to the frame's input.
     fn inject(&mut self, store: &UiStore, input: &mut RawInput) {
         let Some(mut replay) = self.replay.take() else {

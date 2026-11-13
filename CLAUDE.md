@@ -26,7 +26,7 @@ for the extraction; Luneterm's `docs/architecture.md` sections "lune-ui modules"
 - Gate (before every commit; must be green): `cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && cargo clippy -p lune-ui-winit --all-targets -- -D warnings && cargo test -p lune-ui-winit && scripts/check-boundaries.sh && scripts/gen-component-index.sh --check && scripts/gen-api-docs.sh --check`
 - Showcase (the gallery's window; Cmd or Ctrl `]` and `[` walk the pages, Cmd or Ctrl `Q` quits; its global settings include text smoothing, hinting and stem darkening): `cargo run -p gallery`
 - Pixel gate (a change to a component's drawing; gallery-only work is checked by eye, D254): `scripts/pixel-gate.sh [--base <rev>] [--allow <id>…] [--removed <id>…]` dumps
-  every scene `gallery --list` prints (438 at the library pass's close; the first 14 are the legacy Painter-API scenes) for `<rev>`
+  every scene `gallery --list` prints (445 at 0.6.0's close; the first 14 are the legacy Painter-API scenes) for `<rev>`
   (default `HEAD`) and for the working tree and compares them
   (`dump-compare`); zero delta unless the look change is intended: name its scenes with `--allow <id>`
   and give the reason in a DECISIONS.md row in the same commit. A scene whose subject is gone is named with `--removed <id>` (D260): it must be in
@@ -36,12 +36,13 @@ for the extraction; Luneterm's `docs/architecture.md` sections "lune-ui modules"
   since 0.4.0 (D296): `gallery --dump` reads `LUNEUI_GALLERY_TEXT` (`on`, `off`; anything else exits 2), and a gate
   against a base from before it runs as `LUNEUI_GALLERY_TEXT=off scripts/pixel-gate.sh --base <rev>` (smoothing off draws that look).
 - Platform smoke (needs a logged-in macOS or Windows GUI session; puts a tray item up for about 2 s; not in the gate; exit 0 held, 1 failed, 2 no session): `cargo run -p gallery -- --smoke-platform`
+- Docked panels smoke (the live check of `platform.desktop`, `window-docking`, `window-group`, `window-shape` and `overlay.menu-window`; needs a logged-in macOS or Windows GUI session; opens three shaped panel windows and a menu window for about 10 s, drives them with synthetic desktop pointers, never moves the real cursor or sends input; not in the gate; exit 0 held, 1 a check failed, 2 no session): `cargo run -p gallery -- --smoke-panels`
 - Frame pacing probe (needs a logged-in macOS GUI session; a window opens for about 15 s, leave it visible and untouched; not in the gate; exit 0 held, 1 did not hold, 2 could not measure): `cargo run --release -p gallery -- --pace-probe`
 - Dump the scenes by hand: `cargo run -p gallery -- --dump <dir>` (`-- --list` prints the scene names)
 - M1-only proof against Luneterm's 18-scene spike gate: `scripts/pixel-gate-luneterm.sh` (its full run
   cannot build against the M2 API and exits 2; `--parity-only` checked that `Cargo.lock` holds no
   version Luneterm's lock lacks, and fails by design from M10 on: `arboard` and its tree are new, D213)
-- Cross-target (Windows clippy, Linux in Docker; skips Linux when Docker is not running): `scripts/check-targets.sh`
+- Cross-target (Windows and macOS clippy, Linux in Docker; skips Linux when Docker is not running): `scripts/check-targets.sh`
 - Snapshot export for an app that vendors the toolkit (D239; exit 0 done, 1 a check failed, 2 usage or setup; reads `git archive <rev>`, never the working tree; `docs/consuming.md` says how it is used): `scripts/export-snapshot.sh <dest> [--rev <rev>]`
 - API reference (D287; a Markdown page per module of the five library crates, generated from rustdoc JSON by `tools/api-docs`, so it cannot go stale: signatures, doc comments, fields, variants, methods, trait impls; regenerate after any public API or doc-comment change; `--check` is in the gate; exit 0 done or current, 1 stale, 2 setup or a failed completeness check): `scripts/gen-api-docs.sh [--check]`; start at `docs/api/INDEX.md`. The pages are generated for `aarch64-apple-darwin` on every host, so they do not depend on the host (D303; the target comes from `rust-toolchain.toml`). It sets `RUSTC_BOOTSTRAP=1` for the rustdoc runs only; a toolchain bump that moves the JSON format exits 2 until the exact `rustdoc-types` pin in `tools/api-docs/Cargo.toml` moves
 - Docs (every public function, method, type, trait and module has a doc comment, D242; must build clean): `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --exclude gallery --exclude dump-compare --exclude api-docs`

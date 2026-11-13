@@ -12,7 +12,7 @@ Each crate has a page per module (`<crate>/<module path>.md`; the root is `index
 
 ### `lune-ui-core` (`lune_ui_core`)
 
-92 modules, 1090 items. Left out and counted: 3288 blanket impls, 1 intra-doc links left unlinked (private or unresolvable target), 4738 items of the omitted impls, 1267 items of the trait impls shown as one line, 2202 synthetic impls.
+94 modules, 1106 items. Left out and counted: 3370 blanket impls, 1 intra-doc links left unlinked (private or unresolvable target), 4856 items of the omitted impls, 1305 items of the trait impls shown as one line, 2256 synthetic impls.
 
 | Module | Items |
 | --- | --- |
@@ -23,9 +23,11 @@ Each crate has a page per module (`<crate>/<module path>.md`; the root is `index
 | [`lune_ui_core::chrome`](lune-ui-core/chrome.md) | 6 |
 | [`lune_ui_core::code_doc`](lune-ui-core/code_doc.md) | 1 |
 | [`lune_ui_core::color`](lune-ui-core/color.md) | 7 |
+| [`lune_ui_core::desktop`](lune-ui-core/desktop.md) | 8 |
+| [`lune_ui_core::dock`](lune-ui-core/dock.md) | 5 |
 | [`lune_ui_core::drag`](lune-ui-core/drag.md) | 23 |
 | [`lune_ui_core::icon`](lune-ui-core/icon.md) | 31 |
-| [`lune_ui_core::image`](lune-ui-core/image.md) | 8 |
+| [`lune_ui_core::image`](lune-ui-core/image.md) | 11 |
 | [`lune_ui_core::input`](lune-ui-core/input.md) | 19 |
 | [`lune_ui_core::json`](lune-ui-core/json.md) | 11 |
 | [`lune_ui_core::layout`](lune-ui-core/layout.md) | 11 |
@@ -111,7 +113,7 @@ Each crate has a page per module (`<crate>/<module path>.md`; the root is `index
 
 ### `lune-ui-wgpu` (`lune_ui_wgpu`)
 
-9 modules, 17 items. Left out and counted: 169 blanket impls, 2 intra-doc links left unlinked (private or unresolvable target), 121 items of the omitted impls, 27 items of the trait impls shown as one line, 66 synthetic impls.
+9 modules, 17 items. Left out and counted: 169 blanket impls, 2 intra-doc links left unlinked (private or unresolvable target), 121 items of the omitted impls, 28 items of the trait impls shown as one line, 66 synthetic impls.
 
 | Module | Items |
 | --- | --- |
@@ -127,7 +129,7 @@ Each crate has a page per module (`<crate>/<module path>.md`; the root is `index
 
 ### `lune-ui-winit` (`lune_ui_winit`)
 
-5 modules, 19 items. Left out and counted: 112 blanket impls, 1 intra-doc links left unlinked (private or unresolvable target), 104 items of the omitted impls, 22 items of the trait impls shown as one line, 54 synthetic impls.
+5 modules, 20 items. Left out and counted: 112 blanket impls, 1 intra-doc links left unlinked (private or unresolvable target), 104 items of the omitted impls, 22 items of the trait impls shown as one line, 54 synthetic impls.
 
 | Module | Items |
 | --- | --- |
@@ -135,31 +137,34 @@ Each crate has a page per module (`<crate>/<module path>.md`; the root is `index
 | [`lune_ui_winit::access`](lune-ui-winit/access.md) | 6 |
 | [`lune_ui_winit::clipboard`](lune-ui-winit/clipboard.md) | 2 |
 | [`lune_ui_winit::input`](lune-ui-winit/input.md) | 8 |
-| [`lune_ui_winit::window`](lune-ui-winit/window.md) | 3 |
+| [`lune_ui_winit::window`](lune-ui-winit/window.md) | 4 |
 
 ### `lune-ui-platform` (`lune_ui_platform`)
 
-4 modules, 12 items. Left out and counted: 100 blanket impls, 94 items of the omitted impls, 23 items of the trait impls shown as one line, 48 synthetic impls.
+6 modules, 25 items. Left out and counted: 148 blanket impls, 138 items of the omitted impls, 33 items of the trait impls shown as one line, 72 synthetic impls.
 
 | Module | Items |
 | --- | --- |
 | [`lune_ui_platform`](lune-ui-platform/index.md) | 0 |
+| [`lune_ui_platform::desktop`](lune-ui-platform/desktop.md) | 11 |
+| [`lune_ui_platform::group`](lune-ui-platform/group.md) | 2 |
 | [`lune_ui_platform::material`](lune-ui-platform/material.md) | 3 |
 | [`lune_ui_platform::popover`](lune-ui-platform/popover.md) | 2 |
 | [`lune_ui_platform::tray`](lune-ui-platform/tray.md) | 7 |
 
 ### `lune-ui` (`lune_ui`)
 
-6 modules, 126 re-exports shown as links.
+7 modules, 148 re-exports shown as links.
 
 | Module | Re-exports |
 | --- | --- |
-| [`lune_ui`](lune-ui/index.md) | 35 |
+| [`lune_ui`](lune-ui/index.md) | 37 |
 | [`lune_ui::access`](lune-ui/access.md) | 19 |
+| [`lune_ui::desktop`](lune-ui/desktop.md) | 19 |
 | [`lune_ui::input`](lune-ui/input.md) | 27 |
 | [`lune_ui::text`](lune-ui/text.md) | 16 |
 | [`lune_ui::tray`](lune-ui/tray.md) | 18 |
-| [`lune_ui::window`](lune-ui/window.md) | 11 |
+| [`lune_ui::window`](lune-ui/window.md) | 12 |
 
 ## All items, A to Z
 
@@ -409,6 +414,8 @@ Every top-level item of the four owning crates, by name.
 - [`DEFAULTS`](lune-ui-core/strings.md#constant.DEFAULTS) - constant, `lune_ui_core::strings`
 - [`DESC_GAP`](lune-ui-core/widgets/row.md#constant.DESC_GAP) - constant, `lune_ui_core::widgets::row`
 - [`DESC_LINE`](lune-ui-core/widgets/row.md#constant.DESC_LINE) - constant, `lune_ui_core::widgets::row`
+- [`DesktopPoint`](lune-ui-core/desktop.md#struct.DesktopPoint) - struct, `lune_ui_core::desktop`
+- [`DesktopRect`](lune-ui-core/desktop.md#struct.DesktopRect) - struct, `lune_ui_core::desktop`
 - [`DETAIL_TOP`](lune-ui-core/widgets/toast.md#constant.DETAIL_TOP) - constant, `lune_ui_core::widgets::toast`
 - [`Dialog`](lune-ui-core/widgets/dialog.md#struct.Dialog) - struct, `lune_ui_core::widgets::dialog`
 - [`dialog`](lune-ui-core/widgets/dialog.md#fn.dialog) - function, `lune_ui_core::widgets::dialog`
@@ -430,6 +437,9 @@ Every top-level item of the four owning crates, by name.
 - [`DISMISS_MARGIN`](lune-ui-core/widgets/toast.md#constant.DISMISS_MARGIN) - constant, `lune_ui_core::widgets::toast`
 - [`Dismissal`](lune-ui-core/ui.md#enum.Dismissal) - enum, `lune_ui_core::ui`
 - [`DisplayFormat`](lune-ui-core/strings.md#struct.DisplayFormat) - struct, `lune_ui_core::strings`
+- [`DockDrag`](lune-ui-core/dock.md#struct.DockDrag) - struct, `lune_ui_core::dock`
+- [`docked_sets`](lune-ui-core/dock.md#fn.docked_sets) - function, `lune_ui_core::dock`
+- [`docked_with`](lune-ui-core/dock.md#fn.docked_with) - function, `lune_ui_core::dock`
 - [`DOT`](lune-ui-core/widgets/icon_rail.md#constant.DOT) - constant, `lune_ui_core::widgets::icon_rail`
 - [`DOT`](lune-ui-core/widgets/radio_group.md#constant.DOT) - constant, `lune_ui_core::widgets::radio_group`
 - [`DOT_R`](lune-ui-core/widgets/lane_graph.md#constant.DOT_R) - constant, `lune_ui_core::widgets::lane_graph`
@@ -516,6 +526,7 @@ Every top-level item of the four owning crates, by name.
 - [`FOCUS`](lune-ui-core/widgets/tab_strip.md#constant.FOCUS) - constant, `lune_ui_core::widgets::tab_strip`
 - [`FOCUS`](lune-ui-core/widgets/toggle.md#constant.FOCUS) - constant, `lune_ui_core::widgets::toggle`
 - [`FocusEvent`](lune-ui-core/input.md#enum.FocusEvent) - enum, `lune_ui_core::input`
+- [`Follow`](lune-ui-platform/desktop.md#enum.Follow) - enum, `lune_ui_platform::desktop`
 - [`Font`](lune-ui-core/text.md#enum.Font) - enum, `lune_ui_core::text`
 - [`FOOTER`](lune-ui-core/widgets/kanban_board.md#constant.FOOTER) - constant, `lune_ui_core::widgets::kanban_board`
 - [`FOOTER_GAP`](lune-ui-core/widgets/kanban_board.md#constant.FOOTER_GAP) - constant, `lune_ui_core::widgets::kanban_board`
@@ -664,9 +675,11 @@ Every top-level item of the four owning crates, by name.
 - [`image_store_contract`](lune-ui-core/testing.md#fn.image_store_contract) - function, `lune_ui_core::testing`
 - [`ImageAlign`](lune-ui-core/image.md#struct.ImageAlign) - struct, `lune_ui_core::image`
 - [`ImageData`](lune-ui-core/image.md#struct.ImageData) - struct, `lune_ui_core::image`
+- [`ImageDraw`](lune-ui-core/image.md#struct.ImageDraw) - struct, `lune_ui_core::image`
 - [`ImageError`](lune-ui-core/image.md#enum.ImageError) - enum, `lune_ui_core::image`
 - [`ImageId`](lune-ui-core/image.md#struct.ImageId) - struct, `lune_ui_core::image`
 - [`ImageItem`](lune-ui-core/scene.md#struct.ImageItem) - struct, `lune_ui_core::scene`
+- [`ImagePart`](lune-ui-core/image.md#struct.ImagePart) - struct, `lune_ui_core::image`
 - [`ImageSource`](lune-ui-core/scene.md#enum.ImageSource) - enum, `lune_ui_core::scene`
 - [`ImageStore`](lune-ui-core/image.md#trait.ImageStore) - trait, `lune_ui_core::image`
 - [`ime_area_physical`](lune-ui-winit/input.md#fn.ime_area_physical) - function, `lune_ui_winit::input`
@@ -830,12 +843,16 @@ Every top-level item of the four owning crates, by name.
 - [`mix`](lune-ui-core/color.md#fn.mix) - function, `lune_ui_core::color`
 - [`Modifiers`](lune-ui-core/input.md#struct.Modifiers) - struct, `lune_ui_core::input`
 - [`Mods`](lune-ui-core/shortcuts.md#struct.Mods) - struct, `lune_ui_core::shortcuts`
+- [`Monitor`](lune-ui-core/desktop.md#struct.Monitor) - struct, `lune_ui_core::desktop`
+- [`monitor_at`](lune-ui-core/desktop.md#fn.monitor_at) - function, `lune_ui_core::desktop`
+- [`monitors`](lune-ui-platform/desktop.md#fn.monitors) - function, `lune_ui_platform::desktop`
 - [`MOTION`](lune-ui-core/motion.md#constant.MOTION) - constant, `lune_ui_core::motion`
 - [`Motion`](lune-ui-core/motion.md#struct.Motion) - struct, `lune_ui_core::motion`
 - [`Motion`](lune-ui-core/text_edit.md#enum.Motion) - enum, `lune_ui_core::text_edit`
 - [`MotionTier`](lune-ui-core/motion.md#enum.MotionTier) - enum, `lune_ui_core::motion`
 - [`MotionTokens`](lune-ui-core/motion.md#struct.MotionTokens) - struct, `lune_ui_core::motion`
 - [`MOVE`](lune-ui-core/widgets/toggle.md#constant.MOVE) - constant, `lune_ui_core::widgets::toggle`
+- [`move_windows`](lune-ui-platform/desktop.md#fn.move_windows) - function, `lune_ui_platform::desktop`
 - [`NAME_GAP`](lune-ui-core/widgets/verdict_row.md#constant.NAME_GAP) - constant, `lune_ui_core::widgets::verdict_row`
 - [`NAME_LINE`](lune-ui-core/widgets/list_row.md#constant.NAME_LINE) - constant, `lune_ui_core::widgets::list_row`
 - [`NAME_W`](lune-ui-core/widgets/verdict_row.md#constant.NAME_W) - constant, `lune_ui_core::widgets::verdict_row`
@@ -868,6 +885,7 @@ Every top-level item of the four owning crates, by name.
 - [`OverlayLayer`](lune-ui-core/scene.md#struct.OverlayLayer) - struct, `lune_ui_core::scene`
 - [`OverlayOptions`](lune-ui-core/ui.md#struct.OverlayOptions) - struct, `lune_ui_core::ui`
 - [`OverlayPhase`](lune-ui-core/ui.md#enum.OverlayPhase) - enum, `lune_ui_core::ui`
+- [`owned_by`](lune-ui-platform/group.md#fn.owned_by) - function, `lune_ui_platform::group`
 - [`PAD`](lune-ui-core/widgets/badge.md#constant.PAD) - constant, `lune_ui_core::widgets::badge`
 - [`PAD`](lune-ui-core/widgets/nav_item.md#constant.PAD) - constant, `lune_ui_core::widgets::nav_item`
 - [`PAD`](lune-ui-core/widgets/page.md#constant.PAD) - constant, `lune_ui_core::widgets::page`
@@ -926,6 +944,7 @@ Every top-level item of the four owning crates, by name.
 - [`Pane`](lune-ui-core/widgets/split_panes.md#enum.Pane) - enum, `lune_ui_core::widgets::split_panes`
 - [`PANEL`](lune-ui-core/theme/lunegit_dark.md#constant.PANEL) - constant, `lune_ui_core::theme::lunegit_dark`
 - [`PANEL`](lune-ui-core/theme/near_black.md#constant.PANEL) - constant, `lune_ui_core::theme::near_black`
+- [`panel_attributes`](lune-ui-winit/window.md#fn.panel_attributes) - function, `lune_ui_winit::window`
 - [`PANEL_BLACK_MAX`](lune-ui-core/theme/near_black.md#constant.PANEL_BLACK_MAX) - constant, `lune_ui_core::theme::near_black`
 - [`panel_rect`](lune-ui-core/widgets/dropdown.md#fn.panel_rect) - function, `lune_ui_core::widgets::dropdown`
 - [`PanelKind`](lune-ui-core/widgets/panel.md#enum.PanelKind) - enum, `lune_ui_core::widgets::panel`
@@ -942,6 +961,7 @@ Every top-level item of the four owning crates, by name.
 - [`PITCH`](lune-ui-core/widgets/icon_rail.md#constant.PITCH) - constant, `lune_ui_core::widgets::icon_rail`
 - [`PITCH`](lune-ui-core/widgets/nav_item.md#constant.PITCH) - constant, `lune_ui_core::widgets::nav_item`
 - [`place`](lune-ui-core/widgets/popover.md#fn.place) - function, `lune_ui_core::widgets::popover`
+- [`place_popup`](lune-ui-core/desktop.md#fn.place_popup) - function, `lune_ui_core::desktop`
 - [`place_surface`](lune-ui-core/tray.md#fn.place_surface) - function, `lune_ui_core::tray`
 - [`PlaceAlign`](lune-ui-core/widgets/popover.md#enum.PlaceAlign) - enum, `lune_ui_core::widgets::popover`
 - [`PLACEHOLDER`](lune-ui-core/widgets/stat.md#constant.PLACEHOLDER) - constant, `lune_ui_core::widgets::stat`
@@ -950,6 +970,7 @@ Every top-level item of the four owning crates, by name.
 - [`PlainHighlighter`](lune-ui-core/widgets/text_lines.md#struct.PlainHighlighter) - struct, `lune_ui_core::widgets::text_lines`
 - [`PLOT`](lune-ui-core/widgets/bar_chart.md#constant.PLOT) - constant, `lune_ui_core::widgets::bar_chart`
 - [`plus_rect`](lune-ui-core/widgets/stepper.md#fn.plus_rect) - function, `lune_ui_core::widgets::stepper`
+- [`pointer`](lune-ui-platform/desktop.md#fn.pointer) - function, `lune_ui_platform::desktop`
 - [`PointerButton`](lune-ui-core/input.md#enum.PointerButton) - enum, `lune_ui_core::input`
 - [`polyline_length`](lune-ui-core/paint.md#fn.polyline_length) - function, `lune_ui_core::paint`
 - [`popover_attributes`](lune-ui-winit/window.md#fn.popover_attributes) - function, `lune_ui_winit::window`
@@ -1040,6 +1061,7 @@ Every top-level item of the four owning crates, by name.
 - [`RowHeights`](lune-ui-core/widgets/virtual_list.md#struct.RowHeights) - struct, `lune_ui_core::widgets::virtual_list`
 - [`RowKey`](lune-ui-core/widgets/virtual_list.md#struct.RowKey) - struct, `lune_ui_core::widgets::virtual_list`
 - [`RowLook`](lune-ui-core/widgets/menu.md#struct.RowLook) - struct, `lune_ui_core::widgets::menu`
+- [`Sampling`](lune-ui-core/image.md#enum.Sampling) - enum, `lune_ui_core::image`
 - [`Scene`](lune-ui-core/scene.md#struct.Scene) - struct, `lune_ui_core::scene`
 - [`SCENE_LAYERS`](lune-ui-core/scene.md#constant.SCENE_LAYERS) - constant, `lune_ui_core::scene`
 - [`Scope`](lune-ui-core/shortcuts.md#enum.Scope) - enum, `lune_ui_core::shortcuts`
@@ -1071,12 +1093,17 @@ Every top-level item of the four owning crates, by name.
 - [`Sense`](lune-ui-core/ui.md#struct.Sense) - struct, `lune_ui_core::ui`
 - [`SEPARATOR`](lune-ui-core/widgets/diff_view.md#constant.SEPARATOR) - constant, `lune_ui_core::widgets::diff_view`
 - [`set_event_handler`](lune-ui-platform/tray.md#fn.set_event_handler) - function, `lune_ui_platform::tray`
+- [`set_window_origin`](lune-ui-platform/desktop.md#fn.set_window_origin) - function, `lune_ui_platform::desktop`
+- [`set_window_shape`](lune-ui-platform/desktop.md#fn.set_window_shape) - function, `lune_ui_platform::desktop`
 - [`SettingRow`](lune-ui-core/widgets/row.md#struct.SettingRow) - struct, `lune_ui_core::widgets::row`
 - [`SettingsPage`](lune-ui-core/widgets/settings_page.md#struct.SettingsPage) - struct, `lune_ui_core::widgets::settings_page`
 - [`SettingsResponse`](lune-ui-core/widgets/settings_page.md#struct.SettingsResponse) - struct, `lune_ui_core::widgets::settings_page`
 - [`SETTLE`](lune-ui-core/drag.md#constant.SETTLE) - constant, `lune_ui_core::drag`
 - [`settle`](lune-ui-core/widgets/stepper.md#fn.settle) - function, `lune_ui_core::widgets::stepper`
 - [`Shape`](lune-ui-core/scene.md#struct.Shape) - struct, `lune_ui_core::scene`
+- [`ShapeError`](lune-ui-core/desktop.md#enum.ShapeError) - enum, `lune_ui_core::desktop`
+- [`ShapeFollower`](lune-ui-platform/desktop.md#struct.ShapeFollower) - struct, `lune_ui_platform::desktop`
+- [`ShapeMode`](lune-ui-platform/desktop.md#enum.ShapeMode) - enum, `lune_ui_platform::desktop`
 - [`shapes`](lune-ui-core/widgets/selection.md#fn.shapes) - function, `lune_ui_core::widgets::selection`
 - [`SHIFT`](lune-ui-core/widgets/toast.md#constant.SHIFT) - constant, `lune_ui_core::widgets::toast`
 - [`Shortcuts`](lune-ui-core/shortcuts.md#struct.Shortcuts) - struct, `lune_ui_core::shortcuts`
@@ -1109,6 +1136,7 @@ Every top-level item of the four owning crates, by name.
 - [`SMALL_LINE`](lune-ui-core/widgets/stat.md#constant.SMALL_LINE) - constant, `lune_ui_core::widgets::stat`
 - [`SMALL_PADDING`](lune-ui-core/widgets/button.md#constant.SMALL_PADDING) - constant, `lune_ui_core::widgets::button`
 - [`SMALL_RADIUS`](lune-ui-core/widgets/button.md#constant.SMALL_RADIUS) - constant, `lune_ui_core::widgets::button`
+- [`snap`](lune-ui-core/dock.md#fn.snap) - function, `lune_ui_core::dock`
 - [`SNAP_DISTANCE`](lune-ui-core/widgets/scroll_area.md#constant.SNAP_DISTANCE) - constant, `lune_ui_core::widgets::scroll_area`
 - [`Sort`](lune-ui-core/access.md#enum.Sort) - enum, `lune_ui_core::access`
 - [`SortKey`](lune-ui-core/widgets/table.md#struct.SortKey) - struct, `lune_ui_core::widgets::table`
@@ -1220,6 +1248,7 @@ Every top-level item of the four owning crates, by name.
 - [`TITLE_LINE`](lune-ui-core/widgets/page.md#constant.TITLE_LINE) - constant, `lune_ui_core::widgets::page`
 - [`TITLE_LINE`](lune-ui-core/widgets/panel.md#constant.TITLE_LINE) - constant, `lune_ui_core::widgets::panel`
 - [`TITLE_LINE`](lune-ui-core/widgets/row.md#constant.TITLE_LINE) - constant, `lune_ui_core::widgets::row`
+- [`to_units`](lune-ui-core/desktop.md#fn.to_units) - function, `lune_ui_core::desktop`
 - [`toast_size`](lune-ui-core/widgets/toast.md#fn.toast_size) - function, `lune_ui_core::widgets::toast`
 - [`ToastAction`](lune-ui-core/widgets/toast.md#struct.ToastAction) - struct, `lune_ui_core::widgets::toast`
 - [`ToastId`](lune-ui-core/widgets/toast.md#struct.ToastId) - struct, `lune_ui_core::widgets::toast`
@@ -1234,6 +1263,7 @@ Every top-level item of the four owning crates, by name.
 - [`Tone`](lune-ui-core/widgets/tone.md#enum.Tone) - enum, `lune_ui_core::widgets::tone`
 - [`ToolbarCols`](lune-ui-core/widgets/toolbar.md#struct.ToolbarCols) - struct, `lune_ui_core::widgets::toolbar`
 - [`ToolbarOptions`](lune-ui-core/widgets/toolbar.md#struct.ToolbarOptions) - struct, `lune_ui_core::widgets::toolbar`
+- [`touching`](lune-ui-core/dock.md#fn.touching) - function, `lune_ui_core::dock`
 - [`Track`](lune-ui-core/layout.md#enum.Track) - enum, `lune_ui_core::layout`
 - [`track`](lune-ui-core/widgets/slider.md#fn.track) - function, `lune_ui_core::widgets::slider`
 - [`track`](lune-ui-core/widgets/toggle.md#fn.track) - function, `lune_ui_core::widgets::toggle`
@@ -1268,6 +1298,7 @@ Every top-level item of the four owning crates, by name.
 - [`UNAVAILABLE_LINE`](lune-ui-core/widgets/panel.md#constant.UNAVAILABLE_LINE) - constant, `lune_ui_core::widgets::panel`
 - [`UNDO_DEPTH`](lune-ui-core/text_edit.md#constant.UNDO_DEPTH) - constant, `lune_ui_core::text_edit`
 - [`Unit`](lune-ui-core/text.md#enum.Unit) - enum, `lune_ui_core::text`
+- [`units_per_logical`](lune-ui-platform/desktop.md#fn.units_per_logical) - function, `lune_ui_platform::desktop`
 - [`VALUE`](lune-ui-core/widgets/bar_chart.md#constant.VALUE) - constant, `lune_ui_core::widgets::bar_chart`
 - [`VALUE`](lune-ui-core/widgets/pie_chart.md#constant.VALUE) - constant, `lune_ui_core::widgets::pie_chart`
 - [`VALUE`](lune-ui-core/widgets/slider.md#constant.VALUE) - constant, `lune_ui_core::widgets::slider`
@@ -1290,9 +1321,13 @@ Every top-level item of the four owning crates, by name.
 - [`WIDTH_EXPANDED`](lune-ui-core/widgets/toast.md#constant.WIDTH_EXPANDED) - constant, `lune_ui_core::widgets::toast`
 - [`WINDOW`](lune-ui-core/theme/lunegit_dark.md#constant.WINDOW) - constant, `lune_ui_core::theme::lunegit_dark`
 - [`WINDOW`](lune-ui-core/theme/near_black.md#constant.WINDOW) - constant, `lune_ui_core::theme::near_black`
+- [`window_at`](lune-ui-platform/desktop.md#fn.window_at) - function, `lune_ui_platform::desktop`
 - [`WINDOW_BLACK_MAX`](lune-ui-core/theme/near_black.md#constant.WINDOW_BLACK_MAX) - constant, `lune_ui_core::theme::near_black`
+- [`window_frame`](lune-ui-platform/desktop.md#fn.window_frame) - function, `lune_ui_platform::desktop`
 - [`WindowBackdrop`](lune-ui-platform/material.md#struct.WindowBackdrop) - struct, `lune_ui_platform::material`
 - [`WindowCommand`](lune-ui-core/input.md#enum.WindowCommand) - enum, `lune_ui_core::input`
+- [`WindowGroup`](lune-ui-platform/group.md#struct.WindowGroup) - struct, `lune_ui_platform::group`
+- [`WindowShape`](lune-ui-core/desktop.md#struct.WindowShape) - struct, `lune_ui_core::desktop`
 - [`WindowsMaterial`](lune-ui-core/backdrop.md#enum.WindowsMaterial) - enum, `lune_ui_core::backdrop`
 - [`WindowSurface`](lune-ui-wgpu/surface.md#struct.WindowSurface) - struct, `lune_ui_wgpu::surface`
 - [`with_alpha`](lune-ui-core/color.md#fn.with_alpha) - function, `lune_ui_core::color`

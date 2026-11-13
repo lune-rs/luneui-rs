@@ -9,6 +9,10 @@ pub(crate) fn popover(attrs: WindowAttributes) -> WindowAttributes {
     attrs
 }
 
+pub(crate) fn panel(attrs: WindowAttributes) -> WindowAttributes {
+    attrs
+}
+
 /// The keyboard conventions of this platform.
 pub(crate) fn keymap() -> Keymap {
     Keymap::PC

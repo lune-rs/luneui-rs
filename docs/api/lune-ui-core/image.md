@@ -24,7 +24,7 @@ pub struct ImageAlign {
 
 Where the fitted picture sits in the destination rect.
 
-Source: `crates/lune-ui-core/src/image.rs:79`
+Source: `crates/lune-ui-core/src/image.rs:102`
 
 **Fields**
 
@@ -93,6 +93,60 @@ Source: `crates/lune-ui-core/src/image.rs:14`
 - `impl PartialEq for ImageData`
 - `impl StructuralPartialEq for ImageData`
 
+<a id="struct.ImageDraw"></a>
+### Struct `ImageDraw`
+
+```rust
+pub struct ImageDraw {
+    pub part: Option<ImagePart>,
+    pub fit: Fit,
+    pub align: ImageAlign,
+    pub alpha: f32,
+    pub rotation: f32,
+    pub sampling: Sampling,
+}
+```
+
+Everything about one picture draw except where and which picture. `Default` draws the whole
+picture contained, centred, opaque, unturned, with [`Sampling::Auto`](image.md#variant.Sampling.Auto).
+
+Source: `crates/lune-ui-core/src/image.rs:148`
+
+**Fields**
+
+- <a id="structfield.ImageDraw.part"></a>`pub part: Option<ImagePart>`
+
+  The part of the picture to draw; `None` is the whole picture.
+
+- <a id="structfield.ImageDraw.fit"></a>`pub fit: Fit`
+
+  How the picture (or the part) is fitted into the destination rect.
+
+- <a id="structfield.ImageDraw.align"></a>`pub align: ImageAlign`
+
+  Where the fitted picture sits in the destination rect.
+
+- <a id="structfield.ImageDraw.alpha"></a>`pub alpha: f32`
+
+  Opacity multiplier, 0 to 1.
+
+- <a id="structfield.ImageDraw.rotation"></a>`pub rotation: f32`
+
+  Radians, clockwise on screen, about the centre of the fitted picture.
+
+- <a id="structfield.ImageDraw.sampling"></a>`pub sampling: Sampling`
+
+  How the picture is sampled.
+
+**Trait implementations**
+
+- `impl Clone for ImageDraw`
+- `impl Copy for ImageDraw`
+- `impl Debug for ImageDraw`
+- `impl Default for ImageDraw`
+- `impl PartialEq for ImageDraw`
+- `impl StructuralPartialEq for ImageDraw`
+
 <a id="struct.ImageId"></a>
 ### Struct `ImageId`
 
@@ -120,6 +174,44 @@ Source: `crates/lune-ui-core/src/image.rs:9`
 - `impl PartialOrd for ImageId`
 - `impl StructuralPartialEq for ImageId`
 
+<a id="struct.ImagePart"></a>
+### Struct `ImagePart`
+
+```rust
+pub struct ImagePart {
+    pub x: u32,
+    pub y: u32,
+    pub w: u32,
+    pub h: u32,
+}
+```
+
+A rect of a picture's own pixels, top-left origin: a sprite cut from a sheet. A part with no
+area (`w` or `h` 0) draws nothing; a part past the picture's edge is dropped by the renderer,
+which knows the picture's size.
+
+Source: `crates/lune-ui-core/src/image.rs:124`
+
+**Fields**
+
+- <a id="structfield.ImagePart.x"></a>`pub x: u32`
+
+- <a id="structfield.ImagePart.y"></a>`pub y: u32`
+
+- <a id="structfield.ImagePart.w"></a>`pub w: u32`
+
+- <a id="structfield.ImagePart.h"></a>`pub h: u32`
+
+**Trait implementations**
+
+- `impl Clone for ImagePart`
+- `impl Copy for ImagePart`
+- `impl Debug for ImagePart`
+- `impl Eq for ImagePart`
+- `impl Hash for ImagePart`
+- `impl PartialEq for ImagePart`
+- `impl StructuralPartialEq for ImagePart`
+
 ## Enums
 
 <a id="enum.Anchor"></a>
@@ -135,7 +227,7 @@ pub enum Anchor {
 
 A position along one axis.
 
-Source: `crates/lune-ui-core/src/image.rs:71`
+Source: `crates/lune-ui-core/src/image.rs:94`
 
 **Variants**
 
@@ -165,7 +257,7 @@ pub enum Fit {
 
 How a picture is fitted into its destination rect.
 
-Source: `crates/lune-ui-core/src/image.rs:64`
+Source: `crates/lune-ui-core/src/image.rs:87`
 
 **Variants**
 
@@ -186,15 +278,19 @@ Source: `crates/lune-ui-core/src/image.rs:64`
 ### Enum `ImageError`
 
 ```rust
+#[non_exhaustive]
 pub enum ImageError {
     BadLength,
     TooLarge { limit: u32 },
+    UnknownId,
+    OutOfBounds,
 }
 ```
 
-Why a store refused a picture. A refusal changes nothing: a replaced id keeps its old picture.
+Why a store refused a picture or an update. A refusal changes nothing: a replaced id keeps its
+old picture.
 
-Source: `crates/lune-ui-core/src/image.rs:29`
+Source: `crates/lune-ui-core/src/image.rs:31`
 
 **Variants**
 
@@ -206,6 +302,14 @@ Source: `crates/lune-ui-core/src/image.rs:29`
 
   A side is above what the store can hold; `limit` is the most it takes.
 
+- <a id="variant.ImageError.UnknownId"></a>`UnknownId`
+
+  An update named an id that is not registered.
+
+- <a id="variant.ImageError.OutOfBounds"></a>`OutOfBounds`
+
+  An update's rect does not lie inside the registered picture.
+
 **Trait implementations**
 
 - `impl Clone for ImageError`
@@ -216,6 +320,48 @@ Source: `crates/lune-ui-core/src/image.rs:29`
 - `impl Error for ImageError`
 - `impl PartialEq for ImageError`
 - `impl StructuralPartialEq for ImageError`
+
+<a id="enum.Sampling"></a>
+### Enum `Sampling`
+
+```rust
+pub enum Sampling {
+    Auto,
+    Nearest,
+    Linear,
+}
+```
+
+How a draw samples its picture.
+
+Source: `crates/lune-ui-core/src/image.rs:133`
+
+**Variants**
+
+- <a id="variant.Sampling.Auto"></a>`Auto`
+
+  The renderer's own rule: whole texels (nearest) when the drawn part is scaled up by an
+  integer factor or drawn at its own size, linear filtering otherwise (D106), measured on
+  the drawn part, not on the whole picture.
+
+- <a id="variant.Sampling.Nearest"></a>`Nearest`
+
+  Always the nearest texel: crisp pixel art at any scale.
+
+- <a id="variant.Sampling.Linear"></a>`Linear`
+
+  Always linear filtering: smooth at any scale.
+
+**Trait implementations**
+
+- `impl Clone for Sampling`
+- `impl Copy for Sampling`
+- `impl Debug for Sampling`
+- `impl Default for Sampling`
+- `impl Eq for Sampling`
+- `impl Hash for Sampling`
+- `impl PartialEq for Sampling`
+- `impl StructuralPartialEq for Sampling`
 
 ## Traits
 
@@ -229,7 +375,7 @@ pub trait ImageStore { .. }
 Where registered pictures live. The renderer implements it; the painter only names ids, so an
 id that is unknown or released draws nothing.
 
-Source: `crates/lune-ui-core/src/image.rs:49`
+Source: `crates/lune-ui-core/src/image.rs:57`
 
 **Required items**
 
@@ -246,6 +392,22 @@ Source: `crates/lune-ui-core/src/image.rs:49`
 
   Frees `id`; does nothing for an id that is not registered. The id may be registered again.
 
+- <a id="tymethod.ImageStore.update"></a>`fn update(&mut self, id: ImageId, at: (u32, u32), data: &ImageData) -> Result<(), ImageError>`
+
+  Replaces the pixels of the rect of the picture registered as `id` whose top-left corner is
+  `at` (picture pixels) and whose size is `data`'s, in place: the picture's size, its id and
+  the store's live count do not change, and the pixels outside the rect stay. `data` is
+  straight alpha like [`ImageData`](image.md#struct.ImageData). A `data` with no pixels does nothing. A refusal changes
+  nothing.
+
+  The next frame drawn after the call shows the new pixels; update a picture before drawing
+  any window of the frame.
+
+  ###### Errors
+  Checked in this order: [`ImageError::BadLength`](image.md#variant.ImageError.BadLength) when `data.rgba` is not
+  `4 * width * height` bytes; [`ImageError::UnknownId`](image.md#variant.ImageError.UnknownId) when `id` is not registered;
+  [`ImageError::OutOfBounds`](image.md#variant.ImageError.OutOfBounds) when the rect reaches past the picture's right or bottom edge.
+
 ## Functions
 
 <a id="fn.image_rect"></a>
@@ -258,5 +420,5 @@ pub fn image_rect(size: (u32, u32), dst: Rect, fit: Fit, align: ImageAlign) -> O
 The rect a picture of `size` (width, height in pixels) occupies when fitted into `dst`, or
 `None` when the picture or `dst` has no area or a number is not finite.
 
-Source: `crates/lune-ui-core/src/image.rs:99`
+Source: `crates/lune-ui-core/src/image.rs:178`
 

@@ -2,12 +2,14 @@
 # Cross-target checks. Usage: scripts/check-targets.sh [--skip-linux]
 #   windows  cargo clippy --workspace --all-targets --locked --target x86_64-pc-windows-msvc -- -D warnings
 #            (needs that rustup target installed; prints the `rustup target add` hint when it is not)
+#   macos    cargo clippy --workspace --all-targets --locked --target aarch64-apple-darwin -- -D warnings
+#            (compile check only, no run; needs that rustup target installed, same hint when it is not)
 #   linux    fmt --check, clippy --locked -D warnings, test --locked, in a rust:1.92 container with
 #            the repo mounted read-only. Target, cargo and rustup state live in the named volumes
 #            luneui-linux-{target,cargo,rustup}: created if missing, never removed. The container
 #            is --rm. Skipped (not failed) when docker is missing, the daemon is not running, or
 #            --skip-linux is given. This script never starts Docker.
-# Prints `windows: passed|FAILED` and `linux: passed|FAILED|skipped (<reason>)`.
+# Prints `windows: passed|FAILED`, `macos: passed|FAILED` and `linux: passed|FAILED|skipped (<reason>)`.
 # Exit codes: 0 every half that ran passed; 1 a check failed; 2 usage error.
 set -euo pipefail
 
@@ -15,6 +17,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 WIN_TARGET=x86_64-pc-windows-msvc
+MAC_TARGET=aarch64-apple-darwin
 skip_linux=0
 for arg in "$@"; do
   case "$arg" in
@@ -36,6 +39,19 @@ if grep -qx "$WIN_TARGET" <<< "$installed"; then
   fi
 else
   echo "windows: FAILED (run: rustup target add $WIN_TARGET)"
+  failed=1
+fi
+
+# macOS half.
+if grep -qx "$MAC_TARGET" <<< "$installed"; then
+  if cargo clippy --workspace --all-targets --locked --target "$MAC_TARGET" -- -D warnings; then
+    echo "macos: passed"
+  else
+    echo "macos: FAILED"
+    failed=1
+  fi
+else
+  echo "macos: FAILED (run: rustup target add $MAC_TARGET)"
   failed=1
 fi
 

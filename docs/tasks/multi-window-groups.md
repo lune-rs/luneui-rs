@@ -1,4 +1,6 @@
-# Task: docked multi-window groups (someday, maybe never)
+# Task: docked multi-window groups (done, 0.6.0)
+
+Status: done. Shipped as version 0.6.0 by the task `luneui-rs/multi-window-groups`: D304 to D306 (image parts and sampling), D307 (`ImageStore::update`), D308 (macOS compile check), D309 to D311 (desktop units, docking, popup placement), D312 (window commands, `panel_attributes`), D313 and D314 (the app-run drag, `windows-sys`), D315 (window shapes), D316 (window groups), D317 and D318 (the gallery page and its smoke), D319 (the release). Catalogue: `platform.desktop`, `platform.window-docking`, `platform.window-group`, `platform.window-shape`, `overlay.menu-window`. The text below is the original brief, kept as written.
 
 Optional toolkit support, discussed 2026-11-12. **Nothing is waiting on this.** It comes from a
 possible full Rust rewrite of whipspot (`~/Projects/archived/whipspot`, a Winamp-style player), but

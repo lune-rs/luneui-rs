@@ -7,7 +7,7 @@
 Window helpers: the core's edge resize, double click and caption buttons, and the winit glass
 attributes and resize direction.
 
-Source: `crates/lune-ui/src/lib.rs:51`
+Source: `crates/lune-ui/src/lib.rs:58`
 
 ## Re-exports
 
@@ -22,6 +22,7 @@ Source: `crates/lune-ui/src/lib.rs:51`
 | `caption_buttons` | Function | [`lune_ui_core::window::caption_buttons`](../lune-ui-core/window.md#fn.caption_buttons) |
 | `edge_at` | Function | [`lune_ui_core::window::edge_at`](../lune-ui-core/window.md#fn.edge_at) |
 | `glass_attributes` | Function | [`lune_ui_winit::window::glass_attributes`](../lune-ui-winit/window.md#fn.glass_attributes) |
+| `panel_attributes` | Function | [`lune_ui_winit::window::panel_attributes`](../lune-ui-winit/window.md#fn.panel_attributes) |
 | `popover_attributes` | Function | [`lune_ui_winit::window::popover_attributes`](../lune-ui-winit/window.md#fn.popover_attributes) |
 | `resize_direction` | Function | [`lune_ui_winit::window::resize_direction`](../lune-ui-winit/window.md#fn.resize_direction) |
 

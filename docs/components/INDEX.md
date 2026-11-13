@@ -13,9 +13,9 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | planned | 0 |
 | stub | 0 |
 | in-progress | 2 |
-| done | 92 |
+| done | 97 |
 | external | 4 |
-| **total** | **98** |
+| **total** | **103** |
 
 ## core
 
@@ -25,7 +25,7 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | [core.color](core/color.md) | Colour helpers | done | luneterm | Straight-alpha RGBA values with premultiply, blend-over and alpha helpers |
 | [core.focus](core/focus.md) | Keyboard focus | done | any | Tab order by call order within focus scopes, focus-visible, scope push, trap and restore, roving focus in composites |
 | [core.icon](core/icon.md) | Codicon glyph constants | done | luneterm, wane | Codicon glyph constants and a glyph helper; the app supplies the icon font |
-| [core.image](core/image.md) | Image drawing | done | lunegit, wane | Image primitive: app-decoded RGBA drawn into a rect with a fit mode, alpha and optional corner radius; explicit resource lifetime |
+| [core.image](core/image.md) | Image drawing | done | lunegit, wane | Image primitive: app-decoded RGBA drawn into a rect with a fit mode, alpha, optional corner radius, a part of the picture (sprite sheets) and per-draw sampling; explicit resource lifetime and in-place rect updates |
 | [core.input](core/input.md) | Input model | done | any | Plain-data RawInput in, FrameOutput out; the windowing adapter translates both |
 | [core.painter](core/painter.md) | Immediate-mode painter | done | luneterm | Painter: ordered layers, fills, rings, strokes, acrylic, text, clip, transform and hit regions, building a plain-data Scene; holds the aggregate table of new primitives |
 | [core.scene](core/scene.md) | Display list | done | any | Plain-data Scene the painter builds and a renderer consumes; the draw-order contract |
@@ -50,10 +50,14 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | id | title | status | consumers | summary |
 | --- | --- | --- | --- | --- |
 | [platform.clipboard](platform/clipboard.md) | Clipboard | done | any | Text clipboard through FrameOutput requests and input events; types in M4, fake in M5, platform adapter in M10 |
+| [platform.desktop](platform/desktop.md) | Desktop: units, monitors, pointer, frames and moves | done | any | The OS desktop in one unit: monitors and work areas, the pointer, window frames, atomic multi-window moves and the window under a point |
 | [platform.input](platform/input.md) | winit input translation and output | done | any | Translator turns winit events into RawInput; OutputState applies FrameOutput to a window |
 | [platform.material](platform/material.md) | OS glass materials | in-progress | luneterm | Backdrop seam in core (Material, Backdrop, NullMaterial); OS glass behind it: macOS NSVisualEffect and Liquid Glass, Windows acrylic and mica, opaque elsewhere |
 | [platform.tray-icon](platform/tray-icon.md) | Tray icon with status dot | done | wane | 16 px monochrome glyph with a status dot (green serving, amber degraded, grey paused), rendered to OS bitmaps at 1x and 2x; opens toolkit glass menus |
 | [platform.window](platform/window.md) | Glass window helpers | done | luneterm, wane | Glass window attributes, edge resize, double-click detection and caption buttons |
+| [platform.window-docking](platform/window-docking.md) | Window docking: touching, docked sets, snapping and a set drag | done | any | Pure docking maths in desktop units: touching edges, transitive docked sets, snapping to edges and a group drag |
+| [platform.window-group](platform/window-group.md) | Window group: windows that raise, minimise and stay on top as one | done | any | A leader and its member windows that the OS treats as one: one taskbar entry, raise, on top and minimise together |
+| [platform.window-shape](platform/window-shape.md) | Window shape: the part of a window that is drawn and takes the pointer | done | any | A window shaped as a union of polygons: a window region on Windows, a pointer follower on macOS |
 
 ## widget
 
@@ -95,6 +99,7 @@ under `docs/components/<area>/` and re-run the script. See [README](README.md).
 | [overlay.dropdown](overlay/dropdown.md) | Drop-down list | done | luneterm, wane | Combo drop-down option list that flips above its anchor near the window bottom |
 | [overlay.flyout](overlay/flyout.md) | Tray flyout | done | wane | Windows tray left-click surface: header, stats, route list, action rows |
 | [overlay.menu](overlay/menu.md) | Glass context menu | done | luneterm, wane | Glass context menu with open and close motion |
+| [overlay.menu-window](overlay/menu-window.md) | Context menu in its own window | done | any | A menu that opens as a window of its own, placed from the pointer on the right monitor and kept inside its work area |
 | [overlay.popover](overlay/popover.md) | Anchored popover | done | any | Anchored overlay placement and lifecycle: flip and shift inside the window, dismiss on outside click, Escape and focus loss, Popup layer, focus scope |
 | [overlay.toast-notifications](overlay/toast-notifications.md) | Toasts and notification history | done | lunegit | Bottom-right toast stack (max 3, timed dismissal, loading and prompt toasts) and a 50-item notification history |
 | [overlay.tooltip](overlay/tooltip.md) | Tooltips | done | lunegit, wane | Hover tooltip: glass shell radius 8, padding 10 by 8, one 800 ms show delay, text or small rich content, also on disabled controls |
