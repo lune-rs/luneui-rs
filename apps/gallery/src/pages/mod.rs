@@ -87,8 +87,9 @@ mod virtual_list;
 mod window;
 
 pub(crate) use docked_panels::{
-    METER_FRAME_MS, METER_LIVE, MenuPick, MenuState, PanelFrame, PanelKind, PanelView, draw_menu,
-    draw_panel, menu_pick, menu_window_size, meter_pixels, panel_shape,
+    METER_FRAME_MS, METER_LIVE, MenuPick, MenuState, PanelFrame, PanelKind, PanelView, body_probe,
+    draw_menu, draw_panel, menu_pick, menu_window_size, meter_pixels, notch_probe, panel_shape,
+    pictures as panel_pictures,
 };
 pub(crate) use tray::{SurfaceFrame, draw_surface, surface_size};
 

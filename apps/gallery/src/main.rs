@@ -12,6 +12,10 @@
 //! - `--smoke-platform`: puts an item in the tray, opens and closes its surface and tears down,
 //!   in about two seconds (see `smoke`). It needs a logged-in GUI session: exit 0 when it ran
 //!   and held, 1 when a check failed, 2 when there is no session to run in;
+//! - `--smoke-panels`: opens the docked panels and the menu window of the `docked-panels` page and
+//!   checks them on the real desktop with synthetic pointers (see `smoke_panels`). It needs a
+//!   logged-in GUI session: exit 0 when every applicable check held, 1 when one failed, 2 when there
+//!   is no session to run in;
 //! - `--pace-probe`: times the frame pacing on the real renderer in four phases (see `pace`). It
 //!   needs a logged-in GUI session; a window opens for about 15 s, leave it visible and untouched;
 //!   exit 0 held, 1 did not hold, 2 could not measure.
@@ -33,6 +37,7 @@ mod popover;
 mod scenes;
 mod showcase;
 mod smoke;
+mod smoke_panels;
 mod window;
 
 use std::path::{Path, PathBuf};
@@ -47,7 +52,7 @@ use page::{FrameTweaks, PageKind, meets_expectation, register_images, release_im
 use pages::PAGES;
 use scenes::{H, W};
 
-const USAGE: &str = "usage: gallery [--dump <dir> | --list | --bench [--runs N] [--frames N] [--size WxH] | --smoke-platform | --pace-probe]\n  --smoke-platform needs a logged-in GUI session (it puts an item in the tray for about 2 s); exit 2 without one\n  --pace-probe needs a logged-in GUI session; a window opens for about 15 s, leave it visible and untouched; exit 0 held, 1 did not hold, 2 could not measure";
+const USAGE: &str = "usage: gallery [--dump <dir> | --list | --bench [--runs N] [--frames N] [--size WxH] | --smoke-platform | --smoke-panels | --pace-probe]\n  --smoke-platform needs a logged-in GUI session (it puts an item in the tray for about 2 s); exit 2 without one\n  --smoke-panels needs a logged-in GUI session (three panel windows and a menu open for about 10 s; it never moves the cursor); exit 0 held, 1 failed, 2 no session\n  --pace-probe needs a logged-in GUI session; a window opens for about 15 s, leave it visible and untouched; exit 0 held, 1 did not hold, 2 could not measure";
 
 enum Command {
     Window,
@@ -55,6 +60,7 @@ enum Command {
     List,
     Bench(bench::Options),
     SmokePlatform,
+    SmokePanels,
     PaceProbe,
 }
 
@@ -63,6 +69,7 @@ fn parse(args: &[String]) -> Result<Command, String> {
         [] => Ok(Command::Window),
         [a] if a == "--list" => Ok(Command::List),
         [a] if a == "--smoke-platform" => Ok(Command::SmokePlatform),
+        [a] if a == "--smoke-panels" => Ok(Command::SmokePanels),
         [a] if a == "--pace-probe" => Ok(Command::PaceProbe),
         [a, dir] if a == "--dump" => Ok(Command::Dump(PathBuf::from(dir))),
         [a, rest @ ..] if a == "--bench" => bench::Options::parse(rest).map(Command::Bench),
@@ -115,6 +122,7 @@ fn main() -> ExitCode {
         }
         Command::Bench(opts) => bench::run(&opts),
         Command::SmokePlatform => smoke::run(),
+        Command::SmokePanels => smoke_panels::run(),
         Command::PaceProbe => pace::run(),
         Command::Window => window::run(),
     }

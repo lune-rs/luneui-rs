@@ -109,6 +109,8 @@ struct Panel {
     mode: ShapeMode,
     /// The control flow this panel's last frame asked for.
     flow: ControlFlow,
+    /// Frames drawn into this window.
+    frames: u64,
 }
 
 /// A drag of the panels, from a press on a strip until the button is released.
@@ -304,6 +306,7 @@ impl PanelsHost {
                 follower: ShapeFollower::default(),
                 mode: ShapeMode::Unsupported,
                 flow: ControlFlow::Wait,
+                frames: 0,
             });
         }
         let mut host = Self {
@@ -487,11 +490,19 @@ impl PanelsHost {
         let Some((id, pointer)) = self.press else {
             return;
         };
+        if self.panels[i].window.id() == id {
+            self.begin_drag(i, pointer);
+        }
+    }
+
+    /// Starts a drag of panel `i` with the pointer at `pointer` (desktop units): the path a
+    /// press takes, with the pointer given. Returns whether a drag began.
+    pub(crate) fn begin_drag(&mut self, i: usize, pointer: DesktopPoint) -> bool {
         let Some(frames) = frames_of(&self.panels) else {
-            return;
+            return false;
         };
-        if self.panels[i].window.id() != id || self.drag.is_some() {
-            return;
+        if self.drag.is_some() || i >= self.panels.len() {
+            return false;
         }
         let moving = if i == 0 {
             docked_with(0, &frames)
@@ -511,15 +522,20 @@ impl PanelsHost {
             areas,
             within,
         });
+        true
     }
 
-    /// Moves the dragged set to where the OS pointer puts it now: one batch, and only when an
-    /// origin changed.
+    /// Moves the dragged set to where the OS pointer puts it now.
     fn drag_to_pointer(&mut self) {
+        if let Some(pointer) = desktop::pointer() {
+            self.drag_to(pointer);
+        }
+    }
+
+    /// Moves the dragged set to where `pointer` puts it: one batch, and only when an origin
+    /// changed.
+    pub(crate) fn drag_to(&mut self, pointer: DesktopPoint) {
         let Some(drag) = &self.drag else {
-            return;
-        };
-        let Some(pointer) = desktop::pointer() else {
             return;
         };
         let Some(frames) = frames_of(&self.panels) else {
@@ -541,7 +557,7 @@ impl PanelsHost {
     }
 
     /// The button came up: the drag is over, and the group learns which members are docked now.
-    fn end_drag(&mut self) {
+    pub(crate) fn end_drag(&mut self) {
         if self.drag.take().is_some() {
             self.dock_all();
         }
@@ -573,7 +589,7 @@ impl PanelsHost {
     }
 
     /// Rolls the first panel up to its strip, or down again.
-    fn toggle_shade(&mut self) {
+    pub(crate) fn toggle_shade(&mut self) {
         self.flags.shaded = !self.flags.shaded;
         let command = size_command(PanelKind::Main, self.flags.shaded, self.factor());
         self.route(0, command);
@@ -716,7 +732,7 @@ impl PanelsHost {
         event_loop: &ActiveEventLoop,
         r: &mut Renderer,
         at: DesktopPoint,
-    ) -> Result<(), String> {
+    ) -> Result<DesktopRect, String> {
         let mini = self.panels[PanelKind::Mini.index()].window.clone();
         let state = self.menu_state();
         let logical = {
@@ -744,7 +760,55 @@ impl PanelsHost {
         if let Some(m) = &mut self.menu {
             m.open(logical, placed.origin());
         }
-        Ok(())
+        Ok(placed)
+    }
+
+    /// The menu's window, once it has been made.
+    pub(crate) fn menu_window(&self) -> Option<&Arc<Window>> {
+        self.menu.as_ref().map(MenuWindow::window)
+    }
+
+    /// Whether the menu is shown and has not been closed.
+    pub(crate) fn menu_open(&self) -> bool {
+        self.menu.as_ref().is_some_and(|m| m.open && m.visible)
+    }
+
+    /// Closes the menu as a dismissal does: its exit plays and the window hides once idle.
+    pub(crate) fn dismiss_menu(&mut self) {
+        if let Some(m) = &mut self.menu {
+            m.open = false;
+            m.window().request_redraw();
+        }
+    }
+
+    /// The window of panel `i`.
+    pub(crate) fn window(&self, i: usize) -> &Arc<Window> {
+        &self.panels[i].window
+    }
+
+    /// The group the panels are in.
+    pub(crate) fn group(&self) -> &WindowGroup {
+        &self.group
+    }
+
+    /// Every panel's frame in desktop units, in panel order; `None` while the OS cannot say.
+    pub(crate) fn frames(&self) -> Option<Vec<DesktopRect>> {
+        frames_of(&self.panels)
+    }
+
+    /// The distance, in desktop units, within which a drag of panel `i` snaps.
+    pub(crate) fn snap_within(&self, i: usize) -> i32 {
+        to_units(SNAP, desktop::units_per_logical(&self.panels[i].window))
+    }
+
+    /// Frames drawn into panel `i`'s window so far.
+    pub(crate) fn frames_drawn(&self, i: usize) -> u64 {
+        self.panels[i].frames
+    }
+
+    /// How many meter pictures were written and how many writes were refused.
+    pub(crate) fn meter_writes(&self) -> (u32, u32) {
+        (self.meter_writes, self.meter_errors)
     }
 
     fn render_menu(&mut self, r: &mut Renderer, now: Duration) -> Result<Outcome, String> {
@@ -831,6 +895,7 @@ impl Panel {
         window.pre_present_notify();
         self.surface.present(&r.gpu, frame);
         r.gpu.end_frame(&mut r.text);
+        self.frames += 1;
         let (flow, redraw) = control_flow(out.repaint, start);
         self.flow = flow;
         if redraw {
