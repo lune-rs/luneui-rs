@@ -124,7 +124,10 @@ impl WindowGroup {
     }
 
     /// Restores the group from [`WindowGroup::minimise`]: the leader comes back, and on macOS the
-    /// detached members are ordered in front again without taking the keys.
+    /// detached members are ordered in front again without taking the keys. The app calls this
+    /// when the leader comes back from the OS's own un-minimise (the Dock, the taskbar), not only
+    /// when it restores the group itself: on macOS the detached members stay ordered out until it
+    /// does. It is harmless on a group already restored.
     pub fn restore(&self) {
         self.leader.set_minimized(false);
         os::show_detached(&self.windows(), &self.docked());

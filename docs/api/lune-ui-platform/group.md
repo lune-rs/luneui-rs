@@ -91,7 +91,10 @@ Source: `crates/lune-ui-platform/src/group.rs:47`
 - <a id="method.WindowGroup.restore"></a>`pub fn restore(&self)`
 
   Restores the group from [`WindowGroup::minimise`](group.md#method.WindowGroup.minimise): the leader comes back, and on macOS the
-  detached members are ordered in front again without taking the keys.
+  detached members are ordered in front again without taking the keys. The app calls this
+  when the leader comes back from the OS's own un-minimise (the Dock, the taskbar), not only
+  when it restores the group itself: on macOS the detached members stay ordered out until it
+  does. It is harmless on a group already restored.
 
 - <a id="method.WindowGroup.set_always_on_top"></a>`pub fn set_always_on_top(&self, on: bool)`
 

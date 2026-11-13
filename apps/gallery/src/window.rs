@@ -529,7 +529,12 @@ impl ApplicationHandler<AppEvent> for App {
             self.panels_window_event(event_loop, id, &event);
             return;
         }
+        // A window the host already dropped (a later `Destroyed` or `Focused(false)`) is not the
+        // showcase window: its events never reach the main window's input or frame.
         let Some(shown) = &mut self.shown else { return };
+        if shown.window.id() != id {
+            return;
+        }
         shown.bridge.window_event(&shown.window, &event);
         let action = match &event {
             WindowEvent::KeyboardInput { event: key, .. } if key.state == ElementState::Pressed => {

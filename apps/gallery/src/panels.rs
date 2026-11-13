@@ -149,6 +149,10 @@ pub(crate) struct PanelsHost {
     /// The app's time origin, for the control flow the frames ask for.
     start: Instant,
     closing: bool,
+    /// The group was minimised by a panel's control and not yet restored: the leader coming back
+    /// from the OS's own un-minimise must call `WindowGroup::restore` (macOS orders the detached
+    /// members out on a minimise).
+    minimised: bool,
 }
 
 impl std::fmt::Debug for PanelsHost {
@@ -326,6 +330,7 @@ impl PanelsHost {
             meter_errors: 0,
             start,
             closing: false,
+            minimised: false,
         };
         host.dock_all();
         for i in 0..host.panels.len() {
@@ -441,7 +446,13 @@ impl PanelsHost {
                 self.closing = true;
                 return self.outcome();
             }
-            WindowEvent::Focused(true) => self.group.raise(id),
+            WindowEvent::Focused(true) => {
+                if i == 0 && self.minimised {
+                    self.minimised = false;
+                    self.group.restore();
+                }
+                self.group.raise(id);
+            }
             WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. } => self.reshape(i),
             WindowEvent::MouseInput {
                 state,
@@ -570,7 +581,10 @@ impl PanelsHost {
     fn route(&mut self, i: usize, command: WindowCommand) {
         if goes_to_group(&command) {
             match command {
-                WindowCommand::Minimize => self.group.minimise(),
+                WindowCommand::Minimize => {
+                    self.group.minimise();
+                    self.minimised = true;
+                }
                 WindowCommand::SetAlwaysOnTop(on) => {
                     self.group.set_always_on_top(on);
                     self.flags.on_top = on;
