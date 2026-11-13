@@ -5,13 +5,13 @@
 //! the pointer are read from AppKit. Every function needs the main thread and answers `None` or an
 //! empty list elsewhere.
 
-use lune_ui_core::desktop::{DesktopPoint, DesktopRect, Monitor};
+use lune_ui_core::desktop::{DesktopPoint, DesktopRect, Monitor, WindowShape};
 use objc2::MainThreadMarker;
 use objc2_app_kit::{NSEvent, NSScreen, NSWindow};
 use winit::dpi::LogicalPosition;
 use winit::window::Window;
 
-use crate::desktop::{flip_rect, flip_y, round_units};
+use crate::desktop::{ShapeMode, flip_rect, flip_y, round_units};
 use crate::platform::macos::ns_window;
 
 /// The height of the primary display in points: the line the y axis is flipped about.
@@ -87,4 +87,20 @@ pub(crate) fn window_at(window: &Window, at: DesktopPoint) -> Option<bool> {
     point.y = height - f64::from(at.y);
     let number = NSWindow::windowNumberAtPoint_belowWindowWithWindowNumber(point, 0, mtm);
     Some(number == own.windowNumber())
+}
+
+/// AppKit has no window shape: the pointer is followed instead (`crate::desktop::ShapeFollower`).
+pub(crate) const SHAPE_MODE: ShapeMode = ShapeMode::Pointer;
+
+pub(crate) fn set_window_shape(
+    window: &Window,
+    shape: Option<&WindowShape>,
+    _scale: f32,
+) -> Result<ShapeMode, String> {
+    if shape.is_none() {
+        // The follower may have left the window letting the pointer through. AppKit's
+        // `ignoresMouseEvents` cannot refuse, so there is no error to pass on.
+        let _ = window.set_cursor_hittest(true);
+    }
+    Ok(SHAPE_MODE)
 }

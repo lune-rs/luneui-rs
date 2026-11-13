@@ -47,6 +47,7 @@ Source: `crates/lune-ui/src/lib.rs:1`
 | `dump` | Module | [`lune_ui_wgpu::dump`](../lune-ui-wgpu/dump.md) |
 | `frame` | Module | [`lune_ui_wgpu::frame`](../lune-ui-wgpu/frame.md) |
 | `gpu` | Module | [`lune_ui_wgpu::gpu`](../lune-ui-wgpu/gpu.md) |
+| `group` | Module | [`lune_ui_platform::group`](../lune-ui-platform/group.md) |
 | `icon` | Module | [`lune_ui_core::icon`](../lune-ui-core/icon.md) |
 | `image` | Module | [`lune_ui_core::image`](../lune-ui-core/image.md) |
 | `json` | Module | [`lune_ui_core::json`](../lune-ui-core/json.md) |

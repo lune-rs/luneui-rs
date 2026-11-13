@@ -15,8 +15,11 @@ Source: `crates/lune-ui/src/lib.rs:28`
 | --- | --- | --- |
 | `DesktopPoint` | Struct | [`lune_ui_core::desktop::DesktopPoint`](../lune-ui-core/desktop.md#struct.DesktopPoint) |
 | `DesktopRect` | Struct | [`lune_ui_core::desktop::DesktopRect`](../lune-ui-core/desktop.md#struct.DesktopRect) |
+| `Follow` | Enum | [`lune_ui_platform::desktop::Follow`](../lune-ui-platform/desktop.md#enum.Follow) |
 | `Monitor` | Struct | [`lune_ui_core::desktop::Monitor`](../lune-ui-core/desktop.md#struct.Monitor) |
 | `ShapeError` | Enum | [`lune_ui_core::desktop::ShapeError`](../lune-ui-core/desktop.md#enum.ShapeError) |
+| `ShapeFollower` | Struct | [`lune_ui_platform::desktop::ShapeFollower`](../lune-ui-platform/desktop.md#struct.ShapeFollower) |
+| `ShapeMode` | Enum | [`lune_ui_platform::desktop::ShapeMode`](../lune-ui-platform/desktop.md#enum.ShapeMode) |
 | `WindowShape` | Struct | [`lune_ui_core::desktop::WindowShape`](../lune-ui-core/desktop.md#struct.WindowShape) |
 | `monitor_at` | Function | [`lune_ui_core::desktop::monitor_at`](../lune-ui-core/desktop.md#fn.monitor_at) |
 | `monitors` | Function | [`lune_ui_platform::desktop::monitors`](../lune-ui-platform/desktop.md#fn.monitors) |
@@ -24,6 +27,7 @@ Source: `crates/lune-ui/src/lib.rs:28`
 | `place_popup` | Function | [`lune_ui_core::desktop::place_popup`](../lune-ui-core/desktop.md#fn.place_popup) |
 | `pointer` | Function | [`lune_ui_platform::desktop::pointer`](../lune-ui-platform/desktop.md#fn.pointer) |
 | `set_window_origin` | Function | [`lune_ui_platform::desktop::set_window_origin`](../lune-ui-platform/desktop.md#fn.set_window_origin) |
+| `set_window_shape` | Function | [`lune_ui_platform::desktop::set_window_shape`](../lune-ui-platform/desktop.md#fn.set_window_shape) |
 | `to_units` | Function | [`lune_ui_core::desktop::to_units`](../lune-ui-core/desktop.md#fn.to_units) |
 | `units_per_logical` | Function | [`lune_ui_platform::desktop::units_per_logical`](../lune-ui-platform/desktop.md#fn.units_per_logical) |
 | `window_at` | Function | [`lune_ui_platform::desktop::window_at`](../lune-ui-platform/desktop.md#fn.window_at) |

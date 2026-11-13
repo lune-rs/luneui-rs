@@ -21,7 +21,7 @@ pub use theme::near_black;
 
 pub use lune_ui_wgpu::{blur, custom, dump, frame, gpu, surface};
 
-pub use lune_ui_platform::{material, popover};
+pub use lune_ui_platform::{group, material, popover};
 
 /// The desktop: the core's units, monitors, popup placement and window shapes, and the OS
 /// functions that read the monitors and the pointer and move windows (`lune-ui-platform`).

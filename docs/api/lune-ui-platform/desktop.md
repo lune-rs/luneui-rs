@@ -14,7 +14,132 @@ them), points from the top-left of the primary display, y down, on macOS. A wind
 become units by [`units_per_logical`](desktop.md#fn.units_per_logical). The macOS functions must run on the main thread and
 answer `None` or an empty list elsewhere.
 
+A window can also be given a shape ([`set_window_shape`](desktop.md#fn.set_window_shape)): the part of it that is drawn and
+takes the pointer, so the desktop shows, and takes clicks, between the parts (D315).
+
 Source: `crates/lune-ui-platform/src/desktop.rs:1`
+
+## Structs
+
+<a id="struct.ShapeFollower"></a>
+### Struct `ShapeFollower`
+
+```rust
+pub struct ShapeFollower {
+    // some fields omitted
+}
+```
+
+Follows the pointer for a shaped window on a platform whose mode is [`ShapeMode::Pointer`](desktop.md#variant.ShapeMode.Pointer):
+over the window's frame but outside its shape the window lets clicks through to what is
+below, and everywhere else it takes them. Where the mode is not `Pointer` it does nothing and
+always answers [`Follow::Idle`](desktop.md#variant.Follow.Idle). One follower per window.
+
+Source: `crates/lune-ui-platform/src/desktop.rs:119`
+
+**Methods and associated items**
+
+`impl ShapeFollower`
+
+- <a id="method.ShapeFollower.update"></a>
+
+  ```rust
+  pub fn update(
+      &mut self,
+      window: &Window,
+      shape: Option<&WindowShape>,
+      scale: f32,
+      pointer: Option<DesktopPoint>,
+  ) -> Follow
+  ```
+
+  Updates the window for the pointer at `pointer` (desktop units, from [`pointer()`](desktop.md#fn.pointer)), with the
+  window's `shape` and the frame's `scale` as given to [`set_window_shape`](desktop.md#fn.set_window_shape). It calls the
+  window only when what it should do changes. No pointer or no frame make the window take
+  clicks.
+
+**Trait implementations**
+
+- `impl Debug for ShapeFollower`
+- `impl Default for ShapeFollower`
+
+## Enums
+
+<a id="enum.Follow"></a>
+### Enum `Follow`
+
+```rust
+pub enum Follow {
+    Idle,
+    Poll,
+}
+```
+
+What [`ShapeFollower::update`](desktop.md#method.ShapeFollower.update) asks of the app.
+
+Source: `crates/lune-ui-platform/src/desktop.rs:105`
+
+**Variants**
+
+- <a id="variant.Follow.Idle"></a>`Idle`
+
+  Nothing until the window's next pointer event.
+
+- <a id="variant.Follow.Poll"></a>`Poll`
+
+  The window lets the pointer through, so it gets no pointer events: call
+  [`ShapeFollower::update`](desktop.md#method.ShapeFollower.update) again soon (on a short timer) with the OS pointer, so the window
+  takes clicks again when the pointer comes back into its shape or leaves its frame.
+
+**Trait implementations**
+
+- `impl Clone for Follow`
+- `impl Copy for Follow`
+- `impl Debug for Follow`
+- `impl Eq for Follow`
+- `impl PartialEq for Follow`
+- `impl StructuralPartialEq for Follow`
+
+<a id="enum.ShapeMode"></a>
+### Enum `ShapeMode`
+
+```rust
+pub enum ShapeMode {
+    Region,
+    Pointer,
+    Unsupported,
+}
+```
+
+How a platform gives a window its shape, as [`set_window_shape`](desktop.md#fn.set_window_shape) reports it.
+
+Source: `crates/lune-ui-platform/src/desktop.rs:68`
+
+**Variants**
+
+- <a id="variant.ShapeMode.Region"></a>`Region`
+
+  The OS clips the window to the shape, both its drawing and the pointer (Windows: a window
+  region). Nothing more is needed until the window's size or scale changes.
+
+- <a id="variant.ShapeMode.Pointer"></a>`Pointer`
+
+  The OS has no shape for a window: the app keeps a [`ShapeFollower`](desktop.md#struct.ShapeFollower) up to date with the
+  pointer, which lets clicks outside the shape through to what is below (macOS). The app
+  draws nothing outside the shape itself.
+
+- <a id="variant.ShapeMode.Unsupported"></a>`Unsupported`
+
+  The platform cannot shape a window: the whole frame takes the pointer.
+
+**Trait implementations**
+
+- `impl Clone for ShapeMode`
+- `impl Copy for ShapeMode`
+- `impl Debug for ShapeMode`
+- `impl Eq for ShapeMode`
+- `impl PartialEq for ShapeMode`
+- `impl StructuralPartialEq for ShapeMode`
 
 ## Functions
 
@@ -28,7 +153,7 @@ pub fn monitors(window: &winit::window::Window) -> Vec<lune_ui_core::desktop::Mo
 The monitors the OS has, with their bounds and work areas in desktop units. `window` is any
 window of the app: the OS asks it for its display list. Empty when the list cannot be read.
 
-Source: `crates/lune-ui-platform/src/desktop.rs:18`
+Source: `crates/lune-ui-platform/src/desktop.rs:21`
 
 <a id="fn.move_windows"></a>
 ### Function `move_windows`
@@ -44,7 +169,7 @@ the OS can (Windows: one `DeferWindowPos` batch, so a docked set moves in one st
 stacking order do not change. An empty list is `Ok`. On `Err` no promise is made about which
 windows moved.
 
-Source: `crates/lune-ui-platform/src/desktop.rs:45`
+Source: `crates/lune-ui-platform/src/desktop.rs:48`
 
 <a id="fn.pointer"></a>
 ### Function `pointer`
@@ -57,7 +182,7 @@ The pointer's position in desktop units, read from the OS now, wherever it is (a
 every window of the app). `None` when the OS cannot say. This is live OS state, so a frame that
 must stay deterministic gets it from the app.
 
-Source: `crates/lune-ui-platform/src/desktop.rs:25`
+Source: `crates/lune-ui-platform/src/desktop.rs:28`
 
 <a id="fn.set_window_origin"></a>
 ### Function `set_window_origin`
@@ -69,7 +194,31 @@ pub fn set_window_origin(window: &winit::window::Window, at: lune_ui_core::deskt
 Moves `window` so that its outer top-left corner is at `at`, in desktop units. Its size and
 its place in the stacking order do not change.
 
-Source: `crates/lune-ui-platform/src/desktop.rs:37`
+Source: `crates/lune-ui-platform/src/desktop.rs:40`
+
+<a id="fn.set_window_shape"></a>
+### Function `set_window_shape`
+
+```rust
+pub fn set_window_shape(
+    window: &winit::window::Window,
+    shape: Option<&lune_ui_core::desktop::WindowShape>,
+    scale: f32,
+) -> Result<ShapeMode, String>
+```
+
+Gives `window` a shape, or takes it away with `None`: the part of the window that is drawn and
+takes the pointer. The shape is in the frame's logical px, from the top-left of the window's
+content; `scale` is the frame's physical px per shape unit (`RawInput::scale`), so a window
+drawn at a zoom keeps its shape in step with what it draws. A non-finite or non-positive
+`scale` is an `Err` and changes nothing.
+
+The OS does not rescale a shape: the app sets it again after the window is resized or its
+scale factor changes. On Windows the shape becomes the window region ([`ShapeMode::Region`](desktop.md#variant.ShapeMode.Region));
+on macOS it is followed with the pointer ([`ShapeMode::Pointer`](desktop.md#variant.ShapeMode.Pointer); `None` makes the whole
+window take clicks again); elsewhere nothing happens ([`ShapeMode::Unsupported`](desktop.md#variant.ShapeMode.Unsupported)).
+
+Source: `crates/lune-ui-platform/src/desktop.rs:90`
 
 <a id="fn.units_per_logical"></a>
 ### Function `units_per_logical`
@@ -81,7 +230,7 @@ pub fn units_per_logical(window: &winit::window::Window) -> f32
 Desktop units per logical px for `window`: its scale factor on Windows and X11, 1.0 on macOS
 where the units are points.
 
-Source: `crates/lune-ui-platform/src/desktop.rs:51`
+Source: `crates/lune-ui-platform/src/desktop.rs:54`
 
 <a id="fn.window_at"></a>
 ### Function `window_at`
@@ -96,9 +245,9 @@ pub fn window_at(
 Whether `window` is the top-level window the OS would hit at `at` (desktop units): `Some(true)`
 when it is, `Some(false)` when another window or the bare desktop is, `None` when the OS cannot
 say (or the platform has no way to ask). A window with a shape does not answer for the part
-outside the shape. This is live OS state, like [`pointer`].
+outside the shape. This is live OS state, like [`pointer()`](desktop.md#fn.pointer).
 
-Source: `crates/lune-ui-platform/src/desktop.rs:59`
+Source: `crates/lune-ui-platform/src/desktop.rs:62`
 
 <a id="fn.window_frame"></a>
 ### Function `window_frame`
@@ -110,5 +259,5 @@ pub fn window_frame(window: &winit::window::Window) -> Option<lune_ui_core::desk
 The window's outer frame in desktop units. `None` when the OS cannot say, or the window has
 no position (a minimised window on some systems).
 
-Source: `crates/lune-ui-platform/src/desktop.rs:31`
+Source: `crates/lune-ui-platform/src/desktop.rs:34`
 

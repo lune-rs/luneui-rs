@@ -5,15 +5,17 @@
 [API reference](../INDEX.md)
 
 OS layer of the glass UI toolkit: the platform glass effect behind a transparent window, behind
-the core's `Backdrop` capability ([`material`](material.md)), the tray item ([`tray`](tray.md)) and the popover window
-a tray surface draws in ([`popover`](popover.md)). The OS code lives in `material/` and `platform/`, one
-file per platform, selected by `cfg`.
+the core's `Backdrop` capability ([`material`](material.md)), the tray item ([`tray`](tray.md)), the popover window
+a tray surface draws in ([`popover`](popover.md)), the desktop and window shapes ([`desktop`](desktop.md)) and window
+groups ([`group`](group.md)). The OS code lives in `material/` and `platform/`, one file per platform,
+selected by `cfg`.
 
 Source: `crates/lune-ui-platform/src/lib.rs:1`
 
 ## Modules
 
 - [`desktop`](desktop.md) - The desktop as the OS reports it, in the core's desktop units ([`lune_ui_core::desktop`](../lune-ui-core/desktop.md)): the monitors and their work areas, the pointer, a window's frame, moving windows,...
+- [`group`](group.md) - Window groups: several windows of one app that the OS treats as one, so they come to the front, stay on top and minimise together (D316).
 - [`material`](material.md) - OS backdrop material behind a transparent window.
 - [`popover`](popover.md) - The window a tray surface draws in: borderless, above everything, shown and hidden by the app.
 - [`tray`](tray.md) - The tray item: the notification-area icon on Windows, the menu-bar status item on macOS.

@@ -3,9 +3,12 @@
 
 use std::mem::size_of;
 
-use lune_ui_core::desktop::{DesktopPoint, DesktopRect, Monitor};
+use lune_ui_core::desktop::{DesktopPoint, DesktopRect, Monitor, WindowShape};
 use windows_sys::Win32::Foundation::{HWND, POINT};
-use windows_sys::Win32::Graphics::Gdi::{GetMonitorInfoW, HMONITOR, MONITORINFO};
+use windows_sys::Win32::Graphics::Gdi::{
+    ALTERNATE, CombineRgn, CreatePolygonRgn, CreateRectRgn, DeleteObject, GetMonitorInfoW,
+    HMONITOR, HRGN, MONITORINFO, RGN_ERROR, RGN_OR, SetWindowRgn,
+};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     BeginDeferWindowPos, DeferWindowPos, EndDeferWindowPos, GA_ROOT, GetAncestor, GetCursorPos,
     MONITORINFOF_PRIMARY, SWP_NOACTIVATE, SWP_NOOWNERZORDER, SWP_NOSIZE, SWP_NOZORDER,
@@ -16,8 +19,10 @@ use winit::platform::windows::MonitorHandleExtWindows;
 use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use winit::window::Window;
 
+use crate::desktop::{ShapeMode, region_points};
+
 /// The native handle of `window`.
-fn hwnd(window: &Window) -> Option<HWND> {
+pub(crate) fn hwnd(window: &Window) -> Option<HWND> {
     match window.window_handle().ok()?.as_raw() {
         RawWindowHandle::Win32(h) => Some(h.hwnd.get() as HWND),
         _ => None,
@@ -136,4 +141,89 @@ pub(crate) fn window_at(window: &Window, at: DesktopPoint) -> Option<bool> {
     // SAFETY: both calls take plain values; a null result (nothing at the point) is compared as is.
     let top = unsafe { GetAncestor(WindowFromPoint(POINT { x: at.x, y: at.y }), GA_ROOT) };
     Some(top == own)
+}
+
+/// A window region is the OS's clip of the window, for drawing and the pointer at once.
+pub(crate) const SHAPE_MODE: ShapeMode = ShapeMode::Region;
+
+/// A GDI region this code still owns: deleted when dropped, unless handed to the window.
+struct OwnedRegion(HRGN);
+
+impl OwnedRegion {
+    /// Takes `region` (a fresh handle, or null for a failed creation, which is an `Err`).
+    fn new(region: HRGN, what: &str) -> Result<Self, String> {
+        if region.is_null() {
+            Err(format!("{what} failed"))
+        } else {
+            Ok(Self(region))
+        }
+    }
+
+    /// Lets go of the handle without deleting it: it now belongs to whoever took it.
+    fn into_raw(self) -> HRGN {
+        let region = self.0;
+        std::mem::forget(self);
+        region
+    }
+}
+
+impl Drop for OwnedRegion {
+    fn drop(&mut self) {
+        // SAFETY: the handle is a live region this code created and nobody else owns: one handed
+        // to a window leaves through `into_raw`, which skips this.
+        unsafe { DeleteObject(self.0) };
+    }
+}
+
+pub(crate) fn set_window_shape(
+    window: &Window,
+    shape: Option<&WindowShape>,
+    scale: f32,
+) -> Result<ShapeMode, String> {
+    let h = hwnd(window).ok_or("the window has no native handle")?;
+    let Some(shape) = shape else {
+        // SAFETY: a null region takes the window's region away (the OS deletes the old one);
+        // `h` is a window handle from winit.
+        if unsafe { SetWindowRgn(h, std::ptr::null_mut(), 1) } == 0 {
+            return Err("SetWindowRgn failed".into());
+        }
+        return Ok(ShapeMode::Region);
+    };
+    // A region is relative to the window's outer top-left; the shape to its content's.
+    let offset = match (window.inner_position(), window.outer_position()) {
+        (Ok(inner), Ok(outer)) => (
+            inner.x.saturating_sub(outer.x),
+            inner.y.saturating_sub(outer.y),
+        ),
+        _ => (0, 0),
+    };
+    // Starts empty, so a shape with no polygon is a window with no area.
+    // SAFETY: the call takes plain values and returns a new region or null.
+    let acc = OwnedRegion::new(unsafe { CreateRectRgn(0, 0, 0, 0) }, "CreateRectRgn")?;
+    for polygon in region_points(shape, scale, offset) {
+        let points: Vec<POINT> = polygon.iter().map(|&(x, y)| POINT { x, y }).collect();
+        let count = i32::try_from(points.len()).map_err(|_| "a polygon has too many points")?;
+        // SAFETY: `points` is a live array of `count` POINTs, read during the call only. Each
+        // polygon is filled even-odd on its own (`ALTERNATE`), as `WindowShape::contains` does.
+        let part = OwnedRegion::new(
+            unsafe { CreatePolygonRgn(points.as_ptr(), count, ALTERNATE) },
+            "CreatePolygonRgn",
+        )?;
+        // SAFETY: both are live regions this code owns; the destination may be a source. The
+        // polygons are a union, so they are combined one by one with `RGN_OR`.
+        let kind = unsafe { CombineRgn(acc.0, acc.0, part.0, RGN_OR) };
+        // `part` is deleted here whatever the call answered; `acc` by its guard on an `Err`.
+        drop(part);
+        if kind == RGN_ERROR {
+            return Err("CombineRgn failed".into());
+        }
+    }
+    // SAFETY: `h` is a window handle from winit and `acc.0` a live region this code owns. On
+    // success the OS owns the region and deletes it itself, so the guard lets go of it; on
+    // failure the guard still owns it and deletes it.
+    if unsafe { SetWindowRgn(h, acc.0, 1) } == 0 {
+        return Err("SetWindowRgn failed".into());
+    }
+    let _owned_by_the_window = acc.into_raw();
+    Ok(ShapeMode::Region)
 }
