@@ -220,7 +220,7 @@ Source: `crates/lune-ui-core/src/paint.rs:232`
 - <a id="method.Painter.image_part"></a>`pub fn image_part(&mut self, dst: Rect, id: ImageId, part: ImagePart, alpha: f32)`
 
   Draws `part` of the picture registered as `id` into `dst` at opacity `alpha`, contained
-  and centred, sampled by [`Sampling::Auto`]: [`Self::image_with`](paint.md#method.Painter.image_with) with every other field at
+  and centred, sampled by [`Sampling::Auto`](image.md#variant.Sampling.Auto): [`Self::image_with`](paint.md#method.Painter.image_with) with every other field at
   its default.
 
 - <a id="method.Painter.image_rotated"></a>

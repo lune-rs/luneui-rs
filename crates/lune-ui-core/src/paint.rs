@@ -908,7 +908,7 @@ impl<'a, H: Copy + PartialEq> Painter<'a, H> {
     }
 
     /// Draws `part` of the picture registered as `id` into `dst` at opacity `alpha`, contained
-    /// and centred, sampled by [`Sampling::Auto`]: [`Self::image_with`] with every other field at
+    /// and centred, sampled by [`Sampling::Auto`](crate::image::Sampling::Auto): [`Self::image_with`] with every other field at
     /// its default.
     pub fn image_part(&mut self, dst: Rect, id: ImageId, part: ImagePart, alpha: f32) {
         let draw = ImageDraw {
