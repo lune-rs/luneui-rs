@@ -149,6 +149,16 @@ pub(crate) trait PageState {
         None
     }
 
+    /// Whether the page's switch asks for the live panel windows (`panels.rs`), for window mode;
+    /// `false` on every page that has none.
+    fn panels(&self) -> bool {
+        false
+    }
+
+    /// The panel windows went away on their own (a close control, a failed start): the page turns
+    /// its switch off, so the host is not made again. The default ignores it.
+    fn panels_closed(&mut self) {}
+
     /// Input the page adds to a frame's before it begins: the host of other pages replays a
     /// scene's script here. `store` holds the previous frame, for the rects a script aims at.
     /// The default adds nothing.

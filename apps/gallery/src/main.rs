@@ -28,6 +28,7 @@ mod custom;
 mod pace;
 mod page;
 mod pages;
+mod panels;
 mod popover;
 mod scenes;
 mod showcase;

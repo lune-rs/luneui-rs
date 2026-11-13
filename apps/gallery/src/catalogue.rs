@@ -692,9 +692,9 @@ mod tests {
     }
 
     #[test]
-    fn the_catalogue_loads_98_entries_of_which_four_are_external() {
+    fn the_catalogue_loads_103_entries_of_which_four_are_external() {
         let (entries, _) = all();
-        assert_eq!(entries.len(), 98);
+        assert_eq!(entries.len(), 103);
         assert_eq!(entries.iter().filter(|e| e.status == "external").count(), 4);
     }
 

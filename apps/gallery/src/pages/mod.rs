@@ -23,6 +23,7 @@ mod command_palette;
 mod controls_ui;
 mod dialog;
 mod diff_view;
+mod docked_panels;
 mod drag_drop;
 mod dropdown;
 pub(crate) mod effects;
@@ -85,6 +86,10 @@ mod verdict_row;
 mod virtual_list;
 mod window;
 
+pub(crate) use docked_panels::{
+    METER_FRAME_MS, METER_LIVE, MenuPick, MenuState, PanelFrame, PanelKind, PanelView, draw_menu,
+    draw_panel, menu_pick, menu_window_size, meter_pixels, panel_shape,
+};
 pub(crate) use tray::{SurfaceFrame, draw_surface, surface_size};
 
 /// Every page, in listing and window order.
@@ -161,6 +166,7 @@ pub(crate) static PAGES: &[&Page] = &[
     &diff_view::PAGE,
     &theme::PAGE,
     &tray::PAGE,
+    &docked_panels::PAGE,
     &file_drop::PAGE,
     &window::PAGE,
     &crate::showcase::PAGE,

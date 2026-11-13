@@ -118,6 +118,7 @@ pub(crate) const GROUPS: &[Group] = &[
             "shortcuts",
             "drag-and-drop",
             "tray",
+            "docked-panels",
             "file-drop",
             "window",
         ],
