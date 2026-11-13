@@ -661,7 +661,7 @@ impl PageState for Showcase {
 mod tests {
     use super::*;
     use lune_ui::access::State;
-    use lune_ui::input::{FrameOutput, Translator};
+    use lune_ui::input::{FrameOutput, Translator, WindowCommand};
     use lune_ui::motion::{Cadence, MotionTier};
     use lune_ui::shortcuts::Shortcuts;
     use lune_ui::strings::DisplayFormat;
@@ -836,6 +836,15 @@ mod tests {
         }
 
         fn frame(&mut self) -> FrameOutput {
+            self.chrome_frame(None).0
+        }
+
+        /// A frame with the gallery's own window chrome around the shell, as the window draws it
+        /// where the OS draws none; the chrome's command, if any.
+        fn chrome_frame(
+            &mut self,
+            mut chrome: Option<&mut crate::own_chrome::OwnChrome>,
+        ) -> (FrameOutput, Option<WindowCommand>) {
             self.ms += 16;
             let mut input = self.translator.take(Duration::from_millis(self.ms));
             self.shell.inject(&self.store, &mut input);
@@ -852,9 +861,35 @@ mod tests {
             };
             let mut text = FakeText;
             let mut ui = Ui::begin(&mut self.store, &input, config, &mut text);
+            let mut own = chrome.as_mut().and_then(|c| c.under(&mut ui));
             let shell = &mut self.shell;
             ui.scope(HOST, |ui| shell.draw(ui, &Stage::window()));
-            ui.finish().1
+            if let Some(c) = chrome {
+                let look = crate::own_chrome::WindowLook {
+                    maximized: false,
+                    focused: true,
+                };
+                own = c.over(&mut ui, look).or(own);
+            }
+            (ui.finish().1, own)
+        }
+
+        /// Presses and releases the left button at (`x`, `y`) with the chrome drawn; the
+        /// commands the chrome gave on the press and release frames.
+        fn chrome_click(
+            &mut self,
+            chrome: &mut crate::own_chrome::OwnChrome,
+            (x, y): (f32, f32),
+        ) -> Vec<WindowCommand> {
+            self.translator.cursor_moved(f64::from(x), f64::from(y));
+            self.chrome_frame(Some(chrome));
+            self.translator
+                .mouse_input(ElementState::Pressed, MouseButton::Left);
+            let pressed = self.chrome_frame(Some(chrome)).1;
+            self.translator
+                .mouse_input(ElementState::Released, MouseButton::Left);
+            let released = self.chrome_frame(Some(chrome)).1;
+            pressed.into_iter().chain(released).collect()
         }
 
         /// Frames for 480 ms: the tree's expand motion is done.
@@ -874,6 +909,55 @@ mod tests {
                 .mouse_input(ElementState::Released, MouseButton::Left);
             self.frame();
         }
+    }
+
+    /// The gallery's own chrome (a borderless window on Windows): the title band moves the
+    /// window, a second press there maximises, the caption buttons and the edges work, and a
+    /// press on the page gives no window command.
+    #[test]
+    fn the_own_chrome_moves_sizes_and_closes_the_window() {
+        use crate::own_chrome::OwnChrome;
+        use lune_ui::window::ResizeEdge;
+        let mut rig = Rig::new();
+        rig.settle();
+        let mut chrome = OwnChrome::default();
+        assert_eq!(
+            rig.chrome_click(&mut chrome, (300.0, 14.0)),
+            [WindowCommand::DragMove],
+            "a press on the title band moves the window"
+        );
+        assert_eq!(
+            rig.chrome_click(&mut chrome, (300.0, 14.0)),
+            [WindowCommand::ToggleMaximize],
+            "a second press soon after maximises"
+        );
+        let mut chrome = OwnChrome::default();
+        let w = 1040.0;
+        assert_eq!(
+            rig.chrome_click(&mut chrome, (w - 23.0, 14.0)),
+            [WindowCommand::Close]
+        );
+        assert_eq!(
+            rig.chrome_click(&mut chrome, (w - 69.0, 14.0)),
+            [WindowCommand::ToggleMaximize]
+        );
+        assert_eq!(
+            rig.chrome_click(&mut chrome, (w - 115.0, 14.0)),
+            [WindowCommand::Minimize]
+        );
+        assert_eq!(
+            rig.chrome_click(&mut chrome, (2.0, 300.0)),
+            [WindowCommand::DragResize(ResizeEdge::West)]
+        );
+        assert_eq!(
+            rig.chrome_click(&mut chrome, (w - 2.0, 657.0)),
+            [WindowCommand::DragResize(ResizeEdge::SouthEast)]
+        );
+        assert_eq!(
+            rig.chrome_click(&mut chrome, (120.0, 200.0)),
+            [],
+            "a press on the page is the page's"
+        );
     }
 
     #[test]

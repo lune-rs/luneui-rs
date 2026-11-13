@@ -31,6 +31,7 @@ use lune_ui::tray::TrayState;
 use lune_ui::ui::{FrameConfig, Ui, UiStore};
 use lune_ui::window::glass_attributes;
 
+use crate::own_chrome::{OWN_CHROME, OwnChrome, WindowLook};
 use crate::page::{FrameTweaks, Page, PageKind, PageState, Stage, register_images};
 use crate::panels::PanelsHost;
 use crate::popover::{AppEvent, TrayHost, event_loop, route_tray_events};
@@ -132,6 +133,8 @@ struct App {
     main_flow: ControlFlow,
     pop_flow: ControlFlow,
     panels_flow: ControlFlow,
+    /// The title bar, resize edges and caption buttons the gallery draws where the OS draws none.
+    chrome: OwnChrome,
     /// The app's time origin: the real time the clock runs from.
     start: Instant,
     /// The page's clock: real time scaled by the page's speed.
@@ -169,6 +172,7 @@ pub(crate) fn run() -> ExitCode {
         main_flow: ControlFlow::Wait,
         pop_flow: ControlFlow::Wait,
         panels_flow: ControlFlow::Wait,
+        chrome: OwnChrome::default(),
         start: Instant::now(),
         clock: Clock::default(),
         material: Material::Vibrancy,
@@ -376,11 +380,24 @@ impl App {
             shortcuts: &self.shortcuts,
         };
         let mut ui = Ui::begin(&mut self.store, &input, config, &mut r.text);
+        let look = WindowLook {
+            maximized: window.is_maximized(),
+            focused: window.has_focus(),
+        };
+        let mut own = None;
+        if OWN_CHROME {
+            own = self.chrome.under(&mut ui);
+        }
         ui.scope(page.id, |ui| state.draw(ui, &Stage::window()));
+        if OWN_CHROME {
+            own = self.chrome.over(&mut ui, look).or(own);
+        }
         let (display, mut out) = ui.finish();
         // A hosted page's window commands (the window page's caption buttons) are demonstrations:
-        // its Close must not close the gallery. The gallery quits on its shortcut.
+        // its Close must not close the gallery. Only the gallery's own chrome moves, sizes or
+        // closes the window; the gallery also quits on its shortcut.
         out.commands.clear();
+        out.commands.extend(own);
         if output.apply(window, &out, s) {
             event_loop.exit();
         }

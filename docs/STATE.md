@@ -1,7 +1,7 @@
 <!-- Short. Rewrite, do not append history; the log is git. Update in the same commit as the work. -->
 # State
 
-Last updated: 2026-11-13 (docked windows and image parts, version 0.6.0 (D304 to D319), merge and the tag `v0.6.0` are the orchestrator's; the gate passes on Windows (D303); tab header tint fix, version 0.5.1 (D301, D302), tagged `v0.5.1`; frame pacing, version 0.5.0, merged at b767f51 and tagged `v0.5.0`; font smoothing, version 0.4.0, tagged `v0.4.0`; the tab strip's `context` (0.3.0, tagged at 2c0e25c), tab-strip-plus-and-slide, library pass and dark-glass are on main, published at github.com/lune-rs/luneui-rs)
+Last updated: 2026-11-13 (the gallery's own window chrome on Windows; docked windows and image parts, version 0.6.0 (D304 to D319), merge and the tag `v0.6.0` are the orchestrator's; the gate passes on Windows (D303); tab header tint fix, version 0.5.1 (D301, D302), tagged `v0.5.1`; frame pacing, version 0.5.0, merged at b767f51 and tagged `v0.5.0`; font smoothing, version 0.4.0, tagged `v0.4.0`; the tab strip's `context` (0.3.0, tagged at 2c0e25c), tab-strip-plus-and-slide, library pass and dark-glass are on main, published at github.com/lune-rs/luneui-rs)
 
 ## Now
 
@@ -49,6 +49,9 @@ the floating surfaces' tint, opacity and border, text smoothing). Seven labs (gl
 Cmd or Ctrl `Q` quits. `--list`, `--dump <dir>` and `--bench` are unchanged; the shell's own scenes are the five `showcase-*`. `docs/components/infra/showcase.md`
 is the entry (what it shows, the four pages with no knob and why, what is unverified); decisions D246 to D254; the code is `apps/gallery/src/showcase/`.
 The showcase task changed nothing under `crates/` (D246); the library follow-ups it found were paid by the library pass.
+On Windows the glass window is borderless, so the gallery draws its own chrome there (`apps/gallery/src/own_chrome.rs`): the title band moves the window
+(a second press maximises), the six pixel edges resize it and the caption buttons minimise, maximise and close it. macOS keeps its title bar, Linux its decorations.
+Checked by hand on Windows 11 on 2026-11-13; the test `the_own_chrome_moves_sizes_and_closes_the_window` drives it with scripted presses.
 
 Gallery work is checked by eye, not by the pixel gate: the gate runs when a component's design changes (D254). A hands-on run in a real window is what
 proves clicks, the OS material swap and the feel of speed and zoom; the tests only drive the shell with scripted pointer events.

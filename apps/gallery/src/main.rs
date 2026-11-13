@@ -29,6 +29,7 @@ mod bench;
 #[cfg(test)]
 mod catalogue;
 mod custom;
+mod own_chrome;
 mod pace;
 mod page;
 mod pages;
