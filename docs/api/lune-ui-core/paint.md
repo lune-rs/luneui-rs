@@ -217,6 +217,12 @@ Source: `crates/lune-ui-core/src/paint.rs:232`
   its text. An id the renderer does not hold draws nothing; so does a `dst` with no area,
   or any number that is not finite.
 
+- <a id="method.Painter.image_part"></a>`pub fn image_part(&mut self, dst: Rect, id: ImageId, part: ImagePart, alpha: f32)`
+
+  Draws `part` of the picture registered as `id` into `dst` at opacity `alpha`, contained
+  and centred, sampled by [`Sampling::Auto`]: [`Self::image_with`](paint.md#method.Painter.image_with) with every other field at
+  its default.
+
 - <a id="method.Painter.image_rotated"></a>
 
   ```rust
@@ -233,6 +239,13 @@ Source: `crates/lune-ui-core/src/paint.rs:232`
 
   [`Self::image`](paint.md#method.Painter.image) turned by `radians` (clockwise on screen) about the centre of the fitted
   picture. Clips and the rounded clip stay put; only the picture turns.
+
+- <a id="method.Painter.image_with"></a>`pub fn image_with(&mut self, dst: Rect, id: ImageId, draw: &ImageDraw)`
+
+  Draws the picture registered as `id` the way `draw` says: a part of it (`draw.part`),
+  fitted and aligned, at an opacity and a turn, sampled as `draw.sampling`. Draws nothing
+  for any case [`Self::image`](paint.md#method.Painter.image) draws nothing for, nor for a part with no area (`w` or `h`
+  0). A part past the picture's edge is dropped by the renderer, not here.
 
 - <a id="method.Painter.measure"></a>`pub fn measure(&mut self, spec: &Spec) -> (f32, f32)`
 
@@ -582,7 +595,7 @@ pub fn polyline_length(pts: &[[f32; 2]]) -> f32
 
 The length of the closed loop through `pts`, the closing segment included.
 
-Source: `crates/lune-ui-core/src/paint.rs:1432`
+Source: `crates/lune-ui-core/src/paint.rs:1450`
 
 ## Re-exports
 

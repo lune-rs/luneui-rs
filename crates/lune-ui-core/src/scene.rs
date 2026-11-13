@@ -16,7 +16,7 @@
 //!   into an offscreen scene; that is then copied to the target and the rest draws there.
 
 use crate::acrylic::NOISE_OPACITY;
-use crate::image::{Fit, ImageAlign, ImageId};
+use crate::image::{Fit, ImageAlign, ImageId, ImagePart, Sampling};
 use crate::paint::Rect;
 use crate::text::{TextKey, TextRendering};
 
@@ -155,6 +155,7 @@ pub struct RoundClip {
 
 /// One recorded image draw. All rects are physical pixels.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct ImageItem {
     pub source: ImageSource,
     /// The destination rect: for an [`ImageSource::Id`] the rect `fit` and `align` place the
@@ -169,6 +170,11 @@ pub struct ImageItem {
     /// Physical clip rect (x, y, w, h); zero width = no clip.
     pub clip: [f32; 4],
     pub round_clip: RoundClip,
+    /// The part of the picture to draw, in the picture's own pixels; `None` is the whole picture.
+    /// With a part, `fit` and `align` place the part's size in `dst`. Text rasters carry `None`.
+    pub part: Option<ImagePart>,
+    /// How the renderer samples the picture; text rasters carry [`Sampling::Auto`].
+    pub sampling: Sampling,
 }
 
 /// One layer's items, grouped by kind, each kind in record order. They draw as: acrylic, under

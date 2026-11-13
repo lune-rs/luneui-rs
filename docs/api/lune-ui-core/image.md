@@ -93,6 +93,60 @@ Source: `crates/lune-ui-core/src/image.rs:14`
 - `impl PartialEq for ImageData`
 - `impl StructuralPartialEq for ImageData`
 
+<a id="struct.ImageDraw"></a>
+### Struct `ImageDraw`
+
+```rust
+pub struct ImageDraw {
+    pub part: Option<ImagePart>,
+    pub fit: Fit,
+    pub align: ImageAlign,
+    pub alpha: f32,
+    pub rotation: f32,
+    pub sampling: Sampling,
+}
+```
+
+Everything about one picture draw except where and which picture. `Default` draws the whole
+picture contained, centred, opaque, unturned, with [`Sampling::Auto`](image.md#variant.Sampling.Auto).
+
+Source: `crates/lune-ui-core/src/image.rs:125`
+
+**Fields**
+
+- <a id="structfield.ImageDraw.part"></a>`pub part: Option<ImagePart>`
+
+  The part of the picture to draw; `None` is the whole picture.
+
+- <a id="structfield.ImageDraw.fit"></a>`pub fit: Fit`
+
+  How the picture (or the part) is fitted into the destination rect.
+
+- <a id="structfield.ImageDraw.align"></a>`pub align: ImageAlign`
+
+  Where the fitted picture sits in the destination rect.
+
+- <a id="structfield.ImageDraw.alpha"></a>`pub alpha: f32`
+
+  Opacity multiplier, 0 to 1.
+
+- <a id="structfield.ImageDraw.rotation"></a>`pub rotation: f32`
+
+  Radians, clockwise on screen, about the centre of the fitted picture.
+
+- <a id="structfield.ImageDraw.sampling"></a>`pub sampling: Sampling`
+
+  How the picture is sampled.
+
+**Trait implementations**
+
+- `impl Clone for ImageDraw`
+- `impl Copy for ImageDraw`
+- `impl Debug for ImageDraw`
+- `impl Default for ImageDraw`
+- `impl PartialEq for ImageDraw`
+- `impl StructuralPartialEq for ImageDraw`
+
 <a id="struct.ImageId"></a>
 ### Struct `ImageId`
 
@@ -119,6 +173,44 @@ Source: `crates/lune-ui-core/src/image.rs:9`
 - `impl PartialEq for ImageId`
 - `impl PartialOrd for ImageId`
 - `impl StructuralPartialEq for ImageId`
+
+<a id="struct.ImagePart"></a>
+### Struct `ImagePart`
+
+```rust
+pub struct ImagePart {
+    pub x: u32,
+    pub y: u32,
+    pub w: u32,
+    pub h: u32,
+}
+```
+
+A rect of a picture's own pixels, top-left origin: a sprite cut from a sheet. A part with no
+area (`w` or `h` 0) draws nothing; a part past the picture's edge is dropped by the renderer,
+which knows the picture's size.
+
+Source: `crates/lune-ui-core/src/image.rs:101`
+
+**Fields**
+
+- <a id="structfield.ImagePart.x"></a>`pub x: u32`
+
+- <a id="structfield.ImagePart.y"></a>`pub y: u32`
+
+- <a id="structfield.ImagePart.w"></a>`pub w: u32`
+
+- <a id="structfield.ImagePart.h"></a>`pub h: u32`
+
+**Trait implementations**
+
+- `impl Clone for ImagePart`
+- `impl Copy for ImagePart`
+- `impl Debug for ImagePart`
+- `impl Eq for ImagePart`
+- `impl Hash for ImagePart`
+- `impl PartialEq for ImagePart`
+- `impl StructuralPartialEq for ImagePart`
 
 ## Enums
 
@@ -217,6 +309,48 @@ Source: `crates/lune-ui-core/src/image.rs:29`
 - `impl PartialEq for ImageError`
 - `impl StructuralPartialEq for ImageError`
 
+<a id="enum.Sampling"></a>
+### Enum `Sampling`
+
+```rust
+pub enum Sampling {
+    Auto,
+    Nearest,
+    Linear,
+}
+```
+
+How a draw samples its picture.
+
+Source: `crates/lune-ui-core/src/image.rs:110`
+
+**Variants**
+
+- <a id="variant.Sampling.Auto"></a>`Auto`
+
+  The renderer's own rule: whole texels (nearest) when the drawn part is scaled up by an
+  integer factor or drawn at its own size, linear filtering otherwise (D106), measured on
+  the drawn part, not on the whole picture.
+
+- <a id="variant.Sampling.Nearest"></a>`Nearest`
+
+  Always the nearest texel: crisp pixel art at any scale.
+
+- <a id="variant.Sampling.Linear"></a>`Linear`
+
+  Always linear filtering: smooth at any scale.
+
+**Trait implementations**
+
+- `impl Clone for Sampling`
+- `impl Copy for Sampling`
+- `impl Debug for Sampling`
+- `impl Default for Sampling`
+- `impl Eq for Sampling`
+- `impl Hash for Sampling`
+- `impl PartialEq for Sampling`
+- `impl StructuralPartialEq for Sampling`
+
 ## Traits
 
 <a id="trait.ImageStore"></a>
@@ -258,5 +392,5 @@ pub fn image_rect(size: (u32, u32), dst: Rect, fit: Fit, align: ImageAlign) -> O
 The rect a picture of `size` (width, height in pixels) occupies when fitted into `dst`, or
 `None` when the picture or `dst` has no area or a number is not finite.
 
-Source: `crates/lune-ui-core/src/image.rs:99`
+Source: `crates/lune-ui-core/src/image.rs:155`
 

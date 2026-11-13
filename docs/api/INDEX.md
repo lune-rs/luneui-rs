@@ -12,7 +12,7 @@ Each crate has a page per module (`<crate>/<module path>.md`; the root is `index
 
 ### `lune-ui-core` (`lune_ui_core`)
 
-92 modules, 1090 items. Left out and counted: 3288 blanket impls, 1 intra-doc links left unlinked (private or unresolvable target), 4738 items of the omitted impls, 1267 items of the trait impls shown as one line, 2202 synthetic impls.
+92 modules, 1093 items. Left out and counted: 3315 blanket impls, 1 intra-doc links left unlinked (private or unresolvable target), 4777 items of the omitted impls, 1280 items of the trait impls shown as one line, 2220 synthetic impls.
 
 | Module | Items |
 | --- | --- |
@@ -25,7 +25,7 @@ Each crate has a page per module (`<crate>/<module path>.md`; the root is `index
 | [`lune_ui_core::color`](lune-ui-core/color.md) | 7 |
 | [`lune_ui_core::drag`](lune-ui-core/drag.md) | 23 |
 | [`lune_ui_core::icon`](lune-ui-core/icon.md) | 31 |
-| [`lune_ui_core::image`](lune-ui-core/image.md) | 8 |
+| [`lune_ui_core::image`](lune-ui-core/image.md) | 11 |
 | [`lune_ui_core::input`](lune-ui-core/input.md) | 19 |
 | [`lune_ui_core::json`](lune-ui-core/json.md) | 11 |
 | [`lune_ui_core::layout`](lune-ui-core/layout.md) | 11 |
@@ -664,9 +664,11 @@ Every top-level item of the four owning crates, by name.
 - [`image_store_contract`](lune-ui-core/testing.md#fn.image_store_contract) - function, `lune_ui_core::testing`
 - [`ImageAlign`](lune-ui-core/image.md#struct.ImageAlign) - struct, `lune_ui_core::image`
 - [`ImageData`](lune-ui-core/image.md#struct.ImageData) - struct, `lune_ui_core::image`
+- [`ImageDraw`](lune-ui-core/image.md#struct.ImageDraw) - struct, `lune_ui_core::image`
 - [`ImageError`](lune-ui-core/image.md#enum.ImageError) - enum, `lune_ui_core::image`
 - [`ImageId`](lune-ui-core/image.md#struct.ImageId) - struct, `lune_ui_core::image`
 - [`ImageItem`](lune-ui-core/scene.md#struct.ImageItem) - struct, `lune_ui_core::scene`
+- [`ImagePart`](lune-ui-core/image.md#struct.ImagePart) - struct, `lune_ui_core::image`
 - [`ImageSource`](lune-ui-core/scene.md#enum.ImageSource) - enum, `lune_ui_core::scene`
 - [`ImageStore`](lune-ui-core/image.md#trait.ImageStore) - trait, `lune_ui_core::image`
 - [`ime_area_physical`](lune-ui-winit/input.md#fn.ime_area_physical) - function, `lune_ui_winit::input`
@@ -1040,6 +1042,7 @@ Every top-level item of the four owning crates, by name.
 - [`RowHeights`](lune-ui-core/widgets/virtual_list.md#struct.RowHeights) - struct, `lune_ui_core::widgets::virtual_list`
 - [`RowKey`](lune-ui-core/widgets/virtual_list.md#struct.RowKey) - struct, `lune_ui_core::widgets::virtual_list`
 - [`RowLook`](lune-ui-core/widgets/menu.md#struct.RowLook) - struct, `lune_ui_core::widgets::menu`
+- [`Sampling`](lune-ui-core/image.md#enum.Sampling) - enum, `lune_ui_core::image`
 - [`Scene`](lune-ui-core/scene.md#struct.Scene) - struct, `lune_ui_core::scene`
 - [`SCENE_LAYERS`](lune-ui-core/scene.md#constant.SCENE_LAYERS) - constant, `lune_ui_core::scene`
 - [`Scope`](lune-ui-core/shortcuts.md#enum.Scope) - enum, `lune_ui_core::shortcuts`

@@ -238,7 +238,7 @@ pub struct RecordingRenderer {
 
 Consumes scenes like a renderer does, in the draw order the [`scene`](scene.md) module
 documents, and records one [`DrawCall`](testing.md#enum.DrawCall) per draw: one per acrylic, under and over shape, one
-per non-empty stroke or path-fill run, one per text item, one per custom item, and the backdrop step when
+per non-empty stroke or path-fill run, one per image item, one per text item, one per custom item, and the backdrop step when
 the scene requests one.
 
 Source: `crates/lune-ui-core/src/testing/recording.rs:82`

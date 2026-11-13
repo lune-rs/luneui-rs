@@ -2,7 +2,8 @@
 //! painter records for images and rotated text.
 
 use lune_ui_core::image::{
-    Anchor, Fit, ImageAlign, ImageData, ImageError, ImageId, ImageStore, image_rect,
+    Anchor, Fit, ImageAlign, ImageData, ImageDraw, ImageError, ImageId, ImagePart, ImageStore,
+    Sampling, image_rect,
 };
 use lune_ui_core::paint::{LayerId, Painter, Rect, Xform};
 use lune_ui_core::scene::{FrameParams, ImageSource};
@@ -339,6 +340,20 @@ fn images_replay_to_the_same_scene() {
         1.0,
         0.5,
     );
+    a.image_with(
+        Rect::new(0.0, 0.0, 40.0, 40.0),
+        ImageId(5),
+        &ImageDraw {
+            part: Some(ImagePart {
+                x: 2,
+                y: 0,
+                w: 2,
+                h: 2,
+            }),
+            sampling: Sampling::Nearest,
+            ..ImageDraw::default()
+        },
+    );
     a.text_rotated(
         &Spec::plain("go", Style::ui(13.0, THEME.fg_primary)),
         (30.0, 30.0),
@@ -346,10 +361,129 @@ fn images_replay_to_the_same_scene() {
     );
     a.pop_clip();
     let ops = a.take_recording();
-    assert_eq!(ops.len(), 5);
+    assert_eq!(ops.len(), 6);
     let mut t2 = FakeText;
     let mut b = painter(&mut t2, 2.0);
     b.replay(&ops);
     assert_eq!(a.scene, b.scene);
-    assert_eq!(a.scene.layers[0].images.len(), 3);
+    assert_eq!(a.scene.layers[0].images.len(), 4);
+    let part = a.scene.layers[0].images[2];
+    assert_eq!(
+        part.part,
+        Some(ImagePart {
+            x: 2,
+            y: 0,
+            w: 2,
+            h: 2
+        })
+    );
+    assert_eq!(part.sampling, Sampling::Nearest);
+}
+
+#[test]
+fn an_image_part_is_recorded_with_its_part_and_sampling() {
+    let mut t = FakeText;
+    let mut p = painter(&mut t, 1.0);
+    p.image_with(
+        Rect::new(0.0, 0.0, 20.0, 20.0),
+        ImageId(1),
+        &ImageDraw {
+            part: Some(ImagePart {
+                x: 2,
+                y: 0,
+                w: 2,
+                h: 2,
+            }),
+            sampling: Sampling::Nearest,
+            ..ImageDraw::default()
+        },
+    );
+    let it = p.scene.layers[0].images[0];
+    assert_eq!(
+        it.part,
+        Some(ImagePart {
+            x: 2,
+            y: 0,
+            w: 2,
+            h: 2
+        })
+    );
+    assert_eq!(it.sampling, Sampling::Nearest);
+    // image_part is image_with with the defaults for the rest.
+    p.image_part(
+        Rect::new(0.0, 0.0, 20.0, 20.0),
+        ImageId(1),
+        ImagePart {
+            x: 1,
+            y: 1,
+            w: 3,
+            h: 3,
+        },
+        0.5,
+    );
+    let it = p.scene.layers[0].images[1];
+    assert_eq!(it.part.map(|q| (q.x, q.y, q.w, q.h)), Some((1, 1, 3, 3)));
+    assert_eq!(it.sampling, Sampling::Auto);
+    assert_eq!(it.alpha, 0.5);
+    assert_eq!(
+        (it.fit, it.align, it.rotation),
+        (Fit::Contain, ImageAlign::CENTER, 0.0)
+    );
+}
+
+#[test]
+fn a_part_with_no_area_draws_nothing() {
+    let mut t = FakeText;
+    let mut p = painter(&mut t, 1.0);
+    let dst = Rect::new(0.0, 0.0, 20.0, 20.0);
+    for part in [
+        ImagePart {
+            x: 0,
+            y: 0,
+            w: 0,
+            h: 4,
+        },
+        ImagePart {
+            x: 0,
+            y: 0,
+            w: 4,
+            h: 0,
+        },
+    ] {
+        p.image_with(
+            dst,
+            ImageId(1),
+            &ImageDraw {
+                part: Some(part),
+                ..ImageDraw::default()
+            },
+        );
+        p.image_part(dst, ImageId(1), part, 1.0);
+    }
+    assert!(p.scene.in_order().into_iter().all(|l| l.images.is_empty()));
+}
+
+#[test]
+fn the_old_image_calls_record_no_part_and_auto_sampling() {
+    let mut t = FakeText;
+    let mut p = painter(&mut t, 1.0);
+    let r = Rect::new(0.0, 0.0, 20.0, 20.0);
+    p.image(r, ImageId(1), Fit::Contain, ImageAlign::CENTER, 1.0);
+    p.image_rotated(r, ImageId(1), Fit::Contain, ImageAlign::CENTER, 1.0, 0.5);
+    for it in &p.scene.layers[0].images {
+        assert_eq!(it.part, None);
+        assert_eq!(it.sampling, Sampling::Auto);
+    }
+}
+
+#[test]
+fn image_draw_default_is_the_whole_picture_contained_centred() {
+    let d = ImageDraw::default();
+    assert_eq!(d.part, None);
+    assert_eq!(d.fit, Fit::Contain);
+    assert_eq!(d.align, ImageAlign::CENTER);
+    assert_eq!(d.alpha, 1.0);
+    assert_eq!(d.rotation, 0.0);
+    assert_eq!(d.sampling, Sampling::Auto);
+    assert_eq!(Sampling::default(), Sampling::Auto);
 }

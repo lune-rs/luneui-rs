@@ -94,6 +94,62 @@ impl ImageAlign {
     };
 }
 
+/// A rect of a picture's own pixels, top-left origin: a sprite cut from a sheet. A part with no
+/// area (`w` or `h` 0) draws nothing; a part past the picture's edge is dropped by the renderer,
+/// which knows the picture's size.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ImagePart {
+    pub x: u32,
+    pub y: u32,
+    pub w: u32,
+    pub h: u32,
+}
+
+/// How a draw samples its picture.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum Sampling {
+    /// The renderer's own rule: whole texels (nearest) when the drawn part is scaled up by an
+    /// integer factor or drawn at its own size, linear filtering otherwise (D106), measured on
+    /// the drawn part, not on the whole picture.
+    #[default]
+    Auto,
+    /// Always the nearest texel: crisp pixel art at any scale.
+    Nearest,
+    /// Always linear filtering: smooth at any scale.
+    Linear,
+}
+
+/// Everything about one picture draw except where and which picture. `Default` draws the whole
+/// picture contained, centred, opaque, unturned, with [`Sampling::Auto`].
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ImageDraw {
+    /// The part of the picture to draw; `None` is the whole picture.
+    pub part: Option<ImagePart>,
+    /// How the picture (or the part) is fitted into the destination rect.
+    pub fit: Fit,
+    /// Where the fitted picture sits in the destination rect.
+    pub align: ImageAlign,
+    /// Opacity multiplier, 0 to 1.
+    pub alpha: f32,
+    /// Radians, clockwise on screen, about the centre of the fitted picture.
+    pub rotation: f32,
+    /// How the picture is sampled.
+    pub sampling: Sampling,
+}
+
+impl Default for ImageDraw {
+    fn default() -> Self {
+        Self {
+            part: None,
+            fit: Fit::Contain,
+            align: ImageAlign::CENTER,
+            alpha: 1.0,
+            rotation: 0.0,
+            sampling: Sampling::Auto,
+        }
+    }
+}
+
 /// The rect a picture of `size` (width, height in pixels) occupies when fitted into `dst`, or
 /// `None` when the picture or `dst` has no area or a number is not finite.
 pub fn image_rect(size: (u32, u32), dst: Rect, fit: Fit, align: ImageAlign) -> Option<Rect> {
