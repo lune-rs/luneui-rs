@@ -1,6 +1,7 @@
 // Images: one textured quad per instance, optionally rotated about its centre. All positions are
 // physical pixels; the texture holds premultiplied RGBA, so the output is the texel scaled by the
-// draw's alpha and its edge coverage.
+// draw's alpha and its edge coverage. A part of the picture maps the quad onto a UV rect, and
+// the sample is held half a texel inside that rect so linear filtering never reads a neighbour.
 
 struct Globals {
     size: vec2<f32>,
@@ -16,7 +17,8 @@ struct ImageIn {
     @location(0) rect: vec4<f32>,   // the picture's rect: x, y, w, h
     @location(1) clip: vec4<f32>,   // plain clip rect; zero width = none
     @location(2) round: vec4<f32>,  // rounded clip rect
-    @location(3) params: vec4<f32>, // rotation (radians, clockwise), alpha, rounded clip radius, -
+    @location(3) params: vec4<f32>, // rotation (radians, clockwise), alpha, rounded clip radius, 1 for a part
+    @location(4) uv: vec4<f32>,     // the drawn part in texture units: u0, v0, du, dv
 };
 
 struct ImageOut {
@@ -26,6 +28,7 @@ struct ImageOut {
     @location(2) @interpolate(flat) clip: vec4<f32>,
     @location(3) @interpolate(flat) round: vec4<f32>,
     @location(4) @interpolate(flat) params: vec4<f32>,
+    @location(5) @interpolate(flat) uv: vec4<f32>,
 };
 
 fn to_ndc(p: vec2<f32>) -> vec4<f32> {
@@ -57,6 +60,7 @@ fn vs_image(@builtin(vertex_index) vi: u32, s: ImageIn) -> ImageOut {
     o.clip = s.clip;
     o.round = s.round;
     o.params = s.params;
+    o.uv = s.uv;
     return o;
 }
 
@@ -75,6 +79,11 @@ fn fs_image(i: ImageOut) -> @location(0) vec4<f32> {
         let rd = sd_round_rect(i.p - (i.round.xy + i.round.zw * 0.5), i.round.zw * 0.5, i.params.z);
         cov = cov * clamp(0.5 - rd, 0.0, 1.0);
     }
-    let uv = clamp(q / i.rect.zw + vec2<f32>(0.5), vec2<f32>(0.0), vec2<f32>(1.0));
+    let t = clamp(q / i.rect.zw + vec2<f32>(0.5), vec2<f32>(0.0), vec2<f32>(1.0));
+    var uv = i.uv.xy + t * i.uv.zw;
+    if i.params.w > 0.5 {
+        let inset = vec2<f32>(0.5) / vec2<f32>(textureDimensions(tex));
+        uv = max(min(uv, i.uv.xy + i.uv.zw - inset), i.uv.xy + inset);
+    }
     return textureSampleLevel(tex, samp, uv, 0.0) * (i.params.y * cov);
 }
