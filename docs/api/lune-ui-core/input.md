@@ -298,7 +298,7 @@ pub enum CursorIcon {
 
 Cursor icons: the CSS cursor names.
 
-Source: `crates/lune-ui-core/src/input.rs:337`
+Source: `crates/lune-ui-core/src/input.rs:348`
 
 **Variants**
 
@@ -886,6 +886,8 @@ pub enum WindowCommand {
     ToggleMaximize,
     Close,
     Redraw,
+    SetSize { width: u32, height: u32 },
+    SetAlwaysOnTop(bool),
 }
 ```
 
@@ -914,6 +916,24 @@ Source: `crates/lune-ui-core/src/input.rs:321`
 - <a id="variant.WindowCommand.Redraw"></a>`Redraw`
 
   Draw another frame.
+
+- <a id="variant.WindowCommand.SetSize"></a>`SetSize { width: u32, height: u32 }`
+
+  Resize the window's content to this size in the frame's logical pixels (the units of
+  `RawInput::size`); a zero side does nothing.
+
+    - <a id="structfield.WindowCommand.SetSize.width"></a>`width: u32`
+
+      The new content width.
+
+    - <a id="structfield.WindowCommand.SetSize.height"></a>`height: u32`
+
+      The new content height.
+
+- <a id="variant.WindowCommand.SetAlwaysOnTop"></a>`SetAlwaysOnTop(bool)`
+
+  Keep the window above other apps' windows or not; for a window group, route it through
+  `WindowGroup::set_always_on_top`.
 
 **Trait implementations**
 
@@ -998,5 +1018,5 @@ pub fn printable(text: &str) -> Option<String>
 The text a key press types: `text` without control characters, or `None` when nothing is left.
 Adapters and fakes use this one rule to decide whether a press emits [`Event::Text`](input.md#variant.Event.Text).
 
-Source: `crates/lune-ui-core/src/input.rs:421`
+Source: `crates/lune-ui-core/src/input.rs:432`
 

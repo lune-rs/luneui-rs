@@ -9,8 +9,8 @@ mod other;
 mod windows;
 
 #[cfg(target_os = "macos")]
-pub(crate) use macos::{glass, keymap, popover};
+pub(crate) use macos::{glass, keymap, panel, popover};
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-pub(crate) use other::{glass, keymap, popover};
+pub(crate) use other::{glass, keymap, panel, popover};
 #[cfg(target_os = "windows")]
-pub(crate) use windows::{glass, keymap, popover};
+pub(crate) use windows::{glass, keymap, panel, popover};

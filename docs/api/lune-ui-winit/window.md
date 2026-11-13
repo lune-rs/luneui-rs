@@ -27,6 +27,24 @@ transparent, full-size title bar; Windows gets a borderless window (see `caption
 
 Source: `crates/lune-ui-winit/src/window.rs:12`
 
+<a id="fn.panel_attributes"></a>
+### Function `panel_attributes`
+
+```rust
+pub fn panel_attributes(
+    title: &str,
+    size: (f64, f64),
+    visible: bool,
+) -> winit::window::WindowAttributes
+```
+
+Window attributes for a panel: a borderless, transparent window of a fixed size (logical
+pixels) with no shadow and no rounded corners, so the app's own drawing and window shape are
+all that shows. The level is left at its default; a group of panels is raised and kept on top
+through the platform crate's window group.
+
+Source: `crates/lune-ui-winit/src/window.rs:45`
+
 <a id="fn.popover_attributes"></a>
 ### Function `popover_attributes`
 
@@ -49,5 +67,5 @@ pub fn resize_direction(edge: lune_ui_core::window::ResizeEdge) -> winit::window
 
 The winit resize direction of `edge`.
 
-Source: `crates/lune-ui-winit/src/window.rs:42`
+Source: `crates/lune-ui-winit/src/window.rs:57`
 

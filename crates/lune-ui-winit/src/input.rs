@@ -8,7 +8,7 @@ use winit::dpi::{PhysicalPosition, PhysicalSize};
 use winit::event::{ElementState, Ime, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::event_loop::ControlFlow;
 use winit::keyboard::{Key as WKey, ModifiersState, NamedKey as WNamed};
-use winit::window::{CursorIcon as WCursor, Window};
+use winit::window::{CursorIcon as WCursor, Window, WindowLevel};
 
 use lune_ui_core::access::AccessAction;
 use lune_ui_core::input::{
@@ -355,6 +355,18 @@ pub fn ime_area_physical(area: Rect, ui_scale: f32) -> Option<(f32, f32, f32, f3
     (finite && ui_scale > 0.0).then_some((x, y, w, h))
 }
 
+/// The physical size of a content area of `width` by `height` logical px at `ui_scale`:
+/// `round(side * scale)`. `None` for a zero side or a scale that is not finite and above 0: the
+/// window keeps its size.
+pub(crate) fn physical_size(width: u32, height: u32, ui_scale: f32) -> Option<PhysicalSize<u32>> {
+    if width == 0 || height == 0 || !ui_scale.is_finite() || ui_scale <= 0.0 {
+        return None;
+    }
+    // `as` saturates, so a huge side stays in range.
+    let side = |v: u32| (v as f32 * ui_scale).round() as u32;
+    Some(PhysicalSize::new(side(width), side(height)))
+}
+
 /// What [`OutputState::apply`] does with the IME for a frame.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ImePlan {
@@ -448,6 +460,17 @@ impl OutputState {
                 WindowCommand::ToggleMaximize => window.set_maximized(!window.is_maximized()),
                 WindowCommand::Close => close = true,
                 WindowCommand::Redraw => window.request_redraw(),
+                WindowCommand::SetSize { width, height } => {
+                    if let Some(size) = physical_size(*width, *height, ui_scale) {
+                        // The new size arrives as a `Resized` event; the answer is not needed.
+                        let _ = window.request_inner_size(size);
+                    }
+                }
+                WindowCommand::SetAlwaysOnTop(on) => window.set_window_level(if *on {
+                    WindowLevel::AlwaysOnTop
+                } else {
+                    WindowLevel::Normal
+                }),
                 // `WindowCommand` is `#[non_exhaustive]`: a variant added later is a no-op here
                 // until this adapter learns it.
                 #[allow(unreachable_patterns)]
@@ -461,6 +484,27 @@ impl OutputState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_content_size_becomes_physical_pixels() {
+        assert_eq!(
+            physical_size(275, 116, 1.5),
+            Some(PhysicalSize::new(413, 174))
+        );
+        assert_eq!(
+            physical_size(275, 14, 2.0),
+            Some(PhysicalSize::new(550, 28))
+        );
+    }
+
+    #[test]
+    fn a_zero_side_or_a_bad_scale_gives_no_size() {
+        assert_eq!(physical_size(0, 10, 2.0), None);
+        assert_eq!(physical_size(10, 0, 2.0), None);
+        for scale in [0.0, -1.0, f32::NAN, f32::INFINITY] {
+            assert_eq!(physical_size(10, 10, scale), None, "{scale}");
+        }
+    }
 
     fn out(cursor: CursorIcon, ime: Option<Rect>) -> FrameOutput {
         FrameOutput {

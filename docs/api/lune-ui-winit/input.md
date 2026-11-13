@@ -23,7 +23,7 @@ pub struct OutputPlan {
 
 What [`OutputState::apply`](input.md#method.OutputState.apply) changes on the window for a frame, apart from its commands.
 
-Source: `crates/lune-ui-winit/src/input.rs:371`
+Source: `crates/lune-ui-winit/src/input.rs:383`
 
 **Fields**
 
@@ -52,7 +52,7 @@ pub struct OutputState {
 
 Applies a window's [`FrameOutput`](../lune-ui-core/input.md#struct.FrameOutput), touching the cursor and the IME only when they changed.
 
-Source: `crates/lune-ui-winit/src/input.rs:379`
+Source: `crates/lune-ui-winit/src/input.rs:391`
 
 **Methods and associated items**
 
@@ -198,7 +198,7 @@ pub enum ImePlan {
 
 What [`OutputState::apply`](input.md#method.OutputState.apply) does with the IME for a frame.
 
-Source: `crates/lune-ui-winit/src/input.rs:360`
+Source: `crates/lune-ui-winit/src/input.rs:372`
 
 **Variants**
 

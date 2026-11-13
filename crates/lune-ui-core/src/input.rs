@@ -329,6 +329,17 @@ pub enum WindowCommand {
     Close,
     /// Draw another frame.
     Redraw,
+    /// Resize the window's content to this size in the frame's logical pixels (the units of
+    /// `RawInput::size`); a zero side does nothing.
+    SetSize {
+        /// The new content width.
+        width: u32,
+        /// The new content height.
+        height: u32,
+    },
+    /// Keep the window above other apps' windows or not; for a window group, route it through
+    /// `WindowGroup::set_always_on_top`.
+    SetAlwaysOnTop(bool),
 }
 
 /// Cursor icons: the CSS cursor names.

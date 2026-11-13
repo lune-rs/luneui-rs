@@ -129,7 +129,7 @@ Each crate has a page per module (`<crate>/<module path>.md`; the root is `index
 
 ### `lune-ui-winit` (`lune_ui_winit`)
 
-5 modules, 19 items. Left out and counted: 112 blanket impls, 1 intra-doc links left unlinked (private or unresolvable target), 104 items of the omitted impls, 22 items of the trait impls shown as one line, 54 synthetic impls.
+5 modules, 20 items. Left out and counted: 112 blanket impls, 1 intra-doc links left unlinked (private or unresolvable target), 104 items of the omitted impls, 22 items of the trait impls shown as one line, 54 synthetic impls.
 
 | Module | Items |
 | --- | --- |
@@ -137,7 +137,7 @@ Each crate has a page per module (`<crate>/<module path>.md`; the root is `index
 | [`lune_ui_winit::access`](lune-ui-winit/access.md) | 6 |
 | [`lune_ui_winit::clipboard`](lune-ui-winit/clipboard.md) | 2 |
 | [`lune_ui_winit::input`](lune-ui-winit/input.md) | 8 |
-| [`lune_ui_winit::window`](lune-ui-winit/window.md) | 3 |
+| [`lune_ui_winit::window`](lune-ui-winit/window.md) | 4 |
 
 ### `lune-ui-platform` (`lune_ui_platform`)
 
@@ -152,7 +152,7 @@ Each crate has a page per module (`<crate>/<module path>.md`; the root is `index
 
 ### `lune-ui` (`lune_ui`)
 
-7 modules, 135 re-exports shown as links.
+7 modules, 136 re-exports shown as links.
 
 | Module | Re-exports |
 | --- | --- |
@@ -162,7 +162,7 @@ Each crate has a page per module (`<crate>/<module path>.md`; the root is `index
 | [`lune_ui::input`](lune-ui/input.md) | 27 |
 | [`lune_ui::text`](lune-ui/text.md) | 16 |
 | [`lune_ui::tray`](lune-ui/tray.md) | 18 |
-| [`lune_ui::window`](lune-ui/window.md) | 11 |
+| [`lune_ui::window`](lune-ui/window.md) | 12 |
 
 ## All items, A to Z
 
@@ -938,6 +938,7 @@ Every top-level item of the four owning crates, by name.
 - [`Pane`](lune-ui-core/widgets/split_panes.md#enum.Pane) - enum, `lune_ui_core::widgets::split_panes`
 - [`PANEL`](lune-ui-core/theme/lunegit_dark.md#constant.PANEL) - constant, `lune_ui_core::theme::lunegit_dark`
 - [`PANEL`](lune-ui-core/theme/near_black.md#constant.PANEL) - constant, `lune_ui_core::theme::near_black`
+- [`panel_attributes`](lune-ui-winit/window.md#fn.panel_attributes) - function, `lune_ui_winit::window`
 - [`PANEL_BLACK_MAX`](lune-ui-core/theme/near_black.md#constant.PANEL_BLACK_MAX) - constant, `lune_ui_core::theme::near_black`
 - [`panel_rect`](lune-ui-core/widgets/dropdown.md#fn.panel_rect) - function, `lune_ui_core::widgets::dropdown`
 - [`PanelKind`](lune-ui-core/widgets/panel.md#enum.PanelKind) - enum, `lune_ui_core::widgets::panel`
